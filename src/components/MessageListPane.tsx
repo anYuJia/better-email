@@ -32,6 +32,7 @@ export type { BulkMessageAction, MessageContextAction } from './messageContextMe
 
 export type MessageListPaneProps = {
   mobile?: boolean;
+  showAccountSource?: boolean;
   appliedQuery: string;
   filter: FilterMode;
   listMode: ListMode;
@@ -86,6 +87,7 @@ export type MessageListPaneProps = {
 
 function MessageListPane({
   mobile = false,
+  showAccountSource = false,
   appliedQuery,
   filter,
   listMode,
@@ -317,6 +319,7 @@ function MessageListPane({
       ) : (
         <MessageListView
           mobile={mobile}
+          showAccountSource={showAccountSource}
           groups={groupedMessages}
           messages={messages}
           query={appliedQuery}

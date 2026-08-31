@@ -36,6 +36,7 @@ type FlatListItem =
 
 type MessageListViewProps = {
   mobile?: boolean;
+  showAccountSource?: boolean;
   groups: MessageGroup[];
   messages: MessageSummary[];
   query: string;
@@ -66,6 +67,7 @@ type MessageListViewProps = {
 
 export default function MessageListView({
   mobile = false,
+  showAccountSource = false,
   groups,
   messages,
   query,
@@ -698,6 +700,7 @@ export default function MessageListView({
                 >
                   <MessageListCard
                     mobile={mobile}
+                    showAccountSource={showAccountSource}
                     message={message}
                     isCurrentMessage={message.id === selectedId}
                     isSelected={selectedMessageSet.has(message.id)}

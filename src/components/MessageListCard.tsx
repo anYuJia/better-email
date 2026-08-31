@@ -8,6 +8,7 @@ import Avatar from './Avatar';
 
 type MessageListCardProps = {
   mobile?: boolean;
+  showAccountSource?: boolean;
   message: MessageSummary;
   isCurrentMessage: boolean;
   isSelected: boolean;
@@ -28,6 +29,7 @@ type MessageListCardProps = {
 
 export default React.memo(function MessageListCard({
   mobile = false,
+  showAccountSource = false,
   message,
   isCurrentMessage,
   isSelected,
@@ -46,6 +48,7 @@ export default React.memo(function MessageListCard({
   onFocusClaimed,
 }: MessageListCardProps) {
   const mainButtonRef = useRef<HTMLButtonElement | null>(null);
+  const accountSource = showAccountSource ? message.account_email.trim() : '';
   const preview = useMemo(() => mailboxListPreview(message), [message]);
   const metadataLabelState = useMemo(() => {
     const normalizedIdentity = new Set([
@@ -68,6 +71,7 @@ export default React.memo(function MessageListCard({
   const cardLabel = [
     `查看邮件：${message.sender_name || '未知发件人'}，${formatDate(message.received_at)}，`,
     message.subject || '无主题',
+    accountSource ? `，来源邮箱：${accountSource}` : '',
     message.is_read ? '' : '，未读',
     `。按回车打开，按空格${isSelected ? '取消选择' : '选择'}`,
   ].join('');
@@ -220,17 +224,24 @@ export default React.memo(function MessageListCard({
           </span>
         )}
       </div>
-      {preview && <p title={preview}>{preview}</p>}
-      {!preview && metadataLabels.length > 0 && (
-        <div className="message-chips" aria-label="邮件元数据">
-          {metadataLabels.map((label) => <span key={label} title={label}>{label}</span>)}
-          {metadataLabelState.overflow > 0 && (
-            <span title={message.labels.join(', ')}>
-              +{metadataLabelState.overflow}
-            </span>
-          )}
-        </div>
-      )}
+      <div className="message-bottomline">
+        {preview && <p title={preview}>{preview}</p>}
+        {!preview && metadataLabels.length > 0 && (
+          <div className="message-chips" aria-label="邮件元数据">
+            {metadataLabels.map((label) => <span key={label} title={label}>{label}</span>)}
+            {metadataLabelState.overflow > 0 && (
+              <span title={message.labels.join(', ')}>
+                +{metadataLabelState.overflow}
+              </span>
+            )}
+          </div>
+        )}
+        {accountSource && (
+          <span className="message-account-source" title={`来源邮箱：${accountSource}`}>
+            {accountSource}
+          </span>
+        )}
+      </div>
     </div>
   );
 });

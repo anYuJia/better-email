@@ -1419,6 +1419,43 @@
   color: var(--ui-text-tertiary);
 }
 
+.message-bottomline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.message-bottomline > :is(p, .message-chips) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.message-account-source {
+  position: relative;
+  z-index: 2;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
+  margin: 1px 0 0 auto;
+  padding: 1px 5px;
+  overflow: hidden;
+  border: 1px solid var(--ui-info-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-info);
+  background: var(--ui-info-bg);
+  font-size: var(--ui-font-size-aux);
+  font-weight: var(--ui-font-weight-regular);
+  line-height: 1.25;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-account-source:only-child {
+  max-width: 100%;
+}
+
 /* Truncation contract — shared by sender/subject/preview. */
 .sender,
 .subject,

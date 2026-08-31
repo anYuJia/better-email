@@ -15,6 +15,7 @@
   --primitive-hue-paper: 90;
   --primitive-hue-accent: 156;
   --primitive-hue-success: 152;
+  --primitive-hue-info: 250;
   --primitive-hue-warning: 78;
   --primitive-hue-danger: 29;
 
@@ -46,6 +47,9 @@
   --color-accent-soft: oklch(0.955 0.028 var(--primitive-hue-accent));
   --color-success: oklch(0.5 0.13 var(--primitive-hue-success));
   --color-success-soft: oklch(0.95 0.035 var(--primitive-hue-success));
+  --color-info: oklch(0.48 0.14 var(--primitive-hue-info));
+  --color-info-soft: oklch(0.96 0.025 var(--primitive-hue-info));
+  --color-info-border: oklch(0.86 0.05 var(--primitive-hue-info));
   --color-warning: oklch(0.52 0.12 var(--primitive-hue-warning));
   --color-warning-soft: oklch(0.976 0.020 var(--primitive-hue-warning));
   --color-warning-border: oklch(0.895 0.038 var(--primitive-hue-warning));
@@ -237,6 +241,9 @@
   --ui-accent-soft: var(--color-accent-soft);
   --ui-success: var(--color-success);
   --ui-success-bg: var(--color-success-soft);
+  --ui-info: var(--color-info);
+  --ui-info-bg: var(--color-info-soft);
+  --ui-info-border: var(--color-info-border);
   --ui-danger: var(--color-danger);
   --ui-danger-hover: var(--color-danger-hover);
   --ui-danger-bg: var(--color-danger-soft);
@@ -342,6 +349,9 @@
   --color-accent-soft: oklch(0.32 0.03 var(--primitive-hue-accent));
   --color-success: oklch(0.74 0.13 var(--primitive-hue-success));
   --color-success-soft: oklch(0.3 0.045 var(--primitive-hue-success));
+  --color-info: oklch(0.78 0.10 var(--primitive-hue-info));
+  --color-info-soft: oklch(0.30 0.035 var(--primitive-hue-info));
+  --color-info-border: oklch(0.45 0.07 var(--primitive-hue-info));
   --color-warning: oklch(0.76 0.12 var(--primitive-hue-warning));
   --color-warning-soft: oklch(0.29 0.018 var(--primitive-hue-warning));
   --color-warning-border: oklch(0.47 0.045 var(--primitive-hue-warning));

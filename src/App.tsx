@@ -1723,6 +1723,7 @@ function MailboxApp({
     <AppErrorBoundary>
       <MessageListPane
         mobile={isMobileApp}
+        showAccountSource={accountScope === 'all'}
         appliedQuery={appliedQuery}
         onOpenNavigation={isMobileApp ? undefined : showNarrowSidebar}
         filter={filter}

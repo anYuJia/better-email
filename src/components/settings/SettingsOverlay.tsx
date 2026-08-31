@@ -10,6 +10,7 @@ import {
 import type {
   Account,
   AccountCreateInput,
+  AccountScope,
   AppSettingsReport,
   BackgroundTaskKind,
   Contact,
@@ -39,6 +40,7 @@ import type { AccountProviderPreset } from '../../providerCatalog';
 import type { NotificationPolicy } from '../../mailUtils';
 import type { ThemeMode } from '../../hooks/useThemeMode';
 import type { SettingsSectionId } from './SettingsFrame';
+import type { SettingsAccountValueChange, SettingsAccountValues } from './accountScopeTypes';
 import DeferredSurface from '../DeferredSurface';
 import SettingsFrame from './SettingsFrame';
 import { createSettingsHandlers } from './settingsOverlayHandlers';
@@ -63,6 +65,10 @@ export type SettingsOverlayProps = {
   onReady?: () => void;
   accountForm: Account | null;
   accounts: Account[];
+  accountScope: AccountScope;
+  accountValues: SettingsAccountValues;
+  unifiedAccountSettingsDirty: boolean;
+  unifiedAccountSettingsSaving: boolean;
   newAccountForm: AccountCreateInput;
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
@@ -88,9 +94,6 @@ export type SettingsOverlayProps = {
   credentialStatus: CredentialStatus | null;
   notificationPolicy: NotificationPolicy;
   sendUndoDelaySeconds: SendUndoDelaySeconds;
-  globalCrossAccountRiskWarning: boolean;
-  globalAutoDownloadAttachments: boolean;
-  globalAccountPreferenceBusy: boolean;
   remoteImageTrusts: RemoteImageTrust[];
   identities: MailIdentity[];
   identityForm: MailIdentityInput;
@@ -120,9 +123,12 @@ export type SettingsOverlayProps = {
   onClose: () => void;
   onTestConnection: () => void;
   onSave: () => void;
+  onDiscardUnifiedSettings: () => void;
   onSaveAndVerify: (() => void) | undefined;
   onAccountFormChange: Dispatch<SetStateAction<Account | null>>;
-  onSelectAccount: (account: Account) => void;
+  onAccountValueChange: SettingsAccountValueChange;
+  onAccountScopeChange: (value: string) => void;
+  onSetDefaultAccount: (accountId: number) => void;
   onNewAccountFormChange: Dispatch<SetStateAction<AccountCreateInput>>;
   onApplyProviderPreset: (preset: AccountProviderPreset) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
@@ -145,8 +151,6 @@ export type SettingsOverlayProps = {
   onStoreAndVerifyCredential: () => void;
   onNotificationPolicyChange: Dispatch<SetStateAction<NotificationPolicy>>;
   onSendUndoDelayChange: Dispatch<SetStateAction<SendUndoDelaySeconds>>;
-  onGlobalCrossAccountRiskWarningChange: (checked: boolean) => void;
-  onGlobalAutoDownloadAttachmentsChange: (checked: boolean) => void;
   onDeleteRemoteImageTrust: (trust: RemoteImageTrust) => void;
   onIdentityFormChange: Dispatch<SetStateAction<MailIdentityInput>>;
   onEditIdentity: (identity: MailIdentity) => void;
@@ -210,6 +214,11 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     accountSettingsSaving,
     saveAndVerifyRunning,
   } = props;
+  const unifiedSettingsDirty = props.accountScope === 'all' && props.unifiedAccountSettingsDirty;
+  const settingsDirty = props.accountScope === 'all' ? unifiedSettingsDirty : accountSettingsDirty;
+  const settingsBusy = props.accountScope === 'all'
+    ? props.unifiedAccountSettingsSaving
+    : accountSettingsSaving || saveAndVerifyRunning;
 
   const propsRef = useRef(props);
   propsRef.current = props;
@@ -217,9 +226,11 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
 
   const accountProps = useMemo(() => ({
     accounts: props.accounts,
+    accountScope: props.accountScope,
     accountForm: props.accountForm,
+    accountValues: props.accountValues,
     accountCount: props.accounts.length,
-    accountSwitchDisabled: props.accountSettingsDirty,
+    accountSwitchDisabled: settingsDirty,
     newAccountForm: props.newAccountForm,
     oauthClientId: props.oauthClientId,
     oauthClientSecret: props.oauthClientSecret,
@@ -235,8 +246,10 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     authTypeChangeNotice: props.authTypeChangeNotice,
   }), [
     props.accounts,
+    props.accountScope,
     props.accountForm,
-    props.accountSettingsDirty,
+    props.accountValues,
+    settingsDirty,
     props.newAccountForm,
     props.oauthClientId,
     props.oauthClientSecret,
@@ -263,10 +276,16 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   ]);
 
   const experienceProps = useMemo(() => ({
+    accountScope: props.accountScope,
+    accounts: props.accounts,
+    accountValues: props.accountValues,
     remoteImageTrusts: props.remoteImageTrusts,
     identities: props.identities,
     identityForm: props.identityForm,
   }), [
+    props.accountScope,
+    props.accounts,
+    props.accountValues,
     props.remoteImageTrusts,
     props.identities,
     props.identityForm,
@@ -289,9 +308,17 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   ]);
 
   const syncProps = useMemo(() => ({
+    accountScope: props.accountScope,
+    accounts: props.accounts,
+    accountForm: props.accountForm,
+    accountValues: props.accountValues,
     imapMailboxes: props.imapMailboxes,
     folders: props.folders,
   }), [
+    props.accountScope,
+    props.accounts,
+    props.accountForm,
+    props.accountValues,
     props.imapMailboxes,
     props.folders,
   ]);
@@ -348,11 +375,25 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
         nativeCloseRequestVersion={props.nativeCloseRequestVersion}
         onReady={props.onReady}
         activeSection={activeSettingsSection}
-        isDirty={accountSettingsDirty}
-        isBusy={accountSettingsSaving || saveAndVerifyRunning || Boolean(props.connectionTestRunning)}
+        accounts={props.accounts}
+        accountScope={props.accountScope}
+        onAccountScopeChange={props.onAccountScopeChange}
+        onDiscardChanges={() => {
+          if (props.accountScope === 'all') {
+            props.onDiscardUnifiedSettings();
+          } else if (props.accountForm) {
+            const persisted = props.accounts.find((account) => account.id === props.accountForm?.id);
+            if (persisted) handlers.onAccountFormChange(persisted);
+          }
+        }}
+        onSetDefaultAccount={props.onSetDefaultAccount}
+        onAddAccount={() => props.onNavigate('accounts')}
+        isDirty={settingsDirty}
+        isBusy={settingsBusy || Boolean(props.connectionTestRunning)}
         isTestingConnection={props.connectionTestRunning}
         connectionTestFeedback={props.connectionTestFeedback}
-        canSaveAndVerify={Boolean(accountForm) && Boolean(props.onSaveAndVerify)}
+        canSaveAndVerify={props.accountScope !== 'all' && Boolean(accountForm) && Boolean(props.onSaveAndVerify)}
+        canSave={settingsDirty && (props.accountScope === 'all' ? props.accounts.length > 0 : Boolean(accountForm))}
         {...handlers}
       >
         <Suspense fallback={<div className="settings-page-loading" role="status">正在加载设置页面…</div>}>
@@ -361,9 +402,10 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
               <MemoizedAccountConnection
                 section={activeSettingsSection}
                 {...accountProps}
+                onAccountValueChange={props.onAccountValueChange}
                 {...handlers}
               />
-              {activeSettingsSection === 'auth' && accountForm && (
+              {activeSettingsSection === 'auth' && props.accountScope !== 'all' && accountForm && (
                 <MemoizedCredentialSecurity
                   account={accountForm}
                   {...credentialProps}
@@ -377,6 +419,7 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
               section={activeSettingsSection}
               accountForm={accountForm}
               {...experienceProps}
+              onAccountValueChange={props.onAccountValueChange}
               onNavigateToAi={() => handlers.onNavigate('ai')}
               {...handlers}
             />
@@ -386,27 +429,21 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
               themeMode={props.themeMode}
               notificationPolicy={props.notificationPolicy}
               sendUndoDelaySeconds={props.sendUndoDelaySeconds}
-              crossAccountRiskWarning={props.globalCrossAccountRiskWarning}
-              accountPreferenceBusy={props.globalAccountPreferenceBusy}
               onThemeModeChange={props.onThemeModeChange}
               onNotificationPolicyChange={handlers.onNotificationPolicyChange}
               onSendUndoDelayChange={handlers.onSendUndoDelayChange}
-              onCrossAccountRiskWarningChange={props.onGlobalCrossAccountRiskWarningChange}
             />
           )}
           {activeSettingsSection === 'backup' && (
             <MemoizedDataSafety
               {...backupProps}
-              autoDownloadAttachments={props.globalAutoDownloadAttachments}
-              accountPreferenceBusy={props.globalAccountPreferenceBusy}
-              onAutoDownloadAttachmentsChange={props.onGlobalAutoDownloadAttachmentsChange}
               {...handlers}
             />
           )}
-          {activeSettingsSection === 'sync' && accountForm && (
+          {activeSettingsSection === 'sync' && (
             <MemoizedSyncOperations
-              accountForm={accountForm}
               {...syncProps}
+              onAccountValueChange={props.onAccountValueChange}
               {...handlers}
             />
           )}

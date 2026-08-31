@@ -2,6 +2,7 @@ import type React from 'react';
 import type {
   Account,
   AccountCreateInput,
+  AccountScope,
   OAuthCallbackReport,
   OAuthRefreshReport,
   OAuthSession,
@@ -13,11 +14,15 @@ import type { SettingsSectionId } from './SettingsFrame';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AuthenticationSettingsPage from './pages/AuthenticationSettingsPage';
 import ProviderSettingsPage from './pages/ProviderSettingsPage';
+import AccountScopeRequired from './shared/AccountScopeRequired';
+import type { SettingsAccountValueChange, SettingsAccountValues } from './accountScopeTypes';
 
 export type AccountConnectionSettingsProps = {
   section: 'accounts' | 'providers' | 'auth';
   accounts: Account[];
+  accountScope: AccountScope;
   accountForm: Account | null;
+  accountValues: SettingsAccountValues;
   accountCount: number;
   accountSwitchDisabled?: boolean;
   newAccountForm: AccountCreateInput;
@@ -34,7 +39,7 @@ export type AccountConnectionSettingsProps = {
   authTypeChanged: boolean;
   authTypeChangeNotice: string | null;
   onAccountFormChange: (account: Account) => void;
-  onSelectAccount: (account: Account) => void;
+  onAccountValueChange: SettingsAccountValueChange;
   onNewAccountFormChange: (account: AccountCreateInput) => void;
   onApplyProviderPreset: (preset: AccountProviderPreset) => void;
   onApplyNewAccountPreset: (preset: AccountProviderPreset) => void;
@@ -57,16 +62,18 @@ export type AccountConnectionSettingsProps = {
 export default function AccountConnectionSettings(props: AccountConnectionSettingsProps) {
   let page: React.ReactNode;
 
-  if (props.section === 'accounts' || !props.accountForm) {
+  if (props.section === 'accounts') {
     page = (
       <AccountSettingsPage
         accounts={props.accounts}
+        accountScope={props.accountScope}
         accountForm={props.accountForm}
+        accountValues={props.accountValues}
         accountCount={props.accountCount}
         accountSwitchDisabled={props.accountSwitchDisabled}
         newAccountForm={props.newAccountForm}
         onAccountFormChange={props.onAccountFormChange}
-        onSelectAccount={props.onSelectAccount}
+        onAccountValueChange={props.onAccountValueChange}
         onNewAccountFormChange={props.onNewAccountFormChange}
         onApplyNewAccountPreset={props.onApplyNewAccountPreset}
         onCreateNewAccount={props.onCreateNewAccount}
@@ -75,6 +82,8 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
         onNavigate={props.onNavigate}
       />
     );
+  } else if (props.accountScope === 'all' || !props.accountForm) {
+    page = <AccountScopeRequired accountScope={props.accountScope} />;
   } else if (props.section === 'providers') {
     page = (
       <ProviderSettingsPage

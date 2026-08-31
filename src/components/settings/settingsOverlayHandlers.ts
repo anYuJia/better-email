@@ -16,21 +16,12 @@ import type { RuleConditionField, SendUndoDelaySeconds } from '../../app/appConf
  * actually change instead of on every application tick.
  */
 export type SettingsHandlers = {
-  readonly accountOptions: Array<{
-    id: number;
-    label: string;
-    email: string;
-    isDefault: boolean;
-  }>;
-  readonly activeAccountId: number | null;
-  onSelectAccountId: (accountId: number) => void;
   onNavigate: (section: SettingsSectionId) => void;
   onClose: () => void;
   onTestConnection: () => void;
   onSave: () => void;
   onSaveAndVerify: () => void;
   onAccountFormChange: (account: SetStateAction<Account | null>) => void;
-  onSelectAccount: (account: NonNullable<SettingsOverlayProps['accountForm']>) => void;
   onNewAccountFormChange: (account: SetStateAction<AccountCreateInput>) => void;
   onApplyProviderPreset: SettingsOverlayProps['onApplyProviderPreset'];
   onApplyNewAccountPreset: SettingsOverlayProps['onApplyNewAccountPreset'];
@@ -97,28 +88,12 @@ type OverlayRef = { current: SettingsOverlayProps };
 export function createSettingsHandlers(ref: OverlayRef): SettingsHandlers {
   const latest = (): SettingsOverlayProps => ref.current;
   return {
-    get accountOptions() {
-      return latest().accounts.map((account) => ({
-        id: account.id,
-        label: account.display_name || account.email,
-        email: account.email,
-        isDefault: account.is_default,
-      }));
-    },
-    get activeAccountId() {
-      return latest().accountForm?.id ?? null;
-    },
-    onSelectAccountId: (accountId) => {
-      const account = latest().accounts.find((candidate) => candidate.id === accountId);
-      if (account) latest().onSelectAccount(account);
-    },
     onNavigate: (section) => latest().onNavigate(section),
     onClose: () => latest().onClose(),
     onTestConnection: () => latest().onTestConnection(),
     onSave: () => latest().onSave(),
     onSaveAndVerify: () => latest().onSaveAndVerify?.(),
     onAccountFormChange: (account) => latest().onAccountFormChange(account),
-    onSelectAccount: (account) => latest().onSelectAccount(account),
     onNewAccountFormChange: (account) => latest().onNewAccountFormChange(account),
     onApplyProviderPreset: (preset: AccountProviderPreset) => latest().onApplyProviderPreset(preset),
     onApplyNewAccountPreset: (preset: AccountProviderPreset) => latest().onApplyNewAccountPreset(preset),

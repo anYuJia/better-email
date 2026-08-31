@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Account, RemoteImageTrust } from '../../../app/types';
+import type { SettingsAccountValues } from '../accountScopeTypes';
 import PrivacySettingsPage from './PrivacySettingsPage';
 
 function makeAccount(overrides: Partial<Account> = {}): Account {
@@ -18,6 +19,16 @@ function makeTrust(overrides: Partial<RemoteImageTrust> = {}): RemoteImageTrust 
   } as RemoteImageTrust;
 }
 
+const accountValues: SettingsAccountValues = {
+  sync_mode: '1min',
+  remote_images_allowed: false,
+  warn_external_senders: false,
+  cross_account_risk_warning: true,
+  block_external_mailboxes: false,
+  intercept_https_links: true,
+  auto_download_attachments: false,
+};
+
 function renderPage(
   account: Account,
   trusts: RemoteImageTrust[],
@@ -25,9 +36,13 @@ function renderPage(
 ) {
   return render(
     <PrivacySettingsPage
+      accountScope={account.id}
+      accounts={[account]}
       accountForm={account}
+      accountValues={accountValues}
       remoteImageTrusts={trusts}
       onAccountFormChange={() => undefined}
+      onAccountValueChange={() => undefined}
       onDeleteRemoteImageTrust={() => undefined}
       onNavigateToAi={onNavigateToAi}
     />,
@@ -42,7 +57,7 @@ describe('PrivacySettingsPage', () => {
   it('renders the remote image policy toggle with risk-aware copy', () => {
     renderPage(makeAccount({ remote_images_allowed: false }), []);
     const toggles = screen.getAllByRole('checkbox');
-    expect(toggles.length).toBe(2);
+    expect(toggles.length).toBe(4);
     expect(screen.getByText('默认阻止远程图片与追踪像素；可信发件人或域名可单独放行。')).not.toBeNull();
     expect((toggles[0] as HTMLInputElement).checked).toBe(false);
   });
@@ -56,8 +71,8 @@ describe('PrivacySettingsPage', () => {
   it('只保留远程图片与外部发件人提示', () => {
     renderPage(makeAccount(), []);
     expect(screen.getByText('提示外部发件人')).not.toBeNull();
-    expect(screen.queryByText('拦截外部邮箱邮件')).toBeNull();
-    expect(screen.queryByText('隐藏邮件中的链接')).toBeNull();
+    expect(screen.getByText('拦截外部邮箱邮件')).not.toBeNull();
+    expect(screen.getByText('拦截邮件中的 HTTPS 链接')).not.toBeNull();
   });
 
   it('shows an explicit empty state for the trust list', () => {

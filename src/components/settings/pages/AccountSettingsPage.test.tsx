@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import type { Account, AccountCreateInput } from '../../../app/types';
+import { cleanup, render, screen, within } from '@testing-library/react';
+import type { Account, AccountCreateInput, AccountScope } from '../../../app/types';
+import type { SettingsAccountValues } from '../accountScopeTypes';
 import AccountSettingsPage from './AccountSettingsPage';
 
 function makeAccount(overrides: Partial<Account> = {}): Account {
@@ -56,26 +57,38 @@ const accounts = [
   }),
 ];
 
+const accountValues: SettingsAccountValues = {
+  sync_mode: '1min',
+  remote_images_allowed: false,
+  warn_external_senders: false,
+  cross_account_risk_warning: true,
+  block_external_mailboxes: false,
+  intercept_https_links: true,
+  auto_download_attachments: false,
+};
+
 function renderPage({
   accountForm = accounts[0],
+  accountScope = accounts[0].id,
   accountSwitchDisabled = false,
   onAccountFormChange = vi.fn(),
-  onSelectAccount = vi.fn(),
 }: {
   accountForm?: Account | null;
+  accountScope?: AccountScope;
   accountSwitchDisabled?: boolean;
   onAccountFormChange?: (account: Account) => void;
-  onSelectAccount?: (account: Account) => void;
 } = {}) {
   const result = render(
     <AccountSettingsPage
       accounts={accounts}
+      accountScope={accountScope}
       accountForm={accountForm}
+      accountValues={accountValues}
       accountCount={accounts.length}
       accountSwitchDisabled={accountSwitchDisabled}
       newAccountForm={emptyNewAccount}
       onAccountFormChange={onAccountFormChange}
-      onSelectAccount={onSelectAccount}
+      onAccountValueChange={vi.fn()}
       onNewAccountFormChange={() => undefined}
       onApplyNewAccountPreset={() => undefined}
       onCreateNewAccount={async () => undefined}
@@ -84,7 +97,7 @@ function renderPage({
       onNavigate={() => undefined}
     />,
   );
-  return { ...result, onAccountFormChange, onSelectAccount };
+  return { ...result, onAccountFormChange };
 }
 
 describe('AccountSettingsPage account-first layout', () => {
@@ -108,17 +121,13 @@ describe('AccountSettingsPage account-first layout', () => {
     expect(
       within(accountOverview as HTMLElement).getByRole('textbox', { name: /显示名/ }),
     ).not.toBeNull();
-    expect(within(accountOverview as HTMLElement).queryByText('跨邮箱发送风险提示')).toBeNull();
-    expect(within(accountOverview as HTMLElement).queryByText('自动下载新邮件附件')).toBeNull();
+    expect(within(accountOverview as HTMLElement).getByText('跨邮箱发送提醒')).not.toBeNull();
+    expect(within(accountOverview as HTMLElement).getByText('自动下载新邮件附件')).not.toBeNull();
   });
 
-  it('selects another account from the mobile account list', () => {
-    const onSelectAccount = vi.fn();
-    renderPage({ onSelectAccount });
-
-    const accountList = screen.getByRole('list', { name: '邮箱账号' });
-    fireEvent.click(within(accountList).getByRole('button', { name: /个人邮箱/ }));
-    expect(onSelectAccount).toHaveBeenCalledWith(accounts[1]);
+  it('does not duplicate the account selector inside the account page', () => {
+    const { container } = renderPage();
+    expect(container.querySelector('.settings-mobile-account-list')).toBeNull();
   });
 
   it('moves account removal into the selected account detail and disables it while dirty', () => {

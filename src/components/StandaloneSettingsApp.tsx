@@ -11,6 +11,7 @@ import {
   type SettingsWindowRequest,
 } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
+import type { AccountScope } from '../app/types';
 import {
   isSettingsSectionId,
   type SettingsSectionId,
@@ -21,8 +22,19 @@ function initialSettingsSection(): SettingsSectionId {
   return isSettingsSectionId(requested) ? requested : 'accounts';
 }
 
+function settingsScopeFromValue(value: unknown): AccountScope | undefined {
+  if (value === 'all') return 'all';
+  const id = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(id) && id > 0 ? id : undefined;
+}
+
+function initialSettingsAccountScope(): AccountScope | undefined {
+  return settingsScopeFromValue(new URLSearchParams(window.location.search).get('scope'));
+}
+
 export default function StandaloneSettingsApp() {
   const [requestedSection, setRequestedSection] = useState<SettingsSectionId>(initialSettingsSection);
+  const [requestedAccountScope, setRequestedAccountScope] = useState<AccountScope | undefined>(initialSettingsAccountScope);
   const [nativeCloseRequestVersion, setNativeCloseRequestVersion] = useState(0);
   const readyRef = useRef(false);
   const lifecycleReadyRef = useRef(false);
@@ -92,6 +104,8 @@ export default function StandaloneSettingsApp() {
           if (isSettingsSectionId(event.payload?.section)) {
             setRequestedSection(event.payload.section);
           }
+          const nextScope = settingsScopeFromValue(event.payload?.accountScope);
+          if (nextScope !== undefined) setRequestedAccountScope(nextScope);
         },
       );
       if (!active) {
@@ -134,6 +148,7 @@ export default function StandaloneSettingsApp() {
     <App
       standaloneSettingsWindow
       requestedSettingsSection={requestedSection}
+      requestedSettingsAccountScope={requestedAccountScope}
       nativeSettingsCloseRequestVersion={nativeCloseRequestVersion}
       onStandaloneSettingsReady={handleSurfaceReady}
     />

@@ -68,17 +68,19 @@
 
 .settings-main-header {
   position: relative;
-  min-height: 48px;
-  height: 48px;
-  flex: 0 0 48px;
-  display: flex;
+  min-height: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  display: grid;
+  grid-template-columns: minmax(190px, 220px) minmax(240px, 420px) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 0 12px 0 18px;
   border-bottom: 1px solid var(--st-header-border);
   background: var(--st-canvas);
   color: var(--st-text);
+  overflow: visible;
+  z-index: 6;
 }
 
 /* Standalone Settings uses the same unified macOS titlebar contract as the
@@ -124,6 +126,26 @@ body[data-settings-window-platform='macos']
   gap: 8px;
 }
 
+.settings-header-leading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.settings-header-leading .settings-desktop-title {
+  display: none;
+}
+
+.settings-header-account-switcher {
+  width: min(100%, 220px);
+  flex: 1 1 0;
+}
+
+.settings-header-account-switcher .account-switcher-trigger {
+  min-height: 40px;
+  padding-inline: 9px;
+}
+
 .settings-title-copy {
   min-width: 0;
   display: flex;
@@ -150,6 +172,88 @@ body[data-settings-window-platform='macos']
   display: flex;
   align-items: center;
   gap: 6px;
+  justify-self: end;
+}
+
+.settings-header-search {
+  position: relative;
+  width: min(100%, 420px);
+  min-width: 0;
+  justify-self: center;
+  z-index: 5;
+}
+
+.settings-search-toggle {
+  display: none;
+}
+
+.settings-search-field {
+  position: relative;
+  min-width: 0;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius-md);
+  color: var(--st-text-tertiary);
+  background: var(--st-surface);
+}
+
+.settings-search-field:focus-within {
+  border-color: var(--st-focus-border);
+}
+
+.settings-search-field input {
+  min-width: 0;
+  min-height: 34px;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--st-text);
+  background: transparent;
+  box-shadow: none;
+  font-size: var(--st-font-size-secondary);
+}
+
+.settings-search-field input:focus,
+.settings-search-field input:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
+.settings-search-field > button {
+  width: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--st-radius-sm);
+  color: var(--st-text-tertiary);
+  background: transparent;
+}
+
+.settings-search-field > button:hover {
+  color: var(--st-text);
+  background: var(--st-surface-muted);
+}
+
+.settings-search-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  max-height: min(420px, calc(100vh - 78px));
+  overflow: auto;
+  padding: 5px;
+  border: 1px solid var(--st-border-strong);
+  border-radius: var(--st-radius-md);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-float);
 }
 
 .settings-header-button {
@@ -233,61 +337,6 @@ body[data-settings-window-platform='macos']
   background: var(--st-sidebar);
 }
 
-.settings-nav-search {
-  position: relative;
-  min-height: 36px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0 2px 10px;
-  padding: 0 9px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  color: var(--st-text-tertiary);
-  background: var(--st-surface);
-}
-
-.settings-nav-search:focus-within {
-  border-color: var(--st-focus-border);
-}
-
-.settings-nav-search input {
-  min-width: 0;
-  min-height: 34px;
-  flex: 1;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  color: var(--st-text);
-  background: transparent;
-  box-shadow: none;
-  font-size: var(--st-font-size-secondary);
-}
-
-.settings-nav-search input:focus,
-.settings-nav-search input:focus-visible {
-  outline: 0;
-  box-shadow: none;
-}
-
-.settings-nav-search > button {
-  width: 26px;
-  min-width: 26px;
-  min-height: 26px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--st-radius-sm);
-  color: var(--st-text-tertiary);
-  background: transparent;
-}
-
-.settings-nav-search > button:hover {
-  color: var(--st-text);
-  background: var(--st-surface-muted);
-}
-
 .settings-search-shortcut {
   padding: 1px 4px;
   border: 1px solid var(--st-border);
@@ -306,8 +355,7 @@ body[data-settings-window-platform='macos']
   overscroll-behavior: contain;
 }
 
-.settings-nav-list,
-.settings-search-results {
+.settings-nav-list {
   display: grid;
   gap: 2px;
 }
@@ -557,10 +605,6 @@ body[data-settings-window-platform='macos']
   background: var(--st-canvas);
 }
 
-.settings-content-area.has-account-tabs {
-  grid-template-rows: auto minmax(0, 1fr);
-}
-
 .settings-content {
   min-width: 0;
   min-height: 0;
@@ -568,118 +612,6 @@ body[data-settings-window-platform='macos']
   flex-direction: column;
   overflow: hidden;
   background: var(--st-canvas);
-}
-
-.settings-account-tabs {
-  min-width: 0;
-  min-height: 52px;
-  display: block;
-  overflow: hidden;
-  border-bottom: 1px solid var(--st-border);
-  background: var(--st-canvas);
-}
-
-.settings-account-tabs-list {
-  width: min(100%, var(--st-content-max-width));
-  min-width: 0;
-  display: flex;
-  gap: 12px;
-  margin: 0 auto;
-  padding: 0 24px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-
-.settings-account-tabs-list::-webkit-scrollbar {
-  display: none;
-}
-
-.settings-account-tab {
-  min-width: 0;
-  height: 52px;
-  flex: 1 1 0;
-  max-width: 240px;
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 7px;
-  padding: 0 4px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  color: var(--st-text-secondary);
-  background: transparent;
-  box-shadow: none;
-  text-align: left;
-  cursor: pointer;
-  transition: var(--ui-transition-fast-color-background-border);
-}
-
-.settings-account-tab:hover:not(:disabled) {
-  color: var(--st-text);
-  background: transparent;
-}
-
-.settings-account-tab:active:not(:disabled) {
-  color: var(--st-accent);
-  background: transparent;
-}
-
-.settings-account-tab.active {
-  color: var(--st-text);
-  border-bottom-color: var(--st-accent);
-  background: transparent;
-}
-
-.settings-account-tab:focus-visible {
-  outline: var(--st-focus-outline);
-  outline-offset: -2px;
-}
-
-.settings-account-tab-icon {
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  color: var(--st-text-tertiary);
-}
-
-.settings-account-tab.active .settings-account-tab-icon {
-  color: var(--st-accent);
-}
-
-.settings-account-tab-copy {
-  min-width: 0;
-  display: grid;
-  gap: 2px;
-}
-
-.settings-account-tab-copy strong,
-.settings-account-tab-copy small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-account-tab-copy strong {
-  color: inherit;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.settings-account-tab-copy small {
-  color: var(--st-text-tertiary);
-  font-size: 10.5px;
-}
-
-.settings-account-tab em {
-  justify-self: end;
-  color: var(--st-accent);
-  font-size: 10px;
-  font-style: normal;
-  font-weight: 600;
 }
 
 .settings-page {
@@ -734,6 +666,17 @@ body[data-settings-window-platform='macos']
   color: var(--st-text-secondary);
   font-size: var(--st-font-size-secondary);
   line-height: 1.45;
+}
+
+.settings-account-context {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--st-text-tertiary);
+  font-size: var(--st-font-size-aux);
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-page-content {
@@ -832,6 +775,21 @@ body[data-settings-window-platform='macos']
 .settings-discard-confirm button.danger {
   color: var(--st-danger);
   background: var(--st-danger-soft);
+}
+
+.settings-scope-switch-confirm {
+  width: min(460px, calc(100% - 24px));
+  align-items: flex-start;
+}
+
+.settings-scope-switch-confirm > div {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.settings-discard-confirm button.primary {
+  color: var(--st-on-accent);
+  background: var(--st-accent);
 }
 
 .settings-workspace[data-input-modality='pointer']

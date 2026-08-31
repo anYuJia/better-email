@@ -3,6 +3,7 @@ import { emptyIdentityForm } from '../app/appConfig';
 import { replaceAccountScopedItems } from '../app/accountConnectionSettings';
 import type {
   Account,
+  AccountScope,
   CredentialStatus,
   CredentialVerificationReport,
   Folder,
@@ -23,6 +24,7 @@ type SettingsAccountSelectionOptions = {
   setIdentities: Dispatch<SetStateAction<MailIdentity[]>>;
   setFolders: Dispatch<SetStateAction<Folder[]>>;
   setStatus: Dispatch<SetStateAction<string>>;
+  onScopeChange?: (scope: AccountScope) => void;
 };
 
 export default function useSettingsAccountSelection({
@@ -35,11 +37,13 @@ export default function useSettingsAccountSelection({
   setIdentities,
   setFolders,
   setStatus,
+  onScopeChange,
 }: SettingsAccountSelectionOptions) {
   const requestRef = useRef(0);
 
   return useCallback((next: Account) => {
     const requestId = ++requestRef.current;
+    onScopeChange?.(next.id);
     setAccountForm(next);
     setIdentityForm(emptyIdentityForm);
     setCredentialSecret('');
@@ -71,5 +75,6 @@ export default function useSettingsAccountSelection({
     setIdentityForm,
     setRemoteImageTrusts,
     setStatus,
+    onScopeChange,
   ]);
 }

@@ -56,8 +56,8 @@ describe('settingsNavigation information architecture', () => {
 
   it('uses explicit labels for the consolidated destinations', () => {
     expect(getSettingsSectionPresentation('general').label).toBe('通用');
-    expect(getSettingsSectionPresentation('accounts').label).toBe('账号');
-    expect(getSettingsSectionPresentation('identities').label).toBe('发件身份与标签');
+    expect(getSettingsSectionPresentation('accounts').label).toBe('账户信息');
+    expect(getSettingsSectionPresentation('identities').label).toBe('发件身份');
   });
 
   it('places contact template and automation management behind one tools hub', () => {

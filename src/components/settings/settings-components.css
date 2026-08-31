@@ -303,6 +303,14 @@
   background: var(--st-accent);
 }
 
+.settings-modal .st-switch input[type="checkbox"][data-indeterminate="true"] {
+  background: var(--st-accent-soft);
+}
+
+.settings-modal .st-switch input[type="checkbox"][data-indeterminate="true"]::after {
+  transform: translateX(8px);
+}
+
 .settings-modal .st-switch input[type="checkbox"]:checked::after {
   transform: translateX(16px);
 }

@@ -15,6 +15,7 @@ import {
   SETTINGS_READY_QUERY_EVENT,
   SETTINGS_WINDOW_LABEL,
 } from './app/settingsWindow';
+import type { AccountScope } from './app/types';
 import { IPC } from './ipc/commands';
 
 type InvokeArgs = Record<string, unknown> | undefined;
@@ -286,6 +287,9 @@ async function ensureSettingsWindow(request: SettingsWindowRequest): Promise<voi
     settingsUrl.search = '';
     settingsUrl.searchParams.set('window', 'settings');
     settingsUrl.searchParams.set('section', request.section || 'accounts');
+    if (request.accountScope !== undefined) {
+      settingsUrl.searchParams.set('scope', String(request.accountScope));
+    }
     settingsUrl.hash = '';
     const child = new WebviewWindow(SETTINGS_WINDOW_LABEL, {
       url: settingsUrl.toString(),
@@ -376,6 +380,13 @@ export async function prodOpenSettingsWindow(request: SettingsWindowRequest = {}
   await waitForSettingsWindowReady(settingsWindow);
   await settingsWindow.emit(SETTINGS_OPEN_EVENT, request);
   await focusComposerWindow(settingsWindow);
+}
+
+export async function prodSyncSettingsWindowAccountScope(scope: AccountScope): Promise<void> {
+  const { WebviewWindow } = await loadWebviewWindow();
+  const settingsWindow = await WebviewWindow.getByLabel(SETTINGS_WINDOW_LABEL);
+  if (!settingsWindow) return;
+  await settingsWindow.emit(SETTINGS_OPEN_EVENT, { accountScope: scope });
 }
 
 export async function prodShowCurrentWindow(): Promise<void> {

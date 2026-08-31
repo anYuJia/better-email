@@ -51,6 +51,7 @@ import {
   prodOpenComposerWindow,
   prodOpenSettingsWindow,
   prodPrewarmComposerWindow,
+  prodSyncSettingsWindowAccountScope,
 } from './tauriBridge.prod';
 
 const composerWindow = {
@@ -125,6 +126,12 @@ describe('production composer window bridge', () => {
     expect(mocks.show).toHaveBeenCalledOnce();
     expect(mocks.unminimize).toHaveBeenCalledOnce();
     expect(mocks.setFocus).toHaveBeenCalledOnce();
+  });
+
+  it('updates an already-open settings window when the mailbox scope changes', async () => {
+    await prodSyncSettingsWindowAccountScope(2);
+
+    expect(mocks.emit).toHaveBeenCalledWith(SETTINGS_OPEN_EVENT, { accountScope: 2 });
   });
 
   it('destroys settings instead of retaining hidden stale state', async () => {

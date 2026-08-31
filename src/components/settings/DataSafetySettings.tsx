@@ -23,7 +23,6 @@ import {
   SettingsButton,
   SettingsRow,
   SettingsSection,
-  SettingsSwitch,
 } from './shared';
 
 type DataSafetySettingsProps = {
@@ -33,14 +32,11 @@ type DataSafetySettingsProps = {
   appSettings: AppSettingsReport | null;
   downloadDirBusy: boolean;
   downloadDirError: string | null;
-  autoDownloadAttachments: boolean;
-  accountPreferenceBusy: boolean;
   onImportBackup: () => void;
   onExportBackup: () => void;
   onClearAttachmentCache: () => Promise<void>;
   onPickDownloadDir: () => void;
   onResetDownloadDir: () => void;
-  onAutoDownloadAttachmentsChange: (checked: boolean) => void;
 };
 
 export default function DataSafetySettings({
@@ -50,14 +46,11 @@ export default function DataSafetySettings({
   appSettings,
   downloadDirBusy,
   downloadDirError,
-  autoDownloadAttachments,
-  accountPreferenceBusy,
   onImportBackup,
   onExportBackup,
   onClearAttachmentCache,
   onPickDownloadDir,
   onResetDownloadDir,
-  onAutoDownloadAttachmentsChange,
 }: DataSafetySettingsProps) {
   const [cacheConfirmationOpen, setCacheConfirmationOpen] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -209,13 +202,6 @@ export default function DataSafetySettings({
             <p className="settings-download-error" role="alert">{downloadDirError}</p>
           )}
         </div>
-        <SettingsSwitch
-          label="自动下载新邮件附件"
-          description="所有邮箱账号收到的新附件都会保存到上面的默认下载位置。"
-          checked={autoDownloadAttachments}
-          disabled={accountPreferenceBusy}
-          onChange={onAutoDownloadAttachmentsChange}
-        />
       </SettingsSection>
 
       <SettingsSection

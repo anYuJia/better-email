@@ -9,24 +9,18 @@ type GeneralSettingsProps = {
   themeMode: ThemeMode;
   notificationPolicy: NotificationPolicy;
   sendUndoDelaySeconds: SendUndoDelaySeconds;
-  crossAccountRiskWarning: boolean;
-  accountPreferenceBusy: boolean;
   onThemeModeChange: (mode: ThemeMode) => void;
   onNotificationPolicyChange: (policy: NotificationPolicy) => void;
   onSendUndoDelayChange: (seconds: SendUndoDelaySeconds) => void;
-  onCrossAccountRiskWarningChange: (checked: boolean) => void;
 };
 
 export default function GeneralSettings({
   themeMode,
   notificationPolicy,
   sendUndoDelaySeconds,
-  crossAccountRiskWarning,
-  accountPreferenceBusy,
   onThemeModeChange,
   onNotificationPolicyChange,
   onSendUndoDelayChange,
-  onCrossAccountRiskWarningChange,
 }: GeneralSettingsProps) {
   return (
     <>
@@ -36,10 +30,7 @@ export default function GeneralSettings({
       />
       <SendingSettingsPage
         sendUndoDelaySeconds={sendUndoDelaySeconds}
-        crossAccountRiskWarning={crossAccountRiskWarning}
-        accountPreferenceBusy={accountPreferenceBusy}
         onSendUndoDelayChange={onSendUndoDelayChange}
-        onCrossAccountRiskWarningChange={onCrossAccountRiskWarningChange}
       />
       <NotificationSettingsPage
         notificationPolicy={notificationPolicy}

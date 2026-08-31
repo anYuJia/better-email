@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   loadTemplates,
   persistTemplates,
   saveTemplate,
   deleteTemplate,
+  templatesForAccount,
   substituteTemplateVariables,
 } from '../app/templateStore';
 import type { ComposeTemplate, DraftInput } from '../app/types';
@@ -11,6 +12,7 @@ import { plainTextToRichHtml } from '../components/composer/composerBody';
 
 type ComposerTemplatesOptions = {
   draft: DraftInput;
+  fallbackAccountId?: number;
   setDraft: Dispatch<SetStateAction<DraftInput>>;
   setRichComposer: Dispatch<SetStateAction<boolean>>;
   setStatus: Dispatch<SetStateAction<string>>;
@@ -18,16 +20,23 @@ type ComposerTemplatesOptions = {
 
 export default function useComposerTemplates({
   draft,
+  fallbackAccountId = 0,
   setDraft,
   setRichComposer,
   setStatus,
 }: ComposerTemplatesOptions) {
-  const [composeTemplates, setComposeTemplates] = useState<ComposeTemplate[]>(loadTemplates);
+  const [storedTemplates, setStoredTemplates] = useState<ComposeTemplate[]>(loadTemplates);
   const [templateName, setTemplateName] = useState('');
+  const effectiveAccountId = draft.account_id || fallbackAccountId;
 
   useEffect(() => {
-    persistTemplates(composeTemplates);
-  }, [composeTemplates]);
+    persistTemplates(storedTemplates);
+  }, [storedTemplates]);
+
+  const composeTemplates = useMemo(
+    () => templatesForAccount(storedTemplates, effectiveAccountId),
+    [effectiveAccountId, storedTemplates],
+  );
 
   const applyComposeTemplate = useCallback((template: ComposeTemplate) => {
     const contactEmail = draft.to
@@ -105,24 +114,24 @@ export default function useComposerTemplates({
       html_body: draft.html_body,
       category: '',
       tags: [],
-      account_id: draft.account_id,
+      account_id: effectiveAccountId,
       is_favorite: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
-    setComposeTemplates(nextTemplate);
+    setStoredTemplates(nextTemplate);
     setTemplateName('');
     setStatus(`模板已保存：${name}`);
-  }, [draft, templateName, setStatus]);
+  }, [draft, effectiveAccountId, templateName, setStatus]);
 
   const deleteComposeTemplate = useCallback((template: ComposeTemplate) => {
-    setComposeTemplates(deleteTemplate(template.id));
+    setStoredTemplates(deleteTemplate(template.id));
     setStatus(`模板已删除：${template.name}`);
   }, [setStatus]);
 
   return {
     composeTemplates,
-    setComposeTemplates,
+    setComposeTemplates: setStoredTemplates,
     templateName,
     setTemplateName,
     applyComposeTemplate,

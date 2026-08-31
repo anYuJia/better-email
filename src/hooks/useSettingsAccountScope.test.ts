@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import type { Account, AccountScope } from '../app/types';
 import {
   SETTINGS_ACCOUNT_SCOPE_EVENT,
@@ -54,6 +55,7 @@ describe('useSettingsAccountScope', () => {
   function renderScope(overrides: Partial<Parameters<typeof useSettingsAccountScope>[0]> = {}) {
     const changeAccountScope = vi.fn();
     const selectSettingsAccount = vi.fn();
+    const onSettingsScopeChange = vi.fn();
     const showNarrowList = vi.fn();
     const setAccount = vi.fn();
     const setAccounts = vi.fn();
@@ -65,6 +67,7 @@ describe('useSettingsAccountScope', () => {
       accountsLoaded: false,
       standaloneSettingsWindow: false,
       useNativeSettingsWindow: false,
+      onSettingsScopeChange,
       setAccount,
       setAccounts,
       setAccountForm,
@@ -77,6 +80,7 @@ describe('useSettingsAccountScope', () => {
       ...renderHook(() => useSettingsAccountScope(options)),
       changeAccountScope,
       selectSettingsAccount,
+      onSettingsScopeChange,
       showNarrowList,
       setAccount,
       setAccounts,
@@ -89,8 +93,45 @@ describe('useSettingsAccountScope', () => {
 
     act(() => scope.result.current.handleSettingsAccountScopeChange('2'));
 
+    expect(scope.changeAccountScope).toHaveBeenCalledWith('2');
     expect(scope.selectSettingsAccount).toHaveBeenCalledWith(accounts[1]);
+    expect(scope.onSettingsScopeChange).toHaveBeenCalledWith(2);
     expect(mocks.emitToMain).toHaveBeenCalledWith(SETTINGS_ACCOUNT_SCOPE_EVENT, { scope: 2 });
+  });
+
+  it('does not reapply the initial standalone scope after a user selects an account', async () => {
+    const selectSettingsAccount = vi.fn();
+    const { result } = renderHook(() => {
+      const [accountScope, setAccountScope] = useState<AccountScope>('all');
+      const [requestedScope, setRequestedScope] = useState<AccountScope>('all');
+      const changeAccountScope = (value: string) => {
+        setAccountScope(value === 'all' ? 'all' : Number(value));
+      };
+
+      const scope = useSettingsAccountScope({
+        accountScope,
+        accounts,
+        requestedAccountScope: requestedScope,
+        accountsLoaded: true,
+        standaloneSettingsWindow: true,
+        useNativeSettingsWindow: false,
+        onSettingsScopeChange: setRequestedScope,
+        setAccount: vi.fn(),
+        setAccounts: vi.fn(),
+        setAccountForm: vi.fn(),
+        changeAccountScope,
+        selectSettingsAccount,
+        showNarrowList: vi.fn(),
+      });
+
+      return { ...scope, accountScope, requestedScope };
+    });
+
+    act(() => result.current.handleSettingsAccountScopeChange('2'));
+
+    await waitFor(() => expect(result.current.accountScope).toBe(2));
+    expect(result.current.requestedScope).toBe(2);
+    expect(selectSettingsAccount).toHaveBeenCalledWith(accounts[1]);
   });
 
   it('forwards mailbox scope changes to an open native settings window', () => {

@@ -677,6 +677,7 @@ pub struct SyncSchedulePlan {
 #[derive(Debug, Clone, Serialize)]
 pub struct Contact {
     pub id: i64,
+    pub account_id: i64,
     pub name: String,
     pub email: String,
     pub aliases: Vec<String>,
@@ -770,6 +771,7 @@ pub struct ContactImportCommitSummary {
 #[derive(Debug, Clone, Serialize)]
 pub struct ContactImportBatch {
     pub id: i64,
+    pub account_id: i64,
     pub file_name: String,
     pub total_count: i64,
     pub created_count: i64,
@@ -796,6 +798,7 @@ pub struct ContactExportSummary {
 #[derive(Debug, Clone, Serialize)]
 pub struct MailRule {
     pub id: i64,
+    pub account_id: i64,
     pub name: String,
     pub condition: String,
     pub action: String,

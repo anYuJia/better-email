@@ -15,11 +15,13 @@ import { IPC } from '../ipc/commands';
 type ContactManagementOptions = {
   setStatus: Dispatch<SetStateAction<string>>;
   setNotificationPolicy: Dispatch<SetStateAction<NotificationPolicy>>;
+  accountId?: number | null;
 };
 
 export default function useContactManagement({
   setStatus,
   setNotificationPolicy,
+  accountId,
 }: ContactManagementOptions) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
@@ -31,9 +33,17 @@ export default function useContactManagement({
   const [contactTransferBusy, setContactTransferBusy] = useState(false);
   const [confirmDeleteContact, setConfirmDeleteContact] = useState<Contact | null>(null);
 
+  // Metadata refreshes are asynchronous. Keep the previous account's rows out
+  // of every consumer during the gap between a scope change and its response.
+  const visibleContacts = useMemo(() => (
+    typeof accountId === 'number'
+      ? contacts.filter((contact) => contact.account_id === accountId)
+      : contacts
+  ), [accountId, contacts]);
+
   const filteredContacts = useMemo(() => {
     const term = contactQuery.trim().toLowerCase();
-    const sortedContacts = [...contacts].sort((left, right) => {
+    const sortedContacts = [...visibleContacts].sort((left, right) => {
       const byCount = right.message_count - left.message_count;
       if (byCount !== 0) return byCount;
       return right.last_seen_at.localeCompare(left.last_seen_at);
@@ -43,7 +53,7 @@ export default function useContactManagement({
       .filter((contact) =>
         [contact.name, contact.email, contact.aliases.join(' ')].join(' ').toLowerCase().includes(term),
       );
-  }, [contactQuery, contacts]);
+  }, [contactQuery, visibleContacts]);
 
   function startEditContact(contact: Contact) {
     setEditingContactId(contact.id);
@@ -52,15 +62,15 @@ export default function useContactManagement({
   }
 
   const refreshManagedContacts = useCallback(async () => {
-    const refreshed = await invoke<Contact[]>(IPC.ListContacts);
+    const refreshed = await invoke<Contact[]>(IPC.ListContacts, { accountId });
     setContacts(refreshed);
     return refreshed;
-  }, []);
+  }, [accountId]);
 
   async function exportContactsVcard() {
     setContactTransferBusy(true);
     try {
-      const summary = await invoke<ContactExportSummary | null>(IPC.ExportContactsVcard);
+      const summary = await invoke<ContactExportSummary | null>(IPC.ExportContactsVcard, { accountId });
       if (!summary) {
         setStatus('已取消联系人 vCard 导出');
         return;
@@ -72,12 +82,17 @@ export default function useContactManagement({
   }
 
   async function createManagedContact() {
+    if (typeof accountId !== 'number') {
+      setStatus('请先选择具体邮箱账号，再添加联系人');
+      return;
+    }
     const email = contactForm.email.trim().toLowerCase();
     if (!email) {
       setStatus('请输入联系人邮箱');
       return;
     }
     const created = await invoke<Contact>(IPC.CreateContact, {
+      accountId,
       input: {
         ...contactForm,
         email,
@@ -95,6 +110,7 @@ export default function useContactManagement({
       .filter((alias) => alias !== contact.email.trim().toLowerCase());
     const updated = await invoke<Contact>(IPC.UpdateContact, {
       contactId: contact.id,
+      accountId: contact.account_id,
       input: {
         name: contactEditName.trim() || contact.name,
         aliases,
@@ -111,6 +127,7 @@ export default function useContactManagement({
     const aliases = contact.aliases ?? [];
     const updated = await invoke<Contact>(IPC.UpdateContact, {
       contactId: contact.id,
+      accountId: contact.account_id,
       input: {
         name: contact.name,
         aliases,
@@ -134,7 +151,7 @@ export default function useContactManagement({
   }
 
   async function deleteManagedContact(contact: Contact) {
-    await invoke(IPC.DeleteContact, { contactId: contact.id });
+    await invoke(IPC.DeleteContact, { contactId: contact.id, accountId: contact.account_id });
     setContacts((current) => current.filter((item) => item.id !== contact.id));
     if (editingContactId === contact.id) {
       setEditingContactId(null);
@@ -159,7 +176,7 @@ export default function useContactManagement({
     setContactQuery,
     contactTransferBusy,
     filteredContacts,
-    managedContacts: contacts,
+    managedContacts: visibleContacts,
     startEditContact,
     createManagedContact,
     saveContactOverride,

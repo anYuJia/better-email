@@ -5,10 +5,12 @@ import {
   duplicateTemplate,
   loadTemplates,
   migrateLegacyTemplate,
+  normalizeTemplate,
   parseAiGeneratedTemplate,
   persistTemplates,
   saveTemplate,
   substituteTemplateVariables,
+  templatesForAccount,
 } from './templateStore';
 
 describe('template store', () => {
@@ -130,6 +132,20 @@ describe('template store', () => {
   it('migrateLegacyTemplate returns null for garbage', () => {
     expect(migrateLegacyTemplate(null)).toBeNull();
     expect(migrateLegacyTemplate({ name: '' })).toBeNull();
+  });
+
+  it('keeps shared templates visible while isolating account templates', () => {
+    const templates = [
+      normalizeTemplate({ id: 'shared', name: 'Shared', account_id: 0 }),
+      normalizeTemplate({ id: 'account-one', name: 'Account One', account_id: 1 }),
+      normalizeTemplate({ id: 'account-two', name: 'Account Two', account_id: 2 }),
+    ];
+    expect(templatesForAccount(templates, 1).map((template) => template.id))
+      .toEqual(['shared', 'account-one']);
+    expect(templatesForAccount(templates, 2).map((template) => template.id))
+      .toEqual(['shared', 'account-two']);
+    expect(templatesForAccount(templates, null).map((template) => template.id))
+      .toEqual(['shared', 'account-one', 'account-two']);
   });
 });
 

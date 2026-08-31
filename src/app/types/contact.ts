@@ -1,5 +1,6 @@
 export type Contact = {
   id: number;
+  account_id: number;
   name: string;
   email: string;
   aliases: string[];
@@ -91,6 +92,7 @@ export type ContactImportCommitSummary = {
 
 export type ContactImportBatch = {
   id: number;
+  account_id: number;
   file_name: string;
   total_count: number;
   created_count: number;
@@ -105,4 +107,3 @@ export type ContactImportUndoReport = {
   remaining_created: number;
   note: string;
 };
-

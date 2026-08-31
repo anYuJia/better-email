@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { LoaderCircle, Pencil, Plus, Trash2 } from 'lucide-react';
 import {
   ruleActionParts,
@@ -7,6 +7,7 @@ import {
   type RuleConditionField,
 } from '../../app/appConfig';
 import type {
+  AccountScope,
   Label,
   MailRule,
   MailRuleInput,
@@ -15,6 +16,7 @@ import {
   AnimatedDisclosure,
   SettingsBadge,
   SettingsButton,
+  AccountScopeRequired,
   SettingsEmptyState,
   SettingsField,
   SettingsSection,
@@ -23,6 +25,7 @@ import {
 import { CustomSelect } from './accounts/CustomSelect';
 
 type RuleAutomationSettingsProps = {
+  accountScope?: AccountScope;
   ruleForm: MailRuleInput;
   ruleBuilderField: RuleConditionField;
   ruleBuilderNeedle: string;
@@ -41,6 +44,7 @@ type RuleAutomationSettingsProps = {
 };
 
 export default function RuleAutomationSettings({
+  accountScope = 1,
   ruleForm,
   ruleBuilderField,
   ruleBuilderNeedle,
@@ -97,11 +101,30 @@ export default function RuleAutomationSettings({
     }
   }
 
+  // The account refresh is asynchronous. Do not leave the previous account's
+  // rules visible while the new scope is loading.
+  const visibleRules = useMemo(
+    () => typeof accountScope === 'number'
+      ? rules.filter((rule) => rule.account_id === accountScope)
+      : rules,
+    [accountScope, rules],
+  );
+
+  if (accountScope === 'all') {
+    return (
+      <AccountScopeRequired
+        accountScope={accountScope}
+        title="请选择具体邮箱账号"
+        description="自动化规则只对一个邮箱账号的新邮件生效。请使用顶部的邮箱范围选择器选择一个账号后继续。"
+      />
+    );
+  }
+
   return (
     <SettingsSection
       title="处理规则"
       description="按发件人、主题、正文或收件人处理新邮件"
-      badge={<SettingsBadge tone="neutral">{rules.length} 条规则</SettingsBadge>}
+      badge={<SettingsBadge tone="neutral">{visibleRules.length} 条规则</SettingsBadge>}
       dataSection="rules"
     >
       <div className="settings-rule-editor">
@@ -239,11 +262,11 @@ export default function RuleAutomationSettings({
         </div>
       </div>
 
-      {rules.length === 0 ? (
+      {visibleRules.length === 0 ? (
         <SettingsEmptyState>还没有规则。创建一条规则，按条件自动处理新邮件。</SettingsEmptyState>
       ) : (
         <div className="settings-rule-list">
-          {rules.map((rule) => (
+          {visibleRules.map((rule) => (
             <div className="settings-rule-item" key={rule.id}>
               <span>
                 <strong>{rule.name}</strong>

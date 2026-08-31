@@ -13,6 +13,7 @@ const mockLocalFileAssetUrl = vi.mocked(localFileAssetUrl);
 
 const ada: Contact = {
   id: 1,
+  account_id: 1,
   name: 'Ada Lovelace',
   email: 'ada@example.com',
   aliases: [],
@@ -23,6 +24,7 @@ const ada: Contact = {
 
 const adaWu: Contact = {
   id: 2,
+  account_id: 1,
   name: 'Ada Wu',
   email: 'ada.wu@example.com',
   aliases: [],

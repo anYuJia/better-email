@@ -32,9 +32,10 @@ export function formatContactImportError(
 
 type ContactImportManagerOptions = {
   setStatus: Dispatch<SetStateAction<string>>;
+  accountId?: number | null;
 };
 
-export default function useContactImportManager({ setStatus }: ContactImportManagerOptions) {
+export default function useContactImportManager({ setStatus, accountId }: ContactImportManagerOptions) {
   const [preview, setPreview] = useState<ContactImportPreview | null>(null);
   const [commitResult, setCommitResult] = useState<ContactImportCommitSummary | null>(null);
   const [selectionMap, setSelectionMap] = useState<ImportSelectionMap>({});
@@ -73,7 +74,7 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
         setStatus('已取消选择联系人导入文件');
         return;
       }
-      const nextPreview = await invoke<ContactImportPreview>(IPC.PreviewContactImport, { path });
+      const nextPreview = await invoke<ContactImportPreview>(IPC.PreviewContactImport, { path, accountId });
       if (importGenerationRef.current !== generation) return;
       setPreview(nextPreview);
       setCommitResult(null);
@@ -97,7 +98,7 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
         setPreviewing(false);
       }
     }
-  }, [defaultActionForStatus, setStatus]);
+  }, [accountId, defaultActionForStatus, setStatus]);
 
   const setSelection = useCallback((email: string, action: 'create' | 'merge' | 'skip') => {
     setSelectionMap((current) => ({ ...current, [email]: action }));
@@ -144,7 +145,8 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
       const summary = await invoke<ContactImportCommitSummary>(IPC.CommitContactImportEntries, {
         fileName: preview.file_name,
         entries,
-        scope: 'global',
+        scope: accountId ? String(accountId) : 'global',
+        accountId,
       });
       setPreview(null);
       setEntryEdits({});
@@ -157,7 +159,7 @@ export default function useContactImportManager({ setStatus }: ContactImportMana
     } finally {
       setImporting(false);
     }
-  }, [preview, entryEdits, selectionMap, defaultActionForStatus, setStatus]);
+  }, [accountId, preview, entryEdits, selectionMap, defaultActionForStatus, setStatus]);
 
   const cancelImport = useCallback(() => {
     // 使进行中的选择/预览请求全部失效，防止旧 Promise 回写状态。

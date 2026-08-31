@@ -210,6 +210,7 @@ export default function ComposerWindow({
   const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
   const draftAccount = accounts.find((entry) => entry.id === accountId) ?? null;
+  const draftContacts = contacts.filter((contact) => contact.account_id === accountId);
   const draftIdentities = identities.filter((identity) => identity.account_id === accountId);
   const draftIdentity =
     draftIdentities.find((identity) => identity.id === draft.identity_id)
@@ -554,7 +555,7 @@ export default function ComposerWindow({
 
             <ComposerPrimaryFields
               draft={draft}
-              contacts={contacts}
+              contacts={draftContacts}
               richComposer={richComposer}
               dropActive={dropActive}
               ccOpen={ccOpen}
@@ -739,7 +740,7 @@ export default function ComposerWindow({
 
           {contactsPanelVisible && (
             <ComposerContactsPanel
-              contacts={contacts}
+              contacts={draftContacts}
               draft={draft}
               activeRecipientField={activeRecipientField}
               onAddContacts={onAddContacts}

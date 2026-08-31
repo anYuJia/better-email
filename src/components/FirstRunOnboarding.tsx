@@ -216,9 +216,12 @@ export default function FirstRunOnboarding({
     startImport,
     commitImport,
     cancelImport,
-  } = useContactImportManager({ setStatus: (value) => {
-    if (typeof value !== 'function') onStatus(value);
-  } });
+  } = useContactImportManager({
+    accountId,
+    setStatus: (value) => {
+      if (typeof value !== 'function') onStatus(value);
+    },
+  });
   const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   // Contact import is a body portal above the onboarding. While it is open,

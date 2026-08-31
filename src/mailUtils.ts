@@ -630,19 +630,19 @@ function decodeMailtoValue(value: string): string {
 
 export function parseMailtoUrl(url: string): MailtoParsed {
   const result: MailtoParsed = { to: '', cc: '', bcc: '', subject: '', body: '' };
-  
+
   const cleanUrl = url.replace(/[\x00-\x1F\x7F]/g, '');
   if (!cleanUrl.toLowerCase().startsWith('mailto:')) {
     return result;
   }
-  
+
   const rawParts = cleanUrl.substring(7);
   const [toPart, queryPart] = rawParts.split('?');
-  
+
   if (toPart) {
     result.to = decodeMailtoValue(toPart);
   }
-  
+
   if (queryPart) {
     const params = queryPart.split('&');
     for (const param of params) {
@@ -650,10 +650,10 @@ export function parseMailtoUrl(url: string): MailtoParsed {
       const key = separatorIndex >= 0 ? param.slice(0, separatorIndex) : param;
       const value = separatorIndex >= 0 ? param.slice(separatorIndex + 1) : '';
       if (!key) continue;
-      
+
       const cleanKey = key.trim().toLowerCase();
       const decodedValue = decodeMailtoValue(value || '');
-      
+
       if (cleanKey === 'to') {
         result.to = result.to ? `${result.to},${decodedValue}` : decodedValue;
       } else if (cleanKey === 'cc') {
@@ -667,7 +667,7 @@ export function parseMailtoUrl(url: string): MailtoParsed {
       }
     }
   }
-  
+
   return result;
 }
 

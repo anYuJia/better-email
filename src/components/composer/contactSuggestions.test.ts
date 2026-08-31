@@ -9,6 +9,7 @@ import {
 function contact(id: number, name: string, email: string, aliases: string[] = []): Contact {
   return {
     id,
+    account_id: 1,
     name,
     email,
     aliases,

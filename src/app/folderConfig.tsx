@@ -55,4 +55,3 @@ export function folderIconForRole(role: FolderRole): React.ReactNode {
 
 
 export const primaryFolderRoles = new Set<FolderRole>(['inbox', 'sent', 'drafts', 'archive']);
-

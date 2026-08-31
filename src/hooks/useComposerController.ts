@@ -108,7 +108,13 @@ export default function useComposerController({
     applyComposeTemplate,
     saveDraftAsTemplate,
     deleteComposeTemplate,
-  } = useComposerTemplates({ draft, setDraft, setRichComposer, setStatus });
+  } = useComposerTemplates({
+    draft,
+    fallbackAccountId: account?.id ?? accounts[0]?.id ?? 0,
+    setDraft,
+    setRichComposer,
+    setStatus,
+  });
 
   const onAttachmentsReady = useCallback((
     newAttachments: OutboundAttachmentInput[],
@@ -293,7 +299,7 @@ export default function useComposerController({
   function composeToContact(contact: Contact) {
     openComposer({
       ...emptyDraft,
-      account_id: account?.id ?? 0,
+      account_id: contact.account_id,
       to: contact.email,
     }, { replaceExisting: true });
     setStatus(`正在给 ${contact.name || contact.email} 写邮件`);

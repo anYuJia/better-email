@@ -8,6 +8,7 @@ afterEach(cleanup);
 
 const ada: Contact = {
   id: 1,
+  account_id: 1,
   name: 'Ada Lovelace',
   email: 'ada@example.com',
   aliases: ['ada@work.example.com'],
@@ -18,6 +19,7 @@ const ada: Contact = {
 
 const grace: Contact = {
   id: 2,
+  account_id: 1,
   name: 'Grace Hopper',
   email: 'grace@example.com',
   aliases: [],
@@ -28,6 +30,7 @@ const grace: Contact = {
 
 const lin: Contact = {
   id: 3,
+  account_id: 1,
   name: 'Lin Chen',
   email: 'lin@example.com',
   aliases: [],
@@ -38,6 +41,7 @@ const lin: Contact = {
 
 const newcomer: Contact = {
   id: 4,
+  account_id: 1,
   name: 'New Contact',
   email: 'new@example.com',
   aliases: [],
@@ -48,6 +52,7 @@ const newcomer: Contact = {
 
 const emailOnly: Contact = {
   id: 5,
+  account_id: 1,
   name: '',
   email: 'noreply@example.com',
   aliases: [],

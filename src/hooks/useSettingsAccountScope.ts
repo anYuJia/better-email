@@ -17,6 +17,7 @@ type UseSettingsAccountScopeOptions = {
   accountsLoaded: boolean;
   standaloneSettingsWindow: boolean;
   useNativeSettingsWindow: boolean;
+  onSettingsScopeChange?: (scope: AccountScope) => void;
   setAccount: Dispatch<SetStateAction<Account | null>>;
   setAccounts: Dispatch<SetStateAction<Account[]>>;
   setAccountForm: Dispatch<SetStateAction<Account | null>>;
@@ -38,6 +39,7 @@ export default function useSettingsAccountScope({
   accountsLoaded,
   standaloneSettingsWindow,
   useNativeSettingsWindow,
+  onSettingsScopeChange,
   setAccount,
   setAccounts,
   setAccountForm,
@@ -45,20 +47,31 @@ export default function useSettingsAccountScope({
   selectSettingsAccount,
   showNarrowList,
 }: UseSettingsAccountScopeOptions) {
+  const selectConcreteAccount = useCallback((nextAccount: Account) => {
+    // Scope owns the mailbox/settings context. Keep account data loading in the
+    // selection hook, but commit the scope here so every picker path updates
+    // the same state immediately, including the native settings window.
+    if (accountScope !== nextAccount.id) {
+      changeAccountScope(String(nextAccount.id));
+    }
+    selectSettingsAccount(nextAccount);
+  }, [accountScope, changeAccountScope, selectSettingsAccount]);
+
   const handleSettingsAccountScopeChange = useCallback((value: string) => {
     const nextScope = parseAccountScope(value);
     if (nextScope === null) return;
+    onSettingsScopeChange?.(nextScope);
     if (nextScope === 'all') {
       changeAccountScope('all');
     } else {
       const nextAccount = accounts.find((account) => account.id === nextScope);
-      if (nextAccount) selectSettingsAccount(nextAccount);
+      if (nextAccount) selectConcreteAccount(nextAccount);
       else changeAccountScope(value);
     }
     if (standaloneSettingsWindow) {
       void emitToMain(SETTINGS_ACCOUNT_SCOPE_EVENT, { scope: nextScope }).catch(() => undefined);
     }
-  }, [accounts, changeAccountScope, selectSettingsAccount, standaloneSettingsWindow]);
+  }, [accounts, changeAccountScope, onSettingsScopeChange, selectConcreteAccount, standaloneSettingsWindow]);
 
   const handleMailboxAccountScopeChange = useCallback((value: string) => {
     const nextScope = parseAccountScope(value);
@@ -81,14 +94,14 @@ export default function useSettingsAccountScope({
       return;
     }
     const requestedAccount = accounts.find((account) => account.id === requestedAccountScope);
-    if (requestedAccount) selectSettingsAccount(requestedAccount);
+    if (requestedAccount) selectConcreteAccount(requestedAccount);
     else changeAccountScope(String(requestedAccountScope));
   }, [
     accountScope,
     accounts,
     changeAccountScope,
     requestedAccountScope,
-    selectSettingsAccount,
+    selectConcreteAccount,
     standaloneSettingsWindow,
   ]);
 

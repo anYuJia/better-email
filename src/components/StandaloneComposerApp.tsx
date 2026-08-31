@@ -91,17 +91,17 @@ export default function StandaloneComposerApp() {
   const loadComposerData = useCallback(async (preferredAccountId?: number) => {
     const nextAccounts = await invoke<Account[]>(IPC.ListAccounts);
     const storedScope = loadAccountScope();
+    const fallbackAccount = nextAccounts.find((entry) => entry.is_default) ?? nextAccounts[0] ?? null;
     const requestedAccountId = preferredAccountId && preferredAccountId > 0
       ? preferredAccountId
       : typeof storedScope === 'number'
         ? storedScope
-        : null;
+        : fallbackAccount?.id ?? null;
     const [nextAccount, nextContacts, nextIdentities] = await Promise.all([
       invoke<Account | null>(IPC.GetAccount, { accountId: requestedAccountId }),
-      invoke<Contact[]>(IPC.ListContacts),
+      invoke<Contact[]>(IPC.ListContacts, { accountId: requestedAccountId }),
       invoke<MailIdentity[]>(IPC.ListIdentities, { accountId: requestedAccountId }),
     ]);
-    const fallbackAccount = nextAccounts.find((entry) => entry.is_default) ?? nextAccounts[0] ?? null;
     setAccounts(nextAccounts);
     setAccount(nextAccount ?? fallbackAccount);
     setContacts(nextContacts);
@@ -118,10 +118,10 @@ export default function StandaloneComposerApp() {
   }, [loadComposerData]);
 
   const refreshContacts = useCallback(async () => {
-    const refreshed = await invoke<Contact[]>(IPC.ListContacts);
+    const refreshed = await invoke<Contact[]>(IPC.ListContacts, { accountId: account?.id ?? null });
     setContacts(refreshed);
     return refreshed;
-  }, []);
+  }, [account?.id]);
 
   const scanRecentContacts = useCallback(async () => {
     if (contactScanBusyRef.current) return;
@@ -129,7 +129,10 @@ export default function StandaloneComposerApp() {
     setContactScanBusy(true);
     setStatus('正在扫描已发送邮件头并同步最近联系人…');
     try {
-      const report = await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, { initialOnly: false });
+      const report = await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, {
+        initialOnly: false,
+        accountId: account?.id ?? null,
+      });
       await refreshContacts();
       setStatus(`最近联系人同步完成：发现 ${report.discovered_contacts} 位，新增 ${report.created} 位`);
     } catch (error) {
@@ -138,7 +141,7 @@ export default function StandaloneComposerApp() {
       contactScanBusyRef.current = false;
       setContactScanBusy(false);
     }
-  }, [refreshContacts]);
+  }, [account?.id, refreshContacts]);
 
   const focusMailboxRole = useCallback(async (
     _role: FolderRole,

@@ -45,19 +45,16 @@ export default function AccountSwitcher({
   const selectedAccount = accountScope === 'all'
     ? null
     : accounts.find((account) => account.id === accountScope) ?? null;
-  const defaultAccount = accounts.find((account) => account.is_default) ?? accounts[0] ?? null;
+  const accountCountLabel = `${accounts.length} 个账号`;
+  const allAccountsSecondaryLabel = accounts.length > 0
+    ? `所有邮箱账号 · ${accountCountLabel}`
+    : '所有邮箱账号';
   const primaryLabel = selectedAccount?.display_name.trim()
     || selectedAccount?.email
     || '统一邮箱';
   const secondaryLabel = selectedAccount
-    ? [
-        selectedAccount.email,
-        providerLabel(selectedAccount.provider),
-        selectedAccount.is_default ? '默认' : '',
-      ].filter(Boolean).join(' · ')
-    : accounts.length > 1
-      ? `${accounts.length} 个账号`
-      : defaultAccount?.email ?? '全部账号';
+    ? selectedAccount.email
+    : allAccountsSecondaryLabel;
 
   function openMenu(x: number, y: number) {
     setMenu({ x, y });
@@ -75,7 +72,7 @@ export default function AccountSwitcher({
     {
       id: 'account-scope-all',
       label: '统一邮箱',
-      detail: accounts.length > 1 ? `${accounts.length} 个账号` : defaultAccount?.email,
+      detail: allAccountsSecondaryLabel,
       icon: <Mails size={15} />,
       checked: accountScope === 'all',
       selectionRole: 'radio' as const,

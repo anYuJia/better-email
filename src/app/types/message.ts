@@ -129,4 +129,3 @@ export type FolderReadReport = {
   remote_failed_count: number;
   message: string;
 };
-

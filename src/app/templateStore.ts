@@ -66,6 +66,18 @@ export function loadTemplates(): ComposeTemplate[] {
   }
 }
 
+/**
+ * 返回当前邮箱可使用的模板：0 表示明确共享给所有账号的模板；正数表示
+ * 只属于对应邮箱账号的模板。统一范围下保留完整列表，方便在设置中查看归属。
+ */
+export function templatesForAccount(
+  templates: ComposeTemplate[],
+  accountId: number | null | undefined,
+): ComposeTemplate[] {
+  if (!accountId || accountId <= 0) return templates;
+  return templates.filter((template) => template.account_id === 0 || template.account_id === accountId);
+}
+
 export function persistTemplates(templates: ComposeTemplate[]): void {
   window.localStorage.setItem(composeTemplatesStorageKey, JSON.stringify(templates));
 }

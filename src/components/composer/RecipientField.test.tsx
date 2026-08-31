@@ -8,9 +8,9 @@ afterEach(() => {
 });
 
 const contacts: ContactSearchEntry[] = [
-  { contact: { id: 1, name: 'Ada Chen', email: 'ada@example.com', aliases: [], vip: false, message_count: 0, last_seen_at: '' }, searchText: 'ada@example.com ada chen' },
-  { contact: { id: 2, name: 'Bob Lin', email: 'bob@example.com', aliases: [], vip: false, message_count: 0, last_seen_at: '' }, searchText: 'bob@example.com bob lin' },
-  { contact: { id: 3, name: 'Carol Wu', email: 'carol@example.com', aliases: [], vip: false, message_count: 0, last_seen_at: '' }, searchText: 'carol@example.com carol wu' },
+  { contact: { id: 1, account_id: 1, name: 'Ada Chen', email: 'ada@example.com', aliases: [], vip: false, message_count: 0, last_seen_at: '' }, searchText: 'ada@example.com ada chen' },
+  { contact: { id: 2, account_id: 1, name: 'Bob Lin', email: 'bob@example.com', aliases: [], vip: false, message_count: 0, last_seen_at: '' }, searchText: 'bob@example.com bob lin' },
+  { contact: { id: 3, account_id: 1, name: 'Carol Wu', email: 'carol@example.com', aliases: [], vip: false, message_count: 0, last_seen_at: '' }, searchText: 'carol@example.com carol wu' },
 ];
 
 function renderField(onChange = vi.fn()) {

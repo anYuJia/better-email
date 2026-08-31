@@ -138,6 +138,17 @@ pub(super) fn import_backup_table(
             );
             normalized.insert("is_downloaded".into(), serde_json::Value::Number(0.into()));
         }
+        if matches!(table, "contacts" | "mail_rules") && !normalized.contains_key("account_id") {
+            let default_account_id: i64 = conn.query_row(
+                "SELECT id FROM accounts ORDER BY is_default DESC, id LIMIT 1",
+                [],
+                |row| row.get(0),
+            )?;
+            normalized.insert(
+                "account_id".into(),
+                serde_json::Value::Number(default_account_id.into()),
+            );
+        }
         let mut insert_columns = Vec::new();
         let mut values = Vec::new();
         for column in &columns {

@@ -121,7 +121,7 @@ export default function ConfirmDialog({
         <p id={descId} className="confirm-dialog-description">
           {description}
         </p>
-        
+
         {error && (
           <div className="confirm-dialog-error" role="alert">
             错误: {error}

@@ -324,6 +324,7 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   ]);
 
   const contactsProps = useMemo(() => ({
+    accountScope: props.accountScope,
     contactForm: props.contactForm,
     contactFormAliases: props.contactFormAliases,
     contacts: props.contacts,
@@ -343,9 +344,11 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     props.contactEditName,
     props.contactEditAliases,
     props.contactTransferBusy,
+    props.accountScope,
   ]);
 
   const rulesProps = useMemo(() => ({
+    accountScope: props.accountScope,
     ruleForm: props.ruleForm,
     ruleBuilderField: props.ruleBuilderField,
     ruleBuilderNeedle: props.ruleBuilderNeedle,
@@ -359,6 +362,7 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     props.editingRuleId,
     props.rules,
     props.labels,
+    props.accountScope,
   ]);
 
   const isAccountSection = activeSettingsSection === 'accounts'
@@ -469,7 +473,11 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
             <MemoizedMcp />
           )}
           {activeSettingsSection === 'templates' && (
-            <MemoizedTemplates onNavigateToAi={() => handlers.onNavigate('ai')} />
+            <MemoizedTemplates
+              accountScope={props.accountScope}
+              accounts={props.accounts}
+              onNavigateToAi={() => handlers.onNavigate('ai')}
+            />
           )}
           {activeSettingsSection === 'about' && (
             <MemoizedAbout />

@@ -15,11 +15,13 @@ type RuleManagementOptions = {
   rules: MailRule[];
   setRules: Dispatch<SetStateAction<MailRule[]>>;
   setStatus: Dispatch<SetStateAction<string>>;
+  accountId?: number | null;
 };
 
 export default function useRuleManagement({
   setRules,
   setStatus,
+  accountId,
 }: RuleManagementOptions) {
   const [ruleForm, setRuleForm] = useState<MailRuleInput>(emptyRuleForm);
   const [ruleBuilderField, setRuleBuilderField] = useState<RuleConditionField>('from');
@@ -32,9 +34,15 @@ export default function useRuleManagement({
       setStatus('请填写规则名称、条件和动作');
       return;
     }
+    if (accountId === null) {
+      setStatus('请先选择具体邮箱账号，再保存规则');
+      return;
+    }
+    const scopeArgs = accountId === undefined ? {} : { accountId };
     const saved = await invoke<MailRule>(IPC.UpsertRule, {
       ruleId: editingRuleId,
       input: ruleForm,
+      ...scopeArgs,
     });
     setRules((current) => {
       const exists = current.some((rule) => rule.id === saved.id);
@@ -46,9 +54,14 @@ export default function useRuleManagement({
   }
 
   async function toggleRule(rule: MailRule) {
+    if (accountId === null) {
+      setStatus('请先选择具体邮箱账号，再修改规则');
+      return;
+    }
     const updated = await invoke<MailRule>(IPC.SetRuleEnabled, {
       ruleId: rule.id,
       enabled: !rule.enabled,
+      ...(accountId === undefined ? { accountId: rule.account_id } : { accountId }),
     });
     setRules((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     setStatus(updated.enabled ? `规则已启用：${updated.name}` : `规则已停用：${updated.name}`);
@@ -69,7 +82,14 @@ export default function useRuleManagement({
   }
 
   async function removeRuleConfirmed(rule: MailRule) {
-    await invoke(IPC.DeleteRule, { ruleId: rule.id });
+    if (accountId === null) {
+      setStatus('请先选择具体邮箱账号，再删除规则');
+      return;
+    }
+    await invoke(IPC.DeleteRule, {
+      ruleId: rule.id,
+      ...(accountId === undefined ? { accountId: rule.account_id } : { accountId }),
+    });
     setRules((current) => current.filter((item) => item.id !== rule.id));
     if (editingRuleId === rule.id) {
       setEditingRuleId(null);

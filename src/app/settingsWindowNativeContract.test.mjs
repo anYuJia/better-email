@@ -11,6 +11,10 @@ const standaloneSource = readFileSync(
   'utf8',
 );
 const appSource = readFileSync(join(repoRoot, 'src/App.tsx'), 'utf8');
+const navigationSource = readFileSync(
+  join(repoRoot, 'src/hooks/useMailboxNavigation.ts'),
+  'utf8',
+);
 const rustAppSource = readFileSync(join(repoRoot, 'src-tauri/src/lib.rs'), 'utf8');
 const capability = JSON.parse(
   readFileSync(join(repoRoot, 'src-tauri/capabilities/default.json'), 'utf8'),
@@ -32,7 +36,7 @@ describe('standalone settings native-window lifecycle contract', () => {
 
   it('creates a hidden settings WebView and reveals it only after readiness', () => {
     expect(bridgeSource).toContain("settingsUrl.searchParams.set('window', 'settings')");
-    expect(bridgeSource).toContain("settingsUrl.searchParams.set('section', request.section || 'accounts')");
+    expect(bridgeSource).toContain("settingsUrl.searchParams.set('section', request.section || DEFAULT_SETTINGS_SECTION)");
     expect(bridgeSource).toContain("settingsUrl.searchParams.set('scope', String(request.accountScope))");
     expect(bridgeSource).toMatch(/new WebviewWindow\(SETTINGS_WINDOW_LABEL,[\s\S]*?visible: false/);
     expect(bridgeSource).toMatch(/new WebviewWindow\(SETTINGS_WINDOW_LABEL,[\s\S]*?titleBarStyle: 'overlay'/);
@@ -42,7 +46,10 @@ describe('standalone settings native-window lifecycle contract', () => {
     const openSettings = exportedFunction(bridgeSource, 'prodOpenSettingsWindow');
     expect(openSettings).toContain('waitForSettingsWindowReady(settingsWindow)');
     expect(openSettings).toContain('focusComposerWindow(settingsWindow)');
-    expect(openSettings.match(/settingsWindow\.emit\(SETTINGS_OPEN_EVENT, request\)/g)).toHaveLength(2);
+    expect(openSettings.match(/settingsWindow\.emit\(SETTINGS_OPEN_EVENT, normalizedRequest\)/g)).toHaveLength(2);
+
+    const prewarmSettings = exportedFunction(bridgeSource, 'prodPrewarmSettingsWindow');
+    expect(prewarmSettings).toContain('waitForSettingsWindowReady(await getSettingsWindow())');
   });
 
   it('mounts a dedicated settings renderer instead of mailbox chrome', () => {
@@ -50,6 +57,15 @@ describe('standalone settings native-window lifecycle contract', () => {
     expect(rootSource).toContain('<StandaloneSettingsApp />');
     expect(appSource).toContain('{standaloneSettingsWindow ? null : isMobileApp ? (');
     expect(appSource).toContain('standalone={standaloneSettingsWindow}');
+  });
+
+  it('defaults every settings entry point to the general page', () => {
+    expect(appSource).toContain("requestedSettingsSection = 'general'");
+    expect(appSource).toContain("useCallback((section: SettingsSectionId = 'general')");
+    expect(appSource).toContain("openDesktopSettingsWindow('general')");
+    expect(appSource).toContain('prewarmSettingsWindow');
+    expect(navigationSource).toContain('setActiveSettingsSection(DEFAULT_SETTINGS_SECTION)');
+    expect(standaloneSource).toContain('return isSettingsSectionId(requested) ? requested : DEFAULT_SETTINGS_SECTION');
   });
 
   it('routes native close requests into the same dirty-state close flow', () => {

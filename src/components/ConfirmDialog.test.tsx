@@ -27,10 +27,10 @@ describe('ConfirmDialog Component robust behaviors', () => {
     );
 
     expect(screen.getByRole('dialog')).toBeDefined();
-    
+
     // Focus recovery target simulation
     const cancelBtn = screen.getByRole('button', { name: '取消' });
-    
+
     act(() => {
       vi.advanceTimersByTime(50);
     });
@@ -185,7 +185,7 @@ describe('ConfirmDialog Component robust behaviors', () => {
     );
 
     const confirmBtn = screen.getByRole('button', { name: '确认' });
-    
+
     await act(async () => {
       fireEvent.click(confirmBtn);
     });

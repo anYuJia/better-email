@@ -1,0 +1,97 @@
+name: Dependency Snapshot
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - package.json
+      - src-tauri/Cargo.toml
+      - .github/workflows/dependency-snapshot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dependency-snapshot-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate dependency snapshot
+        shell: bash
+        run: |
+          mkdir -p docs
+          node --input-type=module <<'NODE' > docs/DEPENDENCY_STATUS.md
+          import fs from 'node:fs';
+
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+
+          console.log('# Dependency Status');
+          console.log('');
+          console.log('> Generated automatically from the committed dependency manifests.');
+          console.log('');
+          console.log(`Better Email version: **${pkg.version}**`);
+          console.log('');
+          console.log('## Node.js dependencies');
+          console.log('');
+
+          for (const [group, dependencies] of [
+            ['Runtime', pkg.dependencies ?? {}],
+            ['Development', pkg.devDependencies ?? {}],
+          ]) {
+            console.log(`### ${group}`);
+            console.log('');
+            for (const [name, version] of Object.entries(dependencies).sort(([a], [b]) => a.localeCompare(b))) {
+              console.log(`- \`${name}\`: \`${version}\``);
+            }
+            console.log('');
+          }
+
+          console.log('## Rust dependencies');
+          console.log('');
+
+          let section = '';
+          for (const rawLine of cargo.split(/\r?\n/)) {
+            const line = rawLine.trim();
+            const sectionMatch = line.match(/^\[(.+)]$/);
+            if (sectionMatch) {
+              section = sectionMatch[1];
+              continue;
+            }
+            if (!section.includes('dependencies') || !line || line.startsWith('#') || !line.includes('=')) {
+              continue;
+            }
+            console.log(`- \`${line}\``);
+          }
+          NODE
+
+      - name: Commit snapshot when changed
+        shell: bash
+        run: |
+          if git diff --quiet -- docs/DEPENDENCY_STATUS.md; then
+            echo "Dependency snapshot is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/DEPENDENCY_STATUS.md
+          git commit -m "docs: refresh dependency snapshot"
+          git push

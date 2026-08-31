@@ -4,6 +4,7 @@ use super::messages::message_for_conn;
 use super::*;
 
 impl MailStore {
+    #[allow(dead_code)]
     pub fn list_contacts(&self) -> MailResult<Vec<Contact>> {
         self.list_contacts_for_account(None)
     }
@@ -34,6 +35,7 @@ impl MailStore {
             Ok(contacts)
         })
     }
+    #[allow(dead_code)]
     pub fn list_all_contacts(&self) -> MailResult<Vec<Contact>> {
         self.list_all_contacts_for_account(None)
     }
@@ -79,6 +81,7 @@ impl MailStore {
             Ok(completed == 0)
         })
     }
+    #[allow(dead_code)]
     pub fn scan_recent_contacts(&self, initial_only: bool) -> MailResult<RecentContactSyncReport> {
         self.scan_recent_contacts_for_account(initial_only, None)
     }
@@ -348,6 +351,7 @@ impl MailStore {
     ) -> MailResult<ContactImportCommitSummary> {
         self.with_conn(|conn| commit_import_inputs(conn, account_id, inputs, file_name, scope))
     }
+    #[allow(dead_code)]
     pub fn list_contact_import_batches(&self) -> MailResult<Vec<ContactImportBatch>> {
         self.list_contact_import_batches_for_account(None)
     }
@@ -459,6 +463,7 @@ impl MailStore {
             merge_contacts_for_conn(conn, Some(account_id), target_contact_id, source_contact_id)
         })
     }
+    #[allow(dead_code)]
     pub fn list_rules(&self) -> MailResult<Vec<MailRule>> {
         self.list_rules_for_account(None)
     }
@@ -728,10 +733,6 @@ fn merge_contacts_for_conn(
         params![source_contact_id, target.account_id],
     )?;
     get_contact_for_conn_and_account(conn, Some(target.account_id), target_contact_id)
-}
-
-fn contact_row_for_conn(conn: &Connection, email: &str) -> MailResult<Option<Contact>> {
-    contact_row_for_account_conn(conn, None, email)
 }
 
 fn contact_row_for_account_conn(
@@ -1156,10 +1157,6 @@ fn parse_contact_address(value: &str) -> Option<(String, String)> {
         return None;
     }
     Some((name, email))
-}
-
-pub(super) fn get_contact_for_conn(conn: &Connection, contact_id: i64) -> MailResult<Contact> {
-    get_contact_for_conn_and_account(conn, None, contact_id)
 }
 
 fn get_contact_for_conn_and_account(

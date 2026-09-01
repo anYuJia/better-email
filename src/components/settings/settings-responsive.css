@@ -20,12 +20,13 @@
   }
 
   .settings-main-header {
-    min-height: 52px;
-    height: 52px;
-    flex-basis: 52px;
+    min-height: 102px;
+    height: auto;
+    flex-basis: auto;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) 44px auto;
+    grid-template-rows: 52px 50px;
+    gap: 0 4px;
     padding: 0 8px 0 4px;
   }
 
@@ -65,17 +66,24 @@
   }
 
   .settings-header-leading {
-    min-width: 0;
-    gap: 3px;
+    display: contents;
   }
 
   .settings-header-leading .settings-title {
-    flex: 0 0 auto;
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 3px;
   }
 
   .settings-header-account-switcher {
-    width: min(180px, 100%);
-    max-width: 180px;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    max-width: none;
+    border-top: 1px solid var(--st-border);
   }
 
   .settings-header-account-switcher .account-switcher-trigger {
@@ -92,14 +100,16 @@
   }
 
   .settings-header-search {
-    width: 40px;
-    min-width: 40px;
+    grid-column: 2;
+    grid-row: 1;
+    width: 44px;
+    min-width: 44px;
     justify-self: end;
   }
 
   .settings-search-toggle {
-    width: 40px;
-    min-width: 40px;
+    width: 44px;
+    min-width: 44px;
     min-height: 44px;
     display: grid;
     place-items: center;
@@ -121,10 +131,15 @@
   }
 
   .settings-header-search.is-mobile-expanded {
+    grid-column: 1 / -1;
+    grid-row: 1;
     position: absolute;
+    top: 4px;
     right: 8px;
-    left: 54px;
+    left: 8px;
     width: auto;
+    z-index: 10;
+    justify-self: stretch;
   }
 
   .settings-header-search.is-mobile-expanded .settings-search-toggle {
@@ -146,6 +161,8 @@
   }
 
   .settings-header-actions {
+    grid-column: 3;
+    grid-row: 1;
     margin-left: auto;
     gap: 4px;
   }
@@ -282,7 +299,7 @@
   }
 
   .settings-discard-confirm {
-    top: 58px;
+    top: 108px;
     right: 8px;
     left: 8px;
     width: auto;

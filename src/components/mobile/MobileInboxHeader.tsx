@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { filters } from '../../app/appConfig';
 import type { FilterMode, ListMode } from '../../app/types';
-import { useWheelContainment } from '../../hooks/useWheelContainment';
+import ContextMenu, { type ContextMenuItem } from '../ContextMenu';
 
 type MobileInboxHeaderProps = {
   currentViewLabel: string;
@@ -54,9 +54,8 @@ export default function MobileInboxHeader({
   searchOpen,
 }: MobileInboxHeaderProps) {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const listModeMenuRef = useRef<HTMLDivElement | null>(null);
-  const [showListModeMenu, setShowListModeMenu] = useState(false);
-  useWheelContainment(listModeMenuRef, showListModeMenu);
+  const listModeMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [listModeMenu, setListModeMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -69,6 +68,29 @@ export default function MobileInboxHeader({
   }
 
   const activeFilter = filters.find((item) => item.id === filter) ?? filters[0];
+  const listModeMenuItems: ContextMenuItem[] = [
+    {
+      id: 'mobile-filter-attachments',
+      label: '附件',
+      checked: filter === 'attachments',
+      selectionRole: 'radio',
+      onSelect: () => onFilterChange('attachments'),
+    },
+    {
+      id: 'mobile-list-mode-messages',
+      label: '邮件列表',
+      checked: listMode === 'messages',
+      selectionRole: 'radio',
+      onSelect: onShowMessages,
+    },
+    {
+      id: 'mobile-list-mode-threads',
+      label: '会话列表',
+      checked: listMode === 'threads',
+      selectionRole: 'radio',
+      onSelect: onShowThreads,
+    },
+  ];
 
   if (searchOpen) {
     return (
@@ -162,56 +184,35 @@ export default function MobileInboxHeader({
         ))}
         <div className="mobile-inbox-filter-menu">
           <button
+            ref={listModeMenuTriggerRef}
             type="button"
             className={filter === 'attachments' ? 'active' : ''}
             aria-label={`更多筛选，当前：${activeFilter.label}`}
-            aria-expanded={showListModeMenu}
-            onClick={() => setShowListModeMenu((current) => !current)}
+            aria-haspopup="menu"
+            aria-expanded={Boolean(listModeMenu)}
+            onClick={(event) => {
+              if (listModeMenu) {
+                setListModeMenu(null);
+                return;
+              }
+              const bounds = event.currentTarget.getBoundingClientRect();
+              setListModeMenu({ x: bounds.right - 188, y: bounds.bottom + 6 });
+            }}
           >
             <SlidersHorizontal size={16} aria-hidden="true" />
             <span>{filter === 'attachments' ? '附件' : listMode === 'threads' ? '会话' : '更多'}</span>
             <ChevronDown size={13} aria-hidden="true" />
           </button>
-          {showListModeMenu && (
-            <div
-              ref={listModeMenuRef}
-              className="mobile-inbox-filter-popover"
-              role="menu"
-            >
-              <button
-                type="button"
-                role="menuitemradio"
-                aria-checked={filter === 'attachments'}
-                onClick={() => {
-                  onFilterChange('attachments');
-                  setShowListModeMenu(false);
-                }}
-              >
-                附件
-              </button>
-              <button
-                type="button"
-                role="menuitemradio"
-                aria-checked={listMode === 'messages'}
-                onClick={() => {
-                  onShowMessages();
-                  setShowListModeMenu(false);
-                }}
-              >
-                邮件列表
-              </button>
-              <button
-                type="button"
-                role="menuitemradio"
-                aria-checked={listMode === 'threads'}
-                onClick={() => {
-                  onShowThreads();
-                  setShowListModeMenu(false);
-                }}
-              >
-                会话列表
-              </button>
-            </div>
+          {listModeMenu && (
+            <ContextMenu
+              x={listModeMenu.x}
+              y={listModeMenu.y}
+              items={listModeMenuItems}
+              onClose={() => setListModeMenu(null)}
+              closeIgnoreRef={listModeMenuTriggerRef}
+              className="mobile-inbox-filter-menu-surface"
+              ariaLabel="邮件筛选和列表模式"
+            />
           )}
         </div>
       </div>

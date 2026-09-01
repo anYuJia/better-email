@@ -24,6 +24,10 @@
   scrollbar-color: var(--ui-scrollbar-thumb) transparent;
 }
 
+.context-menu-surface.mobile-inbox-filter-menu-surface {
+  width: min(188px, calc(100vw - 24px));
+}
+
 /* Anchored toolbar menus use the same content primitive inside <details>.
    The positioning hook still owns viewport placement; this class only keeps
    the canonical surface geometry from being diluted by legacy menu rules. */
@@ -233,6 +237,7 @@
   border-radius: var(--ui-radius-panel);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
+  z-index: 1;
   scrollbar-width: thin;
   scrollbar-color: var(--ui-scrollbar-thumb) transparent;
 }
@@ -279,6 +284,35 @@
 
   .context-menu-heading {
     padding-block: 9px 10px;
+  }
+
+  /* A side flyout cannot coexist with a 280px parent surface on a phone.
+     Expand the branch inside the owning scroll surface instead, so a tap
+     never lands on an overlapping sibling command after the menu reflows. */
+  .context-submenu {
+    position: static;
+    width: 100%;
+    max-height: none;
+    margin: 2px 0 4px;
+    padding: 3px 4px 3px 12px;
+    overflow: visible;
+    border: 0;
+    border-radius: var(--ui-menu-item-radius);
+    background: var(--ui-surface-muted);
+    box-shadow: none;
+  }
+
+  .context-submenu .context-menu-separator {
+    margin-inline: 6px;
+  }
+
+  .context-menu-branch:hover > .context-submenu {
+    display: none;
+  }
+
+  .context-menu-branch.is-pointer-open > .context-submenu,
+  .context-menu-branch.is-keyboard-open > .context-submenu {
+    display: block;
   }
 }
 

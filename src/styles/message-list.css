@@ -1415,15 +1415,15 @@
   min-width: 0;
   max-width: 55%;
   margin: 1px 0 0 auto;
-  padding: 1px 5px;
+  padding: 0;
   overflow: hidden;
-  border: 1px solid var(--ui-info-border);
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-info);
-  background: var(--ui-info-bg);
+  border: 0;
+  border-radius: 0;
+  color: var(--ui-text-tertiary);
+  background: transparent;
   font-size: var(--ui-font-size-aux);
   font-weight: var(--ui-font-weight-regular);
-  line-height: 1.25;
+  line-height: 1.35;
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2691,6 +2691,30 @@
 }
 
 @media (max-width: 640px) {
+  .message-date-range-trigger::after {
+    inset: -9px -6px;
+  }
+
+  .message-date-range-backdrop {
+    padding: 8px;
+  }
+
+  .message-date-range-modal {
+    max-height: calc(100dvh - 16px);
+  }
+
+  .message-date-range-modal-header {
+    min-height: 56px;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    padding-inline: 8px;
+  }
+
+  .message-date-range-modal-header button,
+  .message-date-range-calendar-header button {
+    width: 44px;
+    height: 44px;
+  }
+
   .message-date-range-inputs {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
@@ -2702,6 +2726,19 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     padding: 0 16px 14px;
+  }
+  .message-date-range-inputs input,
+  .message-date-range-calendar-select button,
+  .message-date-range-calendar-options button,
+  .message-date-range-modal .message-date-range-actions button {
+    min-height: 44px;
+  }
+  .message-date-range-calendar-header {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+  .message-date-range-days button,
+  .message-date-range-day-empty {
+    min-height: 44px;
   }
   .message-date-range-modal .message-date-range-error { margin-inline: 16px; }
   .message-date-range-modal .message-date-range-actions { padding-inline: 16px; }

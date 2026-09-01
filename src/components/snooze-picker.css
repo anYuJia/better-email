@@ -230,10 +230,24 @@
     border-radius: var(--ui-radius-panel);
   }
 
+  .snooze-dialog > header {
+    grid-template-columns: 24px minmax(0, 1fr) 44px;
+  }
+
+  .snooze-dialog > header button {
+    width: 44px;
+    height: 44px;
+  }
+
   .snooze-preset-grid {
     grid-template-columns: 1fr;
     max-height: 310px;
     overflow-y: auto;
+  }
+
+  .snooze-custom input,
+  .snooze-custom button {
+    min-height: 44px;
   }
 }
 

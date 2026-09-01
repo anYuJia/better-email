@@ -5,6 +5,7 @@ import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
   cleanup();
 });
 
@@ -194,6 +195,41 @@ describe('ContextMenu focus management', () => {
 
     fireEvent.click(trigger);
     expect(branch.classList.contains('is-pointer-open')).toBe(true);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(trigger.getAttribute('aria-controls')).toBeTruthy();
+    fireEvent.click(trigger);
+    expect(branch.classList.contains('is-pointer-open')).toBe(true);
+  });
+
+  it('waits for an explicit tap before expanding an inline mobile submenu', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      media: '(max-width: 720px)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+    render(
+      <ContextMenu
+        x={10}
+        y={10}
+        items={[{
+          id: 'labels',
+          label: '标签',
+          children: [{ id: 'work', label: '工作' }],
+        }]}
+        onClose={vi.fn()}
+      />,
+    );
+    const trigger = screen.getByRole('menuitem', { name: '标签' });
+    const branch = trigger.parentElement as HTMLElement;
+
+    fireEvent.pointerEnter(branch);
+    expect(branch.classList.contains('is-pointer-open')).toBe(false);
+
     fireEvent.click(trigger);
     expect(branch.classList.contains('is-pointer-open')).toBe(true);
   });

@@ -9,6 +9,13 @@ type SenderIdentityProps = {
   onComposeNew?: (fields: { to: string }) => void;
 };
 
+function recipientDisplayName(address: string, accountEmail: string) {
+  const normalizedAccount = accountEmail.trim().toLocaleLowerCase();
+  if (!normalizedAccount) return address;
+  const bracketedAddress = address.match(/<([^>]+)>/)?.[1] ?? address;
+  return bracketedAddress.trim().toLocaleLowerCase() === normalizedAccount ? '我' : address;
+}
+
 export default function SenderIdentity({ message, onComposeNew }: SenderIdentityProps) {
   const senderEmail = message.sender_email.trim();
   const recipientGroups = recipientGroupsForMessage(message);
@@ -19,7 +26,8 @@ export default function SenderIdentity({ message, onComposeNew }: SenderIdentity
   const hasRecipientOverflow = recipientCount > 2 || allRecipientText.length > 72;
   const recipientSummary = recipientGroups.map((group) => {
     const label = group.label === '收件人' ? '发给' : group.label;
-    const visibleAddresses = hasRecipientOverflow ? group.addresses.slice(0, 2) : group.addresses;
+    const visibleAddresses = (hasRecipientOverflow ? group.addresses.slice(0, 2) : group.addresses)
+      .map((address) => recipientDisplayName(address, message.account_email));
     const remainingCount = group.addresses.length - visibleAddresses.length;
     const suffix = remainingCount > 0 ? ` 等 ${remainingCount} 人` : '';
     return `${label} ${visibleAddresses.join(', ')}${suffix}`;

@@ -840,13 +840,24 @@
 }
 
 .color-dot-btn {
-  width: 14px;
-  height: 14px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
   border-radius: 50%;
   border: 1px solid transparent;
+  background: transparent;
   cursor: pointer;
   padding: 0;
   transition: var(--ui-transition-transform-fast), var(--ui-transition-fast-border-shadow);
+}
+
+.color-dot-btn::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--label-color);
 }
 
 .color-dot-btn:hover {
@@ -854,20 +865,21 @@
 }
 
 .color-dot-btn.active {
-  border-color: var(--ui-text);
-  box-shadow: var(--ui-box-shadow-surface-outline), 0 0 0 1.5px var(--ui-surface), 0 0 0 3px var(--ui-accent);
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  box-shadow: none;
 }
 
 .label-add-submit-btn {
   margin-left: auto;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: var(--ui-accent);
   color: var(--color-text-on-accent);
   border: none;
   font-size: 13px;
-  line-height: 24px;
+  line-height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1018,6 +1030,66 @@
   line-height: 1.45;
   width: 100%;
   box-sizing: border-box;
+}
+
+@media (max-width: 720px) {
+  .mobile-app-surface .label-tools .label-menu summary {
+    min-height: 44px;
+    height: 44px;
+    padding-inline: 10px;
+  }
+
+  .mobile-app-surface .label-tools .label-menu > .label-menu-container {
+    width: min(280px, calc(100vw - 24px));
+    min-width: 0;
+    max-height: min(520px, calc(100dvh - 24px));
+    padding: 8px;
+  }
+
+  .mobile-app-surface .label-menu-add-section input,
+  .mobile-app-surface .label-edit-inline input {
+    min-height: 44px;
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .mobile-app-surface .color-dot-btn,
+  .mobile-app-surface .label-add-submit-btn,
+  .mobile-app-surface .label-item-actions button,
+  .mobile-app-surface .label-edit-actions button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .mobile-app-surface .color-dot-btn::before {
+    width: 14px;
+    height: 14px;
+  }
+
+  .mobile-app-surface .label-menu-item-row,
+  .mobile-app-surface .label-select-btn {
+    min-height: 44px;
+  }
+
+  .mobile-app-surface .label-menu-item-row {
+    padding-block: 0;
+  }
+
+  .mobile-app-surface .label-item-actions {
+    flex: 0 0 auto;
+    opacity: 1;
+  }
+
+  .mobile-app-surface .label-edit-inline {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .mobile-app-surface .label-edit-actions {
+    margin-left: auto;
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1754,16 +1826,19 @@
 }
 
 .reader-warning-more > summary {
-  width: 32px;
+  width: auto;
   min-height: 32px;
-  padding: 0;
+  padding: 0 9px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .reader-warning-more > summary:hover,
@@ -1829,7 +1904,7 @@
   }
 
   .app-shell.is-mobile-app .reader-warning-more > summary {
-    width: var(--ui-control-height-touch);
+    width: auto;
   }
 }
 

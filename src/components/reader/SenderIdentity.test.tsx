@@ -37,6 +37,12 @@ function message(overrides: Partial<MessageSummary> = {}): MessageSummary {
 }
 
 describe('SenderIdentity recipient summary', () => {
+  it('uses a quiet personal label when the recipient is the current account', () => {
+    render(<SenderIdentity message={message({ recipients: 'me@example.com' })} />);
+    expect(screen.getByText('发给 我')).toBeDefined();
+    expect(screen.queryByText('发给 me@example.com')).toBeNull();
+  });
+
   it('shows cc in the compact sender line', () => {
     render(<SenderIdentity message={message({ cc: 'copy@example.com' })} />);
     expect(screen.getByText('发给 yhan-sun@foxmail.com，抄送 copy@example.com')).toBeDefined();

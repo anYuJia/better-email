@@ -175,40 +175,6 @@
     flex: 0 0 auto;
   }
 
-  .mobile-inbox-filter-popover {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    z-index: 80;
-    min-width: 148px;
-    padding: 5px;
-    border: 1px solid var(--ui-border-strong);
-    border-radius: var(--ui-radius-panel);
-    background: var(--ui-surface);
-    box-shadow: var(--ui-shadow-popover);
-  }
-
-  .mobile-inbox-filter-popover button {
-    width: 100%;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    padding: 0 11px;
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    color: var(--ui-text-secondary);
-    background: transparent;
-    text-align: left;
-    font-size: 13px;
-  }
-
-  .mobile-inbox-filter-popover button:hover,
-  .mobile-inbox-filter-popover button:focus-visible {
-    color: var(--ui-text);
-    background: var(--quiet-row-hover);
-    outline: none;
-  }
-
   .mobile-inbox-header--search {
     min-height: 61px;
     display: flex;
@@ -842,6 +808,56 @@
   .app-shell.is-mobile-app .composer .composer-body-field textarea,
   .app-shell.is-mobile-app .composer .composer-richtext-body {
     font-size: 16px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-recipient-actions {
+    right: 14px;
+    gap: 0;
+    padding-left: 8px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-recipient-actions button {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-rich-toolbar {
+    min-height: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    align-items: center;
+    gap: 4px;
+    padding-inline: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    touch-action: pan-x;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-rich-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-rich-toolbar-group {
+    min-width: max-content;
+    flex: 0 0 auto;
+    gap: 2px;
+    padding-right: 4px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-rich-toolbar button:not(.custom-select-summary) {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-rich-toolbar .composer-rich-toolbar-select .custom-select-summary {
+    width: auto;
+    min-width: 66px;
+    min-height: 44px;
   }
 
   .app-shell.is-mobile-app .composer footer {

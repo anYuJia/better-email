@@ -353,7 +353,17 @@
 }
 
 @media (max-width: 640px) {
+  .dialog-card-close {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
   .dialog-button {
+    min-height: 44px;
+  }
+
+  .http-link-row button {
     min-height: 44px;
   }
 }

@@ -21,6 +21,17 @@ function getFloatingPanel(menu: HTMLElement) {
   );
 }
 
+function syncSummaryDisclosureState(menu: HTMLElement) {
+  const summary = menu.querySelector<HTMLElement>(':scope > summary');
+  if (!summary) return;
+
+  // WebKit does not expose every styled <summary> as an actionable button in
+  // the accessibility tree. Keep all shared details menus explicit and make
+  // their disclosure state observable to assistive technology.
+  summary.setAttribute('role', 'button');
+  summary.setAttribute('aria-expanded', menu.hasAttribute('open') ? 'true' : 'false');
+}
+
 function showInTopLayer(panel: PopoverPanel) {
   if (typeof panel.showPopover !== 'function') return;
   if (!panel.hasAttribute('popover')) panel.setAttribute('popover', 'manual');
@@ -74,6 +85,7 @@ export function useDetailsMenu(
     if (details.hasAttribute('open')) {
       details.removeAttribute('open');
     }
+    syncSummaryDisclosureState(details);
     details.removeAttribute('data-menu-positioned');
     const summary = details.querySelector('summary');
     if (summary && document.activeElement !== summary) {
@@ -147,6 +159,7 @@ export function useDetailsMenu(
     }
 
     function handleToggle() {
+      syncSummaryDisclosureState(menu);
       if (!menu.hasAttribute('open')) {
         clearPositionFrame();
         menu.removeAttribute('data-menu-positioned');
@@ -197,6 +210,7 @@ export function useDetailsMenu(
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
     menu.addEventListener('wheel', handleWheel, { passive: false });
+    syncSummaryDisclosureState(menu);
     if (menu.hasAttribute('open')) scheduleFloatingPosition();
     return () => {
       clearPositionFrame();

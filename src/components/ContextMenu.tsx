@@ -73,6 +73,12 @@ function positionSubmenuForBranch(branch: HTMLElement) {
   submenu.style.visibility = previousVisibility;
 }
 
+function usesInlineSubmenu() {
+  return typeof window.matchMedia === 'function'
+    ? window.matchMedia('(max-width: 720px)').matches
+    : window.innerWidth <= 720;
+}
+
 function MenuItems({
   items,
   onClose,
@@ -96,6 +102,10 @@ function MenuItems({
   }
 
   function positionSubmenu(event: React.PointerEvent<HTMLDivElement>) {
+    // On phones the submenu expands inline after an explicit tap. Opening it
+    // on pointer-enter moves the target between pointer movement and press,
+    // which can accidentally activate a newly inserted child command.
+    if (usesInlineSubmenu()) return;
     cancelScheduledClose();
     setPointerOpenId(
       event.currentTarget.querySelector(':scope > button')?.getAttribute('data-context-item') ?? null,
@@ -104,6 +114,7 @@ function MenuItems({
   }
 
   function scheduleSubmenuClose(itemId: string) {
+    if (usesInlineSubmenu()) return;
     cancelScheduledClose();
     // Leave enough time to cross the small visual gap between two fixed
     // surfaces. Entering the submenu cancels this timer through the branch.
@@ -115,6 +126,9 @@ function MenuItems({
 
   return items.map((item, index) => {
     const detailId = item.detail ? `${detailIdPrefix}-detail-${index}` : undefined;
+    const submenuId = item.children?.length
+      ? `${detailIdPrefix}-submenu-${index}`
+      : undefined;
     return (
     <React.Fragment key={item.id}>
       {item.separatorBefore && <div className="context-menu-separator" role="separator" />}
@@ -141,9 +155,17 @@ function MenuItems({
           ].filter(Boolean).join(' ') || undefined}
           disabled={item.disabled}
           aria-haspopup={item.children?.length ? 'menu' : undefined}
+          aria-expanded={item.children?.length ? pointerOpenId === item.id : undefined}
+          aria-controls={submenuId}
           title={item.tooltip}
           onClick={(event) => {
             if (item.children?.length) {
+              // A branch is a disclosure, not a command. Prevent the click
+              // from reaching an owning <details> menu: WebKit can otherwise
+              // toggle the ancestor after a native top-layer popover has
+              // moved the panel out of its normal paint tree.
+              event.preventDefault();
+              event.stopPropagation();
               const branch = event.currentTarget.parentElement;
               if (branch) positionSubmenuForBranch(branch);
               cancelScheduledClose();
@@ -168,7 +190,7 @@ function MenuItems({
           {item.children?.length ? <ChevronRight className="context-menu-chevron" size={14} /> : null}
         </button>
         {item.children?.length ? (
-          <div className="context-submenu" role="menu" aria-label={item.label}>
+          <div id={submenuId} className="context-submenu" role="menu" aria-label={item.label}>
             <MenuItems items={item.children} onClose={onClose} />
           </div>
         ) : null}
@@ -224,6 +246,7 @@ export function ContextMenuItems({
         event.preventDefault();
         positionSubmenuForBranch(branch);
         branch.classList.add('is-keyboard-open');
+        activeButton?.setAttribute('aria-expanded', 'true');
         firstChild.focus({ preventScroll: true });
       }
       return;
@@ -234,6 +257,7 @@ export function ContextMenuItems({
       if (parentButton) {
         event.preventDefault();
         activeMenu.parentElement?.classList.remove('is-keyboard-open');
+        parentButton.setAttribute('aria-expanded', 'false');
         parentButton.focus({ preventScroll: true });
       }
     }
@@ -295,14 +319,31 @@ export default function ContextMenu({
   useLayoutEffect(() => {
     const menu = menuRef.current;
     if (!menu) return;
-    const margin = 8;
-    const width = Math.min(menu.offsetWidth || menu.getBoundingClientRect().width, window.innerWidth - margin * 2);
-    const height = Math.min(menu.scrollHeight || menu.getBoundingClientRect().height, window.innerHeight - margin * 2);
-    menu.style.setProperty('--context-menu-max-height', `${window.innerHeight - margin * 2}px`);
-    setPosition({
-      x: Math.max(margin, Math.min(x, window.innerWidth - width - margin)),
-      y: Math.max(margin, Math.min(y, window.innerHeight - height - margin)),
-    });
+    const updatePosition = () => {
+      const margin = 8;
+      const width = Math.min(
+        menu.offsetWidth || menu.getBoundingClientRect().width,
+        window.innerWidth - margin * 2,
+      );
+      const height = Math.min(
+        menu.scrollHeight || menu.getBoundingClientRect().height,
+        window.innerHeight - margin * 2,
+      );
+      menu.style.setProperty('--context-menu-max-height', `${window.innerHeight - margin * 2}px`);
+      setPosition({
+        x: Math.max(margin, Math.min(x, window.innerWidth - width - margin)),
+        y: Math.max(margin, Math.min(y, window.innerHeight - height - margin)),
+      });
+    };
+
+    updatePosition();
+    // Mobile submenus expand inside the parent surface. Re-clamp after that
+    // disclosure changes the menu height, otherwise the new lower actions
+    // can extend past the viewport with no remaining internal scroll range.
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(updatePosition);
+    observer.observe(menu);
+    return () => observer.disconnect();
   }, [x, y]);
 
   useEffect(() => {

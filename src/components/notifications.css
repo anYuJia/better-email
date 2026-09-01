@@ -2,10 +2,10 @@
 /* Keep notification primitives local to the notification layer to avoid global token bleed. */
 .snackbar-stack,
 .message-toast-stack {
-  --notification-inline-action-height: 26px;
-  --notification-inline-action-radius: 7px;
+  --notification-inline-action-height: 32px;
+  --notification-inline-action-radius: var(--ui-radius-control);
   --notification-inline-action-padding-x: 10px;
-  --notification-inline-action-size: 26px;
+  --notification-inline-action-size: 32px;
   --notification-inline-action-bg: var(--ui-accent);
   --notification-inline-action-bg-hover: var(--ui-accent-hover);
   --notification-inline-action-text: var(--color-text-on-accent);
@@ -34,7 +34,7 @@
   right: auto;
   bottom: 16px;
   display: grid;
-  width: min(264px, calc(100vw - 32px));
+  width: min(320px, calc(100vw - 32px));
   gap: 8px;
   transform: none;
   z-index: 10000;
@@ -46,10 +46,11 @@
   min-width: 0;
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 10px;
+  min-height: 62px;
+  padding: 10px;
   border: 0;
   border-radius: var(--ui-radius-panel);
   color: var(--ui-text);
@@ -63,8 +64,19 @@
   pointer-events: auto;
 }
 
-.undo-snackbar > div {
+.undo-snackbar-copy {
   min-width: 0;
+}
+
+.undo-snackbar-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--ui-accent);
+  background: var(--ui-accent-soft);
 }
 
 .message-toast-progress {
@@ -101,7 +113,7 @@
   font-weight: 600;
 }
 
-.undo-snackbar span,
+.undo-snackbar-copy > span,
 .message-toast-undo-main span {
   display: block;
   margin-top: 2px;
@@ -154,10 +166,6 @@
   align-items: center;
   justify-content: center;
   transition: var(--ui-transition-slow-color-background);
-}
-
-.message-toast-close {
-  --notification-inline-action-size: 24px;
 }
 
 .undo-snackbar button.undo-close:hover,
@@ -297,7 +305,23 @@
 }
 
 @media (max-width: 720px) {
+  .snackbar-stack,
+  .message-toast-stack {
+    --notification-inline-action-height: var(--ui-control-height-touch);
+    --notification-inline-action-size: var(--ui-control-height-touch);
+  }
+
   .app-shell.is-mobile-app:has(.mobile-screen-mail) .snackbar-stack {
     bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
+  .undo-snackbar {
+    grid-template-columns: 32px minmax(0, 1fr) auto auto;
+    min-height: 68px;
+  }
+
+  .undo-snackbar-icon {
+    width: 32px;
+    height: 32px;
   }
 }

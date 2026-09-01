@@ -261,7 +261,7 @@ export default function MessageDateRangePicker({ onConfirm, disabled = false }: 
         onClick={() => { setError(''); setOpen((current) => !current); }}
       >
         <CalendarDays size={14} aria-hidden="true" />
-        <span>多筛日期</span>
+        <span>日期筛选</span>
       </button>
       {open && createPortal((
         <div className="message-date-range-backdrop" ref={backdropRef} onMouseDown={(event) => { if (event.target === event.currentTarget) closePicker(); }}>

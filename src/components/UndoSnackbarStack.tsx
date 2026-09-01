@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { RotateCcw, X } from 'lucide-react';
 import type { UndoAction } from '../app/types';
 import type { SendUndoDelaySeconds } from '../app/appConfig';
 
@@ -25,12 +25,20 @@ export default function UndoSnackbarStack({
   return (
     <div className="snackbar-stack">
       {undoAction && (
-        <section className="undo-snackbar" role="status" aria-live="polite">
-          <div>
+        <section className="undo-snackbar" role="status" aria-live="polite" aria-atomic="true">
+          <span className="undo-snackbar-icon" aria-hidden="true">
+            <RotateCcw size={16} />
+          </span>
+          <div className="undo-snackbar-copy">
             <strong>{undoAction.title}</strong>
             <span>{undoAction.detail}</span>
           </div>
-          <button type="button" onClick={onUndoAction}>
+          <button
+            type="button"
+            className="undo-snackbar-action"
+            aria-label={`撤销${undoAction.title}`}
+            onClick={onUndoAction}
+          >
             撤销
           </button>
           <button type="button" className="undo-close" aria-label="关闭撤销提示" onClick={onDismissAction}>

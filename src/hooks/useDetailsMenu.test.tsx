@@ -39,6 +39,23 @@ function openDetails() {
 }
 
 describe('useDetailsMenu', () => {
+  it('exposes every shared summary as a button with synchronized disclosure state', () => {
+    render(<MenuHarness />);
+    const summary = document.querySelector('summary') as HTMLElement;
+    const details = document.querySelector('details') as HTMLElement;
+
+    expect(summary.getAttribute('role')).toBe('button');
+    expect(summary.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(summary);
+    details.setAttribute('open', '');
+    fireEvent(details, new Event('toggle'));
+    expect(summary.getAttribute('aria-expanded')).toBe('true');
+
+    fireEvent.click(screen.getByRole('button', { name: '命令A' }));
+    expect(summary.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('closes a single-command menu after the command is selected', () => {
     const onCommand = vi.fn();
     render(<MenuHarness onCommand={onCommand} />);

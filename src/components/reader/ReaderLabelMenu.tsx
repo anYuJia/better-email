@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { Tag } from 'lucide-react';
 import type { Label } from '../../app/types';
 import { logError } from '../../app/logger';
@@ -98,7 +98,7 @@ export default function ReaderLabelMenu({
                   type="button"
                   key={c}
                   className={`color-dot-btn ${newLabelColor === c ? 'active' : ''}`}
-                  style={{ background: c }}
+                  style={{ '--label-color': c } as CSSProperties}
                   aria-label={`使用${colorName}标签颜色`}
                   aria-pressed={newLabelColor === c}
                   title={`${colorName}标签颜色`}

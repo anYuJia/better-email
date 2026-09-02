@@ -88,11 +88,27 @@ export function useDesktopWindowChrome(testPlatform?: DesktopPlatform) {
       return () => { active = false; };
     }
     if (!isTauriRuntime()) return undefined;
-    void invoke(IPC.WindowChromeReady).catch((error) => logError('Failed to apply native window chrome', error));
-    void resolveDesktopPlatform().then((resolved) => { if (active) setPlatform(resolved); })
-      .catch((error) => logError('Failed to resolve native platform', error));
+    void invoke(IPC.WindowChromeReady).catch((error) => logError('Failed to apply main window chrome', error));
+    void resolveDesktopPlatform().then(async (resolved) => {
+      if (!active) return;
+      setPlatform(resolved);
+      if (resolved === 'windows') {
+        try {
+          await (await getCurrentTauriWindow()).setDecorations(false);
+        } catch (error) {
+          logError('Failed to remove current Windows decorations', error);
+        }
+      }
+    }).catch((error) => logError('Failed to resolve native platform', error));
     return () => { active = false; };
   }, [testPlatform]);
+
+  useEffect(() => {
+    const platformClasses: DesktopPlatform[] = ['macos', 'windows', 'linux', 'web'];
+    platformClasses.forEach((item) => document.body.classList.remove(`platform-${item}`));
+    if (platform !== 'web') document.body.classList.add(`platform-${platform}`);
+    return () => platformClasses.forEach((item) => document.body.classList.remove(`platform-${item}`));
+  }, [platform]);
 
   useEffect(() => {
     if (platform !== 'windows' || (!isTauriRuntime() && !testPlatform)) return undefined;
@@ -151,7 +167,7 @@ export function DesktopWindowControls({
   );
 }
 
-export function DesktopWindowChrome({
+export default function DesktopWindowChrome({
   className = '',
   left,
   center,

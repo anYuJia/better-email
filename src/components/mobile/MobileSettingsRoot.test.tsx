@@ -55,6 +55,7 @@ describe('MobileSettingsRoot', () => {
     );
 
     expect(screen.getByRole<HTMLButtonElement>('button', { name: '打开账号设置' }).disabled).toBe(false);
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: /效率工具/ }).disabled).toBe(true);
     const disabledRows = Array.from(document.querySelectorAll<HTMLButtonElement>('.mobile-settings-row:disabled'));
     expect(disabledRows.length).toBeGreaterThan(0);
   });

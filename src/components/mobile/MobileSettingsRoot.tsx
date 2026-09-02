@@ -2,6 +2,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import type { Account } from '../../app/types';
 import {
   accountScopedSections,
+  getSettingsDetailItems,
   settingsNavigationGroups,
   type SettingsSectionId,
 } from '../settings/settingsNavigation';
@@ -52,8 +53,12 @@ export default function MobileSettingsRoot({
             <div className="mobile-settings-group-list">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const disabled = item.id !== 'accounts'
-                  && accountScopedSections.has(item.id)
+                const requiresAccount = item.id !== 'accounts'
+                  && (accountScopedSections.has(item.id)
+                    || getSettingsDetailItems(item.id).some((detailItem) => (
+                      accountScopedSections.has(detailItem.id)
+                    )));
+                const disabled = requiresAccount
                   && accounts.length === 0;
                 return (
                   <button

@@ -90,8 +90,6 @@ export function prodGetCurrentWindow() {
     },
     onFocusChanged: async (handler: (focused: boolean) => void) => {
       const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
-      // Tauri 的 onFocusChanged 回调携带 Event<boolean>；透传 payload，
-      // 让调用方只在窗口真正获得焦点时刷新未读数，失焦不再触发 IPC。
       return getTauriCurrentWindow().onFocusChanged((event) => handler(event.payload));
     },
   };
@@ -145,23 +143,14 @@ async function waitForComposerWindowReady(composerWindow: ComposerNativeWindow):
       const { listen: tauriListen } = await loadEvent();
       let resolveReady: (() => void) | undefined;
       let timeoutId: number | undefined;
-      const readySignal = new Promise<void>((resolve) => {
-        resolveReady = resolve;
-      });
-      const unlisten = await tauriListen<void>(COMPOSER_READY_EVENT, () => {
-        resolveReady?.();
-      });
-
+      const readySignal = new Promise<void>((resolve) => { resolveReady = resolve; });
+      const unlisten = await tauriListen<void>(COMPOSER_READY_EVENT, () => { resolveReady?.(); });
       try {
-        // A prewarmed window may already be ready before the main window starts
-        // waiting. Querying it closes that lost-signal gap.
         await composerWindow.emit(COMPOSER_READY_QUERY_EVENT);
         await Promise.race([
           readySignal,
           new Promise<never>((_resolve, reject) => {
-            timeoutId = window.setTimeout(() => {
-              reject(new Error('写信窗口初始化超时，请重试'));
-            }, COMPOSER_READY_TIMEOUT_MS);
+            timeoutId = window.setTimeout(() => reject(new Error('写信窗口初始化超时，请重试')), COMPOSER_READY_TIMEOUT_MS);
           }),
         ]);
       } finally {
@@ -171,7 +160,6 @@ async function waitForComposerWindowReady(composerWindow: ComposerNativeWindow):
     })();
     composerWindowReady = readyWait;
   }
-
   const currentReadyWait = composerWindowReady;
   try {
     await currentReadyWait;
@@ -182,23 +170,17 @@ async function waitForComposerWindowReady(composerWindow: ComposerNativeWindow):
 }
 
 async function ensureComposerWindow(): Promise<void> {
-  // If a prewarm/create is already running, wait for the same single-flight
-  // operation instead of treating a half-created WebviewWindow as ready.
   if (composerWindowCreation) {
     await composerWindowCreation;
     return;
   }
-
-  // Assign the promise before the first await. The prewarm effect and a user
-  // click can enter this function in the same turn; both must share one
-  // native-window creation rather than racing to create two windows.
   const creation = (async () => {
-    const { WebviewWindow } = await loadWebviewWindow();
+    const [{ WebviewWindow }, { LogicalPosition }] = await Promise.all([
+      loadWebviewWindow(),
+      loadDpi(),
+    ]);
     const existing = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
     if (existing) return;
-
-    // A previous composer may have been destroyed as a close fallback. Its
-    // readiness must never be reused for the replacement window.
     composerWindowReady = null;
     const composeUrl = new URL(window.location.href);
     composeUrl.search = '?window=compose&prewarm=1';
@@ -212,21 +194,19 @@ async function ensureComposerWindow(): Promise<void> {
       minHeight: 560,
       resizable: true,
       decorations: true,
-      titleBarStyle: 'visible',
-      hiddenTitle: false,
+      titleBarStyle: 'overlay',
+      trafficLightPosition: new LogicalPosition(16, 18),
+      hiddenTitle: true,
       focus: false,
       visible: false,
       skipTaskbar: false,
     });
     await new Promise<void>((resolve, reject) => {
       void child.once('tauri://created', () => resolve());
-      void child.once('tauri://error', (event) => {
-        reject(new Error(`无法创建独立写信窗口：${String(event.payload)}`));
-      });
+      void child.once('tauri://error', (event) => reject(new Error(`无法创建独立写信窗口：${String(event.payload)}`)));
     });
   })();
   composerWindowCreation = creation;
-
   try {
     await creation;
   } finally {
@@ -237,9 +217,7 @@ async function ensureComposerWindow(): Promise<void> {
 async function getComposerWindow(): Promise<ComposerNativeWindow> {
   const { WebviewWindow } = await loadWebviewWindow();
   const composerWindow = await WebviewWindow.getByLabel(COMPOSER_WINDOW_LABEL);
-  if (!composerWindow) {
-    throw new Error('独立写信窗口创建完成后仍不可用');
-  }
+  if (!composerWindow) throw new Error('独立写信窗口创建完成后仍不可用');
   return composerWindow;
 }
 
@@ -249,19 +227,11 @@ export async function prodPrewarmComposerWindow(): Promise<void> {
 }
 
 export async function prodOpenComposerWindow(request: ComposerWindowRequest): Promise<void> {
-  // The pending request is authoritative. Events are only a wake-up signal and
-  // may be emitted before the React side has finished booting.
   await prodInvoke<void>(IPC.SetPendingComposerRequest, { request });
   await ensureComposerWindow();
-
   const composerWindow = await getComposerWindow();
-
   await composerWindow.emit(COMPOSER_OPEN_EVENT);
   await waitForComposerWindowReady(composerWindow);
-  // Emit again after readiness. The first signal covers requests arriving
-  // during boot; the second covers a listener that was not registered yet.
-  // The composer reveals itself only after its UI and close handler are ready,
-  // so the main window never exposes a blank WebView.
   await composerWindow.emit(COMPOSER_OPEN_EVENT);
 }
 
@@ -274,7 +244,6 @@ async function ensureSettingsWindow(request: SettingsWindowRequest): Promise<voi
     await settingsWindowCreation;
     return;
   }
-
   const creation = (async () => {
     const [{ WebviewWindow }, { LogicalPosition }] = await Promise.all([
       loadWebviewWindow(),
@@ -282,15 +251,12 @@ async function ensureSettingsWindow(request: SettingsWindowRequest): Promise<voi
     ]);
     const existing = await WebviewWindow.getByLabel(SETTINGS_WINDOW_LABEL);
     if (existing) return;
-
     settingsWindowReady = null;
     const settingsUrl = new URL(window.location.href);
     settingsUrl.search = '';
     settingsUrl.searchParams.set('window', 'settings');
     settingsUrl.searchParams.set('section', request.section || DEFAULT_SETTINGS_SECTION);
-    if (request.accountScope !== undefined) {
-      settingsUrl.searchParams.set('scope', String(request.accountScope));
-    }
+    if (request.accountScope !== undefined) settingsUrl.searchParams.set('scope', String(request.accountScope));
     settingsUrl.hash = '';
     const child = new WebviewWindow(SETTINGS_WINDOW_LABEL, {
       url: settingsUrl.toString(),
@@ -311,13 +277,10 @@ async function ensureSettingsWindow(request: SettingsWindowRequest): Promise<voi
     });
     await new Promise<void>((resolve, reject) => {
       void child.once('tauri://created', () => resolve());
-      void child.once('tauri://error', (event) => {
-        reject(new Error(`无法创建独立设置窗口：${String(event.payload)}`));
-      });
+      void child.once('tauri://error', (event) => reject(new Error(`无法创建独立设置窗口：${String(event.payload)}`)));
     });
   })();
   settingsWindowCreation = creation;
-
   try {
     await creation;
   } finally {
@@ -328,9 +291,7 @@ async function ensureSettingsWindow(request: SettingsWindowRequest): Promise<voi
 async function getSettingsWindow(): Promise<ComposerNativeWindow> {
   const { WebviewWindow } = await loadWebviewWindow();
   const settingsWindow = await WebviewWindow.getByLabel(SETTINGS_WINDOW_LABEL);
-  if (!settingsWindow) {
-    throw new Error('独立设置窗口创建完成后仍不可用');
-  }
+  if (!settingsWindow) throw new Error('独立设置窗口创建完成后仍不可用');
   return settingsWindow;
 }
 
@@ -340,21 +301,14 @@ async function waitForSettingsWindowReady(settingsWindow: ComposerNativeWindow):
       const { listen: tauriListen } = await loadEvent();
       let resolveReady: (() => void) | undefined;
       let timeoutId: number | undefined;
-      const readySignal = new Promise<void>((resolve) => {
-        resolveReady = resolve;
-      });
-      const unlisten = await tauriListen<void>(SETTINGS_READY_EVENT, () => {
-        resolveReady?.();
-      });
-
+      const readySignal = new Promise<void>((resolve) => { resolveReady = resolve; });
+      const unlisten = await tauriListen<void>(SETTINGS_READY_EVENT, () => { resolveReady?.(); });
       try {
         await settingsWindow.emit(SETTINGS_READY_QUERY_EVENT);
         await Promise.race([
           readySignal,
           new Promise<never>((_resolve, reject) => {
-            timeoutId = window.setTimeout(() => {
-              reject(new Error('设置窗口初始化超时，请重试'));
-            }, SETTINGS_READY_TIMEOUT_MS);
+            timeoutId = window.setTimeout(() => reject(new Error('设置窗口初始化超时，请重试')), SETTINGS_READY_TIMEOUT_MS);
           }),
         ]);
       } finally {
@@ -364,7 +318,6 @@ async function waitForSettingsWindowReady(settingsWindow: ComposerNativeWindow):
     })();
     settingsWindowReady = readyWait;
   }
-
   const currentReadyWait = settingsWindowReady;
   try {
     await currentReadyWait;
@@ -375,10 +328,7 @@ async function waitForSettingsWindowReady(settingsWindow: ComposerNativeWindow):
 }
 
 function normalizeSettingsWindowRequest(request: SettingsWindowRequest = {}): SettingsWindowRequest {
-  return {
-    ...request,
-    section: request.section || DEFAULT_SETTINGS_SECTION,
-  };
+  return { ...request, section: request.section || DEFAULT_SETTINGS_SECTION };
 }
 
 export async function prodPrewarmSettingsWindow(request: SettingsWindowRequest = {}): Promise<void> {
@@ -413,10 +363,7 @@ export function prodTakePendingComposerRequest(): Promise<ComposerWindowRequest 
   return prodInvoke<ComposerWindowRequest | null>(IPC.TakePendingComposerRequest);
 }
 
-export async function prodListenCurrentWindow<T>(
-  event: string,
-  handler: (event: { payload: T }) => void,
-): Promise<() => void> {
+export async function prodListenCurrentWindow<T>(event: string, handler: (event: { payload: T }) => void): Promise<() => void> {
   const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
   return getTauriCurrentWindow().listen<T>(event, handler);
 }
@@ -433,15 +380,10 @@ export async function prodCloseCurrentWindow(): Promise<void> {
     try {
       await currentWindow.hide();
     } catch (hideError) {
-      // Hiding keeps the prewarmed composer reusable. If a platform or
-      // capability regression prevents it, force-destroy the window so the
-      // user's first close action still succeeds and the next open recreates it.
       try {
         await currentWindow.destroy();
       } catch (destroyError) {
-        throw new Error(
-          `无法关闭写信窗口：隐藏失败（${String(hideError)}），销毁失败（${String(destroyError)}）`,
-        );
+        throw new Error(`无法关闭写信窗口：隐藏失败（${String(hideError)}），销毁失败（${String(destroyError)}）`);
       }
     }
     return;
@@ -450,9 +392,7 @@ export async function prodCloseCurrentWindow(): Promise<void> {
   await currentWindow.destroy();
 }
 
-export async function prodOnCurrentWindowCloseRequested(
-  handler: (event: NativeCloseRequestEvent) => void,
-): Promise<() => void> {
+export async function prodOnCurrentWindowCloseRequested(handler: (event: NativeCloseRequestEvent) => void): Promise<() => void> {
   const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
   return getTauriCurrentWindow().onCloseRequested(handler);
 }

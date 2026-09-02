@@ -1664,6 +1664,8 @@ async function main() {
     await evalInPage(cdp, "document.querySelector('.settings-mobile-back')?.click()");
     await waitForExpression(cdp, "document.querySelector('.mobile-settings-root') && !document.querySelector('.settings-modal') && window.history.state?.betterEmailScreen === 'settings' && !window.history.state?.betterEmailSettingsSection");
     await evalInPage(cdp, "document.querySelector('.mobile-settings-header .mobile-header-icon[aria-label=\"返回邮箱\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-mailbox-sheet') && window.history.state?.betterEmailScreen === 'mailbox'");
+    await evalInPage(cdp, "document.querySelector('.mobile-mailbox-sheet .mobile-header-icon[aria-label=\"关闭邮箱导航\"]')?.click()");
     await waitForExpression(cdp, "document.querySelector('.mobile-message-list-panel') && window.history.state?.betterEmailScreen === 'mail'");
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 1440,

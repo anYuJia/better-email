@@ -72,14 +72,15 @@ describe('AppTitlebar', () => {
     expect(detectDesktopPlatform()).toBe('web');
   });
 
-  it('keeps the current view and result count together beside search', () => {
+  it('keeps mailbox identity out of the window-level titlebar', () => {
     const { container } = renderTitlebar(undefined, '统一收件箱', '40+ 封');
-    const context = container.querySelector('.titlebar-context');
 
-    expect(context).not.toBeNull();
-    expect(context?.querySelector('.titlebar-context-label')?.textContent).toBe('统一收件箱');
-    expect(context?.querySelector('.titlebar-context-count')?.textContent).toBe('40+ 封');
-    expect(context?.parentElement?.classList.contains('titlebar-left')).toBe(true);
+    expect(container.querySelector('.titlebar-brand')).toBeNull();
+    expect(container.querySelector('.titlebar-context')).toBeNull();
+    expect(screen.queryByText('Better Email')).toBeNull();
+    expect(screen.queryByText('统一收件箱')).toBeNull();
+    expect(screen.queryByText('40+ 封')).toBeNull();
+    expect(container.querySelector('.titlebar-center')).not.toBeNull();
   });
 
   it('renders a browser preview without native window controls or fake traffic lights', () => {

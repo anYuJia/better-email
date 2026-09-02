@@ -1,0 +1,655 @@
+/*
+ * Product-level de-AI polish.
+ *
+ * This layer deliberately changes information density and hierarchy without
+ * changing mailbox, reader, settings or composer behavior. The rule is simple:
+ * persistent UI stays flat; borders separate structure; elevation belongs only
+ * to genuinely floating controls such as the mobile compose affordance.
+ */
+
+/* --------------------------------------------------------------------------
+ * Mobile mail: one destination, one header, one list, one compose action.
+ * ----------------------------------------------------------------------- */
+@media (max-width: 720px) {
+  .app-shell.is-mobile-app .mobile-inbox-header {
+    padding: max(6px, env(safe-area-inset-top)) 10px 0;
+    background: var(--workspace-toolbar);
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-title-row {
+    min-height: 48px;
+    gap: 2px;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-title {
+    min-height: 42px;
+    padding-inline: 4px;
+    gap: 5px;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-title strong {
+    font-size: 19px;
+    font-weight: 600;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-title span {
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-filter-row {
+    min-height: 39px;
+    gap: 2px;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-filter-row > button,
+  .app-shell.is-mobile-app .mobile-inbox-filter-menu > button {
+    min-width: 48px;
+    min-height: 39px;
+    padding-inline: 9px;
+    border-bottom-width: 2px;
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-card, .thread-card) {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-card, .thread-card):not(:last-child) {
+    border-bottom-color: var(--ui-border);
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.sender, .thread-sender) {
+    font-weight: 600;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-card p, .thread-preview) {
+    color: var(--ui-text-tertiary);
+  }
+
+  /* Bottom navigation was mixing destinations, a filter and an action.
+     Keep the tested DOM contract, but visually collapse it to one compose FAB.
+     Mailbox navigation owns starred/settings; the inbox owns the mail list. */
+  .app-shell.is-mobile-app .mobile-bottom-nav {
+    position: absolute;
+    inset: auto 0 0;
+    z-index: 42;
+    width: 0;
+    height: 0;
+    min-height: 0;
+    flex: 0 0 0;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-nav > button {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-nav > .mobile-bottom-compose {
+    position: fixed;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 43;
+    width: 54px;
+    min-width: 54px;
+    height: 54px;
+    min-height: 54px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--ui-accent) 84%, transparent);
+    border-radius: 17px;
+    color: var(--color-text-on-accent) !important;
+    background: var(--ui-accent);
+    box-shadow: 0 7px 20px color-mix(in srgb, var(--ui-accent) 22%, transparent);
+    pointer-events: auto;
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-compose:active {
+    transform: scale(.96);
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-compose-icon {
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    color: inherit;
+    background: transparent;
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-compose > span:last-child {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-list, .thread-list) {
+    padding-bottom: calc(82px + env(safe-area-inset-bottom));
+  }
+
+  /* Search should read as a native search field, not a framed form card. */
+  .app-shell.is-mobile-app .mobile-inbox-header--search {
+    min-height: 54px;
+    padding-bottom: 6px;
+  }
+
+  .app-shell.is-mobile-app .mobile-search-form {
+    min-height: 40px;
+    border-color: transparent;
+    border-radius: 10px;
+    background: var(--ui-surface-muted);
+    box-shadow: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-search-form:focus-within {
+    border-color: transparent;
+    background: var(--ui-surface);
+    box-shadow: inset 0 0 0 1px var(--ui-accent);
+  }
+
+  .app-shell.is-mobile-app .mobile-search-form input {
+    height: 40px;
+  }
+
+  /* ------------------------------------------------------------------------
+   * Mailbox drawer: navigation rows, not cards inside a drawer.
+   * --------------------------------------------------------------------- */
+  .app-shell.is-mobile-app .mobile-sheet-backdrop {
+    background: oklch(0.1 0.01 var(--primitive-hue-neutral) / .38);
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-sheet {
+    width: min(86vw, 340px);
+    max-width: calc(100vw - 36px);
+    border-radius: 0;
+    border-inline-end: 1px solid var(--ui-border);
+    box-shadow: 10px 0 28px oklch(0.2 0.02 var(--primitive-hue-neutral) / .10);
+  }
+
+  .app-shell.is-mobile-app .mobile-sheet-header {
+    min-height: 54px;
+    padding-inline: 16px 8px;
+  }
+
+  .app-shell.is-mobile-app .mobile-sheet-header span {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-sheet-header h1 {
+    font-size: 20px;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-scroll {
+    padding: 12px 8px 18px;
+    background: var(--ui-surface);
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-section {
+    margin-bottom: 18px;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-section h2 {
+    padding: 4px 10px 6px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-list {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-row {
+    min-height: 48px;
+    gap: 10px;
+    padding: 7px 10px;
+    border-bottom: 0;
+    border-radius: 7px;
+    color: var(--ui-text-secondary);
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-row + .mobile-mailbox-row {
+    margin-top: 1px;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-row.active {
+    color: var(--ui-accent);
+    background: var(--ui-accent-soft);
+  }
+
+  .app-shell.is-mobile-app :is(.mobile-mailbox-row-icon, .mobile-mailbox-avatar) {
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: transparent;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-avatar {
+    color: var(--color-text-on-accent);
+    background: var(--ui-accent);
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-row-copy {
+    gap: 1px;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-row-copy strong {
+    font-size: 14.5px;
+    font-weight: 500;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-row-copy small {
+    font-size: 11.5px;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-row > svg:last-child {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-check {
+    font-size: 0;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-check::after {
+    content: '✓';
+    font-size: 14px;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-footer {
+    display: block;
+    padding: 6px 8px calc(8px + env(safe-area-inset-bottom));
+    background: var(--ui-surface);
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-footer > button:first-child {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-footer button {
+    width: 100%;
+    min-height: 44px;
+    justify-content: flex-start;
+    padding-inline: 10px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    font-size: 13.5px;
+    font-weight: 500;
+  }
+
+  /* ------------------------------------------------------------------------
+   * Reader: reading first, action chrome second.
+   * --------------------------------------------------------------------- */
+  .app-shell.is-mobile-app .narrow-reader-navigation {
+    min-height: 52px;
+    padding: max(4px, env(safe-area-inset-top)) 8px 4px;
+    gap: 2px;
+  }
+
+  .app-shell.is-mobile-app .narrow-reader-navigation button {
+    min-width: 42px;
+    min-height: 42px;
+    padding-inline: 8px;
+    border-radius: 7px;
+    font-weight: 500;
+  }
+
+  .app-shell.is-mobile-app .reader {
+    padding: 16px 16px calc(36px + env(safe-area-inset-bottom));
+  }
+
+  .app-shell.is-mobile-app .reader-header {
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .app-shell.is-mobile-app .reader-header h1 {
+    margin-bottom: 10px;
+    font-size: 22px;
+    line-height: 1.28;
+    letter-spacing: -.01em;
+  }
+
+  .app-shell.is-mobile-app .reader-actions {
+    width: calc(100% + 32px);
+    margin-inline: -16px;
+    padding: 4px 10px;
+    border-top: 0;
+    background: var(--workspace-reader);
+  }
+
+  .app-shell.is-mobile-app .reader-actions :is(button, .reader-more-menu summary, .reader-reply-menu summary, .reader-ai-trigger, select) {
+    min-width: 42px;
+    min-height: 42px;
+    height: 42px;
+    padding-inline: 9px;
+    border-radius: 7px;
+    font-size: 12.5px;
+  }
+
+  .app-shell.is-mobile-app .reader-actions .primary-action {
+    min-width: 68px;
+    color: var(--ui-accent);
+    background: transparent;
+  }
+
+  .app-shell.is-mobile-app .reader-message-actions {
+    margin-inline-start: 2px;
+    padding-inline-start: 5px;
+  }
+
+  .app-shell.is-mobile-app .reader-sender {
+    padding-block: 2px 8px;
+  }
+
+  .app-shell.is-mobile-app :is(.reader-html, .body-text, .reader-plain-text) {
+    font-size: 16px;
+    line-height: 1.72;
+  }
+
+  .app-shell.is-mobile-app :is(.attachment-section, .quick-reply, .reader-translation) {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* ------------------------------------------------------------------------
+   * Settings root: native push-list hierarchy, no dashboard cards.
+   * --------------------------------------------------------------------- */
+  .app-shell.is-mobile-app .mobile-settings-header {
+    min-height: calc(52px + env(safe-area-inset-top));
+    padding: max(4px, env(safe-area-inset-top)) 8px 0;
+    background: var(--ui-surface);
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-header h1 {
+    font-size: 17px;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-scroll {
+    background: var(--ui-bg);
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-account-summary {
+    width: 100%;
+    min-height: 70px;
+    display: flex;
+    margin: 0 0 18px;
+    padding: 10px 16px;
+    border: 0;
+    border-bottom: 1px solid var(--ui-border);
+    border-radius: 0;
+    color: var(--ui-text);
+    background: var(--ui-surface);
+    box-shadow: none;
+    text-align: left;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-account-avatar {
+    width: 38px;
+    min-width: 38px;
+    height: 38px;
+    font-size: 15px;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-account-summary > svg {
+    margin-left: auto;
+    color: var(--ui-text-tertiary);
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-group {
+    margin-bottom: 22px;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-group h2 {
+    padding: 0 16px 7px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-group-list {
+    border-top: 1px solid var(--ui-border);
+    border-bottom: 1px solid var(--ui-border);
+    background: var(--ui-surface);
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-row {
+    min-height: 54px;
+    gap: 11px;
+    padding: 7px 16px;
+    background: transparent;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-row:last-child {
+    border-bottom: 0;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-row-icon {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    border-radius: 0;
+    color: var(--ui-text-secondary);
+    background: transparent;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-row-icon svg {
+    width: 19px;
+    height: 19px;
+    stroke-width: 1.8;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-row-copy {
+    display: flex;
+    align-items: center;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-row-copy strong {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-row-copy small {
+    display: none;
+  }
+
+  /* Detail settings are pushed pages. Remove the desktop-style two-row
+     toolbar; account scope is changed from the root Accounts destination. */
+  .settings-workspace .settings-shell.settings-modal .settings-main-header {
+    min-height: 54px;
+    height: 54px;
+    grid-template-columns: minmax(0, 1fr) 44px auto;
+    grid-template-rows: 54px;
+    padding: 0 8px 0 4px;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-header-leading .settings-title {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-header-account-switcher {
+    display: none;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-header-search {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-header-actions {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-mobile-back {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-mobile-page-title {
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-page-header {
+    padding: 10px 16px 8px;
+    gap: 5px;
+    border-bottom: 0;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-page-heading p {
+    color: var(--st-text-tertiary);
+    font-size: 12.5px;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-page-content {
+    gap: 18px;
+    padding: 8px 16px calc(30px + env(safe-area-inset-bottom));
+  }
+
+  .settings-workspace .settings-shell.settings-modal :is(.st-section, .settings-section) {
+    border-radius: 0;
+    background: transparent;
+  }
+
+  /* ------------------------------------------------------------------------
+   * Composer: full-screen mail editor, not a dialog dashboard.
+   * --------------------------------------------------------------------- */
+  .app-shell.is-mobile-app > .composer-backdrop {
+    background: var(--ui-surface);
+  }
+
+  .app-shell.is-mobile-app .composer {
+    background: var(--ui-surface);
+  }
+
+  .app-shell.is-mobile-app .composer .composer-editor-header {
+    min-height: calc(52px + env(safe-area-inset-top));
+    padding: max(4px, env(safe-area-inset-top)) 8px 0 14px;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .app-shell.is-mobile-app .composer .composer-title-copy strong {
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-autosave-status {
+    font-size: 11px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-field-row {
+    min-height: 48px;
+    grid-template-columns: 48px minmax(0, 1fr);
+    padding-inline: 14px;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-field-row + .composer-field-row {
+    border-top-color: var(--ui-border);
+  }
+
+  .app-shell.is-mobile-app .composer .composer-field-row > label,
+  .app-shell.is-mobile-app .composer .composer-field-label {
+    color: var(--ui-text-tertiary);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .app-shell.is-mobile-app .composer :is(.composer-body-field, .composer-richtext-shell) {
+    border-radius: 0;
+    background: var(--ui-surface);
+    box-shadow: none;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-rich-toolbar {
+    min-height: 44px;
+    height: 44px;
+    flex-basis: 44px;
+    border-radius: 0;
+    background: var(--ui-surface);
+  }
+
+  .app-shell.is-mobile-app .composer footer {
+    min-height: calc(58px + env(safe-area-inset-bottom));
+    padding: 6px 10px env(safe-area-inset-bottom);
+    border-top: 1px solid var(--ui-border);
+    background: var(--ui-surface);
+  }
+
+  .app-shell.is-mobile-app .composer .composer-footer-main {
+    gap: 5px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-send-primary {
+    min-height: 44px;
+    border-radius: 8px 0 0 8px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-send-menu-trigger {
+    min-height: 44px;
+    border-radius: 0 8px 8px 0;
+  }
+
+  .app-shell.is-mobile-app .composer :is(.composer-risk-banner, .composer-schedule-status) {
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * Desktop titlebar: window-level controls only. The sidebar/list already
+ * communicate product identity and mailbox context; repeating both in chrome
+ * makes the window read like a demo header.
+ * ----------------------------------------------------------------------- */
+@media (min-width: 721px) {
+  .app-titlebar .titlebar-brand,
+  .app-titlebar .titlebar-context {
+    display: none;
+  }
+
+  .app-titlebar .app-titlebar-grid {
+    grid-template-columns: minmax(120px, 1fr) var(--global-search-width) minmax(120px, 1fr);
+  }
+
+  .app-titlebar .global-search-box {
+    height: 36px;
+    min-height: 36px;
+    border-color: transparent;
+    border-radius: 8px;
+    background: var(--ui-surface-muted);
+  }
+
+  .app-titlebar .global-search-box:hover {
+    border-color: transparent;
+    background: var(--ui-control-hover);
+  }
+
+  .app-titlebar .global-search-box:focus-within {
+    border-color: var(--ui-accent);
+    background: var(--ui-surface);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 14%, transparent);
+  }
+
+  .app-titlebar .titlebar-sync-status {
+    max-width: 96px;
+    color: var(--ui-text-tertiary);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell.is-mobile-app .mobile-bottom-compose:active {
+    transform: none;
+  }
+}

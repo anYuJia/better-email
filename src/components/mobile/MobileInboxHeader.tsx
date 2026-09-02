@@ -54,8 +54,8 @@ export default function MobileInboxHeader({
   searchOpen,
 }: MobileInboxHeaderProps) {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const listModeMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [listModeMenu, setListModeMenu] = useState<{ x: number; y: number } | null>(null);
+  const filterMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -68,19 +68,26 @@ export default function MobileInboxHeader({
   }
 
   const activeFilter = filters.find((item) => item.id === filter) ?? filters[0];
-  const listModeMenuItems: ContextMenuItem[] = [
-    {
-      id: 'mobile-filter-attachments',
-      label: '附件',
-      checked: filter === 'attachments',
-      selectionRole: 'radio',
-      onSelect: () => onFilterChange('attachments'),
-    },
+  const hasNonDefaultView = filter !== 'all' || listMode !== 'messages';
+  const secondarySummary = [
+    visibleListSummary,
+    filter !== 'all' ? activeFilter.label : '',
+    listMode === 'threads' ? '会话' : '',
+  ].filter(Boolean).join(' · ');
+  const filterMenuItems: ContextMenuItem[] = [
+    ...filters.map((item) => ({
+      id: `mobile-filter-${item.id}`,
+      label: item.label,
+      checked: filter === item.id,
+      selectionRole: 'radio' as const,
+      onSelect: () => onFilterChange(item.id),
+    })),
     {
       id: 'mobile-list-mode-messages',
       label: '邮件列表',
       checked: listMode === 'messages',
       selectionRole: 'radio',
+      separatorBefore: true,
       onSelect: onShowMessages,
     },
     {
@@ -143,18 +150,38 @@ export default function MobileInboxHeader({
           <Menu size={22} aria-hidden="true" />
         </button>
         <button type="button" className="mobile-inbox-title" onClick={onOpenMailbox}>
-          <strong>{currentViewLabel}</strong>
-          <span>{visibleListSummary}</span>
+          <span className="mobile-inbox-title-copy">
+            <strong>{currentViewLabel}</strong>
+            <small>{secondarySummary}</small>
+          </span>
           <ChevronDown size={15} aria-hidden="true" />
         </button>
         <div className="mobile-inbox-actions">
+          <button
+            ref={filterMenuTriggerRef}
+            type="button"
+            className={`mobile-header-icon mobile-filter-trigger${hasNonDefaultView ? ' active' : ''}`}
+            aria-label={`筛选和列表，当前：${activeFilter.label}${listMode === 'threads' ? '，会话列表' : ''}`}
+            aria-haspopup="menu"
+            aria-expanded={Boolean(filterMenu)}
+            onClick={(event) => {
+              if (filterMenu) {
+                setFilterMenu(null);
+                return;
+              }
+              const bounds = event.currentTarget.getBoundingClientRect();
+              setFilterMenu({ x: Math.max(8, bounds.right - 208), y: bounds.bottom + 4 });
+            }}
+          >
+            <SlidersHorizontal size={19} aria-hidden="true" />
+          </button>
           <button
             type="button"
             className="mobile-header-icon"
             aria-label="搜索邮件"
             onClick={onOpenSearch}
           >
-            <Search size={21} aria-hidden="true" />
+            <Search size={20} aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -164,58 +191,21 @@ export default function MobileInboxHeader({
             disabled={isRefreshing}
             onClick={onRefresh}
           >
-            <RefreshCw size={19} aria-hidden="true" className={isRefreshing ? 'animate-spin' : ''} />
+            <RefreshCw size={18} aria-hidden="true" className={isRefreshing ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
-
-      <div className="mobile-inbox-filter-row" role="tablist" aria-label="邮件筛选">
-        {filters.slice(0, 3).map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={filter === item.id}
-            className={filter === item.id ? 'active' : ''}
-            onClick={() => onFilterChange(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-        <div className="mobile-inbox-filter-menu">
-          <button
-            ref={listModeMenuTriggerRef}
-            type="button"
-            className={filter === 'attachments' ? 'active' : ''}
-            aria-label={`更多筛选，当前：${activeFilter.label}`}
-            aria-haspopup="menu"
-            aria-expanded={Boolean(listModeMenu)}
-            onClick={(event) => {
-              if (listModeMenu) {
-                setListModeMenu(null);
-                return;
-              }
-              const bounds = event.currentTarget.getBoundingClientRect();
-              setListModeMenu({ x: bounds.right - 188, y: bounds.bottom + 6 });
-            }}
-          >
-            <SlidersHorizontal size={16} aria-hidden="true" />
-            <span>{filter === 'attachments' ? '附件' : listMode === 'threads' ? '会话' : '更多'}</span>
-            <ChevronDown size={13} aria-hidden="true" />
-          </button>
-          {listModeMenu && (
-            <ContextMenu
-              x={listModeMenu.x}
-              y={listModeMenu.y}
-              items={listModeMenuItems}
-              onClose={() => setListModeMenu(null)}
-              closeIgnoreRef={listModeMenuTriggerRef}
-              className="mobile-inbox-filter-menu-surface"
-              ariaLabel="邮件筛选和列表模式"
-            />
-          )}
-        </div>
-      </div>
+      {filterMenu && (
+        <ContextMenu
+          x={filterMenu.x}
+          y={filterMenu.y}
+          items={filterMenuItems}
+          onClose={() => setFilterMenu(null)}
+          closeIgnoreRef={filterMenuTriggerRef}
+          className="mobile-inbox-filter-menu-surface"
+          ariaLabel="邮件筛选和列表模式"
+        />
+      )}
     </header>
   );
 }

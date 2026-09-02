@@ -30,15 +30,21 @@ export default function MobileSettingsRoot({
       </header>
 
       <div className="mobile-settings-scroll">
-        <section className="mobile-settings-account-summary" aria-label="当前账号">
+        <button
+          type="button"
+          className="mobile-settings-account-summary"
+          aria-label="打开账号设置"
+          onClick={() => onOpenSection('accounts')}
+        >
           <span className="mobile-settings-account-avatar" aria-hidden="true">
             {(account?.display_name || account?.email || 'B').slice(0, 1).toUpperCase()}
           </span>
           <div>
-            <strong>{account?.display_name || account?.email || '未添加账号'}</strong>
-            <span>{account?.email || `${accounts.length} 个账号`}</span>
+            <strong>{account?.display_name || account?.email || '账号'}</strong>
+            <span>{account?.email || (accounts.length ? `${accounts.length} 个账号` : '添加或管理邮箱账号')}</span>
           </div>
-        </section>
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>
 
         {settingsNavigationGroups.map((group) => (
           <section className="mobile-settings-group" key={group.label}>

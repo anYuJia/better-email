@@ -1,0 +1,13 @@
+/*
+ * Mobile reader scroll ownership.
+ *
+ * The app surface clips its viewport. The reader destination therefore must
+ * constrain ReaderPane to the remaining mobile viewport so .reader-panel can
+ * be the single vertical scroll owner instead of growing past the clipped
+ * Android WebView surface.
+ */
+.mobile-reader-surface {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

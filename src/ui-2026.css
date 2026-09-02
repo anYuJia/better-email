@@ -24,6 +24,7 @@
 @import './styles/overlay.css';
 @import './styles/global-tooltip.css';
 @import './styles/mobile.css';
+@import './styles/mobile-reader.css';
 
 /* Dark theme is load-order dependent: must stay after every light sheet */
 @import './styles/dark-mode.css';

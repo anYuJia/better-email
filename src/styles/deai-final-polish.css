@@ -1,0 +1,380 @@
+/*
+ * Final product polish: remove the last "designed demo" signals.
+ * Mobile keeps native-sized hit targets while reducing persistent chrome,
+ * decorative surfaces, oversized spacing and feature-showcase labels.
+ */
+
+@media (max-width: 720px) {
+  /* Inbox: one compact header. Filtering is a utility, not a permanent tab bar. */
+  .app-shell.is-mobile-app .mobile-inbox-header {
+    padding: max(4px, env(safe-area-inset-top)) 8px 0;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-title-row {
+    min-height: 50px;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-title {
+    gap: 5px;
+    padding-inline: 2px;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-title-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: grid;
+    gap: 0;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-title-copy strong {
+    overflow: hidden;
+    color: var(--ui-text);
+    font-size: 17.5px;
+    font-weight: 600;
+    line-height: 1.22;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-title-copy small {
+    overflow: hidden;
+    color: var(--ui-text-tertiary);
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-actions {
+    gap: 0;
+  }
+
+  .app-shell.is-mobile-app .mobile-filter-trigger {
+    position: relative;
+  }
+
+  .app-shell.is-mobile-app .mobile-filter-trigger.active {
+    color: var(--ui-accent);
+    background: transparent;
+  }
+
+  .app-shell.is-mobile-app .mobile-filter-trigger.active::after {
+    position: absolute;
+    right: 7px;
+    top: 8px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--ui-accent);
+    content: "";
+  }
+
+  .app-shell.is-mobile-app .mobile-inbox-filter-row {
+    display: none;
+  }
+
+  /* The mobile list should feel like Mail, not a contact-card feed. */
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-card {
+    min-height: 0;
+    padding: 7px 50px 7px 16px;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-leading {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-unread-dot {
+    left: 6px;
+    top: 13px;
+    width: 4px;
+    height: 4px;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-topline {
+    min-height: 17px;
+    margin-bottom: 1px;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.sender, .thread-sender) {
+    font-size: 14.5px;
+    line-height: 1.2;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.subject, .thread-subject) {
+    font-size: 14px;
+    line-height: 1.24;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-card p, .thread-preview) {
+    font-size: 12.5px;
+    line-height: 1.28;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-card time, .thread-card time) {
+    font-size: 11.5px;
+  }
+
+  .app-shell.is-mobile-app .message-mobile-menu-button {
+    right: 2px;
+    color: var(--ui-text-tertiary);
+  }
+
+  /* Compose stays reachable but stops looking like a promotional CTA. */
+  .app-shell.is-mobile-app .mobile-bottom-nav > .mobile-bottom-compose {
+    right: 14px;
+    bottom: calc(14px + env(safe-area-inset-bottom));
+    width: 50px;
+    min-width: 50px;
+    height: 50px;
+    min-height: 50px;
+    border: 0;
+    border-radius: 50%;
+    box-shadow: 0 2px 9px color-mix(in srgb, var(--ui-text) 14%, transparent);
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-compose-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-list, .thread-list) {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+
+  /* Drawer: quieter selection and less floating-panel theatre. */
+  .app-shell.is-mobile-app .mobile-mailbox-sheet {
+    box-shadow: 5px 0 18px color-mix(in srgb, var(--ui-text) 8%, transparent);
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-row {
+    min-height: 46px;
+    padding-block: 6px;
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-row.active {
+    color: var(--ui-text);
+    background: var(--quiet-row-selected);
+  }
+
+  .app-shell.is-mobile-app .mobile-mailbox-row.active .mobile-mailbox-row-icon,
+  .app-shell.is-mobile-app .mobile-mailbox-row.active .mobile-mailbox-count,
+  .app-shell.is-mobile-app .mobile-mailbox-check {
+    color: var(--ui-accent);
+  }
+
+  /* Reader: icon-first mail toolbar, content first. Text remains in the DOM. */
+  .app-shell.is-mobile-app .narrow-reader-navigation {
+    min-height: 48px;
+    padding: max(2px, env(safe-area-inset-top)) 8px 2px;
+  }
+
+  .app-shell.is-mobile-app .narrow-reader-navigation button {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .app-shell.is-mobile-app .narrow-reader-navigation button svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .app-shell.is-mobile-app .reader {
+    padding: 12px 16px calc(30px + env(safe-area-inset-bottom));
+  }
+
+  .app-shell.is-mobile-app .reader-header {
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .app-shell.is-mobile-app .reader-header h1 {
+    margin-bottom: 7px;
+    font-size: 21px;
+    line-height: 1.27;
+  }
+
+  .app-shell.is-mobile-app .reader-actions {
+    gap: 1px;
+    padding: 3px 10px;
+    overflow-x: auto;
+    border-top: 1px solid var(--ui-border);
+    border-bottom: 0;
+  }
+
+  .app-shell.is-mobile-app .reader-actions :is(
+    button,
+    .reader-more-menu summary,
+    .reader-reply-menu summary,
+    .reader-ai-trigger,
+    select
+  ) {
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding-inline: 8px;
+    border-radius: 6px;
+  }
+
+  .app-shell.is-mobile-app .reader-actions .primary-action {
+    min-width: 44px;
+    background: transparent;
+  }
+
+  .app-shell.is-mobile-app .reader-actions :is(button, summary) > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .app-shell.is-mobile-app .reader-message-actions {
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+  }
+
+  .app-shell.is-mobile-app .reader-meta {
+    gap: 6px;
+    font-size: 11.5px;
+  }
+
+  .app-shell.is-mobile-app :is(.reader-html, .body-text, .reader-plain-text) {
+    line-height: 1.66;
+  }
+
+  /* Settings: typography + rows carry hierarchy; icons do not need decoration. */
+  .app-shell.is-mobile-app .mobile-settings-account-summary {
+    min-height: 64px;
+    margin-bottom: 16px;
+    padding-block: 8px;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-account-avatar {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    font-size: 13px;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-group {
+    margin-bottom: 18px;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-group h2 {
+    padding-bottom: 5px;
+    font-size: 11.5px;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-row {
+    min-height: 52px;
+    gap: 0;
+    padding-block: 6px;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-row-icon {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-settings-row-copy strong {
+    font-weight: 400;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-page-heading :is(h2, p) {
+    display: none;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-page-header {
+    padding: 4px 16px 2px;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-page-header:not(:has(.settings-account-context)) {
+    display: none;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-account-context {
+    color: var(--st-text-tertiary);
+    font-size: 11.5px;
+    font-weight: 400;
+  }
+
+  .settings-workspace .settings-shell.settings-modal .settings-page-content {
+    gap: 14px;
+    padding-top: 8px;
+  }
+
+  /* Composer: mail editor controls, not a feature showcase ribbon. */
+  .app-shell.is-mobile-app .composer .composer-editor-header {
+    min-height: calc(50px + env(safe-area-inset-top));
+  }
+
+  .app-shell.is-mobile-app .composer-header-actions > button[aria-label="收起写信"] {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-field-row {
+    min-height: 46px;
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .app-shell.is-mobile-app .composer .composer-quick-toolbar {
+    min-height: 44px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-footer-tool-group {
+    gap: 0;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-footer-tool-group > button {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    font-size: 0;
+    border-radius: 6px;
+    background: transparent;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-footer-tool-group > button small {
+    position: absolute;
+    min-width: 14px;
+    padding-inline: 3px;
+    font-size: 10px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-format-glyph,
+  .app-shell.is-mobile-app .composer .composer-more-glyph {
+    font-size: 16px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-footer-main {
+    gap: 3px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-send-primary {
+    min-width: 70px;
+    padding-inline: 13px;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-send-primary .composer-send-label-full {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-send-label-compact {
+    display: inline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell.is-mobile-app .mobile-bottom-compose:active {
+    transform: none;
+  }
+}

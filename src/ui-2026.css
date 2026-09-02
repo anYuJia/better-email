@@ -8,6 +8,8 @@
 @import './styles/responsive.css';
 @import './styles/dropdowns.css';
 @import './styles/window-chrome.css';
+@import './styles/standalone-window-chrome.css';
+@import './styles/standalone-window-frame.css';
 @import './styles/shared-motion.css';
 @import './styles/shared-dialogs.css';
 @import './styles/shortcut-help.css';

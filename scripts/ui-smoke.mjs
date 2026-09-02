@@ -1625,7 +1625,9 @@ async function main() {
     await fillInput(cdp, '.mobile-search-form input[aria-label="搜索邮件"]', 'invoice');
     await evalInPage(cdp, "document.querySelector('.mobile-search-form')?.requestSubmit()");
     await waitForExpression(cdp, "document.querySelector('.mobile-search-form input[aria-label=\"搜索邮件\"]')?.value === 'invoice'");
-    await clickButton(cdp, '邮件', "document.querySelector('.mobile-bottom-nav')");
+    await evalInPage(cdp, "document.querySelector('.mobile-search-clear')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-search-form input[aria-label=\"搜索邮件\"]')?.value === ''");
+    await evalInPage(cdp, "document.querySelector('.mobile-inbox-header--search .mobile-header-icon[aria-label=\"关闭搜索\"]')?.click()");
     await waitForExpression(cdp, "!document.querySelector('.mobile-inbox-header--search') && !window.history.state?.betterEmailSearch");
     await evalInPage(cdp, "document.querySelector('.mobile-inbox-actions .mobile-header-icon[aria-label=\"搜索邮件\"]')?.click()");
     await waitForExpression(cdp, "document.querySelector('.mobile-inbox-header--search input[aria-label=\"搜索邮件\"]')?.value === ''");
@@ -1647,7 +1649,9 @@ async function main() {
     await waitForExpression(cdp, "(() => { const panel = document.querySelector('.mobile-reader-surface > .reader-panel'); return panel && getComputedStyle(panel).overflowY === 'auto' && getComputedStyle(panel).touchAction === 'pan-y'; })()");
     await evalInPage(cdp, "document.querySelector('[data-narrow-reader-back]')?.click()");
     await waitForExpression(cdp, "document.querySelector('.mobile-message-list-panel') && !document.querySelector('.mobile-reader-surface')");
-    await clickButton(cdp, '设置', "document.querySelector('.mobile-bottom-nav')");
+    await evalInPage(cdp, "document.querySelector('.mobile-inbox-header .mobile-header-icon[aria-label=\"打开邮箱导航\"]')?.click()");
+    await waitForExpression(cdp, "document.querySelector('.mobile-mailbox-sheet')");
+    await clickButton(cdp, '设置', "document.querySelector('.mobile-mailbox-footer')");
     await waitForExpression(cdp, "document.querySelector('.mobile-settings-root') && window.history.state?.betterEmailScreen === 'settings' && !document.querySelector('.settings-modal')");
     await waitForExpression(cdp, "(() => { const scroll = document.querySelector('.mobile-settings-scroll'); return scroll && getComputedStyle(scroll).overflowY === 'auto'; })()");
     await evalInPage(cdp, "[...document.querySelectorAll('.mobile-settings-row')].find((item) => item.querySelector('strong')?.textContent.trim() === '效率工具')?.click()");

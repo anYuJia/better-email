@@ -117,7 +117,9 @@ jobs:
   build:
     name: Build installers (${{ matrix.platform }})
     needs: validate
-    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch')
+    # Tags/workflow_dispatch remain supported. A main push is release-capable
+    # only when the dedicated release commit uses the exact release: v prefix.
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: v'))
     strategy:
       fail-fast: false
       matrix:
@@ -183,7 +185,7 @@ jobs:
   build-android:
     name: Build Android (APK and AAB)
     needs: validate
-    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch')
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: v'))
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
@@ -316,9 +318,18 @@ jobs:
 
       - name: Resolve release metadata
         id: meta
+        shell: bash
         run: |
-          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-          echo "tag=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+          VERSION="$(node -p "require('./package.json').version")"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="$GITHUB_REF_NAME"
+          else
+            TAG="v${VERSION}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
 
       - name: Generate updater manifest (latest.json)
@@ -364,7 +375,7 @@ jobs:
           if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
             gh release edit "$TAG" --title "Better Email $TAG" --notes "$BODY"
           else
-            gh release create "$TAG" --title "Better Email $TAG" --notes "$BODY"
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Better Email $TAG" --notes "$BODY"
           fi
           gh release upload "$TAG" \
             "dist/installers-macos-latest/Better_Email_${VERSION}_mac_arm.dmg" \

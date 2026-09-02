@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import DeferredSurface from '../components/DeferredSurface';
+import StandaloneWindowFrame from '../components/StandaloneWindowFrame';
 import { emptyDraft } from './appConfig';
 import { logError } from './logger';
 import { importNativeDroppedAttachmentPaths } from './nativeDroppedAttachments';
@@ -37,24 +38,19 @@ function useBackendStartupStatus(): StartupStatus {
 
   useEffect(() => {
     if (mockMode) return undefined;
-
     let active = true;
     let timer: number | undefined;
-
     const poll = async () => {
       try {
         const next = await invoke<StartupStatus>(IPC.GetStartupStatus);
         if (!active) return;
         setStatus(next);
-        if (next.state === 'starting') {
-          timer = window.setTimeout(poll, STARTUP_POLL_INTERVAL_MS);
-        }
+        if (next.state === 'starting') timer = window.setTimeout(poll, STARTUP_POLL_INTERVAL_MS);
       } catch (error) {
         if (!active) return;
         setStatus({ state: 'failed', elapsedMs: 0, error: String(error) });
       }
     };
-
     void poll();
     return () => {
       active = false;
@@ -70,37 +66,25 @@ function MainShellReadySignal({ standaloneWindow }: { standaloneWindow: boolean 
 
   useLayoutEffect(() => {
     if (standaloneWindow) return undefined;
-
     let active = true;
     let firstFrame = 0;
     let switchFrame = 0;
     void reportStartupMilestone('app_shell_mount');
-
     const scheduleVisibleFrame = () => {
       if (!active) return;
       firstFrame = window.requestAnimationFrame(() => {
         void reportStartupMilestone('app_shell_first_painted');
         if (!active || mockMode) return;
-        // The first frame is now produced by the visible main WebView. Keep
-        // the splash above it for one more frame so the handoff is opaque.
         switchFrame = window.requestAnimationFrame(() => {
           void invoke<void>(IPC.HideSplashscreen).catch(() => undefined);
         });
       });
     };
-
-    if (mockMode) {
-      scheduleVisibleFrame();
-    } else {
-      // A hidden native WebView may throttle rAF completely. Showing it while
-      // the always-on-top splash remains visible lets WebKit produce a real
-      // frame without exposing a blank desktop window.
-      // Keep the native reveal single-flight, but attach the handoff callback
-      // on every effect pass because dev StrictMode re-runs effects once.
+    if (mockMode) scheduleVisibleFrame();
+    else {
       revealPromiseRef.current ??= invoke<void>(IPC.RevealMainWindow).catch(() => undefined);
       void revealPromiseRef.current.then(scheduleVisibleFrame, scheduleVisibleFrame);
     }
-
     return () => {
       active = false;
       window.cancelAnimationFrame(firstFrame);
@@ -113,19 +97,7 @@ function MainShellReadySignal({ standaloneWindow }: { standaloneWindow: boolean 
 
 function StartupFailure({ message }: { message: string }) {
   return (
-    <div
-      role="alert"
-      style={{
-        minHeight: '100%',
-        display: 'grid',
-        placeItems: 'center',
-        padding: 32,
-        boxSizing: 'border-box',
-        background: 'var(--color-bg, #f7f8f7)',
-        color: 'var(--color-text, #202622)',
-        textAlign: 'center',
-      }}
-    >
+    <div role="alert" style={{ minHeight: '100%', display: 'grid', placeItems: 'center', padding: 32, boxSizing: 'border-box', background: 'var(--color-bg, #f7f8f7)', color: 'var(--color-text, #202622)', textAlign: 'center' }}>
       <div style={{ maxWidth: 520 }}>
         <strong style={{ display: 'block', marginBottom: 8 }}>Better Email 启动失败</strong>
         <span style={{ opacity: 0.7, fontSize: 13 }}>{message}</span>
@@ -139,106 +111,57 @@ function MainWindowFileDropBridge() {
     if (mockMode) return undefined;
     let active = true;
     let unlisten: (() => void) | undefined;
-
     void getCurrentWindow().onDragDropEvent((event) => {
       if (!active || event.type !== 'drop') return;
       const paths = event.paths.filter((path) => path.trim());
       if (paths.length === 0) return;
-
       void (async () => {
         try {
           const result = await importNativeDroppedAttachmentPaths(paths);
           if (!active) return;
-          if (result.failed > 0) {
-            logError('Main-window native file drop partially failed', {
-              failed: result.failed,
-              firstError: result.firstError,
-            });
-          }
+          if (result.failed > 0) logError('Main-window native file drop partially failed', { failed: result.failed, firstError: result.firstError });
           if (result.attachments.length === 0) return;
-
-          await openComposerWindow({
-            draft: {
-              ...emptyDraft,
-              attachments: result.attachments,
-            },
-            replaceExisting: true,
-          });
+          await openComposerWindow({ draft: { ...emptyDraft, attachments: result.attachments }, replaceExisting: true });
         } catch (error) {
           logError('Main-window native file drop failed', error);
         }
       })();
-    })
-      .then((nextUnlisten) => {
-        unlisten = nextUnlisten;
-      })
-      .catch((error) => {
-        logError('Main-window native drag/drop listener unavailable', error);
-      });
-
-    return () => {
-      active = false;
-      unlisten?.();
-    };
+    }).then((nextUnlisten) => { unlisten = nextUnlisten; })
+      .catch((error) => logError('Main-window native drag/drop listener unavailable', error));
+    return () => { active = false; unlisten?.(); };
   }, []);
-
   return null;
 }
 
-/**
- * Application entry boundary.
- *
- * The independent native splash window remains above the hidden main window
- * while the database, main HTML and application chunk warm in parallel. The
- * mailbox surface mounts only after Rust reports that MailStore is registered,
- * preventing early IPC calls from racing startup while keeping the handoff
- * aligned to a real visible frame.
- */
 export default function AppRoot() {
   const startup = useBackendStartupStatus();
   const standaloneComposer = isStandaloneComposerWindow();
   const standaloneSettings = isStandaloneSettingsWindow();
   const standaloneWindow = standaloneComposer || standaloneSettings;
 
-  useLayoutEffect(() => {
-    void reportStartupMilestone('app_root_mount');
-  }, []);
+  useLayoutEffect(() => { void reportStartupMilestone('app_root_mount'); }, []);
 
   useEffect(() => {
-    const preloadSurface = standaloneComposer
-      ? loadStandaloneComposerApp
-      : standaloneSettings
-        ? loadStandaloneSettingsApp
-        : loadMailboxApp;
+    const preloadSurface = standaloneComposer ? loadStandaloneComposerApp : standaloneSettings ? loadStandaloneSettingsApp : loadMailboxApp;
     void preloadSurface().catch(() => undefined);
   }, [standaloneComposer, standaloneSettings]);
 
   if (startup.state === 'starting') return null;
-
   if (startup.state === 'failed') {
-    return (
-      <>
-        <StartupFailure message={startup.error || '本地数据库初始化失败。'} />
-        <MainShellReadySignal standaloneWindow={standaloneWindow} />
-      </>
-    );
+    return <><StartupFailure message={startup.error || '本地数据库初始化失败。'} /><MainShellReadySignal standaloneWindow={standaloneWindow} /></>;
   }
+
+  const standaloneSurface = standaloneComposer
+    ? <StandaloneWindowFrame kind="composer" title="Better Email" subtitle="写邮件"><StandaloneComposerApp /></StandaloneWindowFrame>
+    : standaloneSettings
+      ? <StandaloneWindowFrame kind="settings" title="Better Email" subtitle="设置"><StandaloneSettingsApp /></StandaloneWindowFrame>
+      : null;
 
   return (
     <>
       {!standaloneWindow ? <MainWindowFileDropBridge /> : null}
-      <Suspense
-        fallback={standaloneComposer
-          ? <DeferredSurface label="正在准备写信窗口" />
-          : standaloneSettings
-            ? <DeferredSurface label="正在准备设置窗口" />
-            : null}
-      >
-        {standaloneComposer
-          ? <StandaloneComposerApp />
-          : standaloneSettings
-            ? <StandaloneSettingsApp />
-            : <MailboxApp />}
+      <Suspense fallback={standaloneComposer ? <DeferredSurface label="正在准备写信窗口" /> : standaloneSettings ? <DeferredSurface label="正在准备设置窗口" /> : null}>
+        {standaloneSurface ?? <MailboxApp />}
         <MainShellReadySignal standaloneWindow={standaloneWindow} />
       </Suspense>
     </>

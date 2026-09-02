@@ -9,8 +9,8 @@ export type LayoutItem = { top: number; height: number };
  * 虚拟计算高度必须与实际渲染高度一致，否则滚动、选中、悬停会错位。
  */
 export const MESSAGE_ROW_HEIGHT = 82;
-/** Mobile retains the previously approved roomier touch row. */
-export const MOBILE_MESSAGE_ROW_HEIGHT = 88;
+/** Mobile keeps a comfortable touch target without wasting list density. */
+export const MOBILE_MESSAGE_ROW_HEIGHT = 76;
 export const GROUP_HEADER_HEIGHT = 30;
 /** 列表底部“已显示 N 封 / 加载更多”区域的高度，计入外层包裹总高度。 */
 export const LIST_FOOTER_HEIGHT = 40;

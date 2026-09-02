@@ -26,14 +26,21 @@ const baseProps: ComponentProps<typeof MobileInboxHeader> = {
 };
 
 describe('MobileInboxHeader filter menu', () => {
-  it('reports the menu as expanded only while its popover is open', () => {
+  it('keeps filters behind one compact menu instead of a persistent tab row', () => {
     render(<MobileInboxHeader {...baseProps} />);
 
-    const trigger = screen.getByRole('button', { name: '更多筛选，当前：附件' });
+    expect(document.querySelector('.mobile-inbox-filter-row')).toBeNull();
+    expect(screen.getByText('12 封 · 附件')).toBeTruthy();
+
+    const trigger = screen.getByRole('button', { name: '筛选和列表，当前：附件' });
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
 
     fireEvent.click(trigger);
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('menuitemradio', { name: '全部' })).toBeTruthy();
+    expect(screen.getByRole('menuitemradio', { name: '未读' })).toBeTruthy();
+    expect(screen.getByRole('menuitemradio', { name: '星标' })).toBeTruthy();
+    expect(screen.getByRole('menuitemradio', { name: '附件' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('menuitemradio', { name: '附件' }));
     expect(trigger.getAttribute('aria-expanded')).toBe('false');

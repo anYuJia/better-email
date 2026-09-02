@@ -34,5 +34,6 @@
 /* Compatibility and component layers */
 @import './components/notifications.css';
 
-/* Product-level hierarchy and mobile de-AI pass. This intentionally loads last. */
+/* Product hierarchy layers. */
 @import './styles/deai-product-polish.css';
+@import './styles/deai-final-polish.css';

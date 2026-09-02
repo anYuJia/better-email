@@ -119,8 +119,6 @@ export default function AppTitlebar({
   onSearchScopeChange,
   onClearSearchAndFilter,
   onApplySearchShortcut,
-  currentViewLabel,
-  viewSummary,
   isRefreshing = false,
   refreshNotice = null,
   onRefresh,
@@ -210,28 +208,9 @@ export default function AppTitlebar({
       role="banner"
     >
       <div className="app-titlebar-grid">
-        <div className="titlebar-left">
+        <div className="titlebar-left" aria-hidden="true">
           {isNativeTitlebar && (
             <TitlebarDragRegion platform={platform} onToggleMaximize={() => { void toggleMaximize(); }} className="titlebar-left-drag" />
-          )}
-          <div className="titlebar-brand">
-            <img
-              src="/brand/v4/brand-mark-64.png"
-              alt=""
-              width={22}
-              height={22}
-              draggable={false}
-            />
-            <span>Better Email</span>
-          </div>
-          {currentViewLabel && (
-            <div
-              className="titlebar-context"
-              title={viewSummary ? `${currentViewLabel} · ${viewSummary}` : currentViewLabel}
-            >
-              <span className="titlebar-context-label">{currentViewLabel}</span>
-              {viewSummary && <span className="titlebar-context-count">{viewSummary}</span>}
-            </div>
           )}
         </div>
 

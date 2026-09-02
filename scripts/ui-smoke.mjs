@@ -264,7 +264,10 @@ async function openCdp(debugPort, pageUrl) {
 function isTransientCdpError(error) {
   const message = String(error?.message ?? error ?? '');
   return message.includes('Timed out waiting for Chrome CDP response')
-    || message.includes('CDP socket');
+    || message.includes('CDP socket')
+    || message.includes('Inspected target navigated or closed')
+    || message.includes('Execution context was destroyed')
+    || message.includes('Cannot find context with specified id');
 }
 
 function isTransientPageError(error) {
@@ -291,18 +294,25 @@ async function waitForExpression(cdp, expression, timeoutMs = 10_000) {
   return withStep(`waitForExpression ${shortText(expression)}`, async () => {
     const deadline = Date.now() + timeoutMs;
     let lastValue = null;
+    let lastTransientError = null;
     while (Date.now() < deadline) {
       assertGlobalTimeout(`waiting for expression ${shortText(expression)}`);
-      const result = await cdp.send('Runtime.evaluate', {
-        expression: `Boolean(${expression})`,
-        awaitPromise: true,
-        returnByValue: true,
-      });
-      lastValue = result.result?.value;
-      if (lastValue) return lastValue;
+      try {
+        const result = await cdp.send('Runtime.evaluate', {
+          expression: `Boolean(${expression})`,
+          awaitPromise: true,
+          returnByValue: true,
+        });
+        lastValue = result.result?.value;
+        if (lastValue) return lastValue;
+      } catch (error) {
+        if (!isTransientCdpError(error)) throw error;
+        lastTransientError = error;
+      }
       await sleep(150);
     }
-    throw new Error(`Timed out waiting for expression: ${expression}; last=${JSON.stringify(lastValue)}`);
+    const transientDetail = lastTransientError ? `; lastError=${lastTransientError.message}` : '';
+    throw new Error(`Timed out waiting for expression: ${expression}; last=${JSON.stringify(lastValue)}${transientDetail}`);
   });
 }
 
@@ -2356,23 +2366,23 @@ async function main() {
     await clickContextSubmenuItem(cdp, '移动到', '重点客户');
     await waitForExpression(cdp, "document.body.innerText.includes('已移动到 重点客户')");
     await clickButton(cdp, '重点客户', "document.querySelector('.primary-folder-list')");
-    await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
+    await waitForExpression(cdp, "document.querySelector('.folder.active')?.innerText.includes('重点客户') && [...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单') && item.getAttribute('data-folder-role')?.startsWith('custom:'))");
     await openCardContextMenu(cdp, '安全检查清单');
     await clickContextMenuItem(cdp, '移到废纸篓');
     await waitForExpression(cdp, "document.body.innerText.includes('已移到废纸篓：安全检查清单')");
     await clickButton(cdp, '废纸篓', "document.querySelector('.primary-folder-list')");
-    await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
-    await openCardContextMenu(cdp, '安全检查清单');
+    await waitForExpression(cdp, "document.querySelector('.folder.active[data-folder-role=\"trash\"]') && [...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单') && item.getAttribute('data-folder-role') === 'trash')");
+    await openCardContextMenu(cdp, '安全检查清单', 'trash');
     await clickContextMenuItem(cdp, '恢复到收件箱');
     await waitForExpression(cdp, "document.body.innerText.includes('本地已恢复到收件箱') && document.body.innerText.includes('远端邮件已移动到 INBOX')");
     await clickButton(cdp, '收件箱', "document.querySelector('.folder-list')");
-    await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单')");
-    await openCardContextMenu(cdp, 'Quarterly update');
+    await waitForExpression(cdp, "document.querySelector('.folder.active[data-folder-role=\"inbox\"]') && [...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('安全检查清单') && item.getAttribute('data-folder-role') === 'inbox')");
+    await openCardContextMenu(cdp, 'Quarterly update', 'inbox');
     await clickContextMenuItem(cdp, '移到废纸篓');
     await waitForExpression(cdp, "document.body.innerText.includes('已移到废纸篓：Quarterly update')");
     await clickButton(cdp, '废纸篓', "document.querySelector('.primary-folder-list')");
-    await waitForExpression(cdp, "document.body.innerText.includes('Quarterly update')");
-    await openCardContextMenu(cdp, 'Quarterly update');
+    await waitForExpression(cdp, "document.querySelector('.folder.active[data-folder-role=\"trash\"]') && [...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Quarterly update') && item.getAttribute('data-folder-role') === 'trash')");
+    await openCardContextMenu(cdp, 'Quarterly update', 'trash');
     await clickContextMenuItem(cdp, '永久删除');
     await waitForExpression(cdp, "document.querySelector('.dialog-card') && document.querySelector('.dialog-card')?.innerText.includes('永久删除')");
     await clickButton(cdp, '确认', "document.querySelector('.dialog-card')");

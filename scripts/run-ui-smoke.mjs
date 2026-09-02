@@ -49,6 +49,7 @@ function terminateTree(force) {
 function scheduleTreeCleanup(reason, graceMs) {
   if (failureTimer || successTimer) return;
   const timer = setTimeout(() => {
+    if (successSeen) forcedAfterSuccess = true;
     if (!child || child.exitCode !== null || child.signalCode !== null) return;
     console.warn(`[ui-smoke-runner] ${reason}; terminating leaked browser/dev-server processes`);
     terminateTree(false);
@@ -81,7 +82,7 @@ function observe(chunk, stream) {
     );
   }
 
-  if (FAILURE_MARKER.test(tail) && TRANSIENT_RELOAD_MARKER.test(tail)) {
+  if (!transientReloadFailure && TRANSIENT_RELOAD_MARKER.test(tail)) {
     transientReloadFailure = true;
   }
 }
@@ -114,7 +115,7 @@ function startAttempt() {
     process.exitCode = 1;
   });
 
-  child.on('exit', (code, signal) => {
+  child.on('close', (code, signal) => {
     const passed = successSeen;
     const wasTransientReloadFailure = transientReloadFailure;
     clearTimers();

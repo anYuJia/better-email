@@ -74,6 +74,19 @@ function hideFromTopLayer(panel: PopoverPanel | null) {
  * - 需要连续选择/编辑的菜单（如标签菜单）不调用 closeMenu，但仍受外部点击与
  *   Escape 关闭约束。
  */
+function clearPanelFloatingStyles(panel: HTMLElement | null) {
+  if (!panel) return;
+  panel.style.removeProperty('position');
+  panel.style.removeProperty('inset');
+  panel.style.removeProperty('top');
+  panel.style.removeProperty('left');
+  panel.style.removeProperty('right');
+  panel.style.removeProperty('bottom');
+  panel.style.removeProperty('margin');
+  panel.style.removeProperty('height');
+  panel.style.removeProperty('max-height');
+}
+
 export function useDetailsMenu(
   ref: RefObject<HTMLElement>,
   { floating = false, align = 'end' }: UseDetailsMenuOptions = {},
@@ -81,7 +94,9 @@ export function useDetailsMenu(
   const closeMenu = useCallback(() => {
     const details = ref.current;
     if (!details) return;
-    hideFromTopLayer(getFloatingPanel(details));
+    const panel = getFloatingPanel(details);
+    hideFromTopLayer(panel);
+    clearPanelFloatingStyles(panel);
     if (details.hasAttribute('open')) {
       details.removeAttribute('open');
     }
@@ -113,8 +128,14 @@ export function useDetailsMenu(
 
       // A native popover participates in the browser top layer, so pane
       // containment, overflow clipping and local stacking contexts cannot
-      // cover it. Hosts without the Popover API keep using the existing
-      // fixed-position path below.
+      // cover it. Set explicit sizing properties to avoid user-agent inset:0 stretching.
+      panel.style.setProperty('position', 'fixed');
+      panel.style.setProperty('inset', 'unset');
+      panel.style.setProperty('bottom', 'auto');
+      panel.style.setProperty('right', 'auto');
+      panel.style.setProperty('margin', '0');
+      panel.style.setProperty('height', 'max-content');
+
       showInTopLayer(panel);
 
       const summaryRect = summary.getBoundingClientRect();
@@ -142,6 +163,10 @@ export function useDetailsMenu(
         ? summaryRect.bottom + ANCHOR_GAP
         : Math.max(VIEWPORT_GAP, summaryRect.top - ANCHOR_GAP - panelHeight);
 
+      panel.style.setProperty('left', `${Math.round(left)}px`);
+      panel.style.setProperty('top', `${Math.round(top)}px`);
+      panel.style.setProperty('max-height', `${Math.floor(availableHeight)}px`);
+
       menu.style.setProperty('--floating-menu-left', `${Math.round(left)}px`);
       menu.style.setProperty('--floating-menu-top', `${Math.round(top)}px`);
       menu.style.setProperty('--floating-menu-max-height', `${Math.floor(availableHeight)}px`);
@@ -163,7 +188,9 @@ export function useDetailsMenu(
       if (!menu.hasAttribute('open')) {
         clearPositionFrame();
         menu.removeAttribute('data-menu-positioned');
-        hideFromTopLayer(getFloatingPanel(menu));
+        const panel = getFloatingPanel(menu);
+        hideFromTopLayer(panel);
+        clearPanelFloatingStyles(panel);
         return;
       }
       scheduleFloatingPosition();

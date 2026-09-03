@@ -102,16 +102,18 @@
   /* CustomSelect supplies the final layer inline for modal callers. */
   z-index: 1000;
   display: grid;
+  align-content: start;
   gap: 2px;
   width: max-content;
-  min-width: 0;
+  min-width: 140px;
   max-width: min(var(--ui-dropdown-max-width), calc(100vw - 24px));
   max-height: min(280px, calc(100vh - 24px));
-  padding: var(--ui-menu-padding);
+  height: max-content;
+  padding: 4px;
   overflow-x: hidden;
   overflow-y: auto;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-panel);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
   background: var(--ui-surface);
   color: var(--ui-text);
   box-shadow: var(--ui-shadow-popover);
@@ -143,7 +145,7 @@
   gap: 8px;
   padding: 6px 10px;
   border: 1px solid transparent;
-  border-radius: var(--ui-menu-item-radius);
+  border-radius: 8px;
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
@@ -194,11 +196,20 @@
   background: var(--surface-active);
 }
 
-.custom-select-dropdown button[aria-selected="true"],
-.custom-select-dropdown button[aria-selected="true"]:hover,
-.custom-select-dropdown button[aria-selected="true"].active {
+.custom-select-dropdown button[aria-selected="true"] {
+  color: var(--ui-text);
+  background: transparent;
+}
+
+.custom-select-dropdown button[aria-selected="true"] > svg {
   color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+}
+
+.custom-select-dropdown button[aria-selected="true"]:hover,
+.custom-select-dropdown button[aria-selected="true"]:focus-visible,
+.custom-select-dropdown button[aria-selected="true"].active {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
 }
 
 .custom-select-dropdown button:disabled {

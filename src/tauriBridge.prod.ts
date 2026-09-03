@@ -401,4 +401,3 @@ export async function prodStartDraggingCurrentWindow(): Promise<void> {
   const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
   await getTauriCurrentWindow().startDragging();
 }
-

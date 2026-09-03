@@ -216,4 +216,3 @@ export function startDraggingCurrentWindow(): Promise<void> {
   if (mockMode) return Promise.resolve();
   return loadProdBridge().then(({ prodStartDraggingCurrentWindow }) => prodStartDraggingCurrentWindow());
 }
-

@@ -174,4 +174,3 @@ describe('production composer window bridge', () => {
     expect(mocks.startDragging).toHaveBeenCalledOnce();
   });
 });
-

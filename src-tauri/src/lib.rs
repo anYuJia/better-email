@@ -1071,11 +1071,19 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building Better Email")
         .run(move |_app_handle, event| {
-            if matches!(
-                event,
-                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }
-            ) {
-                exit_startup.shutdown();
+            match event {
+                #[cfg(desktop)]
+                tauri::RunEvent::Reopen { .. } => {
+                    if let Some(window) = _app_handle.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.unminimize();
+                        let _ = window.set_focus();
+                    }
+                }
+                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. } => {
+                    exit_startup.shutdown();
+                }
+                _ => {}
             }
         });
 }

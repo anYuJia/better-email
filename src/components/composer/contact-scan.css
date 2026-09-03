@@ -1,27 +1,29 @@
 .composer-contacts-scan {
-  min-height: 32px;
+  min-height: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-self: center;
-  gap: var(--compose-space-2);
-  padding: 0 10px;
-  border: 1px solid var(--ui-accent);
-  border-radius: var(--ui-radius-control);
-  color: var(--color-text-on-accent);
-  background: var(--ui-accent);
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-sm);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
 }
 
 .composer-contacts-scan:hover:not(:disabled) {
-  border-color: var(--ui-accent-hover);
-  background: var(--ui-accent-hover);
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  background: var(--quiet-row-hover);
 }
 
 .composer-contacts-scan:active:not(:disabled) {
-  border-color: var(--ui-accent-pressed);
-  background: var(--ui-accent-pressed);
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
 }
 
 .composer-contacts-scan:focus-visible {

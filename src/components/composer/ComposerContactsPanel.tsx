@@ -160,8 +160,8 @@ export default function ComposerContactsPanel({
               }
             }}
           >
-            <RefreshCw size={14} aria-hidden="true" className={scanBusy ? 'is-spinning' : ''} />
-            {scanBusy ? '正在扫描…' : '扫描同步最近联系人'}
+            <RefreshCw size={13} aria-hidden="true" className={scanBusy ? 'is-spinning' : ''} />
+            <span>{scanBusy ? '正在扫描…' : '同步'}</span>
           </button>
         ) : null}
         <div className="composer-contacts-heading-actions">

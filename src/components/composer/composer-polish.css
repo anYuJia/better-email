@@ -261,3 +261,9 @@ body[data-composer-window-platform='macos']
   .composer-editor-header {
   padding-left: 88px;
 }
+
+/* Windows native window caption controls safety clearance */
+.composer-backdrop.is-native-window[data-composer-platform='windows'] .composer-contacts-header,
+.composer-backdrop.is-native-window[data-composer-platform='windows'] .composer:not(.has-contacts-panel) .composer-editor-header {
+  padding-right: 140px;
+}

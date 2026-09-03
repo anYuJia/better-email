@@ -14,15 +14,22 @@
   contain: none;
 }
 
-details[data-floating-menu="true"].compact-menu[open] > div,
-details[data-floating-menu="true"].compact-dropdown[open] > div {
+details[data-floating-menu="true"][open] > :is([data-floating-menu-panel="true"], div),
+details[data-floating-menu="true"] > :is([data-floating-menu-panel="true"], div):popover-open {
   box-sizing: border-box;
   position: fixed;
+  inset: unset;
+  inset-block: unset;
+  inset-inline: unset;
   top: var(--floating-menu-top, 0);
+  left: var(--floating-menu-left, 0);
   right: auto;
   bottom: auto;
-  left: var(--floating-menu-left, 0);
+  margin: 0;
   z-index: 2500;
+  width: max-content;
+  min-width: 140px;
+  height: max-content;
   max-width: calc(100vw - 16px);
   max-height: min(460px, var(--floating-menu-max-height, calc(100dvh - 16px)));
   overflow-x: hidden;
@@ -32,15 +39,18 @@ details[data-floating-menu="true"].compact-dropdown[open] > div {
 }
 
 /* Native popovers are promoted into the browser top layer. Reset the user
- * agent's centering margin so the shared viewport coordinates stay exact.
+ * agent's centering margin and default inset so shared viewport coordinates stay exact.
  * The details/fixed-position rules above remain the compatibility fallback
  * for older WebViews without the Popover API. */
 details[data-floating-menu="true"] > [data-floating-menu-panel="true"] {
   margin: 0;
+  inset: unset;
+  bottom: auto;
+  right: auto;
+  height: max-content;
 }
 
-details[data-floating-menu="true"][data-menu-positioned="true"].compact-menu > div,
-details[data-floating-menu="true"][data-menu-positioned="true"].compact-dropdown > div {
+details[data-floating-menu="true"][data-menu-positioned="true"] > :is([data-floating-menu-panel="true"], div) {
   visibility: visible;
 }
 

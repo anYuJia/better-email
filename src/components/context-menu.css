@@ -14,9 +14,9 @@
   max-height: var(--context-menu-max-height, min(460px, calc(100vh - 16px)));
   overflow-y: auto;
   overflow-x: visible;
-  padding: var(--ui-menu-padding);
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-panel);
+  padding: 4px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
@@ -35,9 +35,9 @@
   display: block;
   width: min(var(--ui-menu-width), calc(100vw - 16px));
   min-width: 0;
-  padding: var(--ui-menu-padding);
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-panel);
+  padding: 4px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
 }
@@ -84,7 +84,7 @@
   gap: 8px;
   padding: 0 var(--ui-menu-item-padding-inline);
   border: 0;
-  border-radius: var(--ui-menu-item-radius);
+  border-radius: 8px;
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
@@ -114,9 +114,9 @@
   background: var(--ui-control-hover);
 }
 
+.context-menu-surface button:focus,
 .context-menu-surface button:focus-visible {
-  outline: var(--ui-focus-outline);
-  outline-offset: -1px;
+  outline: none;
 }
 
 .context-menu-surface button:disabled {
@@ -232,9 +232,9 @@
   max-height: min(var(--context-submenu-max-height, 360px), calc(100vh - 16px));
   display: none;
   overflow: auto;
-  padding: var(--ui-menu-padding);
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-panel);
+  padding: 4px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
   z-index: 1;

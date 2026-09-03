@@ -1206,14 +1206,18 @@
 .custom-select-dropdown[data-portal-owner="composer-sender"] button:hover,
 .custom-select-dropdown[data-portal-owner="composer-sender"] button.active {
   color: var(--ui-text);
-  background: var(--ui-accent-soft);
+  background: var(--quiet-row-hover);
 }
 
-.custom-select-dropdown[data-portal-owner="composer-sender"] button[aria-selected="true"],
+.custom-select-dropdown[data-portal-owner="composer-sender"] button[aria-selected="true"] {
+  color: var(--ui-text);
+  background: transparent;
+}
+
 .custom-select-dropdown[data-portal-owner="composer-sender"] button[aria-selected="true"]:hover,
 .custom-select-dropdown[data-portal-owner="composer-sender"] button[aria-selected="true"].active {
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
 }
 
 .custom-select-dropdown[data-portal-owner="composer-sender"] button > svg {

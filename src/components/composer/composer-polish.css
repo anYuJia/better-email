@@ -267,4 +267,3 @@ body[data-composer-window-platform='macos']
 .composer-backdrop.is-native-window[data-composer-platform='windows'] .composer:not(.has-contacts-panel) .composer-editor-header {
   padding-right: 140px;
 }
-

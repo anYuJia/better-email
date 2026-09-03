@@ -86,6 +86,7 @@ function clampComposerPosition(
 export type ComposerWindowProps = {
   minimized: boolean;
   standaloneWindow?: boolean;
+  platform?: 'macos' | 'windows' | 'linux' | 'web';
   focusRequest?: number;
   draft: DraftInput;
   accounts: Account[];
@@ -134,6 +135,7 @@ export type ComposerWindowProps = {
 export default function ComposerWindow({
   minimized,
   standaloneWindow = false,
+  platform = 'web',
   focusRequest = 0,
   draft,
   accounts,
@@ -467,10 +469,21 @@ export default function ComposerWindow({
     else onSendDraft();
   }
 
+  const resolvedPlatform = (
+    platform !== 'web'
+      ? platform
+      : typeof document !== 'undefined' && document.body.dataset.composerWindowPlatform === 'macos'
+        ? 'macos'
+        : typeof document !== 'undefined' && document.body.dataset.composerWindowPlatform === 'windows'
+          ? 'windows'
+          : platform
+  );
+
   return (
     <div
       ref={backdropRef}
       className={`composer-backdrop ${standaloneWindow ? 'is-native-window' : isMobileComposerViewport ? 'is-modal' : 'is-floating'}`}
+      data-composer-platform={standaloneWindow ? resolvedPlatform : undefined}
       role="dialog"
       aria-modal={!standaloneWindow && isMobileComposerViewport ? 'true' : undefined}
       aria-label="写信窗口"
@@ -493,6 +506,13 @@ export default function ComposerWindow({
         <div className={`composer-workspace${contactsPanelVisible ? ' has-contacts' : ''}`}>
           <div className="composer-editor-pane">
             <header className="composer-editor-header" onPointerDown={standaloneWindow ? undefined : beginDrag}>
+              {standaloneWindow && (
+                <div
+                  className="composer-titlebar-drag-region"
+                  data-tauri-drag-region
+                  aria-hidden="true"
+                />
+              )}
               <span className="composer-title-copy">
                 <strong>{windowHeading}</strong>
                 <span

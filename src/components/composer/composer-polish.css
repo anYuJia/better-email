@@ -229,3 +229,36 @@
     flex-basis: 168px;
   }
 }
+
+/* Standalone native composer window: titlebar drag region and platform chrome */
+.composer-backdrop.is-native-window .composer-editor-header {
+  position: relative;
+  cursor: default;
+}
+
+.composer-titlebar-drag-region {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.composer-backdrop.is-native-window .composer-editor-header > :not(.composer-titlebar-drag-region) {
+  position: relative;
+  z-index: 2;
+}
+
+.composer-backdrop.is-native-window .composer-title-copy {
+  pointer-events: none;
+}
+
+/* macOS native window overlay titlebar safety clearance for traffic lights */
+body[data-composer-window-platform='macos']
+  .composer-backdrop.is-native-window
+  .composer-editor-header,
+.composer-backdrop.is-native-window[data-composer-platform='macos']
+  .composer-editor-header {
+  padding-left: 88px;
+}
+

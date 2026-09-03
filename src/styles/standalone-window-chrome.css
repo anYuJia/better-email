@@ -95,6 +95,16 @@
   flex: 1 1 auto;
 }
 
+body[data-composer-window-platform='macos']
+  .standalone-composer-app
+  .composer-backdrop.is-native-window
+  .composer-editor-header,
+.standalone-composer-app
+  .composer-backdrop.is-native-window[data-composer-platform='macos']
+  .composer-editor-header {
+  padding-left: 88px;
+}
+
 .app-shell.standalone-settings-window {
   display: flex;
   flex-direction: column;

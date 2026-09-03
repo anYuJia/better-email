@@ -72,6 +72,8 @@ export default function StandaloneComposerApp() {
   const [composerSendProgress, setComposerSendProgress] = useState<number | null>(null);
   const [composerSendProgressMessage, setComposerSendProgressMessage] = useState<string | null>(null);
   const [composerAttachmentProgress, setComposerAttachmentProgress] = useState<number | null>(null);
+  const [platform, setPlatform] = useState<'macos' | 'windows' | 'linux' | 'web'>('web');
+  const platformReadyRef = useRef(false);
   const closingRef = useRef(false);
   const bootedRef = useRef(false);
   const frontendReadyRef = useRef(false);
@@ -87,6 +89,31 @@ export default function StandaloneComposerApp() {
   const frontendReady = nativeCloseListenerReady && (booted || loadError !== null);
   frontendReadyRef.current = frontendReady;
   loadErrorRef.current = loadError;
+
+  useEffect(() => {
+    let active = true;
+    const body = document.body;
+
+    void invoke<string>(IPC.GetPlatform)
+      .catch(() => 'web')
+      .then((detectedPlatform) => {
+        if (!active) return;
+        const resolved = (
+          detectedPlatform === 'macos' || detectedPlatform === 'windows' || detectedPlatform === 'linux'
+            ? detectedPlatform
+            : 'web'
+        );
+        body.dataset.composerWindowPlatform = resolved;
+        setPlatform(resolved);
+        platformReadyRef.current = true;
+      });
+
+    return () => {
+      active = false;
+      platformReadyRef.current = false;
+      delete body.dataset.composerWindowPlatform;
+    };
+  }, []);
 
   const loadComposerData = useCallback(async (preferredAccountId?: number) => {
     const nextAccounts = await invoke<Account[]>(IPC.ListAccounts);
@@ -335,10 +362,19 @@ export default function StandaloneComposerApp() {
     let active = true;
     const boot = async () => {
       try {
-        // Preload stable composer data first. Consume the pending request only
-        // after the standalone app is nearly ready, so a click during prewarm
-        // cannot be taken too early and then lose its wake-up event.
-        await loadComposerData();
+        const [nextPlatform] = await Promise.all([
+          invoke<string>(IPC.GetPlatform).catch(() => 'web'),
+          loadComposerData(),
+        ]);
+        if (!active) return;
+        const resolved = (
+          nextPlatform === 'macos' || nextPlatform === 'windows' || nextPlatform === 'linux'
+            ? nextPlatform
+            : 'web'
+        );
+        document.body.dataset.composerWindowPlatform = resolved;
+        setPlatform(resolved);
+        platformReadyRef.current = true;
         if (!active) return;
         const pending = normalizeComposerRequest(await takePendingComposerRequest());
         if (!active) return;
@@ -486,6 +522,7 @@ export default function StandaloneComposerApp() {
       {isComposerOpen ? (
         <ComposerWindow
           standaloneWindow
+          platform={platform}
           minimized={isComposerMinimized}
           focusRequest={composerFocusRequest}
           draft={draft}

@@ -304,4 +304,18 @@ describe('ComposerWindow focus lifecycle', () => {
     expect(screen.getByRole('dialog', { name: '选择定时发送时间' })).not.toBeNull();
     expect(document.querySelector('.composer-schedule-status')).toBeNull();
   });
+
+  it('configures standalone window chrome with titlebar drag region and platform attributes', () => {
+    const { container, rerender } = render(cloneElement(composer(), { standaloneWindow: true, platform: 'macos' }));
+
+    const dragRegion = container.querySelector('.composer-titlebar-drag-region');
+    expect(dragRegion).not.toBeNull();
+    expect(dragRegion?.hasAttribute('data-tauri-drag-region')).toBe(true);
+    expect(container.querySelector('.composer-backdrop')?.getAttribute('data-composer-platform')).toBe('macos');
+    expect(screen.queryByRole('button', { name: '收起写信' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '关闭写信窗口' })).toBeNull();
+
+    rerender(cloneElement(composer(), { standaloneWindow: true, platform: 'windows' }));
+    expect(container.querySelector('.composer-backdrop')?.getAttribute('data-composer-platform')).toBe('windows');
+  });
 });

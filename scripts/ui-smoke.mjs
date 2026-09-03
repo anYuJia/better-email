@@ -3208,6 +3208,60 @@ async function main() {
     }
     await captureScreenshot(cdp, 'settings-standalone-window-1040');
 
+    await setUiViewport(cdp, 960, 700);
+    await evalInPage(
+      cdp,
+      `location.href = ${JSON.stringify(`${url}/?window=compose`)}`,
+    );
+    await waitForExpression(cdp, "document.querySelector('.standalone-composer-app .composer-backdrop.is-native-window')", 45_000);
+    await waitForExpression(cdp, "['web', 'macos', 'windows', 'linux'].includes(document.body.dataset.composerWindowPlatform)");
+    await evalInPage(cdp, "document.body.dataset.composerWindowPlatform = 'macos'");
+    await waitForExpression(cdp, "document.body.dataset.composerWindowPlatform === 'macos'");
+    const standaloneComposerMacSnapshot = await evalInPage(cdp, `(() => {
+      const header = document.querySelector('.composer-editor-header');
+      const title = document.querySelector('.composer-editor-header .composer-title-copy strong');
+      const dragRegion = document.querySelector('.composer-titlebar-drag-region[data-tauri-drag-region]');
+      const headerRect = header?.getBoundingClientRect();
+      const titleRect = title?.getBoundingClientRect();
+      const dragRect = dragRegion?.getBoundingClientRect();
+      return {
+        hasMailChrome: Boolean(document.querySelector('.app-titlebar, .app-shell > .sidebar, .message-list-panel, .reader-panel, .standalone-window-chrome')),
+        hasDuplicateClose: Boolean(document.querySelector('.composer-editor-header [aria-label="关闭写信窗口"], .composer-editor-header [aria-label="收起写信"]')),
+        macTrafficLightsSafe: Boolean(titleRect) && titleRect.left >= 84,
+        dragRegionFillsHeader: Boolean(dragRect && headerRect)
+          && Math.abs(dragRect.left - headerRect.left) <= 1
+          && Math.abs(dragRect.right - headerRect.right) <= 1
+          && Math.abs(dragRect.height - headerRect.height) <= 1,
+        noHorizontalScroll: document.documentElement.scrollWidth <= window.innerWidth + 1
+          && document.body.scrollWidth <= window.innerWidth + 1,
+      };
+    })()`);
+    console.log(`[ui-smoke] standalone-composer macOS geometry ${JSON.stringify(standaloneComposerMacSnapshot)}`);
+    if (
+      standaloneComposerMacSnapshot.hasMailChrome
+      || standaloneComposerMacSnapshot.hasDuplicateClose
+      || !standaloneComposerMacSnapshot.macTrafficLightsSafe
+      || !standaloneComposerMacSnapshot.dragRegionFillsHeader
+      || !standaloneComposerMacSnapshot.noHorizontalScroll
+    ) {
+      throw new Error(`Standalone composer macOS geometry contract failed: ${JSON.stringify(standaloneComposerMacSnapshot)}`);
+    }
+
+    await evalInPage(cdp, "document.body.dataset.composerWindowPlatform = 'windows'");
+    await waitForExpression(cdp, "document.body.dataset.composerWindowPlatform === 'windows'");
+    const standaloneComposerWinSnapshot = await evalInPage(cdp, `(() => {
+      const title = document.querySelector('.composer-editor-header .composer-title-copy strong');
+      const titleRect = title?.getBoundingClientRect();
+      return {
+        windowsNormalPadding: Boolean(titleRect) && titleRect.left < 50,
+      };
+    })()`);
+    console.log(`[ui-smoke] standalone-composer Windows geometry ${JSON.stringify(standaloneComposerWinSnapshot)}`);
+    if (!standaloneComposerWinSnapshot.windowsNormalPadding) {
+      throw new Error(`Standalone composer Windows geometry contract failed: ${JSON.stringify(standaloneComposerWinSnapshot)}`);
+    }
+    await captureScreenshot(cdp, 'composer-standalone-window-960');
+
     if (checks.some((ok) => !ok)) throw new Error(`UI smoke checks failed: ${JSON.stringify(checks)}`);
 
     const report = {
@@ -3276,6 +3330,8 @@ async function main() {
         'settings application surface opens',
         'standalone settings renderer fills its native window without mail chrome',
         'standalone settings uses a unified transparent macOS titlebar with safe traffic-light spacing',
+        'standalone composer renderer fills its native window without mail chrome',
+        'standalone composer uses safe traffic-light clearance on macOS and native padding on Windows',
         'settings navigation renders one page at a time',
         'settings desktop sidebar switches standalone pages',
         'settings narrow layout uses native root and detail navigation',

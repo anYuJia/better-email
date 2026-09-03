@@ -1070,20 +1070,18 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building Better Email")
-        .run(move |_app_handle, event| {
-            match event {
-                #[cfg(target_os = "macos")]
-                tauri::RunEvent::Reopen { .. } => {
-                    if let Some(window) = _app_handle.get_webview_window("main") {
-                        let _ = window.show();
-                        let _ = window.unminimize();
-                        let _ = window.set_focus();
-                    }
+        .run(move |_app_handle, event| match event {
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen { .. } => {
+                if let Some(window) = _app_handle.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
                 }
-                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. } => {
-                    exit_startup.shutdown();
-                }
-                _ => {}
             }
+            tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. } => {
+                exit_startup.shutdown();
+            }
+            _ => {}
         });
 }

@@ -90,7 +90,6 @@
   position: absolute;
   inset: 0 auto 0 0;
   width: var(--st-sidebar-width);
-  border-right: 1px solid var(--st-border);
   background: var(--st-sidebar);
   content: '';
   pointer-events: none;
@@ -142,8 +141,21 @@ body[data-settings-window-platform='macos']
 }
 
 .settings-header-account-switcher .account-switcher-trigger {
-  min-height: 40px;
-  padding-inline: 9px;
+  min-height: 38px;
+  padding-inline: 10px;
+  background: var(--st-surface);
+  border: 1px solid var(--st-border);
+  box-shadow: none;
+}
+
+.settings-header-account-switcher .account-switcher-trigger:hover {
+  background: var(--st-surface);
+  border-color: var(--st-border-strong);
+}
+
+.settings-header-account-switcher .account-switcher-trigger[aria-expanded='true'] {
+  background: var(--st-surface);
+  border-color: var(--st-accent);
 }
 
 .settings-title-copy {

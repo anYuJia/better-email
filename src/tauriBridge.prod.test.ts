@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   hide: vi.fn(),
   setFocus: vi.fn(),
   show: vi.fn(),
+  startDragging: vi.fn(),
   unlisten: vi.fn(),
   unminimize: vi.fn(),
   readyHandler: undefined as undefined | ((event: { payload: void }) => void),
@@ -52,6 +53,7 @@ import {
   prodOpenSettingsWindow,
   prodPrewarmComposerWindow,
   prodPrewarmSettingsWindow,
+  prodStartDraggingCurrentWindow,
   prodSyncSettingsWindowAccountScope,
 } from './tauriBridge.prod';
 
@@ -161,4 +163,15 @@ describe('production composer window bridge', () => {
     expect(mocks.hide).not.toHaveBeenCalled();
     expect(mocks.destroy).toHaveBeenCalledOnce();
   });
+
+  it('delegates dragging to the native current window', async () => {
+    mocks.startDragging.mockResolvedValueOnce(undefined);
+    mocks.getCurrentWindow.mockReturnValue({
+      startDragging: mocks.startDragging,
+    });
+
+    await expect(prodStartDraggingCurrentWindow()).resolves.toBeUndefined();
+    expect(mocks.startDragging).toHaveBeenCalledOnce();
+  });
 });
+

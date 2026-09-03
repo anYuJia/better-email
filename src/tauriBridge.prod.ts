@@ -396,3 +396,9 @@ export async function prodOnCurrentWindowCloseRequested(handler: (event: NativeC
   const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
   return getTauriCurrentWindow().onCloseRequested(handler);
 }
+
+export async function prodStartDraggingCurrentWindow(): Promise<void> {
+  const { getCurrentWindow: getTauriCurrentWindow } = await loadWindow();
+  await getTauriCurrentWindow().startDragging();
+}
+

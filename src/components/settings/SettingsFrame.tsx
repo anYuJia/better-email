@@ -11,6 +11,7 @@ import SettingsPageShell from './SettingsPageShell';
 import AccountSwitcher from '../AccountSwitcher';
 import type { Account, AccountScope } from '../../app/types';
 import useModalAccessibility from '../../hooks/useModalAccessibility';
+import { startDraggingCurrentWindow } from '../../tauriBridge';
 import { SettingsSearch, SettingsSidebar } from './SettingsNavigationControls';
 import {
   connectionSettingsSections,
@@ -295,6 +296,11 @@ export default function SettingsFrame({
             <div
               className="settings-titlebar-drag-region"
               data-tauri-drag-region
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                if ((event.target as HTMLElement).closest('button, input, textarea, select, label, a, [role="button"]')) return;
+                void startDraggingCurrentWindow().catch(() => undefined);
+              }}
               aria-hidden="true"
             />
           )}

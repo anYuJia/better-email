@@ -29,6 +29,7 @@ import ComposerQuickTools, { ComposerRichToolbar } from './composer/ComposerQuic
 import ComposerSchedulePicker from './composer/ComposerSchedulePicker';
 import useModalAccessibility from '../hooks/useModalAccessibility';
 import { useWheelContainment } from '../hooks/useWheelContainment';
+import { startDraggingCurrentWindow } from '../tauriBridge';
 import './composer/composer.css';
 import './composer/composer-polish.css';
 
@@ -463,6 +464,12 @@ export default function ComposerWindow({
       : `附件处理中（${normalizedAttachmentProgress}%）`;
   const composerBusy = normalizedSendProgress !== null || normalizedAttachmentProgress !== null;
 
+  function beginNativeDrag(event: React.PointerEvent<HTMLElement>) {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest('button, input, textarea, select, label, a, [role="button"]')) return;
+    void startDraggingCurrentWindow().catch(() => undefined);
+  }
+
   function handlePrimarySend() {
     if (composerBusy) return;
     if (draft.send_at.trim()) onQueueDraft();
@@ -498,18 +505,19 @@ export default function ComposerWindow({
         className={`composer${contactsPanelVisible ? ' has-contacts-panel' : ''}`}
         aria-busy={saveDraftPending || undefined}
         style={standaloneWindow ? undefined : { transform: `translate(${position.x}px, ${position.y}px)` }}
-        onMouseDown={(event) => event.stopPropagation()}
+        onMouseDown={standaloneWindow ? undefined : (event) => event.stopPropagation()}
         onPointerMove={moveDrag}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
         <div className={`composer-workspace${contactsPanelVisible ? ' has-contacts' : ''}`}>
           <div className="composer-editor-pane">
-            <header className="composer-editor-header" onPointerDown={standaloneWindow ? undefined : beginDrag}>
+            <header className="composer-editor-header" onPointerDown={standaloneWindow ? beginNativeDrag : beginDrag}>
               {standaloneWindow && (
                 <div
                   className="composer-titlebar-drag-region"
                   data-tauri-drag-region
+                  onPointerDown={beginNativeDrag}
                   aria-hidden="true"
                 />
               )}

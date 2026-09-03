@@ -211,3 +211,9 @@ export function onCurrentWindowCloseRequested(
   if (mockMode) return Promise.resolve(() => {});
   return loadProdBridge().then(({ prodOnCurrentWindowCloseRequested }) => prodOnCurrentWindowCloseRequested(handler));
 }
+
+export function startDraggingCurrentWindow(): Promise<void> {
+  if (mockMode) return Promise.resolve();
+  return loadProdBridge().then(({ prodStartDraggingCurrentWindow }) => prodStartDraggingCurrentWindow());
+}
+

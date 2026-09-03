@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, Mail, Mails, Plus, Star } from 'lucide-react';
+import { ChevronDown, Plus, Star } from 'lucide-react';
 import type { Account, AccountScope } from '../app/types';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import './account-switcher.css';
@@ -73,23 +73,39 @@ export default function AccountSwitcher({
       id: 'account-scope-all',
       label: '统一邮箱',
       detail: allAccountsSecondaryLabel,
-      icon: <Mails size={15} />,
       checked: accountScope === 'all',
       selectionRole: 'radio' as const,
       onSelect: () => onChange('all'),
     },
-    ...accounts.map((account, index) => ({
-      id: `account-scope-${account.id}`,
-      label: account.display_name.trim() || account.email,
-      detail: account.is_default
-        ? `${account.email} · ${providerLabel(account.provider)} · 默认发件`
-        : `${account.email} · ${providerLabel(account.provider)}`,
-      icon: <Mail size={15} />,
-      checked: accountScope === account.id,
-      selectionRole: 'radio' as const,
-      separatorBefore: index === 0,
-      onSelect: () => onChange(String(account.id)),
-    })),
+    ...accounts.map((account, index) => {
+      const provider = providerLabel(account.provider);
+      const displayName = account.display_name.trim();
+      const hasDistinctDisplayName = Boolean(displayName && displayName !== account.email);
+      const isProviderInName = hasDistinctDisplayName && displayName.toLowerCase().includes(provider.toLowerCase());
+
+      const detailParts: string[] = [];
+      if (hasDistinctDisplayName) {
+        detailParts.push(account.email);
+        if (!isProviderInName && provider && provider !== '邮箱账号') {
+          detailParts.push(provider);
+        }
+      } else if (provider && provider !== '邮箱账号') {
+        detailParts.push(provider);
+      }
+      if (account.is_default) {
+        detailParts.push('默认发件');
+      }
+
+      return {
+        id: `account-scope-${account.id}`,
+        label: displayName || account.email,
+        detail: detailParts.length > 0 ? detailParts.join(' · ') : undefined,
+        checked: accountScope === account.id,
+        selectionRole: 'radio' as const,
+        separatorBefore: index === 0,
+        onSelect: () => onChange(String(account.id)),
+      };
+    }),
   ];
   if (selectedAccount) {
     items.push({

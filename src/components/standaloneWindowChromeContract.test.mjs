@@ -15,9 +15,11 @@ describe('standalone desktop window chrome', () => {
     expect(bridge.match(/hiddenTitle:\s*true/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
   });
 
-  it('wraps both standalone surfaces with shared chrome', () => {
-    expect(appRoot).toContain('StandaloneWindowFrame kind="composer"');
-    expect(appRoot).toContain('StandaloneWindowFrame kind="settings"');
+  it('keeps both standalone surfaces on their existing content roots', () => {
+    expect(appRoot).not.toContain("import StandaloneWindowFrame from '../components/StandaloneWindowFrame'");
+    expect(appRoot).not.toContain('<StandaloneWindowFrame');
+    expect(appRoot).toContain('? <StandaloneComposerApp />');
+    expect(appRoot).toContain('? <StandaloneSettingsApp />');
   });
 
   it('removes decorations from the current Windows child window', () => {

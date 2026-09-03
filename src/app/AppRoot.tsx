@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import DeferredSurface from '../components/DeferredSurface';
-import StandaloneWindowFrame from '../components/StandaloneWindowFrame';
 import { emptyDraft } from './appConfig';
 import { logError } from './logger';
 import { importNativeDroppedAttachmentPaths } from './nativeDroppedAttachments';
@@ -152,9 +151,9 @@ export default function AppRoot() {
   }
 
   const standaloneSurface = standaloneComposer
-    ? <StandaloneWindowFrame kind="composer" title="Better Email" subtitle="写邮件"><StandaloneComposerApp /></StandaloneWindowFrame>
+    ? <StandaloneComposerApp />
     : standaloneSettings
-      ? <StandaloneWindowFrame kind="settings" title="Better Email" subtitle="设置"><StandaloneSettingsApp /></StandaloneWindowFrame>
+      ? <StandaloneSettingsApp />
       : null;
 
   return (

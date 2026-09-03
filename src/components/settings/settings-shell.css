@@ -141,21 +141,22 @@ body[data-settings-window-platform='macos']
 }
 
 .settings-header-account-switcher .account-switcher-trigger {
-  min-height: 38px;
-  padding-inline: 10px;
-  background: var(--st-surface);
-  border: 1px solid var(--st-border);
+  min-height: 40px;
+  padding-inline: 8px;
+  border: 1px solid transparent;
+  background: transparent;
   box-shadow: none;
 }
 
-.settings-header-account-switcher .account-switcher-trigger:hover {
-  background: var(--st-surface);
-  border-color: var(--st-border-strong);
+.settings-header-account-switcher .account-switcher-trigger:hover,
+.settings-header-account-switcher .account-switcher-trigger[aria-expanded='true'] {
+  border-color: transparent;
+  background: var(--quiet-row-hover);
+  box-shadow: none;
 }
 
 .settings-header-account-switcher .account-switcher-trigger[aria-expanded='true'] {
-  background: var(--st-surface);
-  border-color: var(--st-accent);
+  background: var(--quiet-row-selected);
 }
 
 .settings-title-copy {

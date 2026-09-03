@@ -1072,7 +1072,7 @@ pub fn run() {
         .expect("error while building Better Email")
         .run(move |_app_handle, event| {
             match event {
-                #[cfg(desktop)]
+                #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
                     if let Some(window) = _app_handle.get_webview_window("main") {
                         let _ = window.show();

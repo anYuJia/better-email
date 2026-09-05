@@ -783,21 +783,15 @@ Use section dividers and grouped rows.
 
 # 23. Mobile navigation architecture
 
-Mobile is a full-screen stack.
+Mobile uses a touch-first full-screen stack.
 
-Primary bottom navigation should remain consistent throughout main-level application screens.
+The approved mobile architecture uses:
 
-Recommended destinations:
+* **Mailbox Drawer**: Primary account and folder navigation (Inbox, Starred, Sent, Drafts, custom folders) is accessed via the top-left drawer menu.
+* **Persistent Compose Action**: Mobile mail prioritizes quick composition via a clean, reachable floating compose action (`MobileBottomNav`), ensuring maximum vertical space is reserved for mail content.
+* **Secondary Stacks**: Settings, Composer, and Reader push onto dedicated full-screen views with native-feeling back navigation rather than nested multi-column layouts.
 
-* Mail
-* Starred / relevant primary area
-* Compose
-* Contacts or another approved primary product area
-* Settings
-
-Compose may use the central emphasized action.
-
-Do not arbitrarily change bottom navigation between screens.
+Do not render a redundant 4-tab bottom navigation bar that competes with the drawer navigation.
 
 ---
 

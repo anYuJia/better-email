@@ -145,13 +145,13 @@ describe('Inbox toolbar selection mode', () => {
     expect(view.container.querySelector('.list-control-tabs')?.getAttribute('data-active-mode')).toBe('messages');
     expect(view.container.querySelector('.list-control-menus')).not.toBeNull();
     expect(view.getByRole('button', { name: '筛选邮件，当前：全部' })).toBeDefined();
-    expect(view.getByRole('button', { name: '邮件排序，当前：时间' })).toBeDefined();
+    expect(view.getByRole('button', { name: '邮件排序，当前：最新优先' })).toBeDefined();
 
     fireEvent.click(view.getByRole('button', { name: '筛选邮件，当前：全部' }));
     fireEvent.click(view.getByRole('menuitemradio', { name: '未读' }));
     expect(onFilterChange).toHaveBeenCalledWith('unread');
 
-    fireEvent.click(view.getByRole('button', { name: '邮件排序，当前：时间' }));
+    fireEvent.click(view.getByRole('button', { name: '邮件排序，当前：最新优先' }));
     fireEvent.click(view.getByRole('menuitemradio', { name: '最早优先' }));
     expect(onSortChange).toHaveBeenCalledWith('oldest');
   });

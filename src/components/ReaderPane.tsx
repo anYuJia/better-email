@@ -108,6 +108,7 @@ export type ReaderPaneProps = {
   onQuickReplyChange: (value: string) => void;
   onSendQuickReply: (message: Message) => void;
   onBackToList?: () => void;
+  hasNoSearchResults?: boolean;
 };
 
 function NarrowReaderNavigation({ onBack }: { onBack?: () => void }) {
@@ -182,6 +183,7 @@ function ReaderPane({
   onQuickReplyChange,
   onSendQuickReply,
   onBackToList,
+  hasNoSearchResults = false,
 }: ReaderPaneProps) {
   const [linksRevealed, setLinksRevealed] = useState(false);
   const {
@@ -379,17 +381,23 @@ if (activeThread && threadMessages.length > 0) {
       <section className="reader-panel">
         <NarrowReaderNavigation onBack={onBackToList} />
         <div className="empty-reader">
-          <div className="empty-reader-card">
-            <div className="empty-state-mark" aria-hidden="true">
-              <Mail size={22} />
+          {hasNoSearchResults ? (
+            <div className="empty-reader-quiet" aria-live="polite">
+              <span>无可阅读的搜索结果</span>
             </div>
-            <strong>选择一封邮件开始阅读</strong>
-            <span>从左侧列表选择一封邮件，内容会显示在这里。</span>
-            <button type="button" className="empty-reader-compose" onClick={() => onComposeNew()}>
-              <MailPlus size={15} />
-              新邮件
-            </button>
-          </div>
+          ) : (
+            <div className="empty-reader-card">
+              <div className="empty-state-mark" aria-hidden="true">
+                <Mail size={22} />
+              </div>
+              <strong>选择一封邮件开始阅读</strong>
+              <span>从左侧列表选择一封邮件，内容会显示在这里。</span>
+              <button type="button" className="empty-reader-compose" onClick={() => onComposeNew()}>
+                <MailPlus size={15} />
+                新邮件
+              </button>
+            </div>
+          )}
         </div>
       </section>
     );

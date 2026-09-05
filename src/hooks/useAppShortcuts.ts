@@ -69,7 +69,19 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       action.catch((error) => setStatus(String(error)));
     }
 
+    function isInteractiveOverlayTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof Element)) return false;
+      return Boolean(
+        target.closest(
+          '[role="dialog"], [role="menu"], [role="listbox"], [role="combobox"], ' +
+          '.context-menu, .context-menu-surface, .message-date-picker-popover, ' +
+          '.custom-select-menu, .custom-select-dropdown, .custom-select-summary[aria-expanded="true"]'
+        )
+      );
+    }
+
     function handleShortcut(event: KeyboardEvent) {
+      if (event.defaultPrevented) return;
       if (event.isComposing || event.keyCode === 229) return;
       const {
         searchInputRef,
@@ -100,6 +112,8 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       } = optionsRef.current;
       const key = event.key.toLowerCase();
       const editable = isEditableTarget(event.target);
+      const inInteractiveOverlay = isInteractiveOverlayTarget(event.target);
+      const hasActivePopup = Boolean(document.querySelector('.message-date-picker-popover, .context-menu, .custom-select-menu'));
       const commandModifier = event.metaKey || event.ctrlKey;
 
       if (isAccountLoginRequired) return;
@@ -123,7 +137,8 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         return;
       }
 
-      if (editable) return;
+      if (editable || inInteractiveOverlay) return;
+      if (hasActivePopup && ['j', 'k', 'arrowdown', 'arrowup', 's', 'm', 'e', 'd'].includes(key)) return;
 
       if (key === 'escape' && document.querySelector('.context-menu')) {
         return;

@@ -2546,6 +2546,15 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
+.empty-reader-quiet {
+  display: grid;
+  place-items: center;
+  color: var(--ui-text-tertiary);
+  font-size: var(--ui-font-size-secondary, 13.5px);
+  padding: 40px 24px;
+  text-align: center;
+}
+
 .app-shell .empty-reader-card {
   width: min(100%, 360px);
   max-width: 360px;

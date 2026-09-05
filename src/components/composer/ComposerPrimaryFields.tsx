@@ -366,7 +366,7 @@ export default function ComposerPrimaryFields({
     <div className="composer-primary-fields">
       <RecipientField
         label="收件人"
-        placeholder="输入姓名或邮箱，回车添加"
+        placeholder="姓名或邮箱"
         value={draft.to}
         contactSearchEntries={contactSearchEntries}
         blockedEmails={blockedRecipientEmails.to}
@@ -397,7 +397,7 @@ export default function ComposerPrimaryFields({
       {ccOpen && (
         <RecipientField
           label="抄送"
-          placeholder="输入姓名或邮箱，回车添加"
+          placeholder="姓名或邮箱"
           value={draft.cc}
           contactSearchEntries={contactSearchEntries}
           blockedEmails={blockedRecipientEmails.cc}
@@ -409,7 +409,7 @@ export default function ComposerPrimaryFields({
       {bccOpen && (
         <RecipientField
           label="密送"
-          placeholder="输入姓名或邮箱，回车添加"
+          placeholder="姓名或邮箱"
           value={draft.bcc}
           contactSearchEntries={contactSearchEntries}
           blockedEmails={blockedRecipientEmails.bcc}

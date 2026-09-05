@@ -91,6 +91,7 @@ describe('ComposerWindow focus lifecycle', () => {
     const contactsPanel = () => screen.getByRole('complementary', { name: '联系人' });
 
     const { rerender } = render(cloneElement(composer(), {
+      defaultContactsOpen: true,
       accounts: [account(1, 'one@example.com'), account(2, 'two@example.com')],
       draft: { ...emptyDraft, account_id: 1 },
       contacts: [
@@ -103,6 +104,7 @@ describe('ComposerWindow focus lifecycle', () => {
     expect(contactsPanel().textContent).not.toContain('账号二联系人');
 
     rerender(cloneElement(composer(), {
+      defaultContactsOpen: true,
       accounts: [account(1, 'one@example.com'), account(2, 'two@example.com')],
       draft: { ...emptyDraft, account_id: 2 },
       contacts: [
@@ -113,6 +115,20 @@ describe('ComposerWindow focus lifecycle', () => {
 
     expect(contactsPanel().textContent).not.toContain('账号一联系人');
     expect(contactsPanel().textContent).toContain('账号二联系人');
+  });
+
+  it('defaults to collapsed contacts on desktop and allows toggling', () => {
+    render(composer());
+
+    expect(screen.queryByRole('complementary', { name: '联系人' })).toBeNull();
+    const contactToggle = screen.getByRole('button', { name: '切换联系人面板' });
+    expect(contactToggle.getAttribute('aria-controls')).toBe('composer-contacts-panel');
+    expect(contactToggle.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(contactToggle);
+    expect(screen.getByRole('complementary', { name: '联系人' })).not.toBeNull();
+    expect(contactToggle.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(contactToggle);
+    expect(screen.queryByRole('complementary', { name: '联系人' })).toBeNull();
   });
 
   it('keeps the contact picker reachable on a phone-sized viewport', () => {
@@ -256,8 +272,8 @@ describe('ComposerWindow focus lifecycle', () => {
     expect(screen.queryByText('未输入内容')).toBeNull();
   });
 
-  it('keeps one window action set while the desktop contacts rail stays fixed', () => {
-    render(composer());
+  it('keeps one window action set and supports collapsing contacts on desktop', () => {
+    render(cloneElement(composer(), { defaultContactsOpen: true }));
 
     const dialog = screen.getByRole('dialog', { name: '写信窗口' });
     const contactsPanel = screen.getByRole('complementary', { name: '联系人' });
@@ -265,8 +281,8 @@ describe('ComposerWindow focus lifecycle', () => {
     expect(dialog.getAttribute('aria-modal')).toBeNull();
     expect(contactsPanel.querySelector('[aria-label="收起写信"]')).toBeNull();
     expect(contactsPanel.querySelector('[aria-label="关闭写信窗口"]')).toBeNull();
-    expect(contactsPanel.querySelector('[aria-label="关闭联系人面板"]')).toBeNull();
-    expect(screen.queryByRole('button', { name: '切换联系人面板' })).toBeNull();
+    expect(contactsPanel.querySelector('[aria-label="关闭联系人面板"]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: '切换联系人面板' })).not.toBeNull();
     expect(screen.getAllByRole('button', { name: '收起写信' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: '关闭写信窗口' })).toHaveLength(1);
   });

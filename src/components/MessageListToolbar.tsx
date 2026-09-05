@@ -36,9 +36,11 @@ type MessageListToolbarProps = {
 };
 
 function sortTriggerLabel(sort: ListSort): string {
+  if (sort === 'newest') return '最新优先';
+  if (sort === 'oldest') return '最早优先';
   if (sort === 'sender') return '发件人';
   if (sort === 'subject') return '主题';
-  return '时间';
+  return '最新优先';
 }
 
 function MessageListToolbar({

@@ -2592,9 +2592,18 @@
 
 .message-date-range-calendar-select button {
   min-height: 30px;
-  padding-inline: 5px;
-  font-size: 12px;
+  padding-inline: 8px;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.message-date-range-calendar-select button > svg {
+  flex-shrink: 0;
 }
 
 .message-date-range-calendar-select {
@@ -2619,12 +2628,14 @@
 }
 
 .message-date-range-calendar-options button {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
-  min-height: 28px;
+  min-height: 30px;
   padding: 0 8px;
   border: 0;
   border-radius: var(--ui-radius-control);
+  font-size: 13px;
   color: var(--ui-text);
   background: transparent;
   text-align: left;

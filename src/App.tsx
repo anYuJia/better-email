@@ -1787,6 +1787,7 @@ function MailboxApp({
   const readerContent = (
     <AppErrorBoundary>
       <ReaderPane
+        hasNoSearchResults={Boolean(appliedQuery.trim()) && messages.length === 0}
         activeThread={activeThread}
         threadMessages={threadMessages}
         activeThreadSelected={activeThreadSelected}

@@ -83,13 +83,13 @@ function CalendarSelect({
     const initialIndex = Math.max(0, options.indexOf(value));
     setActiveIndex(initialIndex);
     const target = rootRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]');
-    target?.scrollIntoView({ block: 'nearest' });
+    target?.scrollIntoView?.({ block: 'nearest' });
   }, [open, value, options]);
 
   useEffect(() => {
     if (!open || activeIndex < 0 || activeIndex >= options.length) return;
     const target = document.getElementById(`${listboxId}-opt-${options[activeIndex]}`);
-    target?.scrollIntoView({ block: 'nearest' });
+    target?.scrollIntoView?.({ block: 'nearest' });
   }, [activeIndex, listboxId, open, options]);
 
   useEffect(() => {

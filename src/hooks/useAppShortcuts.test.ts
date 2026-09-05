@@ -113,4 +113,51 @@ describe('useAppShortcuts', () => {
     expect(handlers.runBulkAction).toHaveBeenCalledWith('trash');
     expect(handlers.moveSelected).not.toHaveBeenCalled();
   });
+
+  it('does not intercept arrow keys or mail navigation when focused inside an overlay or dropdown', () => {
+    const handlers = renderShortcuts({
+      messages: [selectedMessage, { ...selectedMessage, id: 43 }],
+      selectedId: 42,
+    });
+
+    const overlay = document.createElement('div');
+    overlay.className = 'message-date-picker-popover';
+    const monthButton = document.createElement('button');
+    overlay.appendChild(monthButton);
+    document.body.appendChild(overlay);
+    monthButton.focus();
+
+    monthButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    expect(handlers.setSelectedId).not.toHaveBeenCalled();
+
+    monthButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'j', bubbles: true, cancelable: true }));
+    expect(handlers.setSelectedId).not.toHaveBeenCalled();
+  });
+
+  it('respects defaultPrevented events from local components', () => {
+    const handlers = renderShortcuts({
+      messages: [selectedMessage, { ...selectedMessage, id: 43 }],
+      selectedId: 42,
+    });
+
+    const event = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+    event.preventDefault();
+    window.dispatchEvent(event);
+
+    expect(handlers.setSelectedId).not.toHaveBeenCalled();
+  });
+
+  it('does not change background message selection when a context menu or date picker is open', () => {
+    const handlers = renderShortcuts({
+      messages: [selectedMessage, { ...selectedMessage, id: 43 }],
+      selectedId: 42,
+    });
+
+    const menu = document.createElement('div');
+    menu.className = 'context-menu';
+    document.body.appendChild(menu);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+    expect(handlers.setSelectedId).not.toHaveBeenCalled();
+  });
 });

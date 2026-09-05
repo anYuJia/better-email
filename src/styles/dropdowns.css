@@ -202,7 +202,7 @@
 }
 
 .custom-select-dropdown button[aria-selected="true"] > svg {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent, var(--ui-accent));
 }
 
 .custom-select-dropdown button[aria-selected="true"]:hover,
@@ -221,11 +221,11 @@
   .custom-select-dropdown.dense button {
     min-height: var(--ui-control-height-dense);
     padding-block: 4px;
-    font-size: var(--ui-font-size-aux);
+    font-size: var(--ui-font-size-secondary, 13.5px);
   }
 
   .custom-select-dropdown.dense button strong {
-    font-size: var(--ui-font-size-aux);
+    font-size: var(--ui-font-size-secondary, 13.5px);
   }
 }
 

@@ -87,6 +87,7 @@ function clampComposerPosition(
 export type ComposerWindowProps = {
   minimized: boolean;
   standaloneWindow?: boolean;
+  defaultContactsOpen?: boolean;
   platform?: 'macos' | 'windows' | 'linux' | 'web';
   focusRequest?: number;
   draft: DraftInput;
@@ -136,6 +137,7 @@ export type ComposerWindowProps = {
 export default function ComposerWindow({
   minimized,
   standaloneWindow = false,
+  defaultContactsOpen,
   platform = 'web',
   focusRequest = 0,
   draft,
@@ -192,28 +194,29 @@ export default function ComposerWindow({
   const sendMenuItemRefs = useRef<HTMLButtonElement[]>([]);
   const minimizedRestoreRef = useRef<HTMLButtonElement | null>(null);
   const composerOpenerRef = useRef<HTMLElement | null>(null);
-  const [contactsOpen, setContactsOpen] = useState(
-    () => typeof window === 'undefined' || window.innerWidth >= 900,
-  );
-  const [isNarrowContactsViewport, setIsNarrowContactsViewport] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth < 900,
-  );
+  const [contactsOpen, setContactsOpen] = useState(() => {
+    if (defaultContactsOpen !== undefined) return defaultContactsOpen;
+    if (typeof window === 'undefined') return false;
+    try {
+      const stored = localStorage.getItem('better-email-composer-contacts-open');
+      if (stored !== null) return stored === 'true';
+    } catch {}
+    return false;
+  });
   const [isMobileComposerViewport, setIsMobileComposerViewport] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 720,
   );
   const [ccOpen, setCcOpen] = useState(() => Boolean(draft.cc.trim()));
   const [bccOpen, setBccOpen] = useState(() => Boolean(draft.bcc.trim()));
   const [activeRecipientField, setActiveRecipientField] = useState<ComposerRecipientField>('to');
-  const [formattingOpen, setFormattingOpen] = useState(
-    () => typeof window === 'undefined' || window.innerWidth > 720,
-  );
+  const [formattingOpen, setFormattingOpen] = useState(false);
   const [popoverMode, setPopoverMode] = useState<ComposerPopoverMode>(null);
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
   useWheelContainment(sendMenuRef, sendMenuOpen);
   const [scheduleOpenRequest, setScheduleOpenRequest] = useState(0);
   const [scheduleClearConfirmOpen, setScheduleClearConfirmOpen] = useState(false);
   const [saveDraftPending, setSaveDraftPending] = useState(false);
-  const contactsPanelVisible = standaloneWindow ? contactsOpen : (!isNarrowContactsViewport || contactsOpen);
+  const contactsPanelVisible = contactsOpen;
   const title = draft.subject.trim() || '新邮件';
   const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
@@ -314,7 +317,6 @@ export default function ComposerWindow({
     const contactsMedia = window.matchMedia('(max-width: 899px)');
     const mobileMedia = window.matchMedia('(max-width: 720px)');
     const updateViewportMode = () => {
-      setIsNarrowContactsViewport(contactsMedia.matches);
       setIsMobileComposerViewport(mobileMedia.matches);
       if (contactsMedia.matches) setContactsOpen(false);
     };
@@ -537,21 +539,27 @@ export default function ComposerWindow({
                 </span>
               </span>
               <div className="composer-header-actions">
-                {(standaloneWindow || isNarrowContactsViewport) && (
-                  <button
-                    type="button"
-                    className="composer-contact-toggle"
-                    aria-label="切换联系人面板"
-                    aria-expanded={contactsOpen}
-                    aria-pressed={contactsOpen}
-                    aria-controls="composer-contacts-panel"
-                    title="切换联系人面板"
-                    onClick={() => setContactsOpen((current) => !current)}
-                  >
-                    <UsersRound size={17} aria-hidden="true" />
-                    <span>联系人</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="composer-contact-toggle"
+                  aria-label="切换联系人面板"
+                  aria-expanded={contactsOpen}
+                  aria-pressed={contactsOpen}
+                  aria-controls="composer-contacts-panel"
+                  title="切换联系人面板"
+                  onClick={() => {
+                    setContactsOpen((current) => {
+                      const next = !current;
+                      try {
+                        localStorage.setItem('better-email-composer-contacts-open', String(next));
+                      } catch {}
+                      return next;
+                    });
+                  }}
+                >
+                  <UsersRound size={17} aria-hidden="true" />
+                  <span>联系人</span>
+                </button>
                 {!standaloneWindow && (
                   <>
                     <button type="button" onClick={onMinimize} aria-label="收起写信" title="收起写信">
@@ -782,8 +790,13 @@ export default function ComposerWindow({
               draft={draft}
               activeRecipientField={activeRecipientField}
               onAddContacts={onAddContacts}
-              onClose={() => setContactsOpen(false)}
-              showClose={standaloneWindow || isNarrowContactsViewport}
+              onClose={() => {
+                setContactsOpen(false);
+                try {
+                  localStorage.setItem('better-email-composer-contacts-open', 'false');
+                } catch {}
+              }}
+              showClose={true}
               onOpenContactsSettings={onOpenContactsSettings}
               onScanRecentContacts={onScanRecentContacts}
             />

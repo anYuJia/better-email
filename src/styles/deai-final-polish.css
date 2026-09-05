@@ -346,7 +346,7 @@
     background: transparent;
   }
 
-  .app-shell.is-mobile-app .reader-actions :is(button, summary) > span {
+  .app-shell.is-mobile-app .reader-actions .primary-action > span {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -355,6 +355,16 @@
     clip: rect(0 0 0 0);
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  .app-shell.is-mobile-app .reader-actions .context-menu-surface :is(button, summary) > span,
+  .app-shell.is-mobile-app .reader-actions .context-menu-copy {
+    position: static;
+    width: auto;
+    height: auto;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
   }
 
   /* Secondary actions tucked into More menu on mobile */
@@ -456,9 +466,19 @@
     display: none;
   }
 
-  .app-shell.is-mobile-app .composer .composer-field-row {
-    min-height: 46px;
-    grid-template-columns: 44px minmax(0, 1fr);
+  .app-shell.is-mobile-app .composer :is(.composer-sender-context, .composer-field-row) {
+    min-height: 48px;
+    grid-template-columns: 48px minmax(0, 1fr);
+    padding-inline: 14px;
+    margin-inline: 0;
+    align-items: center;
+  }
+
+  .app-shell.is-mobile-app .composer-sender-heading,
+  .app-shell.is-mobile-app .composer .composer-field-row > span {
+    font-size: 13px;
+    color: var(--ui-text-tertiary);
+    font-weight: 500;
   }
 
   .app-shell.is-mobile-app .composer .composer-quick-toolbar {

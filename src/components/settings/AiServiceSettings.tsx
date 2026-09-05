@@ -63,6 +63,43 @@ export default function AiServiceSettings() {
             <span className="settings-ai-provider-value">OpenAI 兼容 API</span>
           </SettingsField>
 
+          <SettingsField label="API 服务端点">
+            <input
+              className="settings-text-input"
+              type="url"
+              placeholder="https://api.example.com/v1"
+              value={providerEndpoint}
+              onChange={(event) => patchConfig({ endpoint: event.target.value })}
+            />
+          </SettingsField>
+
+          <SettingsField label="API Key / Token">
+            <div className="settings-ai-key-row">
+              <input
+                className="settings-text-input"
+                type="password"
+                placeholder={providerHasApiKey ? '已保存，留空保持不变' : '输入访问密钥'}
+                value={config.apiKey}
+                onChange={(event) => patchConfig({ apiKey: event.target.value })}
+                autoComplete="off"
+              />
+              {providerHasApiKey && !config.apiKey ? (
+                <button
+                  type="button"
+                  className="settings-text-button"
+                  onClick={() => patchConfig({ clearApiKey: true, hasApiKey: false })}
+                >
+                  清除已保存密钥
+                </button>
+              ) : (
+                <span className="settings-ai-key-hint">
+                  <KeyRound size={12} aria-hidden="true" />
+                  {providerHasApiKey ? '已保存' : '未保存'}
+                </span>
+              )}
+            </div>
+          </SettingsField>
+
           <SettingsField label="模型" hint="填写服务支持的模型名称">
             <input
               className="settings-text-input"
@@ -90,50 +127,13 @@ export default function AiServiceSettings() {
               <>
                 <span>
                   <strong>高级连接</strong>
-                  <small>端点、密钥与超时时间</small>
+                  <small>请求超时与其他参数</small>
                 </span>
-                <em>{providerEndpoint ? '已配置' : '待配置'}</em>
+                <em>{config.timeoutSeconds ? `${config.timeoutSeconds}s` : '默认'}</em>
               </>
             )}
           >
             <div className="settings-disclosure-body st-field-grid">
-              <SettingsField label="API 服务端点">
-                <input
-                  className="settings-text-input"
-                  type="url"
-                  placeholder="https://api.example.com/v1"
-                  value={providerEndpoint}
-                  onChange={(event) => patchConfig({ endpoint: event.target.value })}
-                />
-              </SettingsField>
-
-              <SettingsField label="API Key / Token">
-                <div className="settings-ai-key-row">
-                  <input
-                    className="settings-text-input"
-                    type="password"
-                    placeholder={providerHasApiKey ? '已保存，留空保持不变' : '输入访问密钥'}
-                    value={config.apiKey}
-                    onChange={(event) => patchConfig({ apiKey: event.target.value })}
-                    autoComplete="off"
-                  />
-                  {providerHasApiKey && !config.apiKey ? (
-                    <button
-                      type="button"
-                      className="settings-text-button"
-                      onClick={() => patchConfig({ clearApiKey: true, hasApiKey: false })}
-                    >
-                      清除已保存密钥
-                    </button>
-                  ) : (
-                    <span className="settings-ai-key-hint">
-                      <KeyRound size={12} aria-hidden="true" />
-                      {providerHasApiKey ? '已保存' : '未保存'}
-                    </span>
-                  )}
-                </div>
-              </SettingsField>
-
               <SettingsField label="请求超时" hint="5–300 秒">
                 <input
                   className="settings-text-input"

@@ -264,9 +264,7 @@ function MailboxApp({
       || !initialAccountListLoaded
       || accounts.length === 0
     ) return undefined;
-    // The composer is a separate native WebView. Start its full boot while
-    // the mailbox is settling so the first explicit compose action can reuse
-    // an already-ready window instead of paying the startup cost.
+    // Prewarm native windows.
     void prewarmComposerWindow().catch(() => undefined);
     void prewarmSettingsWindow().catch(() => undefined);
     return undefined;
@@ -1871,6 +1869,7 @@ function MailboxApp({
           {mobileScreen === 'mail' && (
             <>
               <MobileInboxHeader
+                accountScopeLabel={accountScope === 'all' ? '统一邮箱' : (account?.display_name || account?.email)}
                 currentViewLabel={currentViewLabel}
                 visibleListSummary={visibleListSummary}
                 query={queryDraft}
@@ -1930,7 +1929,7 @@ function MailboxApp({
             <MobileSettingsRoot
               account={account}
               accounts={accounts}
-              onBack={backMobileScreen}
+              onBack={() => navigateMobileScreen('mail')}
               onOpenSection={openMobileSettingsSection}
             />
           )}

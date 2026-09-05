@@ -12,6 +12,7 @@ import type { FilterMode, ListMode } from '../../app/types';
 import ContextMenu, { type ContextMenuItem } from '../ContextMenu';
 
 type MobileInboxHeaderProps = {
+  accountScopeLabel?: string;
   currentViewLabel: string;
   visibleListSummary: string;
   query: string;
@@ -33,6 +34,7 @@ type MobileInboxHeaderProps = {
 };
 
 export default function MobileInboxHeader({
+  accountScopeLabel,
   currentViewLabel,
   visibleListSummary,
   query,
@@ -69,6 +71,7 @@ export default function MobileInboxHeader({
   const activeFilter = filters.find((item) => item.id === filter) ?? filters[0];
   const hasNonDefaultView = filter !== 'all' || listMode !== 'messages';
   const secondarySummary = [
+    accountScopeLabel,
     visibleListSummary,
     filter !== 'all' ? activeFilter.label : '',
     listMode === 'threads' ? '会话' : '',

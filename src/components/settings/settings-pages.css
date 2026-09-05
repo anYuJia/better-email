@@ -1114,9 +1114,9 @@
 }
 
 .settings-modal .settings-storage-metrics > div.reclaimable {
-  color: var(--st-warning);
-  border-color: var(--ui-warning-border);
-  background: var(--st-warning-soft);
+  color: var(--st-text-tertiary);
+  border-color: var(--st-border);
+  background: var(--st-surface-subtle);
 }
 
 
@@ -2365,13 +2365,13 @@
 }
 
 .settings-modal .settings-contacts-empty-mark {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   border-radius: 50%;
-  color: var(--st-accent);
-  background: var(--st-accent-soft);
+  color: var(--st-text-secondary);
+  background: var(--st-surface-muted);
 }
 
 .settings-modal .settings-contacts-empty p {

@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CalendarDays, Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import useModalAccessibility from '../hooks/useModalAccessibility';
 import { resolveLocalDateTimeRange, type LocalDateTimeRange } from '../mailUtils';
 
@@ -72,6 +72,25 @@ function CalendarSelect({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const listboxId = useId();
   const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(() => Math.max(0, options.indexOf(value)));
+
+  useEffect(() => {
+    setActiveIndex(Math.max(0, options.indexOf(value)));
+  }, [value, options]);
+
+  useEffect(() => {
+    if (!open) return;
+    const initialIndex = Math.max(0, options.indexOf(value));
+    setActiveIndex(initialIndex);
+    const target = rootRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]');
+    target?.scrollIntoView({ block: 'nearest' });
+  }, [open, value, options]);
+
+  useEffect(() => {
+    if (!open || activeIndex < 0 || activeIndex >= options.length) return;
+    const target = document.getElementById(`${listboxId}-opt-${options[activeIndex]}`);
+    target?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex, listboxId, open, options]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -94,6 +113,73 @@ function CalendarSelect({
     };
   }, [open]);
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLButtonElement>) {
+    if (!open) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        setOpen(true);
+        setActiveIndex(Math.max(0, options.indexOf(value)));
+      }
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setActiveIndex((prev) => Math.min(options.length - 1, prev + 1));
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex((prev) => Math.max(0, prev - 1));
+      return;
+    }
+
+    if (event.key === 'PageDown') {
+      event.preventDefault();
+      setActiveIndex((prev) => Math.min(options.length - 1, prev + 10));
+      return;
+    }
+
+    if (event.key === 'PageUp') {
+      event.preventDefault();
+      setActiveIndex((prev) => Math.max(0, prev - 10));
+      return;
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault();
+      setActiveIndex(0);
+      return;
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault();
+      setActiveIndex(options.length - 1);
+      return;
+    }
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      const selected = options[activeIndex];
+      if (selected !== undefined) {
+        onChange(selected);
+      }
+      setOpen(false);
+      triggerRef.current?.focus({ preventScroll: true });
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus({ preventScroll: true });
+    }
+  }
+
+  const activeOptionId = open && activeIndex >= 0 ? `${listboxId}-opt-${options[activeIndex]}` : undefined;
+
   return (
     <div className="message-date-range-calendar-select" ref={rootRef}>
       <button
@@ -104,24 +190,24 @@ function CalendarSelect({
         aria-controls={listboxId}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-activedescendant={activeOptionId}
         onClick={() => setOpen((current) => !current)}
-        onKeyDown={(event) => {
-          if (event.key === 'ArrowDown' && !open) {
-            event.preventDefault();
-            setOpen(true);
-          }
-        }}
+        onKeyDown={handleKeyDown}
       >
-        {format(value)}
+        <span>{format(value)}</span>
+        <ChevronDown size={12} aria-hidden="true" />
       </button>
       {open && (
         <div id={listboxId} className="message-date-range-calendar-options" role="listbox" aria-label={label}>
-          {options.map((option) => (
+          {options.map((option, index) => (
             <button
+              id={`${listboxId}-opt-${option}`}
               key={option}
               type="button"
               role="option"
               aria-selected={option === value}
+              className={[option === value ? 'is-selected' : '', activeIndex === index ? 'is-active' : ''].filter(Boolean).join(' ')}
+              onPointerEnter={() => setActiveIndex(index)}
               onClick={() => {
                 onChange(option);
                 setOpen(false);
@@ -204,7 +290,7 @@ export default function MessageDateRangePicker({ onConfirm, disabled = false }: 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<RangeDraft>({
     startDate: today,
-    startTime: '24:00:00',
+    startTime: '00:00:00',
     endDate: today,
     endTime: '24:00:00',
   });
@@ -230,6 +316,25 @@ export default function MessageDateRangePicker({ onConfirm, disabled = false }: 
       document.body.style.overflow = previousOverflow;
     };
   }, [open]);
+
+  function applyPreset(days: number) {
+    const end = new Date();
+    const start = new Date();
+    if (days > 1) {
+      start.setDate(start.getDate() - (days - 1));
+    }
+    const startKey = dateKey(start);
+    const endKey = dateKey(end);
+    setDraft({
+      startDate: startKey,
+      startTime: '00:00:00',
+      endDate: endKey,
+      endTime: '24:00:00',
+    });
+    setStartMonth(monthOf(start));
+    setEndMonth(monthOf(end));
+    setError('');
+  }
 
   function updateDraft(field: keyof RangeDraft, value: string) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -271,6 +376,11 @@ export default function MessageDateRangePicker({ onConfirm, disabled = false }: 
               <h2>按日期范围筛选邮件</h2>
               <span aria-hidden="true" />
             </header>
+            <div className="message-date-range-presets" role="group" aria-label="快捷日期范围">
+              <button type="button" className="message-date-range-preset-btn" onClick={() => applyPreset(1)}>今天</button>
+              <button type="button" className="message-date-range-preset-btn" onClick={() => applyPreset(7)}>近 7 天</button>
+              <button type="button" className="message-date-range-preset-btn" onClick={() => applyPreset(30)}>近 30 天</button>
+            </div>
             <div className="message-date-range-inputs">
               <label>
                 <span>开始</span>

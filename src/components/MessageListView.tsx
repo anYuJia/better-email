@@ -667,7 +667,7 @@ export default function MessageListView({
                 disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
                 onChange={(event) => toggleVisibleMessages(event.target.checked)}
               />
-              <span className="message-selection-all-label">全部</span>
+              <span className="message-selection-all-label">全选</span>
             </label>
             <MessageDateRangePicker
               onConfirm={handleDateRangeConfirm}
@@ -684,7 +684,7 @@ export default function MessageListView({
                   ? '正在读取完整结果…'
                 : selectedMessageIds.length > 0
                   ? `已选 ${selectedMessageIds.length} 封`
-                  : '选择邮件'}
+                  : ''}
             </span>
           </div>
         )}

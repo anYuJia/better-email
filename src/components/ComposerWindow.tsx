@@ -213,7 +213,7 @@ export default function ComposerWindow({
   const [scheduleOpenRequest, setScheduleOpenRequest] = useState(0);
   const [scheduleClearConfirmOpen, setScheduleClearConfirmOpen] = useState(false);
   const [saveDraftPending, setSaveDraftPending] = useState(false);
-  const contactsPanelVisible = standaloneWindow || !isNarrowContactsViewport || contactsOpen;
+  const contactsPanelVisible = standaloneWindow ? contactsOpen : (!isNarrowContactsViewport || contactsOpen);
   const title = draft.subject.trim() || '新邮件';
   const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
@@ -537,7 +537,7 @@ export default function ComposerWindow({
                 </span>
               </span>
               <div className="composer-header-actions">
-                {!standaloneWindow && isNarrowContactsViewport && (
+                {(standaloneWindow || isNarrowContactsViewport) && (
                   <button
                     type="button"
                     className="composer-contact-toggle"
@@ -783,7 +783,7 @@ export default function ComposerWindow({
               activeRecipientField={activeRecipientField}
               onAddContacts={onAddContacts}
               onClose={() => setContactsOpen(false)}
-              showClose={isNarrowContactsViewport}
+              showClose={standaloneWindow || isNarrowContactsViewport}
               onOpenContactsSettings={onOpenContactsSettings}
               onScanRecentContacts={onScanRecentContacts}
             />

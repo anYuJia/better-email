@@ -47,8 +47,10 @@ export default function PrivacySettingsPage({
     return (
       <AccountScopeRequired
         accountScope={accountScope}
+        accounts={accounts}
+        onSelectAccount={onAccountFormChange}
         title="请先添加邮箱账号"
-        description="隐私与安全设置需要绑定邮箱账号。请先添加账号，或使用顶部的邮箱范围选择器选择一个账号。"
+        description="隐私与安全设置需要绑定邮箱账号。请从下方选择账号或使用顶部的邮箱范围选择器继续。"
       />
     );
   }

@@ -676,10 +676,10 @@
   justify-items: center;
   gap: 6px;
   padding: 20px 16px;
-  border: 1px dashed var(--st-border-strong);
-  border-radius: var(--st-radius-sm);
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius, 8px);
   color: var(--st-text-tertiary);
-  background: transparent;
+  background: var(--st-surface-muted, transparent);
   font-size: var(--st-font-size-secondary);
   line-height: 1.5;
   text-align: center;
@@ -772,4 +772,79 @@
   font-size: var(--st-font-size-secondary);
   font-style: normal;
   line-height: 1.45;
+}
+
+/* ── Inline account scope picker ────────────────────────────────── */
+
+.settings-modal .account-scope-picker-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.settings-modal .account-scope-picker-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--st-border);
+  border-radius: var(--st-radius, 8px);
+  background: var(--st-surface-subtle);
+  color: var(--st-text);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--ui-motion-duration-fast, 150ms) ease;
+}
+
+.settings-modal .account-scope-picker-card:hover {
+  border-color: var(--st-accent);
+  background: var(--st-surface);
+  box-shadow: var(--st-shadow-control);
+}
+
+.settings-modal .account-scope-picker-avatar {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--st-text-secondary);
+  background: var(--st-surface-muted);
+  font-size: 13px;
+  font-weight: 600;
+  flex: 0 0 32px;
+}
+
+.settings-modal .account-scope-picker-info {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 1px;
+}
+
+.settings-modal .account-scope-picker-info strong {
+  font-size: var(--st-font-size-body);
+  font-weight: 500;
+  color: var(--st-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .account-scope-picker-info span {
+  font-size: var(--st-font-size-secondary);
+  color: var(--st-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-modal .account-scope-picker-action {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--st-font-size-secondary);
+  color: var(--st-accent);
+  font-weight: 500;
 }

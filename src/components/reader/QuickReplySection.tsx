@@ -20,9 +20,13 @@ export default function QuickReplySection({
   onSendQuickReply,
 }: QuickReplySectionProps) {
   const replyInputRef = useRef<HTMLTextAreaElement>(null);
+  const isExpanded = Boolean(quickReplyBody.trim());
 
   return (
-    <section className="quick-reply" aria-label="快速回复">
+    <section
+      className={`quick-reply ${isExpanded ? 'is-expanded' : 'is-collapsed'}`}
+      aria-label="快速回复"
+    >
       <header>
         <div>
           <strong>回复</strong>
@@ -35,7 +39,7 @@ export default function QuickReplySection({
         aria-label="输入回复"
         value={quickReplyBody}
         onChange={(event) => onQuickReplyChange(event.target.value)}
-        placeholder="输入回复"
+        placeholder={`回复 ${selected.sender_name || selected.sender_email}…`}
       />
       <footer>
         <span>{quickReplyBody.trim() ? `${quickReplyBody.trim().length} 字` : ''}</span>

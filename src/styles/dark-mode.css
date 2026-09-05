@@ -220,7 +220,7 @@
 }
 
 :root[data-theme="dark"] .reader-actions .primary-action {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: transparent;
 }
 

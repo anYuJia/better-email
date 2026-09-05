@@ -34,25 +34,27 @@ export default function AttachmentList({
 }: AttachmentListProps) {
   return (
     <div className="attachment-section">
-      <header className="attachment-section-header">
-        <span>
-          <strong>附件</strong>
-          <small>{attachments.length} 个 · {formatBytes(totalSize)}</small>
-        </span>
-        {pendingAttachmentCount > 0 && (
-          <button
-            type="button"
-            disabled={isDownloadingAll}
-            aria-busy={isDownloadingAll}
-            onClick={onDownloadAll}
-          >
-            <Download size={14} />
-            {isDownloadingAll
-              ? '顺序下载中…'
-              : `下载全部 ${pendingAttachmentCount} 个`}
-          </button>
-        )}
-      </header>
+      {attachments.length > 1 && (
+        <header className="attachment-section-header">
+          <span>
+            <strong>附件</strong>
+            <small>{attachments.length} 个 · {formatBytes(totalSize)}</small>
+          </span>
+          {pendingAttachmentCount > 0 && (
+            <button
+              type="button"
+              disabled={isDownloadingAll}
+              aria-busy={isDownloadingAll}
+              onClick={onDownloadAll}
+            >
+              <Download size={14} />
+              {isDownloadingAll
+                ? '顺序下载中…'
+                : `下载全部 ${pendingAttachmentCount} 个`}
+            </button>
+          )}
+        </header>
+      )}
       <div className="attachments">
         {attachments.map((attachment) => {
           const downloading = downloadingIds.has(attachment.id);

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type {
+  Account,
   AccountScope,
   Contact,
   ContactCreateInput,
@@ -42,7 +43,9 @@ function contactInitial(contact: Contact) {
 }
 
 type ContactAutomationSettingsProps = {
+  accounts?: Account[];
   accountScope?: AccountScope;
+  onSelectAccount?: (account: Account) => void;
   contactForm: ContactCreateInput;
   contactFormAliases: string;
   contacts: Contact[];
@@ -70,7 +73,9 @@ type ContactAutomationSettingsProps = {
 };
 
 export default function ContactAutomationSettings({
+  accounts = [],
   accountScope = 1,
+  onSelectAccount,
   contactForm,
   contactFormAliases,
   contacts,
@@ -226,8 +231,10 @@ export default function ContactAutomationSettings({
     return (
       <AccountScopeRequired
         accountScope={accountScope}
+        accounts={accounts}
+        onSelectAccount={onSelectAccount}
         title="请选择具体邮箱账号"
-        description="联系人、VIP、别名和导入记录都属于单独邮箱账号。请使用顶部的邮箱范围选择器选择一个账号后继续。"
+        description="联系人、VIP、别名和导入记录都属于单独邮箱账号。请从下方选择账号或使用顶部的邮箱范围选择器继续。"
       />
     );
   }
@@ -319,9 +326,9 @@ export default function ContactAutomationSettings({
 
       {visibleContacts.length === 0 ? (
         <SettingsEmptyState className="settings-contacts-empty">
-          <span className="settings-contacts-empty-mark" aria-hidden="true"><Users size={22} /></span>
-          <strong>还没有联系人</strong>
-          <p>添加常用收件人，写信时可以快速选择；也可以从 vCard（.vcf）/ CSV（.csv）/ Excel（.xlsx）文件批量导入。</p>
+          <span className="settings-contacts-empty-mark" aria-hidden="true"><Users size={20} /></span>
+          <strong>暂无联系人</strong>
+          <p>添加常用联系人，写信时可快捷选择；或从 vCard 文件导入。</p>
         </SettingsEmptyState>
       ) : (
         <div className="settings-contact-list">

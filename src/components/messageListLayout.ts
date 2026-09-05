@@ -3,12 +3,12 @@ export type LayoutItem = { top: number; height: number };
 /**
  * 邮件列表虚拟布局的行高常量 —— 单一事实来源。
  *
- * 与 `styles/message-list.css` 中 `.message-list-item` 的 `height: 82px`
+ * 与 `styles/message-list.css` 中 `.message-list-item` 的 `height: 68px`
  * 以及 `.message-date-header` 的 `height: 30px` 保持严格一致：
  * 每封邮件是一行连续列表（无卡片间隙），日期分组标题固定 30px。
  * 虚拟计算高度必须与实际渲染高度一致，否则滚动、选中、悬停会错位。
  */
-export const MESSAGE_ROW_HEIGHT = 82;
+export const MESSAGE_ROW_HEIGHT = 68;
 /** Mobile keeps a comfortable touch target with mature typography hierarchy. */
 export const MOBILE_MESSAGE_ROW_HEIGHT = 80;
 export const GROUP_HEADER_HEIGHT = 30;

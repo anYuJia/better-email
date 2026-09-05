@@ -49,6 +49,11 @@ export default React.memo(function MessageListCard({
 }: MessageListCardProps) {
   const mainButtonRef = useRef<HTMLButtonElement | null>(null);
   const accountSource = showAccountSource ? message.account_email.trim() : '';
+  const accountSourceShort = useMemo(() => {
+    if (!accountSource) return '';
+    const atIdx = accountSource.indexOf('@');
+    return atIdx > 0 ? accountSource.slice(0, atIdx) : accountSource;
+  }, [accountSource]);
   const preview = useMemo(() => mailboxListPreview(message), [message]);
   const metadataLabelState = useMemo(() => {
     const normalizedIdentity = new Set([
@@ -275,7 +280,7 @@ export default React.memo(function MessageListCard({
         )}
         {accountSource && (
           <span className="message-account-source" title={`来源邮箱：${accountSource}`}>
-            {accountSource}
+            {accountSourceShort}
           </span>
         )}
       </div>

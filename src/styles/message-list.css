@@ -879,7 +879,7 @@
 
 .message-date-range-trigger:hover,
 .message-date-range-trigger[aria-expanded="true"] {
-  color: var(--ui-text-on-accent);
+  color: var(--color-text-on-accent);
   border-color: var(--ui-accent);
   background: var(--ui-accent);
 }
@@ -1030,7 +1030,7 @@
 
 .message-list-item {
   box-sizing: border-box;
-  height: 82px;
+  height: 68px;
   padding: 0;
 }
 
@@ -1371,9 +1371,9 @@
 .subject {
   margin-top: 0;
   display: block;
-  color: var(--ui-text);
+  color: var(--ui-text-secondary);
   font-size: var(--ui-font-size-secondary);
-  font-weight: 500;
+  font-weight: 400;
   line-height: var(--ui-line-height-tight);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1423,20 +1423,18 @@
 .message-account-source {
   position: relative;
   z-index: 2;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
-  max-width: 55%;
+  max-width: 96px;
   margin: 1px 0 0 auto;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 0;
+  padding: 0 4px;
+  border-radius: var(--ui-radius-control, 4px);
+  background: var(--ui-surface-muted);
   color: var(--ui-text-tertiary);
-  background: transparent;
-  font-size: var(--ui-font-size-aux);
-  font-weight: var(--ui-font-weight-regular);
-  line-height: 1.35;
-  text-align: right;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2235,7 +2233,7 @@
   flex-direction: column;
   gap: 2px;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-panel);
+  border-radius: var(--ui-radius-panel, 9px);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
 }
@@ -2247,14 +2245,14 @@
 
 .compact-dropdown > div button {
   width: 100%;
-  min-height: 32px;
-  height: 32px;
+  min-height: var(--ui-menu-item-height, 34px);
+  height: var(--ui-menu-item-height, 34px);
   padding: 0 10px;
   display: flex;
   align-items: center;
   gap: 6px;
   border: 0;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control, 6px);
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
@@ -2293,7 +2291,7 @@
   height: 16px;
   display: inline-grid;
   place-items: center;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
 }
 
 /* Selection mode occupies the same second row as the ordinary list controls.
@@ -2635,9 +2633,40 @@
 }
 
 .message-date-range-calendar-options button:hover,
-.message-date-range-calendar-options button[aria-selected="true"] {
-  color: var(--ui-accent);
+.message-date-range-calendar-options button.is-active {
+  background: var(--quiet-row-hover);
+  color: var(--ui-text);
+}
+
+.message-date-range-calendar-options button[aria-selected="true"],
+.message-date-range-calendar-options button.is-selected {
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
+  font-weight: 600;
+}
+
+.message-date-range-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 20px 0;
+}
+
+.message-date-range-preset-btn {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control, 6px);
+  background: var(--ui-surface);
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-meta, 12px);
+  cursor: pointer;
+  transition: var(--ui-transition-fast-color-background);
+}
+
+.message-date-range-preset-btn:hover {
+  background: var(--quiet-row-hover);
+  color: var(--ui-text);
 }
 
 .message-date-range-weekdays,
@@ -2677,7 +2706,7 @@
 .message-date-range-days button.is-selected,
 .message-date-range-days button[aria-pressed="true"] {
   border-color: var(--ui-accent);
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
   font-weight: 600;
 }
@@ -2687,7 +2716,10 @@
 }
 
 .message-date-range-modal .message-date-range-actions {
+  display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 8px;
   margin: 0;
   padding: 12px 20px 16px;
   border-top: 1px solid var(--ui-border);
@@ -2709,7 +2741,7 @@
 
 .message-date-range-modal .message-date-range-actions .message-date-range-confirm {
   border-color: var(--ui-accent);
-  color: var(--ui-text-on-accent);
+  color: var(--color-text-on-accent);
   background: var(--ui-accent);
 }
 

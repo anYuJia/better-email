@@ -324,7 +324,9 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   ]);
 
   const contactsProps = useMemo(() => ({
+    accounts: props.accounts,
     accountScope: props.accountScope,
+    onSelectAccount: (account: Account) => props.onAccountScopeChange(String(account.id)),
     contactForm: props.contactForm,
     contactFormAliases: props.contactFormAliases,
     contacts: props.contacts,
@@ -335,6 +337,7 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     editAliases: props.contactEditAliases,
     transferBusy: props.contactTransferBusy,
   }), [
+    props.accounts,
     props.contactForm,
     props.contactFormAliases,
     props.contacts,
@@ -345,10 +348,13 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     props.contactEditAliases,
     props.contactTransferBusy,
     props.accountScope,
+    props.onAccountScopeChange,
   ]);
 
   const rulesProps = useMemo(() => ({
+    accounts: props.accounts,
     accountScope: props.accountScope,
+    onSelectAccount: (account: Account) => props.onAccountScopeChange(String(account.id)),
     ruleForm: props.ruleForm,
     ruleBuilderField: props.ruleBuilderField,
     ruleBuilderNeedle: props.ruleBuilderNeedle,
@@ -356,6 +362,7 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     rules: props.rules,
     labels: props.labels,
   }), [
+    props.accounts,
     props.ruleForm,
     props.ruleBuilderField,
     props.ruleBuilderNeedle,
@@ -363,6 +370,7 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     props.rules,
     props.labels,
     props.accountScope,
+    props.onAccountScopeChange,
   ]);
 
   const isAccountSection = activeSettingsSection === 'accounts'

@@ -64,3 +64,14 @@ describe('tertiary text contrast', () => {
     });
   }
 });
+
+describe('accent text contrast', () => {
+  for (const [theme, block] of [['light', rootBlock], ['dark', darkBlock]]) {
+    it(`${theme} theme accent text stays AA-readable on selected surface`, () => {
+      const text = parseOklch(block, 'color-text-accent');
+      const selectedSurface = parseOklch(block, 'color-surface-selected');
+      const ratio = contrast(text, selectedSurface);
+      expect(ratio, `${theme}: accent text on --color-surface-selected`).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+});

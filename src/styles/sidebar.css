@@ -235,7 +235,7 @@
 
 .folder.active,
 .folder.active:hover {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--quiet-row-selected);
 }
 
@@ -245,7 +245,7 @@
 }
 
 .folder.active .badge {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   font-weight: 600;
 }
 

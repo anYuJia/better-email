@@ -7,6 +7,7 @@ import {
   type RuleConditionField,
 } from '../../app/appConfig';
 import type {
+  Account,
   AccountScope,
   Label,
   MailRule,
@@ -25,7 +26,9 @@ import {
 import { CustomSelect } from './accounts/CustomSelect';
 
 type RuleAutomationSettingsProps = {
+  accounts?: Account[];
   accountScope?: AccountScope;
+  onSelectAccount?: (account: Account) => void;
   ruleForm: MailRuleInput;
   ruleBuilderField: RuleConditionField;
   ruleBuilderNeedle: string;
@@ -44,7 +47,9 @@ type RuleAutomationSettingsProps = {
 };
 
 export default function RuleAutomationSettings({
+  accounts = [],
   accountScope = 1,
+  onSelectAccount,
   ruleForm,
   ruleBuilderField,
   ruleBuilderNeedle,
@@ -114,8 +119,10 @@ export default function RuleAutomationSettings({
     return (
       <AccountScopeRequired
         accountScope={accountScope}
+        accounts={accounts}
+        onSelectAccount={onSelectAccount}
         title="请选择具体邮箱账号"
-        description="自动化规则只对一个邮箱账号的新邮件生效。请使用顶部的邮箱范围选择器选择一个账号后继续。"
+        description="自动化规则只对一个邮箱账号的新邮件生效。请从下方选择账号或使用顶部的邮箱范围选择器继续。"
       />
     );
   }

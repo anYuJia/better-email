@@ -35,6 +35,7 @@
      surface. */
   --color-text-tertiary: oklch(0.505 0.012 var(--primitive-hue-neutral));
   --color-text-on-accent: oklch(0.985 0.004 var(--primitive-hue-neutral));
+  --color-text-accent: oklch(0.43 0.16 var(--primitive-hue-accent));
 
   --color-border-subtle: oklch(0.925 0.006 var(--primitive-hue-neutral));
   --color-border-strong: oklch(0.86 0.009 var(--primitive-hue-neutral));
@@ -248,6 +249,8 @@
   --ui-accent-hover: var(--color-accent-hover);
   --ui-accent-pressed: var(--color-accent-pressed);
   --ui-accent-soft: var(--color-accent-soft);
+  --ui-text-accent: var(--color-text-accent);
+  --ui-text-on-accent: var(--color-text-on-accent);
   --ui-success: var(--color-success);
   --ui-success-bg: var(--color-success-soft);
   --ui-info: var(--color-info);
@@ -346,6 +349,7 @@
   --color-text-secondary: oklch(0.78 0.012 var(--primitive-hue-neutral));
   --color-text-tertiary: oklch(0.745 0.012 var(--primitive-hue-neutral));
   --color-text-on-accent: oklch(0.99 0.008 var(--primitive-hue-accent));
+  --color-text-accent: oklch(0.77 0.14 var(--primitive-hue-accent));
 
   --color-border-subtle: oklch(0.33 0.014 var(--primitive-hue-neutral));
   --color-border-strong: oklch(0.43 0.016 var(--primitive-hue-neutral));

@@ -680,13 +680,13 @@
 .reader-meta,
 .label-tools {
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .app-shell .reader-meta,
 .app-shell .label-tools {
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .reader-meta span {
@@ -710,9 +710,13 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 0 0 14px;
+  margin: 0 0 8px;
   position: relative;
   z-index: 100;
+}
+
+.label-tools:not(:has(.active-label-chip)) {
+  margin-bottom: 4px;
 }
 
 .label-empty {
@@ -2006,6 +2010,27 @@
   border-radius: var(--ui-radius-control);
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
+  transition: all var(--ui-motion-duration-fast, 150ms) ease;
+}
+
+.quick-reply.is-collapsed:not(:focus-within) {
+  padding: 0;
+  gap: 0;
+  border-color: color-mix(in srgb, var(--ui-border) 70%, transparent);
+  background: var(--ui-surface-muted);
+}
+
+.quick-reply.is-collapsed:not(:focus-within) > header,
+.quick-reply.is-collapsed:not(:focus-within) > footer {
+  display: none;
+}
+
+.quick-reply.is-collapsed:not(:focus-within) textarea {
+  min-height: 38px;
+  height: 38px;
+  padding: 9px 12px;
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .quick-reply:focus-within {

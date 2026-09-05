@@ -105,11 +105,6 @@ export default function DataSafetySettings({
       <SettingsSection
         title="本地存储"
         description="查看本地占用并清理可重新下载的附件缓存。"
-        badge={
-          <SettingsBadge tone="neutral">
-            {storageUsage ? formatBytes(storageUsage.total_managed_bytes) : '读取中'}
-          </SettingsBadge>
-        }
         dataSection="backup"
       >
         <div className="settings-storage-metrics" aria-label="本地存储占用">

@@ -98,10 +98,12 @@
 
 /* Popup menu: clean, calm native dropdown menu */
 .context-menu-surface.account-switcher-menu {
-  width: min(300px, calc(100vw - 16px));
+  min-width: 300px;
+  max-width: min(380px, calc(100vw - 16px));
+  width: max-content;
   padding: 6px;
   border: 1px solid var(--ui-border);
-  border-radius: 14px;
+  border-radius: var(--ui-radius-panel, 9px);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
   backdrop-filter: none;
@@ -114,9 +116,9 @@
 }
 
 .account-switcher-menu button {
-  min-height: 38px;
-  padding: 6px 10px;
-  border-radius: 9px;
+  min-height: var(--ui-menu-item-height, 34px);
+  padding: 5px 10px;
+  border-radius: var(--ui-radius-control, 6px);
   background: transparent;
   transition: background var(--ui-motion-fast) ease;
 }
@@ -143,7 +145,7 @@
 }
 
 .account-switcher-menu button[aria-checked='true'] .context-menu-icon {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
 }
 
 .account-switcher-menu button:disabled {

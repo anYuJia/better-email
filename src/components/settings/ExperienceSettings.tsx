@@ -49,7 +49,13 @@ export default function ExperienceSettings(props: ExperienceSettingsProps) {
   }
 
   if (props.accountScope === 'all' || !props.accountForm) {
-    return <AccountScopeRequired accountScope={props.accountScope} />;
+    return (
+      <AccountScopeRequired
+        accountScope={props.accountScope}
+        accounts={props.accounts}
+        onSelectAccount={props.onAccountFormChange}
+      />
+    );
   }
 
   return (

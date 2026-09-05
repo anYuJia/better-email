@@ -48,22 +48,52 @@ export function ComposerSenderContext({
     ?? availableIdentities[0]
     ?? null;
 
-  const accountOptions = accounts.map((entry) => ({
-    value: `account:${entry.id}`,
-    label: entry.display_name || entry.email,
-    meta: `<${entry.email}>`,
-  }));
-  const identityOptions = availableIdentities.map((identity) => ({
-    value: `identity:${identity.id}`,
-    label: identity.name || identity.email,
-    meta: `<${identity.email}>${identity.is_default ? ' · 默认身份' : ''}`,
-  }));
-  const options = [...accountOptions, ...identityOptions];
+  // Build sender options grouped by account without duplicate default identities
+  const options: Array<{ value: string; label: string; meta?: string }> = [];
+
+  for (const acc of accounts) {
+    const accIdentities = identities.filter((identity) => identity.account_id === acc.id);
+    const accDefaultIdentity = accIdentities.find((identity) => identity.is_default) ?? accIdentities[0];
+
+    if (accIdentities.length === 0) {
+      options.push({
+        value: `account:${acc.id}`,
+        label: acc.display_name || acc.email,
+        meta: `<${acc.email}>`,
+      });
+    } else {
+      for (const identity of accIdentities) {
+        const isDefault = identity.id === accDefaultIdentity?.id;
+        const hasDistinctName = Boolean(identity.name && identity.name !== acc.display_name);
+        const hasDistinctEmail = Boolean(identity.email && identity.email !== acc.email);
+        const hasDistinctReplyTo = Boolean(identity.reply_to && identity.reply_to !== identity.email);
+
+        const metaParts: string[] = [`<${identity.email}>`];
+        if (accounts.length > 1) {
+          metaParts.push(acc.display_name || acc.email);
+        }
+        if (hasDistinctReplyTo) {
+          metaParts.push(`回复至: ${identity.reply_to}`);
+        } else if (isDefault && (hasDistinctName || hasDistinctEmail)) {
+          metaParts.push('默认身份');
+        }
+
+        options.push({
+          value: `identity:${identity.id}`,
+          label: identity.name || acc.display_name || identity.email,
+          meta: metaParts.join(' · '),
+        });
+      }
+    }
+  }
+
   const selectedValue = selectedIdentity
     ? `identity:${selectedIdentity.id}`
     : selectedAccount
-      ? `account:${selectedAccount.id}`
-      : '';
+      ? (availableIdentities.length > 0 && availableIdentities[0]
+        ? `identity:${availableIdentities[0].id}`
+        : `account:${selectedAccount.id}`)
+      : options[0]?.value ?? '';
 
   return (
     <section className="composer-sender-context" aria-label="发件人信息">
@@ -80,8 +110,15 @@ export function ComposerSenderContext({
             const [kind, rawId] = nextValue.split(':');
             const nextId = Number(rawId);
             if (!Number.isFinite(nextId)) return;
-            if (kind === 'account') onPatchDraft({ account_id: nextId, identity_id: 0 });
-            else if (kind === 'identity') onPatchDraft({ identity_id: nextId });
+            if (kind === 'account') {
+              onPatchDraft({ account_id: nextId, identity_id: 0 });
+            } else if (kind === 'identity') {
+              const matchedIdentity = identities.find((i) => i.id === nextId);
+              onPatchDraft({
+                account_id: matchedIdentity ? matchedIdentity.account_id : accountId,
+                identity_id: nextId,
+              });
+            }
           }}
         />
       </div>

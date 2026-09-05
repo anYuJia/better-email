@@ -83,7 +83,13 @@ export default function AccountConnectionSettings(props: AccountConnectionSettin
       />
     );
   } else if (props.accountScope === 'all' || !props.accountForm) {
-    page = <AccountScopeRequired accountScope={props.accountScope} />;
+    page = (
+      <AccountScopeRequired
+        accountScope={props.accountScope}
+        accounts={props.accounts}
+        onSelectAccount={props.onAccountFormChange}
+      />
+    );
   } else if (props.section === 'providers') {
     page = (
       <ProviderSettingsPage

@@ -16,7 +16,7 @@
   overflow-x: visible;
   padding: 4px;
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-panel, 9px);
   color: var(--ui-text);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
@@ -37,7 +37,7 @@
   min-width: 0;
   padding: 4px;
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: var(--ui-radius-panel, 9px);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-popover);
 }
@@ -84,7 +84,7 @@
   gap: 8px;
   padding: 0 var(--ui-menu-item-padding-inline);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--ui-radius-control, 6px);
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);

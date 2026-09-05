@@ -74,10 +74,78 @@
     display: none;
   }
 
+  /* Pull to refresh & sync status bar */
+  .mobile-pull-indicator {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 38px;
+    color: var(--ui-text-secondary);
+    font-size: 12px;
+    pointer-events: none;
+    transition: opacity var(--ui-motion-fast) ease;
+  }
+
+  .mobile-pull-spinner {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ui-accent);
+    transition: transform 0.15s ease;
+  }
+
+  .mobile-pull-indicator.is-refreshing .mobile-pull-spinner {
+    animation: mobile-spin 0.8s linear infinite;
+  }
+
+  @keyframes mobile-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .mobile-inbox-sync-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: var(--ui-text-tertiary);
+    background: var(--ui-surface-muted, var(--quiet-row-hover));
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .mobile-inbox-sync-bar.is-error {
+    color: var(--ui-text-danger, #dc2626);
+    background: color-mix(in srgb, var(--ui-text-danger, #dc2626) 8%, var(--ui-surface));
+  }
+
+  .mobile-inbox-sync-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-inbox-sync-retry {
+    padding: 2px 8px;
+    border: 1px solid currentColor;
+    border-radius: var(--ui-radius-control, 4px);
+    background: transparent;
+    color: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
   /* The mobile list should feel like Mail, not a contact-card feed. */
   .app-shell.is-mobile-app .mobile-message-list-panel .message-card {
     min-height: 0;
-    padding: 7px 50px 7px 16px;
+    padding: 8px 46px 8px 16px;
   }
 
   .app-shell.is-mobile-app .mobile-message-list-panel .message-leading {
@@ -86,40 +154,83 @@
 
   .app-shell.is-mobile-app .mobile-message-list-panel .message-unread-dot {
     left: 6px;
-    top: 13px;
-    width: 4px;
-    height: 4px;
+    top: 14px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ui-accent);
     border: 0;
     box-shadow: none;
   }
 
   .app-shell.is-mobile-app .mobile-message-list-panel .message-topline {
-    min-height: 17px;
-    margin-bottom: 1px;
+    min-height: 18px;
+    margin-bottom: 2px;
   }
 
   .app-shell.is-mobile-app .mobile-message-list-panel :is(.sender, .thread-sender) {
-    font-size: 14.5px;
-    line-height: 1.2;
+    font-size: 15.5px;
+    line-height: 1.22;
+    color: var(--ui-text);
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-card.is-unread :is(.sender, .thread-sender) {
+    font-weight: 600;
   }
 
   .app-shell.is-mobile-app .mobile-message-list-panel :is(.subject, .thread-subject) {
-    font-size: 14px;
-    line-height: 1.24;
+    font-size: 14.5px;
+    line-height: 1.25;
+    color: var(--ui-text-secondary);
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-card.is-unread :is(.subject, .thread-subject) {
+    font-weight: 500;
+    color: var(--ui-text);
   }
 
   .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-card p, .thread-preview) {
-    font-size: 12.5px;
-    line-height: 1.28;
+    font-size: 13.5px;
+    line-height: 1.35;
+    color: var(--ui-text-tertiary);
   }
 
   .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-card time, .thread-card time) {
-    font-size: 11.5px;
+    font-size: 12.5px;
+    color: var(--ui-text-tertiary);
   }
 
   .app-shell.is-mobile-app .message-mobile-menu-button {
-    right: 2px;
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    transform: translateY(-50%);
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 50%;
     color: var(--ui-text-tertiary);
+    background: transparent;
+    z-index: 5;
+  }
+
+  .app-shell.is-mobile-app .message-mobile-menu-button:active {
+    color: var(--ui-text);
+    background: var(--quiet-row-hover);
+  }
+
+  .message-star-glyph {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #eab308;
+    font-size: 12px;
+    margin-right: 4px;
+    line-height: 1;
+    vertical-align: middle;
   }
 
   /* Compose stays reachable but stops looking like a promotional CTA. */
@@ -185,7 +296,7 @@
   }
 
   .app-shell.is-mobile-app .reader {
-    padding: 12px 16px calc(30px + env(safe-area-inset-bottom));
+    padding: 12px 16px calc(76px + env(safe-area-inset-bottom));
   }
 
   .app-shell.is-mobile-app .reader-header {
@@ -200,9 +311,18 @@
   }
 
   .app-shell.is-mobile-app .reader-actions {
-    gap: 1px;
-    padding: 3px 10px;
-    overflow-x: auto;
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+    min-height: calc(52px + env(safe-area-inset-bottom));
+    padding: 6px 16px calc(6px + env(safe-area-inset-bottom));
+    gap: 8px;
+    overflow-x: hidden;
+    background: var(--ui-surface);
     border-top: 1px solid var(--ui-border);
     border-bottom: 0;
   }
@@ -237,9 +357,25 @@
     white-space: nowrap;
   }
 
+  /* Secondary actions tucked into More menu on mobile */
+  .app-shell.is-mobile-app .reader-actions .reader-star-action,
+  .app-shell.is-mobile-app .reader-actions .reader-snooze-action,
+  .app-shell.is-mobile-app .reader-actions .reader-translate-action,
+  .app-shell.is-mobile-app .reader-actions .reader-ai-context-actions {
+    display: none;
+  }
+
+  .app-shell.is-mobile-app .reader-more-menu .reader-more-menu-panel {
+    bottom: 100%;
+    top: auto;
+    margin-bottom: 8px;
+    right: 8px;
+  }
+
   .app-shell.is-mobile-app .reader-message-actions {
     margin-inline-start: 0;
     padding-inline-start: 0;
+    display: contents;
   }
 
   .app-shell.is-mobile-app .reader-meta {
@@ -373,8 +509,22 @@
   }
 }
 
+/* Desktop message list spacing polish: tighter avatar offset and padding */
+.app-shell:not(.is-mobile-app) .message-card {
+  padding-left: 58px;
+}
+
+.app-shell:not(.is-mobile-app) .message-leading {
+  left: 14px;
+}
+
+.app-shell:not(.is-mobile-app) .message-unread-dot {
+  left: 5px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-shell.is-mobile-app .mobile-bottom-compose:active {
     transform: none;
   }
 }
+

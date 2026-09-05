@@ -113,6 +113,39 @@ export default React.memo(function MessageListCard({
     onFocusClaimed?.();
   }, [claimFocus, onFocusClaimed]);
 
+  const longPressTimerRef = useRef<number | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!mobile) return;
+    const touch = event.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = window.setTimeout(() => {
+      openMessageMenuAt(touch.clientX, touch.clientY);
+      longPressTimerRef.current = null;
+    }, 480);
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!touchStartPosRef.current || !longPressTimerRef.current) return;
+    const touch = event.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+    if (dx > 8 || dy > 8) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    touchStartPosRef.current = null;
+  };
+
   return (
     <div
       className={[
@@ -129,6 +162,10 @@ export default React.memo(function MessageListCard({
       style={{ width: '100%', height: '100%', minHeight: '0px', display: 'block' }}
       draggable
       onClick={() => onSelectMessage(message.id)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onDragStart={(event) => {
         const selectedMessageIds = selectedMessageIdsRef.current;
         const messageIds = isSelected && selectedMessageIds.length > 0
@@ -215,7 +252,7 @@ export default React.memo(function MessageListCard({
       </div>
       <div className="message-subject-line">
         <span className={message.is_read ? 'subject' : 'subject unread'}>
-          {message.is_starred ? '★ ' : ''}{message.subject || '(无主题)'}
+          {message.is_starred ? <span className="message-star-glyph" aria-label="星标">★ </span> : ''}{message.subject || '(无主题)'}
         </span>
         {message.attachment_count > 0 && (
           <span className="message-attachment" title={`${message.attachment_count} 个附件`}>

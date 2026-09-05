@@ -204,7 +204,9 @@ export default function ComposerWindow({
   const [ccOpen, setCcOpen] = useState(() => Boolean(draft.cc.trim()));
   const [bccOpen, setBccOpen] = useState(() => Boolean(draft.bcc.trim()));
   const [activeRecipientField, setActiveRecipientField] = useState<ComposerRecipientField>('to');
-  const [formattingOpen, setFormattingOpen] = useState(true);
+  const [formattingOpen, setFormattingOpen] = useState(
+    () => typeof window === 'undefined' || window.innerWidth > 720,
+  );
   const [popoverMode, setPopoverMode] = useState<ComposerPopoverMode>(null);
   const [sendMenuOpen, setSendMenuOpen] = useState(false);
   useWheelContainment(sendMenuRef, sendMenuOpen);

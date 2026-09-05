@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
-  ChevronDown,
   Menu,
   RefreshCw,
   Search,
@@ -149,13 +148,12 @@ export default function MobileInboxHeader({
         >
           <Menu size={22} aria-hidden="true" />
         </button>
-        <button type="button" className="mobile-inbox-title" onClick={onOpenMailbox}>
+        <div className="mobile-inbox-title">
           <span className="mobile-inbox-title-copy">
             <strong>{currentViewLabel}</strong>
             <small>{secondarySummary}</small>
           </span>
-          <ChevronDown size={15} aria-hidden="true" />
-        </button>
+        </div>
         <div className="mobile-inbox-actions">
           <button
             ref={filterMenuTriggerRef}
@@ -183,18 +181,25 @@ export default function MobileInboxHeader({
           >
             <Search size={20} aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            className="mobile-header-icon"
-            aria-label={isRefreshing ? (refreshNotice || '正在同步邮件') : '刷新邮件'}
-            aria-busy={isRefreshing}
-            disabled={isRefreshing}
-            onClick={onRefresh}
-          >
-            <RefreshCw size={18} aria-hidden="true" className={isRefreshing ? 'animate-spin' : ''} />
-          </button>
         </div>
       </div>
+      {(isRefreshing || refreshNotice) && (
+        <div className={`mobile-inbox-sync-bar${refreshNotice && !isRefreshing ? ' is-notice' : ''}`} role="status" aria-live="polite">
+          {isRefreshing ? (
+            <>
+              <RefreshCw size={13} className="animate-spin" aria-hidden="true" />
+              <span>{refreshNotice || '正在同步邮件…'}</span>
+            </>
+          ) : (
+            <>
+              <span>{refreshNotice}</span>
+              <button type="button" className="mobile-sync-retry-btn" onClick={onRefresh}>
+                重试
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {filterMenu && (
         <ContextMenu
           x={filterMenu.x}

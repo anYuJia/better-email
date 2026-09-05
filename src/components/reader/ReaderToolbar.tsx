@@ -161,6 +161,7 @@ function ReaderToolbar({
     'restore',
     'copy-message-info',
   ].includes(item.id));
+  const isMobileViewport = typeof window !== 'undefined' && window.innerWidth <= 720;
   const extraItems: ContextMenuItem[] = [
     {
       id: 'export-eml',
@@ -169,6 +170,39 @@ function ReaderToolbar({
       separatorBefore: true,
       onSelect: onExportMessage,
     },
+    ...(isMobileViewport
+      ? [
+          {
+            id: 'menu-toggle-star',
+            label: selected.is_starred ? '取消星标' : '添加星标',
+            icon: <Star size={15} fill={selected.is_starred ? 'currentColor' : 'none'} />,
+            onSelect: () => onToggleStar(selected),
+          },
+          ...(selected.folder_role === 'snoozed'
+            ? [{
+                id: 'menu-unsnooze',
+                label: '取消稍后处理',
+                icon: <Clock size={15} />,
+                onSelect: onUnsnooze,
+              }]
+            : canSnoozeRole(selected.folder_role)
+              ? [{
+                  id: 'menu-snooze',
+                  label: '稍后处理',
+                  icon: <Clock size={15} />,
+                  onSelect: onSnooze,
+                }]
+              : []),
+          ...(!isDraft && needsTranslation
+            ? [{
+                id: 'menu-translate',
+                label: translationActive ? '显示原文' : '翻译邮件',
+                icon: <Languages size={15} />,
+                onSelect: translationCompleted ? onToggleTranslation : onTranslateMessage,
+              }]
+            : []),
+        ]
+      : []),
     ...(selected.remote_uid > 0 && !selected.body.trim()
       ? [{
           id: 'fetch-body',
@@ -246,7 +280,7 @@ function ReaderToolbar({
         ) : null}
         <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">
           <button
-            className="icon-only-action"
+            className="icon-only-action reader-star-action"
             title={selected.is_starred ? '取消星标' : '添加星标'}
             aria-label={selected.is_starred ? '取消星标' : '添加星标'}
             onClick={() => onToggleStar(selected)}
@@ -254,18 +288,25 @@ function ReaderToolbar({
             <Star size={17} fill={selected.is_starred ? 'currentColor' : 'none'} />
           </button>
           {isTrash ? (
-            <button title="恢复到收件箱" aria-label="恢复到收件箱" onClick={onRestoreFromTrash}>
+            <button className="icon-only-action reader-restore-action" title="恢复到收件箱" aria-label="恢复到收件箱" onClick={onRestoreFromTrash}>
               <RotateCcw size={16} />
-              <span>恢复到收件箱</span>
             </button>
           ) : canArchive && (
-            <button className="icon-only-action" aria-label="归档" title="归档" onClick={onMoveArchive}>
+            <button className="icon-only-action reader-archive-action" aria-label="归档" title="归档" onClick={onMoveArchive}>
               <Archive size={16} />
             </button>
           )}
+          <button
+            className="icon-only-action reader-delete-action"
+            title={isTrash ? '彻底删除' : '删除'}
+            aria-label={isTrash ? '彻底删除' : '删除'}
+            onClick={isTrash ? onPermanentlyDelete : onMoveTrash}
+          >
+            <Trash2 size={16} />
+          </button>
           {selected.folder_role === 'snoozed' ? (
             <button
-              className="icon-only-action"
+              className="icon-only-action reader-snooze-action"
               aria-label="取消稍后处理"
               title="取消稍后处理"
               onClick={onUnsnooze}
@@ -274,7 +315,7 @@ function ReaderToolbar({
             </button>
           ) : canSnoozeRole(selected.folder_role) && (
             <button
-              className="icon-only-action"
+              className="icon-only-action reader-snooze-action"
               aria-label="稍后处理"
               title="稍后处理"
               onClick={onSnooze}
@@ -301,10 +342,12 @@ function ReaderToolbar({
           </button>
         )}
         {!isDraft && (
-          <ReaderAiContextActions
-            message={selected}
-            onComposeFromMessage={onComposeFromMessage}
-          />
+          <div className="reader-ai-context-actions">
+            <ReaderAiContextActions
+              message={selected}
+              onComposeFromMessage={onComposeFromMessage}
+            />
+          </div>
         )}
         <details
           className="reader-more-menu compact-menu"

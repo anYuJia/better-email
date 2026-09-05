@@ -25,7 +25,7 @@ describe('final mobile polish contract', () => {
   });
 
   it('keeps the mobile mail list dense without shrinking below a large touch row', () => {
-    expect(layoutTs).toMatch(/MOBILE_MESSAGE_ROW_HEIGHT\s*=\s*76/);
+    expect(layoutTs).toMatch(/MOBILE_MESSAGE_ROW_HEIGHT\s*=\s*80/);
     expect(finalCss).toMatch(/\.mobile-message-list-panel \.message-leading\s*\{[\s\S]*?display:\s*none;/);
   });
 

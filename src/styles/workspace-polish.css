@@ -40,11 +40,6 @@
     background: var(--quiet-row-selected);
   }
 
-  .app-shell .message-card:not(.is-unread) .sender,
-  .app-shell .message-card:not(.is-unread) .subject {
-    color: var(--ui-text-secondary);
-  }
-
   .app-shell .reader {
     max-width: 820px;
     padding: 18px clamp(22px, 2.6vw, 30px) 42px;

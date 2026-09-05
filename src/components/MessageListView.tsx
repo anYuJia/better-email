@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { RefreshCw, Search } from 'lucide-react';
 import type {
   FilterMode,
   MessageSummary,
@@ -128,6 +128,47 @@ export default function MessageListView({
   useEffect(() => {
     setIsMobileViewport(mobile || window.innerWidth <= 720);
   }, [mobile]);
+
+  const [pullDistance, setPullDistance] = useState(0);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (!isMobileViewport || pullRefreshing) return;
+    if (listRef.current && listRef.current.scrollTop <= 0) {
+      touchStartYRef.current = e.touches[0].clientY;
+    } else {
+      touchStartYRef.current = null;
+    }
+  }, [isMobileViewport, pullRefreshing]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartYRef.current === null || !isMobileViewport || pullRefreshing) return;
+    const currentY = e.touches[0].clientY;
+    const diff = currentY - touchStartYRef.current;
+    if (diff > 0 && listRef.current && listRef.current.scrollTop <= 0) {
+      const distance = Math.min(80, Math.pow(diff, 0.85));
+      setPullDistance(distance);
+    } else {
+      setPullDistance(0);
+    }
+  }, [isMobileViewport, pullRefreshing]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (touchStartYRef.current === null || !isMobileViewport) return;
+    touchStartYRef.current = null;
+    if (pullDistance >= 50 && !pullRefreshing) {
+      setPullRefreshing(true);
+      setPullDistance(44);
+      onRefresh();
+      window.setTimeout(() => {
+        setPullRefreshing(false);
+        setPullDistance(0);
+      }, 1000);
+    } else {
+      setPullDistance(0);
+    }
+  }, [isMobileViewport, onRefresh, pullDistance, pullRefreshing]);
 
   const updateScrollbarThumb = useCallback((scrollTopOverride?: number) => {
     const listElement = listRef.current;
@@ -591,40 +632,62 @@ export default function MessageListView({
         tabIndex={-1}
         data-local-scrollbar="true"
         onScroll={handleListScroll}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       >
+        {isMobileViewport && (pullDistance > 0 || pullRefreshing) && (
+          <div
+            className="mobile-pull-indicator"
+            style={{ height: `${pullDistance}px`, opacity: Math.min(1, pullDistance / 35) }}
+            aria-hidden="true"
+          >
+            <RefreshCw
+              size={17}
+              className={pullRefreshing ? 'animate-spin' : ''}
+              style={{
+                transform: pullRefreshing ? undefined : `rotate(${pullDistance * 4.5}deg)`,
+              }}
+            />
+            <span>{pullRefreshing ? '正在同步…' : pullDistance >= 50 ? '释放立即刷新' : '下拉刷新'}</span>
+          </div>
+        )}
       {messages.length > 0 && (
         <>
-        <div className="message-selection-strip" aria-label="邮件批量选择操作">
-          <label className="message-selection-all">
-            <input
-              ref={visibleCheckboxRef}
-              type="checkbox"
-              aria-label="选择当前筛选结果中的全部邮件"
-              aria-checked={visibleSelectionIndeterminate ? 'mixed' : allMessagesSelected}
-              checked={allMessagesSelected}
+        {(!isMobileViewport || selectedMessageIds.length > 0) && (
+          <div className="message-selection-strip" aria-label="邮件批量选择操作">
+            <label className="message-selection-all">
+              <input
+                ref={visibleCheckboxRef}
+                type="checkbox"
+                aria-label="选择当前筛选结果中的全部邮件"
+                aria-checked={visibleSelectionIndeterminate ? 'mixed' : allMessagesSelected}
+                checked={allMessagesSelected}
+                disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
+                onChange={(event) => toggleVisibleMessages(event.target.checked)}
+              />
+              <span className="message-selection-all-label">全部</span>
+            </label>
+            <MessageDateRangePicker
+              onConfirm={handleDateRangeConfirm}
               disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
-              onChange={(event) => toggleVisibleMessages(event.target.checked)}
             />
-            <span className="message-selection-all-label">全部</span>
-          </label>
-          <MessageDateRangePicker
-            onConfirm={handleDateRangeConfirm}
-            disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
-          />
-          <span
-            className="message-selection-strip-summary"
-            aria-live="polite"
-            aria-busy={isSelectingAll || isSelectingMessageGroup}
-          >
-            {isSelectingAll
-              ? '正在选择全部邮件…'
-              : isSelectingMessageGroup
-                ? '正在读取完整结果…'
-              : selectedMessageIds.length > 0
-                ? `已选 ${selectedMessageIds.length} 封`
-                : '选择邮件'}
-          </span>
-        </div>
+            <span
+              className="message-selection-strip-summary"
+              aria-live="polite"
+              aria-busy={isSelectingAll || isSelectingMessageGroup}
+            >
+              {isSelectingAll
+                ? '正在选择全部邮件…'
+                : isSelectingMessageGroup
+                  ? '正在读取完整结果…'
+                : selectedMessageIds.length > 0
+                  ? `已选 ${selectedMessageIds.length} 封`
+                  : '选择邮件'}
+            </span>
+          </div>
+        )}
         <div
           className="message-list-viewport-wrapper"
           style={{

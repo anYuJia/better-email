@@ -1,4 +1,4 @@
-use super::common::{command_info, format_attachment_progress, mask_email, mask_recipient_list};
+use super::common::{command_info, format_attachment_progress, mask_recipient_list};
 use crate::commands::attachments::{
     read_verified_outbound_message_attachments, validate_outbound_attachment_inputs,
 };

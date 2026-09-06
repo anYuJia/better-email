@@ -21,7 +21,7 @@ impl MailStore {
                 "cc": input.cc.trim(), "bcc": input.bcc.trim(), "subject": input.subject.trim(),
                 "body": input.body, "html": input.html_body, "attachments": input.attachments,
             });
-            let fingerprint = format!("{:x}", Sha256::digest(payload.to_string().as_bytes()));
+            let fingerprint = Sha256::digest(payload.to_string().as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect::<String>();
             let previous = transaction.query_row(
                 "SELECT id, status FROM outbox_queue WHERE submission_fingerprint = ?1 AND status IN ('sending', 'send_unknown')",
                 params![fingerprint],

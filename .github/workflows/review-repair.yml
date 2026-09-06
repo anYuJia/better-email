@@ -1,0 +1,120 @@
+name: Review repair verification
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+permissions:
+  contents: write
+concurrency:
+  group: review-repair-21
+  cancel-in-progress: false
+jobs:
+  repair:
+    if: github.event.pull_request.number == 21 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/mobile-list-gestures-20260906' && github.actor == 'yhan-sun'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Apply exact reviewed edits
+        shell: python
+        run: |
+          import hashlib, json, pathlib, subprocess
+          root = pathlib.Path.cwd()
+          planned = []
+          seen = set()
+          for item in json.loads((root / '.github/review-edits.json').read_text())['files']:
+              name = item['path']
+              relative = pathlib.PurePosixPath(name)
+              if name in seen or relative.is_absolute() or '..' in relative.parts or not (name.startswith(('src/', 'src-tauri/src/', 'scripts/')) or name in ('package.json', 'eslint.config.mjs')):
+                  raise RuntimeError('Unexpected source path: ' + name)
+              seen.add(name)
+              target = root / name
+              if target.is_symlink() or not target.resolve().is_relative_to(root):
+                  raise RuntimeError('Unsafe source path: ' + name)
+              previous = target.read_bytes() if target.exists() else None
+              actual = hashlib.sha1(('blob ' + str(len(previous)) + '\0').encode() + previous).hexdigest() if previous is not None else None
+              if actual != item['before']:
+                  raise RuntimeError('Reviewed source changed: ' + name + ' ' + str(actual))
+              lines = (previous or b'').decode().splitlines(keepends=True)
+              for edit in reversed(item['edits']):
+                  start, end = edit['start'], edit['end']
+                  if not 0 <= start <= end <= len(lines):
+                      raise RuntimeError('Invalid edit range: ' + name)
+                  lines[start:end] = edit['lines']
+              result = ''.join(lines).encode()
+              if hashlib.sha256(result).hexdigest() != item['after']:
+                  raise RuntimeError('Edited source checksum mismatch: ' + name)
+              planned.append((target, result))
+          for target, result in planned:
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(result)
+          print('Applied', len(planned), 'checksum-verified source files')
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Lock lint tools and format Rust
+        run: |
+          npm install --save-dev --save-exact eslint@9 @eslint/js@9 typescript-eslint@8 globals@16 eslint-plugin-react-hooks@5 --ignore-scripts
+          npm ci
+          cargo fmt --manifest-path src-tauri/Cargo.toml
+          git diff --check
+      - name: Commit only reviewed source to the existing PR branch
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, subprocess
+          allowed = {item['path'] for item in json.load(open('.github/review-edits.json'))['files']} | {'package-lock.json'}
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()) | set(subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'], text=True).splitlines())
+          if changed - allowed:
+              raise RuntimeError('Unplanned changes: ' + repr(changed - allowed))
+          subprocess.run(['git', 'add', '--', *sorted(allowed)], check=True)
+          PY
+          git -c user.name=yhan-sun -c user.email=304309934+yhan-sun@users.noreply.github.com commit -m 'feat:补齐发送事务安全与静态检查门禁'
+          git push origin HEAD:refs/heads/fix/mobile-list-gestures-20260906
+      - name: Export exact source and local lint dependencies
+        run: |
+          mkdir -p review-workspace review-results
+          git rev-parse HEAD > review-workspace/HEAD.txt
+          git archive --format=tar.gz HEAD > review-workspace/source.tar.gz
+          tar -czf review-workspace/node_modules.tar.gz node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: review-workspace-${{ github.run_id }}
+          path: review-workspace/
+          retention-days: 2
+      - name: Install native test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Rust regression tests
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml --locked 2>&1 | tee review-results/rust.log
+      - name: Strict native lint
+        if: '!cancelled()'
+        run: |
+          set -o pipefail
+          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings 2>&1 | tee review-results/clippy.log
+      - name: Inspect frontend lint results
+        if: '!cancelled()'
+        run: npx eslint . --format=json --output-file review-results/eslint.json
+      - name: Frontend regressions
+        if: '!cancelled()'
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee review-results/frontend.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: review-results-${{ github.run_id }}
+          path: review-results/
+          retention-days: 7

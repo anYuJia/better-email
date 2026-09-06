@@ -1,3 +1,4 @@
+import useCompositionGuard from '../../hooks/useCompositionGuard';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
@@ -54,6 +55,7 @@ export default function MobileInboxHeader({
   onShowThreads,
   searchOpen,
 }: MobileInboxHeaderProps) {
+  const ime = useCompositionGuard();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const filterMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(null);
@@ -64,6 +66,7 @@ export default function MobileInboxHeader({
   }, [searchOpen]);
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
+    if (ime.isComposing()) { event.preventDefault(); return; }
     onSearchSubmit(event);
     searchInputRef.current?.blur();
   }
@@ -118,9 +121,11 @@ export default function MobileInboxHeader({
             ref={searchInputRef}
             type="search"
             value={query}
-            placeholder="搜索邮件"
+            placeholder="搜索已同步邮件"
             aria-label="搜索邮件"
             onChange={(event) => onQueryChange(event.currentTarget.value)}
+            onCompositionStart={ime.onCompositionStart}
+            onCompositionEnd={ime.onCompositionEnd}
           />
           {query && (
             <button

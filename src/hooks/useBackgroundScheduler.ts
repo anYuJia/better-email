@@ -23,7 +23,7 @@ type BackgroundSchedulerOptions = {
   setStatus: Dispatch<SetStateAction<string>>;
   showToast: (text: string) => void;
   sendDueOutboxItems: () => Promise<{ message: string; items: OutboxItem[] }>;
-  enqueueBackgroundTask: (kind: 'sync', source: 'manual' | 'timer') => Promise<void>;
+  enqueueBackgroundTask: (kind: 'sync', source: 'manual' | 'timer') => Promise<unknown>;
 };
 
 export default function useBackgroundScheduler({
@@ -82,9 +82,9 @@ export default function useBackgroundScheduler({
         .then(({ items }) => {
           const flushedItem = items.find((entry) => entry.id === nextScheduledItem.id);
           const delivered =
-            !flushedItem ||
-            flushedItem.status === 'sent' ||
-            flushedItem.status === 'sent_remote_pending';
+            flushedItem?.status === 'sent' ||
+            flushedItem?.status === 'sent_remote_pending' ||
+            flushedItem?.status === 'archiving';
           if (delivered) showToast('邮件已发送');
         })
         .catch((error) => setStatus(String(error)));

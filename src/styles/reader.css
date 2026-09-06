@@ -2672,3 +2672,16 @@
     scale: 1;
   }
 }
+
+.reader-delivery-status {
+  margin-block: var(--ui-space-3);
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control, 8px);
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+  overflow-wrap: anywhere;
+}
+.reader-delivery-status p { margin-block: var(--ui-space-2); }
+.reader-delivery-actions { display: flex; flex-wrap: wrap; gap: var(--ui-space-2); }
+.reader-delivery-actions button { min-height: var(--ui-control-height); padding-inline: var(--ui-space-3); }

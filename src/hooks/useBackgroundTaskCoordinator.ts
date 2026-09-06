@@ -36,6 +36,7 @@ import useNewMailNotifier from './useNewMailNotifier';
 import useOutboxFlush from './useOutboxFlush';
 import type { MailboxRefreshRequest } from './useAppMetaLoader';
 import { IPC } from '../ipc/commands';
+import { waitForBackgroundTask } from '../app/waitForBackgroundTask';
 
 type LoadMetaResult = {
   folderId: number | null;
@@ -705,8 +706,8 @@ export default function useBackgroundTaskCoordinator({
         ? '同步任务已在队列中'
         : `${task.title} 已入队，将在后台分批同步`,
     );
-    if (!tasks.some((item) => item.status === 'queued')) return;
-    void drainBackgroundTaskQueue();
+    if (tasks.some((item) => item.status === 'queued')) void drainBackgroundTaskQueue();
+    return task;
   }, [drainBackgroundTaskQueue, refreshBackgroundTasks, setBackgroundSyncStatus]);
 
   const enqueueAccountSyncTask = useCallback(async (
@@ -731,11 +732,34 @@ export default function useBackgroundTaskCoordinator({
   const enqueueManualSync = useCallback(async () => {
     const selectedScope = currentRef.current.accountScope;
     if (selectedScope === 'all') {
-      await enqueueBackgroundTask('sync', 'manual');
-      return;
+      return enqueueBackgroundTask('sync', 'manual');
     }
-    await enqueueAccountSyncTask(selectedScope, 'manual');
+    return enqueueAccountSyncTask(selectedScope, 'manual');
   }, [enqueueAccountSyncTask, enqueueBackgroundTask]);
+
+  const manualRefreshes = useRef(new Map<AccountScope, Promise<void>>());
+  const refreshWaiters = useRef(new Set<AbortController>());
+  useEffect(() => () => {
+    refreshWaiters.current.forEach((controller) => controller.abort());
+    refreshWaiters.current.clear();
+  }, []);
+
+  const enqueueManualSyncAndWait = useCallback((): Promise<void> => {
+    const scope = currentRef.current.accountScope;
+    const existing = manualRefreshes.current.get(scope);
+    if (existing) return existing;
+    const controller = new AbortController();
+    refreshWaiters.current.add(controller);
+    const completion = (async () => {
+      const task = await enqueueManualSync();
+      await waitForBackgroundTask(task.id, { signal: controller.signal });
+    })().finally(() => {
+      refreshWaiters.current.delete(controller);
+      if (manualRefreshes.current.get(scope) === completion) manualRefreshes.current.delete(scope);
+    });
+    manualRefreshes.current.set(scope, completion);
+    return completion;
+  }, [enqueueManualSync]);
 
   /**
    * 登录完成后的首次同步入口：绑定明确 account_id，
@@ -786,6 +810,7 @@ export default function useBackgroundTaskCoordinator({
   return {
     enqueueBackgroundTask,
     enqueueManualSync,
+    enqueueManualSyncAndWait,
     enqueueAccountInitialSync,
     retryBackgroundTask,
     cancelBackgroundTask,

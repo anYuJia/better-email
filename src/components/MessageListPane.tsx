@@ -53,7 +53,7 @@ export type MessageListPaneProps = {
   initialScrollTop: number;
   onScrollTopChange: (scrollTop: number) => void;
   onClearSearchAndFilter: () => void;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void>;
   onShowMessages: () => void;
   onShowThreads: () => void;
   onFilterChange: (filter: FilterMode) => void;

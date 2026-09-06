@@ -23,7 +23,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
-use thiserror::Error;
 
 mod accounts;
 pub(crate) mod ai_settings;
@@ -31,6 +30,7 @@ mod app_settings;
 mod attachments;
 mod background_tasks;
 mod backup;
+mod composer_recovery;
 mod contacts_rules;
 mod folders;
 mod labels;
@@ -50,37 +50,8 @@ use self::folders::{create_default_folders_for_account, folder_id_for_role};
 use self::messages::thread_key_for_message;
 use self::migrations::migrate_legacy_database;
 
-#[derive(Debug, Error)]
-pub enum MailError {
-    #[error("database error: {0}")]
-    Database(#[from] rusqlite::Error),
-    #[error("file system error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("application data directory is unavailable")]
-    MissingDataDir,
-    #[error("database connection lock is unavailable")]
-    DatabaseLockPoisoned,
-    #[error("folder role not found: {0}")]
-    MissingFolderRole(String),
-    #[error("{0}")]
-    Smtp(String),
-    #[error("{0}")]
-    Imap(String),
-    /// 系统对话框被用户取消（另存为/选择文件等）：不是失败，调用方应保持现状。
-    #[error("操作已取消。")]
-    Cancelled,
-}
-
-impl serde::Serialize for MailError {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-pub type MailResult<T> = Result<T, MailError>;
+mod error;
+pub use error::{MailError, MailResult};
 
 const VERBOSE_DB_LOG_ENV: &str = "BETTER_EMAIL_VERBOSE_COMMAND_LOGS";
 
@@ -1567,7 +1538,7 @@ mod tests {
             })
             .unwrap();
         let sent_id = store
-            .send_message(DraftInput {
+            .queue_outbox_message(DraftInput {
                 draft_id: 0,
                 account_id: 0,
                 identity_id: 0,
@@ -1580,7 +1551,8 @@ mod tests {
                 send_at: String::new(),
                 attachments: Vec::new(),
             })
-            .unwrap();
+            .unwrap()
+            .message_id;
         let drafts = store
             .list_folders_for_account(Some(store.get_account().unwrap().id))
             .unwrap()
@@ -5333,7 +5305,7 @@ mod tests {
     fn draft_recipients_are_added_only_after_smtp_success_transition() {
         let store = test_store();
         let message_id = store
-            .send_message(DraftInput {
+            .queue_outbox_message(DraftInput {
                 draft_id: 0,
                 account_id: 0,
                 identity_id: 0,
@@ -5346,7 +5318,8 @@ mod tests {
                 send_at: String::new(),
                 attachments: Vec::new(),
             })
-            .unwrap();
+            .unwrap()
+            .message_id;
         let before = store.list_contacts().unwrap();
         assert!(before
             .iter()

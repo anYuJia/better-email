@@ -1,3 +1,4 @@
+import { anchoredScrollTop } from './messageListAnchor';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import type {
@@ -6,6 +7,7 @@ import type {
 } from '../app/types';
 import { messageMatchesLocalDateTimeRange, type LocalDateTimeRange } from '../mailUtils';
 import MessageListCard from './MessageListCard';
+import usePullToRefresh from '../hooks/usePullToRefresh';
 import MessageDateRangePicker from './MessageDateRangePicker';
 import { installScrollbarThumbDrag } from '../hooks/scrollbarThumbDrag';
 import {
@@ -60,7 +62,7 @@ type MessageListViewProps = {
   onCloseMessageMenu: () => void;
   onSetDraggingMessageIds: (messageIds: number[]) => void;
   onClearSearchAndFilter: () => void;
-  onRefresh: () => void;
+  onRefresh: () => Promise<void>;
   onLoadMore: () => Promise<MessageSummary[]>;
   loadMoreStatus?: string | null;
 };
@@ -109,12 +111,14 @@ export default function MessageListView({
   const newMessageExceededRef = useRef(false);
 
   const [viewportHeight, setViewportHeight] = useState(600);
-  const [isMobileViewport, setIsMobileViewport] = useState(
-    () => mobile || (typeof window !== 'undefined' && window.innerWidth <= 720),
+  const [isNarrowViewport, setIsNarrowViewport] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 720,
   );
+  const isMobileViewport = mobile || isNarrowViewport;
   const [, setScrollTop] = useState(initialScrollTop);
   const [heightCacheVersion, setHeightCacheVersion] = useState(0);
   const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
+  const [isScrollbarDragging, setIsScrollbarDragging] = useState(false);
   const [scrollbarThumb, setScrollbarThumb] = useState({ top: 0, height: 0 });
   scrollbarMetricsRef.current = scrollbarThumb;
   const itemHeightCacheRef = useRef<Map<string, number>>(new Map());
@@ -125,50 +129,9 @@ export default function MessageListView({
   } | null>(null);
   const messageRowHeight = isMobileViewport ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT;
 
-  useEffect(() => {
-    setIsMobileViewport(mobile || window.innerWidth <= 720);
-  }, [mobile]);
-
-  const [pullDistance, setPullDistance] = useState(0);
-  const [pullRefreshing, setPullRefreshing] = useState(false);
-  const touchStartYRef = useRef<number | null>(null);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isMobileViewport || pullRefreshing) return;
-    if (listRef.current && listRef.current.scrollTop <= 0) {
-      touchStartYRef.current = e.touches[0].clientY;
-    } else {
-      touchStartYRef.current = null;
-    }
-  }, [isMobileViewport, pullRefreshing]);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    if (touchStartYRef.current === null || !isMobileViewport || pullRefreshing) return;
-    const currentY = e.touches[0].clientY;
-    const diff = currentY - touchStartYRef.current;
-    if (diff > 0 && listRef.current && listRef.current.scrollTop <= 0) {
-      const distance = Math.min(80, Math.pow(diff, 0.85));
-      setPullDistance(distance);
-    } else {
-      setPullDistance(0);
-    }
-  }, [isMobileViewport, pullRefreshing]);
-
-  const handleTouchEnd = useCallback(() => {
-    if (touchStartYRef.current === null || !isMobileViewport) return;
-    touchStartYRef.current = null;
-    if (pullDistance >= 50 && !pullRefreshing) {
-      setPullRefreshing(true);
-      setPullDistance(44);
-      onRefresh();
-      window.setTimeout(() => {
-        setPullRefreshing(false);
-        setPullDistance(0);
-      }, 1000);
-    } else {
-      setPullDistance(0);
-    }
-  }, [isMobileViewport, onRefresh, pullDistance, pullRefreshing]);
+  const { pullDistance, pullRefreshing, refreshError, runRefresh, handleTouchStart,
+    handleTouchMove, handleTouchEnd, handleTouchCancel } =
+    usePullToRefresh(listRef, isMobileViewport, listStateKey, onRefresh);
 
   const updateScrollbarThumb = useCallback((scrollTopOverride?: number) => {
     const listElement = listRef.current;
@@ -235,6 +198,7 @@ export default function MessageListView({
         };
       },
       onDragStart: () => {
+        setIsScrollbarDragging(true);
         if (scrollbarHideTimerRef.current !== null) {
           window.clearTimeout(scrollbarHideTimerRef.current);
           scrollbarHideTimerRef.current = null;
@@ -245,14 +209,18 @@ export default function MessageListView({
         latestScrollTopRef.current = scrollTop;
         updateScrollbarThumb(scrollTop);
       },
-      onDragEnd: () => revealScrollbar(latestScrollTopRef.current),
+      onDragEnd: () => {
+        setIsScrollbarDragging(false);
+        revealScrollbar(latestScrollTopRef.current);
+      },
     });
   }, [revealScrollbar, updateScrollbarThumb]);
 
   useEffect(() => {
     const handleViewportResize = () => {
-      setIsMobileViewport(window.innerWidth <= 720);
+      setIsNarrowViewport(window.innerWidth <= 720);
     };
+    handleViewportResize();
     window.addEventListener('resize', handleViewportResize);
     return () => window.removeEventListener('resize', handleViewportResize);
   }, []);
@@ -281,9 +249,8 @@ export default function MessageListView({
 
   useEffect(() => {
     itemHeightCacheRef.current.clear();
-    itemNodeRefs.current.clear();
     setHeightCacheVersion((current) => current + 1);
-  }, [groups, listStateKey, messageRowHeight]);
+  }, [listStateKey, messageRowHeight]);
 
   useEffect(() => () => {
     if (scrollSaveTimerRef.current !== null) {
@@ -312,6 +279,13 @@ export default function MessageListView({
     }
     return list;
   }, [groups]);
+
+  useEffect(() => {
+    const keys = new Set(flatItems.map((item) => item.key));
+    for (const key of itemHeightCacheRef.current.keys()) {
+      if (!keys.has(key)) itemHeightCacheRef.current.delete(key);
+    }
+  }, [flatItems]);
 
   const selectedMessageSet = useMemo(
     () => new Set(selectedMessageIds),
@@ -412,6 +386,8 @@ export default function MessageListView({
   const visibleRangeRef = useRef(visibleRange);
   visibleRangeRef.current = visibleRange;
 
+  const previousLayout = useRef({ rows: flatItems, layout });
+  const measuredWidthRef = useRef(0);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
@@ -432,7 +408,11 @@ export default function MessageListView({
     const listElement = listRef.current;
     if (!listElement) return;
     const isNewView = restoredViewKeyRef.current !== listStateKey;
-    const requestedScrollTop = isNewView ? initialScrollTop : latestScrollTopRef.current;
+    const previous = previousLayout.current;
+    const requestedScrollTop = isNewView ? initialScrollTop : anchoredScrollTop(
+      previous.rows, previous.layout, flatItems, layout, listElement.scrollTop,
+    );
+    previousLayout.current = { rows: flatItems, layout };
     listElement.scrollTop = requestedScrollTop;
     latestScrollTopRef.current = requestedScrollTop;
     setScrollTop(requestedScrollTop);
@@ -445,7 +425,7 @@ export default function MessageListView({
     } else if (newMessageExceededRef.current) {
       baselineMessageIdsRef.current = new Set(messages.map((m) => m.id));
     }
-  }, [listStateKey, initialScrollTop, messages.length]);
+  }, [listStateKey, initialScrollTop, flatItems, layout, viewportHeight]);
 
   // Absorb newly added ids after their appearance animation has finished, so
   // the is-new highlight is not replayed when virtualized cards remount.
@@ -468,6 +448,12 @@ export default function MessageListView({
       const observer = new ResizeObserver((entries) => {
         for (const entry of entries) {
           setViewportHeight(entry.target.clientHeight);
+          const width = entry.target.clientWidth;
+          if (width !== measuredWidthRef.current) {
+            measuredWidthRef.current = width;
+            itemHeightCacheRef.current.clear();
+            setHeightCacheVersion((current) => current + 1);
+          }
           updateScrollbarThumb();
         }
       });
@@ -479,7 +465,6 @@ export default function MessageListView({
   function handleListScroll(event: React.UIEvent<HTMLDivElement>) {
     const nextScrollTop = event.currentTarget.scrollTop;
     latestScrollTopRef.current = nextScrollTop;
-    revealScrollbar(nextScrollTop);
 
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
@@ -487,6 +472,7 @@ export default function MessageListView({
 
     rafIdRef.current = requestAnimationFrame(() => {
       rafIdRef.current = null;
+      revealScrollbar(nextScrollTop);
       const nextRange = calculateVisibleRange(layoutRef.current, nextScrollTop, viewportHeightRef.current);
       if (
         nextRange.startIdx !== visibleRangeRef.current.startIdx ||
@@ -569,7 +555,7 @@ export default function MessageListView({
     for (const { item } of visibleItems) {
       const node = itemNodeRefs.current.get(item.key);
       if (!node) continue;
-      const measuredHeight = Math.round(node.getBoundingClientRect().height);
+      const measuredHeight = Math.round((item.type === 'message' ? node.firstElementChild ?? node : node).getBoundingClientRect().height);
       if (measuredHeight <= 0) continue;
       const currentHeight = itemHeightCacheRef.current.get(item.key) ?? 0;
       if (currentHeight !== measuredHeight) {
@@ -628,14 +614,14 @@ export default function MessageListView({
         ref={listRef}
         role="list"
         aria-label="邮件列表"
-        aria-busy={Boolean(loadMoreStatus)}
+        aria-busy={Boolean(loadMoreStatus) || pullRefreshing}
         tabIndex={-1}
         data-local-scrollbar="true"
         onScroll={handleListScroll}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
       >
         {isMobileViewport && (pullDistance > 0 || pullRefreshing) && (
           <div
@@ -653,6 +639,12 @@ export default function MessageListView({
             <span>{pullRefreshing ? '正在同步…' : pullDistance >= 50 ? '释放立即刷新' : '下拉刷新'}</span>
           </div>
         )}
+      {refreshError && (
+        <div className="message-list-refresh-error" role="alert">
+          <span>刷新未完成：{refreshError}</span>
+          <button type="button" disabled={pullRefreshing} onClick={() => { void runRefresh(); }}>重试刷新</button>
+        </div>
+      )}
       {messages.length > 0 && (
         <>
         {(!isMobileViewport || selectedMessageIds.length > 0) && (
@@ -866,7 +858,7 @@ export default function MessageListView({
                 清空搜索和筛选
               </button>
             )}
-            <button type="button" onClick={onRefresh}>
+            <button type="button" disabled={pullRefreshing} onClick={() => { void runRefresh(); }}>
               刷新邮箱
             </button>
           </div>
@@ -874,7 +866,7 @@ export default function MessageListView({
       )}
       </div>
       <div
-        className={`message-list-scrollbar-thumb${isScrollbarVisible && scrollbarThumb.height > 0 ? ' is-visible' : ''}`}
+        className={`message-list-scrollbar-thumb${isScrollbarVisible && scrollbarThumb.height > 0 ? ' is-visible' : ''}${isScrollbarDragging ? ' is-dragging' : ''}`}
         ref={scrollbarThumbRef}
         aria-hidden="true"
         role="presentation"

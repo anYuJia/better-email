@@ -278,12 +278,10 @@ function isTransientPageError(error) {
 }
 
 async function sendWithRetry(sendOnce, method, params, retries = 1) {
-  let lastError = null;
   for (let attempt = 0; ; attempt += 1) {
     try {
       return await sendOnce(method, params);
     } catch (error) {
-      lastError = error;
       if (attempt >= retries || !isTransientCdpError(error)) throw error;
       await sleep(250);
     }
@@ -996,7 +994,7 @@ async function assertSettingsNoHorizontalOverflow(cdp, label) {
           return {
             element: element.tagName.toLowerCase()
               + (element.className && typeof element.className === 'string'
-                ? '.' + element.className.trim().replace(/\s+/g, '.')
+                ? '.' + element.className.trim().replace(/\\s+/g, '.')
                 : ''),
             left: Math.round(rect.left),
             right: Math.round(rect.right),
@@ -1159,21 +1157,6 @@ async function fillInput(cdp, selector, value, index = 0) {
   });
 }
 
-async function selectValue(cdp, selector, value, index = 0) {
-  return withStep(`selectValue ${selector} -> ${shortText(value)}`, async () => {
-    await evalInPage(
-      cdp,
-      `(() => {
-        const element = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
-        if (!element) throw new Error('Select not found: ${selector}[${index}]');
-        const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
-        setter.call(element, ${JSON.stringify(value)});
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-      })()`,
-    );
-  });
-}
-
 async function fillComposerBody(cdp, value) {
   return withStep(`fillComposerBody ${shortText(value)}`, async () => {
     const richPoint = await evalInPage(
@@ -1254,18 +1237,6 @@ async function fillComposerBody(cdp, value) {
   });
 }
 
-async function composerBodyHasText(cdp, fragment) {
-  return evalInPage(
-    cdp,
-    `(() => {
-      const rich = document.querySelector('.composer-richtext-body');
-      if (rich) return (rich.textContent ?? '').includes(${JSON.stringify(fragment)});
-      const plain = document.querySelector('.composer textarea[placeholder="正文"]');
-      return Boolean(plain && (plain.value ?? '').includes(${JSON.stringify(fragment)}));
-    })()`,
-  );
-}
-
 async function pickCustomSelect(cdp, summarySelector, optionText) {
   return withStep(`pickCustomSelect ${shortText(summarySelector)} -> ${shortText(optionText)}`, async () => {
     await evalInPage(
@@ -1279,23 +1250,6 @@ async function pickCustomSelect(cdp, summarySelector, optionText) {
     await evalInPage(
       cdp,
       `[...document.querySelectorAll('.custom-select-dropdown button[role="option"]')].find((item) => item.textContent.includes(${JSON.stringify(optionText)})).click()`,
-    );
-  });
-}
-
-async function selectOptionByText(cdp, selector, text, index = 0) {
-  return withStep(`selectOptionByText ${selector} -> ${shortText(text)}`, async () => {
-    await evalInPage(
-      cdp,
-      `(() => {
-        const element = document.querySelectorAll(${JSON.stringify(selector)})[${index}];
-        if (!element) throw new Error('Select not found: ${selector}[${index}]');
-        const option = [...element.options].find((item) => item.textContent.includes(${JSON.stringify(text)}));
-        if (!option) throw new Error('Select option not found: ${text}');
-        const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
-        setter.call(element, option.value);
-        element.dispatchEvent(new Event('change', { bubbles: true }));
-      })()` ,
     );
   });
 }
@@ -1722,7 +1676,7 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('已固定到常用邮箱：垃圾邮件') && document.querySelector('.primary-folder-list .folder[data-folder-role=\"spam\"][data-favorite=\"true\"]') && JSON.parse(localStorage.getItem('better-email.favoriteFolderKeys.v1')).includes('virtual:spam')");
     const favoriteReloadOrigin = await evalInPage(cdp, 'performance.timeOrigin');
     await cdp.send('Page.reload', { ignoreCache: true });
-    await waitForExpression(cdp, `performance.timeOrigin !== ${favoriteReloadOrigin} && document.querySelector('.app-shell') && document.querySelector('.primary-folder-list .folder[data-folder-role=\"spam\"][data-favorite=\"true\"]')`);
+    await waitForExpression(cdp, `performance.timeOrigin !== ${favoriteReloadOrigin} && document.querySelector('.app-shell') && document.querySelector('.primary-folder-list .folder[data-folder-role="spam"][data-favorite="true"]')`);
     await waitForExpression(cdp, "document.querySelector('.primary-folder-list .folder[data-folder-role=\"spam\"]')");
     await openFolderContextMenu(cdp, 'spam', '从常用邮箱移除');
     await clickFolderContextMenuItem(cdp, 'spam', '从常用邮箱移除');
@@ -1967,7 +1921,7 @@ async function main() {
     await waitForExpression(cdp, "!document.querySelector('datalist') && [...document.querySelectorAll('.recipient-suggestions button')].some((item) => item.textContent.includes('ada@example.com')) && document.body.innerText.includes('匹配联系人')");
     await clickButton(cdp, 'Ada', "document.querySelector('.recipient-suggestions')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.composer-recipient-chip-copy')].some((item) => item.getAttribute('title') === 'ada@example.com')");
-    await fillInput(cdp, '.composer input[aria-label=\"主题\"]', 'Smoke Draft Flow');
+    await fillInput(cdp, '.composer input[aria-label="主题"]', 'Smoke Draft Flow');
     await fillComposerBody(cdp, '保存草稿路径验证');
     await waitForExpression(cdp, "JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.subject === 'Smoke Draft Flow' && (JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.body ?? '').includes('保存草稿路径验证') && document.body.innerText.includes('已自动保存')");
     await cdp.send('Page.reload', { ignoreCache: true });
@@ -1975,17 +1929,17 @@ async function main() {
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 2");
     await clickButton(cdp, '设置', "document.querySelector('.sidebar-footer')");
     await waitForExpression(cdp, "document.querySelector('.settings-modal')");
-    await openSettingsSection(cdp, '通讯录', 'contacts', '.settings-page[data-settings-page=\"contacts\"]');
+    await openSettingsSection(cdp, '通讯录', 'contacts', '.settings-page[data-settings-page="contacts"]');
     const contactsNeedComposeSeed = await evalInPage(cdp, "![...document.querySelectorAll('.contact-tool-row')].some((row) => row.innerText.includes('ada@example.com'))");
     if (contactsNeedComposeSeed) {
       await openContactCreateDialog(cdp);
-      await fillInput(cdp, '.contact-create-form input[placeholder=\"联系人名称\"]', 'Ada');
-      await fillInput(cdp, '.contact-create-form input[placeholder=\"name@example.com\"]', 'ada@example.com');
+      await fillInput(cdp, '.contact-create-form input[placeholder="联系人名称"]', 'Ada');
+      await fillInput(cdp, '.contact-create-form input[placeholder="name@example.com"]', 'ada@example.com');
       await clickButton(cdp, '确认添加', "document.querySelector('.contact-create-form')");
       await waitForExpression(cdp, "[...document.querySelectorAll('.contact-tool-row')].some((row) => row.innerText.includes('ada@example.com'))");
       await openContactCreateDialog(cdp);
-      await fillInput(cdp, '.contact-create-form input[placeholder=\"联系人名称\"]', 'Security Team');
-      await fillInput(cdp, '.contact-create-form input[placeholder=\"name@example.com\"]', 'security@example.com');
+      await fillInput(cdp, '.contact-create-form input[placeholder="联系人名称"]', 'Security Team');
+      await fillInput(cdp, '.contact-create-form input[placeholder="name@example.com"]', 'security@example.com');
       await clickButton(cdp, '确认添加', "document.querySelector('.contact-create-form')");
       await waitForExpression(cdp, "[...document.querySelectorAll('.contact-tool-row')].some((row) => row.innerText.includes('security@example.com'))");
     }
@@ -2118,10 +2072,10 @@ async function main() {
     await captureScreenshot(cdp, 'compose-final-polish-template-popover');
     await clickButton(cdp, '保存为模板…', "document.querySelector('.composer-templates-popover')");
     await waitForExpression(cdp, "document.querySelector('.composer-template-save-dialog')");
-    await fillInput(cdp, '.composer-template-save-dialog input[aria-label=\"模板名称\"]', 'Smoke 模板');
+    await fillInput(cdp, '.composer-template-save-dialog input[aria-label="模板名称"]', 'Smoke 模板');
     await clickButton(cdp, '保存', "document.querySelector('.composer-template-save-dialog')");
     await waitForExpression(cdp, "document.body.innerText.includes('模板已保存：Smoke 模板')");
-    await fillInput(cdp, '.composer input[aria-label=\"主题\"]', 'Smoke Template Mutated');
+    await fillInput(cdp, '.composer input[aria-label="主题"]', 'Smoke Template Mutated');
     await fillComposerBody(cdp, '模板覆盖前正文');
     await evalInPage(cdp, "(() => { const subject = document.querySelector('.composer input[aria-label=\"主题\"]'); subject?.focus(); return true; })()");
     await clickButton(cdp, '插入模板', "document.querySelector('.composer')");
@@ -2204,8 +2158,8 @@ async function main() {
     await closeComposer(cdp);
 
     await clickButton(cdp, '写邮件');
-    await fillInput(cdp, '.composer input[role=\"combobox\"]', 'ada@example.com');
-    await fillInput(cdp, '.composer input[aria-label=\"主题\"]', 'Smoke Outbox Flow');
+    await fillInput(cdp, '.composer input[role="combobox"]', 'ada@example.com');
+    await fillInput(cdp, '.composer input[aria-label="主题"]', 'Smoke Outbox Flow');
     await fillComposerBody(cdp, '发件箱排队路径验证');
     await evalInPage(cdp, "document.querySelector('.composer-send-menu-trigger')?.click()");
     await waitForExpression(cdp, "document.querySelector('.composer-send-menu[role=\"menu\"]')");
@@ -2930,8 +2884,8 @@ async function main() {
 
     await clickButton(cdp, '写邮件');
     await waitForExpression(cdp, "document.querySelector('.composer .custom-select-summary[aria-label=\"发件人\"]')");
-    await fillInput(cdp, '.composer input[role=\"combobox\"]', 'ada@example.com');
-    await fillInput(cdp, '.composer input[aria-label=\"主题\"]', 'Smoke Undo Send');
+    await fillInput(cdp, '.composer input[role="combobox"]', 'ada@example.com');
+    await fillInput(cdp, '.composer input[aria-label="主题"]', 'Smoke Undo Send');
     await fillComposerBody(cdp, '撤销发送路径验证');
     await evalInPage(cdp, "document.querySelector('.composer .composer-send-primary').click()");
     await waitForExpression(cdp, "document.querySelector('.message-toast-undo')?.innerText.includes('秒后发送') && document.querySelector('.message-toast-undo')?.innerText.includes('Smoke Undo Send')");
@@ -2942,8 +2896,8 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('Smoke Undo Send')");
 
     await clickButton(cdp, '写邮件');
-    await fillInput(cdp, '.composer input[role=\"combobox\"]', 'ada@example.com');
-    await fillInput(cdp, '.composer input[aria-label=\"主题\"]', 'Smoke Auto Send');
+    await fillInput(cdp, '.composer input[role="combobox"]', 'ada@example.com');
+    await fillInput(cdp, '.composer input[aria-label="主题"]', 'Smoke Auto Send');
     await fillComposerBody(cdp, '延迟发送到期路径验证');
     await evalInPage(cdp, "document.querySelector('.composer .composer-send-primary').click()");
     await waitForExpression(cdp, "document.querySelector('.message-toast-undo')?.innerText.includes('Smoke Auto Send')");
@@ -3127,14 +3081,14 @@ async function main() {
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-page[data-settings-page=\"templates\"] button')].some((item) => item.textContent.includes('新建模板'))");
     await clickButton(cdp, '新建模板', "document.querySelector('.settings-page[data-settings-page=\"templates\"]')");
     await waitForExpression(cdp, "document.querySelector('.template-editor')");
-    await fillInput(cdp, '.template-editor input[placeholder=\"模板名称\"]', 'Smoke 设置模板');
-    await fillInput(cdp, '.template-editor input[placeholder^=\"邮件主题\"]', '你好 {{contact.name}}');
+    await fillInput(cdp, '.template-editor input[placeholder="模板名称"]', 'Smoke 设置模板');
+    await fillInput(cdp, '.template-editor input[placeholder^="邮件主题"]', '你好 {{contact.name}}');
     await fillInput(cdp, '.template-editor textarea', '您好 {{contact.name}}，\n\n这是模板正文。\n\n{{signature}}');
     await clickButton(cdp, '保存模板', "document.querySelector('.template-editor')");
     await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('Smoke 设置模板') && document.querySelector('.settings-inline-status')?.textContent.includes('模板已保存：Smoke 设置模板')");
     await clickButton(cdp, 'AI 生成', "document.querySelector('.settings-page[data-settings-page=\"templates\"]')");
     await waitForExpression(cdp, "document.querySelector('.template-ai-body')");
-    await fillInput(cdp, '.template-ai-generator input[placeholder^=\"描述模板用途\"]', '向新客户介绍产品');
+    await fillInput(cdp, '.template-ai-generator input[placeholder^="描述模板用途"]', '向新客户介绍产品');
     await clickButton(cdp, 'AI 生成', "document.querySelector('.template-ai-generator')");
     await sleep(1000);
     await waitForExpression(cdp, "document.querySelector('.template-ai-preview textarea')?.value.includes('{{contact.name}}') && document.querySelector('.template-ai-preview input')?.value.includes('跟进')");

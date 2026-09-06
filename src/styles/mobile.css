@@ -1153,3 +1153,15 @@
     animation: none;
   }
 }
+
+.app-shell.is-mobile-app :is(button, [role="button"]) {
+  min-width: var(--ui-control-height-touch);
+  min-height: var(--ui-control-height-touch);
+}
+.app-shell.is-mobile-app .composer-autosave-status[data-save-state="error"] {
+  font-size: var(--ui-font-size-aux);
+  max-width: 100%;
+}
+.app-shell.is-mobile-app :is(.mobile-app-surface, .mobile-reader-surface) {
+  max-height: var(--mobile-viewport-height, 100dvh);
+}

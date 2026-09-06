@@ -1,3 +1,6 @@
+import useOnboardingAccount from './hooks/useOnboardingAccount';
+import useMobileVisualViewport from './hooks/useMobileVisualViewport';
+import useMailFeedback from './hooks/useMailFeedback';
 import React, {
   lazy,
   Suspense,
@@ -252,6 +255,7 @@ function MailboxApp({
   const isMobileApp = nativePlatform === 'android'
     || nativePlatform === 'ios'
     || (nativePlatform === 'web' && isViewportMobile);
+  useMobileVisualViewport(isMobileApp);
   const useNativeComposerWindow = !mockMode && nativePlatform === 'desktop';
   const useNativeSettingsWindow = !mockMode
     && nativePlatform === 'desktop'
@@ -656,6 +660,7 @@ function MailboxApp({
   const {
     enqueueBackgroundTask,
     enqueueManualSync,
+    enqueueManualSyncAndWait,
     enqueueAccountInitialSync,
   } = useBackgroundTaskCoordinator({
     automaticProcessingEnabled: !standaloneSettingsWindow,
@@ -1038,6 +1043,7 @@ function MailboxApp({
     closeComposer,
     forceCloseComposer,
     clearComposerAutosave,
+    retryComposerAutosave,
     insertSignatureIntoDraft,
     applyComposeTemplate,
     saveDraftAsTemplate,
@@ -1501,33 +1507,13 @@ function MailboxApp({
     moveSelected,
   });
 
-  const handleRefresh = useCallback(() => {
-    enqueueManualSync().catch((error) => setStatus(String(error)));
-  }, [enqueueManualSync, setStatus]);
+  const { handleRefresh, handleRefreshAction, resolveDelivery } = useMailFeedback({
+    enqueueManualSyncAndWait, refreshAll, setStatus, setOutbox,
+  });
 
-  // 首次引导保存绑定账号 ID，避免后台刷新覆盖最新状态。
-  const handleOnboardingAccountPatch = useCallback(async (accountId: number, patch: Partial<Account>) => {
-    const updated = await invoke<Account>(IPC.UpdateAccountSettings, {
-      accountId,
-      input: { ...accounts.find((item) => item.id === accountId) ?? account, ...patch },
-    });
-    setAccount(updated);
-    setAccountForm(updated);
-    setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-  }, [account, accounts, setAccount, setAccountForm, setAccounts]);
-
-  const completeOnboarding = useCallback(async (accountId: number) => {
-    // 让旧元数据请求失效，避免向导重新出现。
-    mailboxRefreshRef.current += 1;
-    const updated = await invoke<Account>(IPC.SetAccountOnboardingCompleted, {
-      accountId,
-      completed: true,
-    });
-    setAccount(updated);
-    setAccountForm(updated);
-    setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-    setStatus('首次引导已完成，可随时在设置页调整');
-  }, [mailboxRefreshRef, setAccount, setAccountForm, setAccounts, setStatus]);
+  const { handleOnboardingAccountPatch, completeOnboarding } = useOnboardingAccount({
+    account, accounts, setAccount, setAccountForm, setAccounts, setStatus, mailboxRefreshRef,
+  });
 
   const handleMoveBulkToFolder = useCallback((folder: Folder) => {
     moveSelectedMessagesToFolder(folder).catch((error) => setStatus(String(error)));
@@ -1787,7 +1773,8 @@ function MailboxApp({
   const readerContent = (
     <AppErrorBoundary>
       <ReaderPane
-        hasNoSearchResults={Boolean(appliedQuery.trim()) && messages.length === 0}
+        deliveryStatus={outbox.find((item) => item.message_id === selected?.id)}
+        onResolveDelivery={resolveDelivery}
         activeThread={activeThread}
         threadMessages={threadMessages}
         activeThreadSelected={activeThreadSelected}
@@ -1881,7 +1868,7 @@ function MailboxApp({
                 onOpenMailbox={showNarrowSidebar}
                 onOpenSearch={openMobileSearch}
                 onCloseSearch={closeMobileSearch}
-                onRefresh={handleRefresh}
+                onRefresh={handleRefreshAction}
                 onSearchSubmit={runSearch}
                 onQueryChange={handleQueryChange}
                 onClearSearchAndFilter={handleClearSearchAndFilter}
@@ -1953,7 +1940,7 @@ function MailboxApp({
         viewSummary={titlebarViewSummary}
         isRefreshing={isRefreshing || isBackgroundSyncRunning}
         refreshNotice={refreshNotice}
-        onRefresh={handleRefresh}
+        onRefresh={handleRefreshAction}
       />
       <Sidebar
         accountScope={accountScope}
@@ -2061,6 +2048,7 @@ function MailboxApp({
         <Suspense fallback={<DeferredSurface label="正在打开写信窗口" />}>
           <AppErrorBoundary>
             <ComposerWindow
+              mobile={isMobileApp}
               minimized={isComposerMinimized}
               focusRequest={composerFocusRequest}
               draft={draft}
@@ -2077,6 +2065,7 @@ function MailboxApp({
               dropActive={isComposerDropActive}
               status={status}
               autosave={composerAutosave}
+            onRetryAutosave={retryComposerAutosave}
               onMinimize={() => setComposerMinimized(true)}
               onRestore={() => setComposerMinimized(false)}
               onClose={closeComposer}

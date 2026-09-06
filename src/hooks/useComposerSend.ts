@@ -86,6 +86,7 @@ export default function useComposerSend({
   setSendProgressMessage,
   setAttachmentProgress,
 }: ComposerSendOptions) {
+  const submissionInFlight = useRef(false);
   const lastSendProgressRef = useRef<number | null>(null);
   const lastSendProgressMessageRef = useRef<string | null>(null);
   const lastAttachmentProgressRef = useRef<number | null>(null);
@@ -186,8 +187,11 @@ export default function useComposerSend({
   ) => {
     let taskId: number | null = null;
     let pollTimer = 0;
+    let stopped = false;
+    let acceptedMessageId: number | null = null;
 
     const stopPolling = () => {
+      stopped = true;
       if (pollTimer) {
         window.clearInterval(pollTimer);
         pollTimer = 0;
@@ -198,6 +202,7 @@ export default function useComposerSend({
       if (!taskId) return;
       try {
         const latest = await invoke<BackgroundTask>(IPC.GetBackgroundTask, { taskId });
+        if (stopped) return;
         if (latest.status === 'running') {
           const percent = Number.isFinite(latest.progress) ? latest.progress : 0;
           const normalizedPercent = Math.max(0, Math.min(100, Math.round(percent)));
@@ -213,7 +218,7 @@ export default function useComposerSend({
         reportSendProgressMessage(null);
         reportAttachmentProgress(null);
         if (latest.message) {
-          setStatus(`发送完成：${latest.message}`);
+          if (latest.status === 'done') setStatus(`发送完成：${latest.message}`);
         }
       } catch {
         stopPolling();
@@ -253,11 +258,13 @@ export default function useComposerSend({
         threading,
         task_id: taskId,
       });
-      await invoke<BackgroundTask>(IPC.CompleteBackgroundTask, {
-        taskId,
-        message: '发送完成',
-      });
+      acceptedMessageId = messageId;
       stopPolling();
+      try {
+        await invoke<BackgroundTask>(IPC.CompleteBackgroundTask, { taskId, message: '发送完成' });
+      } catch (error) {
+        composerFlowWarn('sent; progress completion failed', { messageId, error: String(error) });
+      }
       reportSendProgressMessage('发送完成');
       reportAttachmentProgress(null);
       await options.onSuccess(messageId);
@@ -265,6 +272,14 @@ export default function useComposerSend({
     } catch (error) {
       const errorMessage = String(error);
       stopPolling();
+      if (acceptedMessageId !== null) {
+        reportSendProgress(null);
+        reportSendProgressMessage(null);
+        reportAttachmentProgress(null);
+        setStatus(`邮件已发送，但界面更新失败，请勿重复发送：${errorMessage}`);
+        composerFlowWarn('sent; UI completion failed', { messageId: acceptedMessageId, error: errorMessage });
+        return;
+      }
       reportSendProgress(null);
       reportSendProgressMessage(null);
       reportAttachmentProgress(null);
@@ -283,10 +298,15 @@ export default function useComposerSend({
       } else {
         setStatus(`发送失败：${errorMessage}`);
       }
+      try {
+        setOutbox(await invoke<OutboxItem[]>(IPC.ListOutbox));
+      } catch {
+        composerFlowWarn('failed to refresh outbox after send error');
+      }
       await options.onFailure(errorMessage);
       return;
     }
-  }, [setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress]);
+  }, [setStatus, setOutbox, setSendProgress, setSendProgressMessage, setAttachmentProgress]);
 
   const sendDraft = useCallback(async () => {
     if (!draft.to.trim()) {
@@ -326,7 +346,9 @@ export default function useComposerSend({
           });
         },
         onFailure: async (message) => {
-          setStatus(`发送失败，邮件内容已保留，可修改后重试：${message}`);
+          setStatus(message.includes('[SEND_OUTCOME_UNKNOWN]')
+            ? '发送结果未确认，邮件内容已保留。请先核对已发送文件夹，并在发件箱确认结果；不要直接重发。'
+            : `发送失败，邮件内容已保留，可修改后重试：${message}`);
           composerFlowWarn('sendDraft failed', {
             accountId: input.account_id,
             error: message,
@@ -413,7 +435,9 @@ export default function useComposerSend({
         onFailure: async (errorMessage) => {
           // Keep the reply body available for correction or retry, and keep
           // the reader in place even when no visible outbox folder exists.
-          setStatus(`快速回复发送失败：${errorMessage}`);
+          setStatus(errorMessage.includes('[SEND_OUTCOME_UNKNOWN]')
+            ? '快速回复的发送结果未确认，正文已保留。请先核对已发送文件夹，并在发件箱确认结果；不要直接重发。'
+            : `快速回复发送失败：${errorMessage}`);
           composerFlowWarn('sendQuickReply failed', {
             accountId: message.account_id,
             error: errorMessage,
@@ -505,11 +529,25 @@ export default function useComposerSend({
     setStatus(`已撤回发送：${pending.subject}`);
   }, [pendingSendUndo, setPendingSendUndo, setOutbox, refreshAll, setStatus]);
 
+  const submitOnce = useCallback(async (submit: () => Promise<void>) => {
+    if (submissionInFlight.current) return;
+    submissionInFlight.current = true;
+    try {
+      await submit();
+    } finally {
+      submissionInFlight.current = false;
+    }
+  }, []);
+  const guardedSaveDraft = useCallback(() => submitOnce(saveDraft), [saveDraft, submitOnce]);
+  const guardedSendDraft = useCallback(() => submitOnce(sendDraft), [sendDraft, submitOnce]);
+  const guardedQueueDraft = useCallback(() => submitOnce(queueDraft), [queueDraft, submitOnce]);
+  const guardedQuickReply = useCallback((message: Message) => submitOnce(() => sendQuickReply(message)), [sendQuickReply, submitOnce]);
+
   return {
-    saveDraft,
-    sendDraft,
-    sendQuickReply,
-    queueDraft,
+    saveDraft: guardedSaveDraft,
+    sendDraft: guardedSendDraft,
+    sendQuickReply: guardedQuickReply,
+    queueDraft: guardedQueueDraft,
     cancelOutboxItem,
     undoPendingSend,
   };

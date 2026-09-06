@@ -31,6 +31,7 @@ import useModalAccessibility from '../hooks/useModalAccessibility';
 import { useWheelContainment } from '../hooks/useWheelContainment';
 import { startDraggingCurrentWindow } from '../tauriBridge';
 import './composer/composer.css';
+import './composer/composer-recovery.css';
 import './composer/composer-polish.css';
 
 type ComposerPosition = {
@@ -87,6 +88,7 @@ function clampComposerPosition(
 export type ComposerWindowProps = {
   minimized: boolean;
   standaloneWindow?: boolean;
+  mobile?: boolean;
   defaultContactsOpen?: boolean;
   platform?: 'macos' | 'windows' | 'linux' | 'web';
   focusRequest?: number;
@@ -104,6 +106,7 @@ export type ComposerWindowProps = {
   dropActive: boolean;
   status: string;
   autosave: ComposerAutosave | null;
+  onRetryAutosave?: () => void;
   onMinimize: () => void;
   onRestore: () => void;
   onClose: () => void;
@@ -137,6 +140,7 @@ export type ComposerWindowProps = {
 export default function ComposerWindow({
   minimized,
   standaloneWindow = false,
+  mobile = false,
   defaultContactsOpen,
   platform = 'web',
   focusRequest = 0,
@@ -154,6 +158,7 @@ export default function ComposerWindow({
   dropActive,
   status,
   autosave,
+  onRetryAutosave,
   onMinimize,
   onRestore,
   onClose,
@@ -203,9 +208,10 @@ export default function ComposerWindow({
     } catch {}
     return false;
   });
-  const [isMobileComposerViewport, setIsMobileComposerViewport] = useState(
+  const [isNarrowComposerViewport, setIsNarrowComposerViewport] = useState(
     () => typeof window !== 'undefined' && window.innerWidth <= 720,
   );
+  const isMobileComposerViewport = mobile || isNarrowComposerViewport;
   const [ccOpen, setCcOpen] = useState(() => Boolean(draft.cc.trim()));
   const [bccOpen, setBccOpen] = useState(() => Boolean(draft.bcc.trim()));
   const [activeRecipientField, setActiveRecipientField] = useState<ComposerRecipientField>('to');
@@ -231,7 +237,11 @@ export default function ComposerWindow({
   const explicitSaveStatus = /^正在保存|保存失败|网络异常/.test(status);
   const autosaveLabel = explicitSaveStatus
     ? status
-    : autosave && !isDraftEmpty(draft)
+    : autosave?.save_state === 'error'
+      ? '自动保存失败，内容仍在编辑器'
+      : autosave?.save_state === 'saving'
+        ? '正在保存到本机…'
+        : autosave && !isDraftEmpty(draft)
       ? `已自动保存 · ${formatClock(autosave.saved_at)}`
       : isDraftEmpty(draft)
         ? ''
@@ -317,7 +327,7 @@ export default function ComposerWindow({
     const contactsMedia = window.matchMedia('(max-width: 899px)');
     const mobileMedia = window.matchMedia('(max-width: 720px)');
     const updateViewportMode = () => {
-      setIsMobileComposerViewport(mobileMedia.matches);
+      setIsNarrowComposerViewport(mobileMedia.matches);
       if (contactsMedia.matches) setContactsOpen(false);
     };
     updateViewportMode();
@@ -530,12 +540,17 @@ export default function ComposerWindow({
                 <span
                   className="composer-autosave-status"
                   aria-live="polite"
-                  title={explicitSaveStatus ? autosaveLabel : autosave ? `恢复点：${autosave.saved_at}` : autosaveLabel}
+                  role={autosave?.save_state === 'error' ? 'alert' : 'status'}
+                  data-save-state={autosave?.save_state ?? 'saved'}
+                  title={autosave?.save_error || (explicitSaveStatus ? autosaveLabel : autosave ? `恢复点：${autosave.saved_at}` : autosaveLabel)}
                 >
-                  {autosave && !isDraftEmpty(draft) && !explicitSaveStatus
+                  {autosave && autosave.save_state !== 'error' && autosave.save_state !== 'saving' && !isDraftEmpty(draft) && !explicitSaveStatus
                     ? <CheckCircle2 size={16} aria-hidden="true" />
                     : null}
                   {autosaveLabel}
+                  {autosave?.save_state === 'error' && onRetryAutosave && (
+                    <button type="button" onClick={onRetryAutosave}>重试自动保存</button>
+                  )}
                 </span>
               </span>
               <div className="composer-header-actions">

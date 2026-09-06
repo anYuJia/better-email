@@ -25,7 +25,7 @@ function outboxItem(
 }
 
 describe('background task coordinator helpers', () => {
-  it('wakes only for scheduled items that are due for SMTP send', () => {
+  it('wakes the earliest actionable item without retrying unknown outcomes', () => {
     const next = nextOutboxWakeItem([
       outboxItem(1, 'sent', ''),
       outboxItem(2, 'retry', '2026-07-10T10:10:00.000Z'),
@@ -69,7 +69,7 @@ describe('background task coordinator helpers', () => {
       outboxFlushMessage([
         outboxItem(1, 'failed', ''),
       ]),
-    ).toBe('SMTP 发送暂停，1 封需要重新保存账号授权码');
+    ).toBe('SMTP 发送暂停，1 封需要检查账号、收件人或附件');
   });
 
   it('releases due scheduled mail before flushing real SMTP', async () => {

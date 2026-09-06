@@ -615,8 +615,15 @@ export type MailtoParsed = {
   body: string;
 };
 
+function replaceMailtoControls(value: string, replacement: string): string {
+  return Array.from(value, (character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127 ? replacement : character;
+  }).join('');
+}
+
 function sanitizeMailtoField(value: string): string {
-  return value.replace(/[\x00-\x1F\x7F]/g, ' ').replace(/\s+/g, ' ').trim();
+  return replaceMailtoControls(value, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function decodeMailtoValue(value: string): string {
@@ -631,7 +638,7 @@ function decodeMailtoValue(value: string): string {
 export function parseMailtoUrl(url: string): MailtoParsed {
   const result: MailtoParsed = { to: '', cc: '', bcc: '', subject: '', body: '' };
 
-  const cleanUrl = url.replace(/[\x00-\x1F\x7F]/g, '');
+  const cleanUrl = replaceMailtoControls(url, '');
   if (!cleanUrl.toLowerCase().startsWith('mailto:')) {
     return result;
   }

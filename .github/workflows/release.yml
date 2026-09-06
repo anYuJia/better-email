@@ -18,7 +18,11 @@ on:
         default: 'v1.0.0'
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -29,9 +33,22 @@ jobs:
   validate:
     name: Validate (PR gate)
     runs-on: ubuntu-22.04
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Pin validated source
+        id: source
+        env:
+          REQUESTED_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+        run: |
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          node scripts/check-release-source.mjs
 
       - name: Install Linux system dependencies
         run: |
@@ -42,12 +59,13 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            google-chrome-stable
+            google-chrome-stable \
+            fonts-noto-cjk
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Setup Rust
@@ -63,7 +81,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Type check (strict, including unused checks)
+      - name: TypeScript and ESLint (warnings as errors)
         run: npm run lint
 
       - name: Frontend unit tests
@@ -76,27 +94,39 @@ jobs:
         run: npm run test:services
 
       - name: Frontend production build
-        run: npm run build
+        run: npm run build:verify
 
       - name: UI smoke test (mock backend, headless browser)
-        # The release build is already covered by the strict unit/build/Rust
-        # gates below; keep the long browser smoke suite on branch/PR checks so
-        # a tagged release cannot be blocked by an unrelated browser timeout.
-        if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/'))
         timeout-minutes: 45
-        run: npm run test:ui
+        run: |
+          mkdir -p quality-evidence
+          set -o pipefail
+          npm run test:ui 2>&1 | tee quality-evidence/browser.log
         env:
           CHROME_PATH: /usr/bin/google-chrome-stable
+          BETTER_EMAIL_UI_CAPTURE_DIR: quality-evidence/screenshots
           # Compose reference fixtures pin wall-clock expectations to UTC+8.
           # Keep Chromium/Node on the same timezone so CI does not render 03:05
           # while the fixture contract correctly expects 11:05.
           TZ: Asia/Shanghai
 
+      - name: Record list algorithm benchmark
+        run: npm run bench:list -- quality-evidence/list-benchmark.json
+
+      - name: Preserve browser and benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-evidence-${{ github.run_id }}
+          path: quality-evidence/
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
 
       - name: Rust clippy (warnings as errors)
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
 
       - name: Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
@@ -134,11 +164,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Setup Rust
@@ -191,11 +224,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Setup Java
@@ -298,18 +334,21 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    needs: [build, build-android]
+    needs: [validate, build, build-android]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Download installer artifacts
         uses: actions/download-artifact@v4
@@ -375,7 +414,7 @@ jobs:
           if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
             gh release edit "$TAG" --title "Better Email $TAG" --notes "$BODY"
           else
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "Better Email $TAG" --notes "$BODY"
+            gh release create "$TAG" --target "${{ needs.validate.outputs.commit }}" --title "Better Email $TAG" --notes "$BODY"
           fi
           gh release upload "$TAG" \
             "dist/installers-macos-latest/Better_Email_${VERSION}_mac_arm.dmg" \

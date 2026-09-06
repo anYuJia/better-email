@@ -25,9 +25,7 @@ pub fn send_outbound(
     let raw_message = email.formatted();
     let mailer = authenticated_transport(account, secret)?;
 
-    mailer
-        .send(&email)
-        .map_err(|error| MailError::Smtp(format!("SMTP 发送失败：{error}")))?;
+    mailer.send(&email).map_err(classify_send_error)?;
     Ok(raw_message)
 }
 
@@ -39,14 +37,33 @@ pub fn send_outbound_with_attachment_bytes(
     secret: &AccountSecret,
     attachment_bytes: &[Vec<u8>],
 ) -> Result<Vec<u8>, MailError> {
+    let mailer = authenticated_transport(account, secret)?;
+    send_outbound_with_transport(&mailer, message, attachment_bytes)
+}
+
+pub(crate) fn send_outbound_with_transport(
+    mailer: &SmtpTransport,
+    message: &OutboundMessage,
+    attachment_bytes: &[Vec<u8>],
+) -> Result<Vec<u8>, MailError> {
     let email = build_outbound_email(message, Some(attachment_bytes))?;
     let raw_message = email.formatted();
-    let mailer = authenticated_transport(account, secret)?;
-
-    mailer
-        .send(&email)
-        .map_err(|error| MailError::Smtp(format!("SMTP 发送失败：{error}")))?;
+    mailer.send(&email).map_err(classify_send_error)?;
     Ok(raw_message)
+}
+
+fn classify_send_error(error: lettre::transport::smtp::Error) -> MailError {
+    if error.is_permanent() {
+        MailError::SmtpPermanent(format!(
+            "发送服务器拒绝了邮件，请检查账号或收件人后再试：{error}"
+        ))
+    } else if error.is_transient() {
+        MailError::Smtp(format!("发送服务器暂时拒绝了邮件，可稍后重试：{error}"))
+    } else {
+        MailError::SmtpOutcomeUnknown(format!(
+            "未收到可靠的发送结果，邮件可能已被服务器接受。已停止自动重发，请先核对已发送文件夹或向收件人确认：{error}"
+        ))
+    }
 }
 
 #[allow(dead_code)]
@@ -119,7 +136,7 @@ pub fn verify_credentials(account: &Account, secret: &AccountSecret) -> Result<(
     }
 }
 
-fn authenticated_transport(
+pub(crate) fn authenticated_transport(
     account: &Account,
     secret: &AccountSecret,
 ) -> Result<SmtpTransport, MailError> {
@@ -732,5 +749,100 @@ mod tests {
 
         assert!(error.contains("附件缺少本地路径"));
         assert!(error.contains("missing.pdf"));
+    }
+}
+
+#[cfg(test)]
+mod delivery_outcome_tests {
+    use super::*;
+    use std::io::{BufRead, BufReader, Write};
+    use std::net::TcpListener;
+
+    fn send_to_local_test_server(
+        final_response: Option<&'static str>,
+    ) -> Result<Vec<u8>, MailError> {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut reader = BufReader::new(socket.try_clone().unwrap());
+            socket.write_all(b"220 local-test ESMTP\r\n").unwrap();
+            let mut in_data = false;
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                    break;
+                }
+                if in_data {
+                    if line == ".\r\n" {
+                        if let Some(response) = final_response {
+                            socket.write_all(response.as_bytes()).unwrap();
+                        }
+                        break;
+                    }
+                    continue;
+                }
+                if line.starts_with("EHLO") || line.starts_with("HELO") {
+                    socket.write_all(b"250 local-test\r\n").unwrap();
+                } else if line.starts_with("DATA") {
+                    in_data = true;
+                    socket.write_all(b"354 end with dot\r\n").unwrap();
+                } else {
+                    socket.write_all(b"250 OK\r\n").unwrap();
+                }
+            }
+        });
+        let transport = SmtpTransport::builder_dangerous("127.0.0.1")
+            .port(port)
+            .timeout(Some(Duration::from_secs(5)))
+            .build();
+        let message = OutboundMessage {
+            id: 11,
+            account_id: 1,
+            sender_name: "Test".into(),
+            sender_email: "sender@example.com".into(),
+            reply_to: String::new(),
+            recipients: "recipient@example.com".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "Local delivery classification".into(),
+            body: "Body".into(),
+            html_body: String::new(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
+            attachments: Vec::new(),
+        };
+        let result = send_outbound_with_transport(&transport, &message, &[]);
+        drop(transport);
+        server.join().unwrap();
+        result
+    }
+
+    #[test]
+    fn accepted_smtp_data_has_a_confirmed_result() {
+        assert!(send_to_local_test_server(Some("250 accepted\r\n")).is_ok());
+    }
+
+    #[test]
+    fn lost_acknowledgement_is_not_safe_to_automatically_retry() {
+        assert!(matches!(
+            send_to_local_test_server(None),
+            Err(MailError::SmtpOutcomeUnknown(_))
+        ));
+    }
+
+    #[test]
+    fn temporary_rejection_can_retry_but_permanent_rejection_is_blocked() {
+        assert!(matches!(
+            send_to_local_test_server(Some("451 try later\r\n")),
+            Err(MailError::Smtp(_))
+        ));
+        assert!(matches!(
+            send_to_local_test_server(Some("550 rejected\r\n")),
+            Err(MailError::SmtpPermanent(_))
+        ));
     }
 }

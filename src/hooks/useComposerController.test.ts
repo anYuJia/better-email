@@ -67,6 +67,11 @@ function renderComposer(sendUndoDelaySeconds: SendUndoDelaySeconds = 5) {
 describe('useComposerController close lifecycle', () => {
   beforeEach(() => {
     mockInvoke.mockReset();
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'load_composer_recovery') return { revision: 0, payload: null };
+      if (command === 'save_composer_recovery' || command === 'clear_composer_recovery') return true;
+      return undefined;
+    });
     localStorage.clear();
   });
 
@@ -410,4 +415,60 @@ describe('useComposerController close lifecycle', () => {
     expect(mocks.focusMailboxRole).not.toHaveBeenCalled();
     expect(mocks.setStatus).toHaveBeenLastCalledWith(expect.stringContaining('快速回复排队失败'));
   });
+
+  it('does not report delivery failure when only progress completion fails', async () => {
+    const { result, mocks } = renderComposer(0);
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'load_composer_recovery') return { revision: 0, payload: null };
+      if (command === 'enqueue_background_task' || command === 'mark_background_task_running') return { id: 70, progress: 0 };
+      if (command === 'send_message') return 701;
+      if (command === 'complete_background_task') throw new Error('task database unavailable');
+      return true;
+    });
+    act(() => { result.current.setDraft({ ...emptyDraft, to: 'a@example.com', body: 'sent once' }); });
+    await act(async () => { await result.current.sendDraft(); });
+    expect(mocks.showToast).toHaveBeenCalledWith('邮件已发送');
+    expect(mockInvoke.mock.calls.filter(([command]) => command === 'fail_background_task')).toHaveLength(0);
+    expect(result.current.draft.body).toBe('');
+  });
+
+  it('does not submit the same draft twice while the first SMTP call is pending', async () => {
+    const { result } = renderComposer(0);
+    let finish!: (id: number) => void;
+    const pending = new Promise<number>((resolve) => { finish = resolve; });
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'load_composer_recovery') return { revision: 0, payload: null };
+      if (command === 'enqueue_background_task' || command === 'mark_background_task_running') return { id: 71, progress: 0 };
+      if (command === 'send_message') return pending;
+      return true;
+    });
+    act(() => { result.current.setDraft({ ...emptyDraft, to: 'a@example.com', body: 'one delivery' }); });
+    await act(async () => {
+      const first = result.current.sendDraft();
+      const second = result.current.sendDraft();
+      await Promise.resolve();
+      await Promise.resolve();
+      finish(702);
+      await Promise.all([first, second]);
+    });
+    expect(mockInvoke.mock.calls.filter(([command]) => command === 'send_message')).toHaveLength(1);
+  });
+
+  it('retains uncertain mail without inviting automatic or immediate resubmission', async () => {
+    const { result, mocks } = renderComposer(0);
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'load_composer_recovery') return { revision: 0, payload: null };
+      if (command === 'enqueue_background_task' || command === 'mark_background_task_running') return { id: 72, progress: 0 };
+      if (command === 'send_message') throw new Error('[SEND_OUTCOME_UNKNOWN] connection closed after DATA');
+      if (command === 'list_outbox') return [];
+      if (command === 'fail_background_task') return { message: 'unknown' };
+      return true;
+    });
+    act(() => { result.current.setDraft({ ...emptyDraft, to: 'a@example.com', body: 'keep me' }); });
+    await act(async () => { await result.current.sendDraft(); });
+    expect(result.current.draft.body).toBe('keep me');
+    expect(mocks.setStatus).toHaveBeenLastCalledWith(expect.stringContaining('不要直接重发'));
+    expect(mocks.showToast).not.toHaveBeenCalledWith('邮件已发送');
+  });
+
 });

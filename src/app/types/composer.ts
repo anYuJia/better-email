@@ -43,6 +43,8 @@ export type ComposeTemplate = {
 
 
 export type ComposerAutosave = {
+  save_state?: 'saving' | 'saved' | 'error';
+  save_error?: string;
   draft: DraftInput;
   isRichComposer: boolean;
   saved_at: string;

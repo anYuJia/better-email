@@ -346,7 +346,6 @@ describe('reader de-AI contract — toolbar is icon-first controls, not a glass 
   });
 
   it('reader-actions buttons expose a 40px accessible pointer target', () => {
-    const rules = findRules(readerCss, '.reader-actions button,');
     // Also check .reader-actions .reader-more-menu summary, .reader-actions select
     const allRules = findRules(readerCss, '.reader-actions');
     const buttonRules = allRules.filter((r) =>

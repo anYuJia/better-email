@@ -1,0 +1,12 @@
+
+.composer-autosave-status[data-save-state="error"] {
+  flex-wrap: wrap;
+  overflow: visible;
+  white-space: normal;
+  color: var(--ui-danger);
+}
+.composer-autosave-status[data-save-state="error"] button {
+  min-height: var(--ui-control-height);
+  color: var(--ui-danger);
+  text-decoration: underline;
+}

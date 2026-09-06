@@ -1,0 +1,32 @@
+import { act, cleanup, renderHook } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import useMobileVisualViewport from './useMobileVisualViewport';
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+it('tracks the keyboard viewport, preserves zoom, and restores CSS on cleanup', () => {
+  const viewport = Object.assign(new EventTarget(), { height: 720, scale: 1 });
+  vi.stubGlobal('visualViewport', viewport);
+  let scheduled: FrameRequestCallback | undefined;
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { scheduled = cb; return 7; });
+  const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+  const style = document.documentElement.style;
+  style.setProperty('--mobile-viewport-height', '800px');
+  const { unmount } = renderHook(() => useMobileVisualViewport(true));
+  expect(style.getPropertyValue('--mobile-viewport-height')).toBe('720px');
+  viewport.height = 360;
+  act(() => { viewport.dispatchEvent(new Event('resize')); scheduled?.(0); });
+  expect(style.getPropertyValue('--mobile-viewport-height')).toBe('360px');
+  viewport.height = 180;
+  viewport.scale = 2;
+  act(() => { viewport.dispatchEvent(new Event('resize')); scheduled?.(0); });
+  expect(style.getPropertyValue('--mobile-viewport-height')).toBe('360px');
+  viewport.dispatchEvent(new Event('resize'));
+  unmount();
+  expect(cancel).toHaveBeenCalledWith(7);
+  expect(style.getPropertyValue('--mobile-viewport-height')).toBe('800px');
+  style.removeProperty('--mobile-viewport-height');
+});
+it('leaves desktop sizing untouched', () => {
+  const { unmount } = renderHook(() => useMobileVisualViewport(false));
+  expect(document.documentElement.style.getPropertyValue('--mobile-viewport-height')).toBe('');
+  unmount();
+});

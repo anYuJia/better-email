@@ -231,13 +231,22 @@ fn post_form_capped(
     form: &[(String, String)],
     max_bytes: u64,
 ) -> Result<(u16, String), String> {
-    let mut response = ureq::post(endpoint)
+    let agent = ureq::Agent::config_builder()
+        .timeout_global(Some(std::time::Duration::from_secs(30)))
+        .max_redirects(0)
+        .build()
+        .new_agent();
+    let mut response = agent
+        .post(endpoint)
         .send_form(
             form.iter()
                 .map(|(key, value)| (key.as_str(), value.as_str())),
         )
         .map_err(|error| format!("OAuth2 token 请求失败：{error}"))?;
     let status = response.status();
+    if !status.is_success() {
+        return Err(format!("OAuth2 token 端点返回 HTTP {status}，请求已拒绝。"));
+    }
     let body = crate::http::read_response_capped(response.body_mut().as_reader(), max_bytes)?;
     Ok((status.as_u16(), body))
 }
@@ -922,5 +931,30 @@ mod tests {
         .expect("small token response read");
         assert_eq!(status, 200);
         assert!(body.contains("\"access_token\""));
+    }
+
+    #[test]
+    fn token_redirect_does_not_forward_credentials_to_another_endpoint() {
+        for status in [301, 302, 303, 307, 308] {
+            let destination = TcpListener::bind("127.0.0.1:0").unwrap();
+            destination.set_nonblocking(true).unwrap();
+            let port = serve_once(
+                &format!(
+                    "HTTP/1.1 {status} Redirect\r\nLocation: http://{}/token",
+                    destination.local_addr().unwrap()
+                ),
+                b"{}".to_vec(),
+            );
+            let result = post_form_capped(
+                &format!("http://127.0.0.1:{port}/token"),
+                &[("refresh_token".into(), "private-token".into())],
+                MAX_OAUTH_RESPONSE_BYTES,
+            );
+            assert!(result.is_err());
+            assert_eq!(
+                destination.accept().unwrap_err().kind(),
+                std::io::ErrorKind::WouldBlock
+            );
+        }
     }
 }

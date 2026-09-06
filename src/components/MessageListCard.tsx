@@ -5,6 +5,7 @@ import { formatDate, mailboxListPreview } from '../mailUtils';
 import { writeMessageDragPayload } from './messageDrag';
 import { senderAvatarTone } from '../app/messageDetailUtils';
 import Avatar from './Avatar';
+import useLongPress from '../hooks/useLongPress';
 
 type MessageListCardProps = {
   mobile?: boolean;
@@ -49,11 +50,7 @@ export default React.memo(function MessageListCard({
 }: MessageListCardProps) {
   const mainButtonRef = useRef<HTMLButtonElement | null>(null);
   const accountSource = showAccountSource ? message.account_email.trim() : '';
-  const accountSourceShort = useMemo(() => {
-    if (!accountSource) return '';
-    const atIdx = accountSource.indexOf('@');
-    return atIdx > 0 ? accountSource.slice(0, atIdx) : accountSource;
-  }, [accountSource]);
+  const accountSourceShort = accountSource;
   const preview = useMemo(() => mailboxListPreview(message), [message]);
   const metadataLabelState = useMemo(() => {
     const normalizedIdentity = new Set([
@@ -118,38 +115,7 @@ export default React.memo(function MessageListCard({
     onFocusClaimed?.();
   }, [claimFocus, onFocusClaimed]);
 
-  const longPressTimerRef = useRef<number | null>(null);
-  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
-
-  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (!mobile) return;
-    const touch = event.touches[0];
-    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = window.setTimeout(() => {
-      openMessageMenuAt(touch.clientX, touch.clientY);
-      longPressTimerRef.current = null;
-    }, 480);
-  };
-
-  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
-    if (!touchStartPosRef.current || !longPressTimerRef.current) return;
-    const touch = event.touches[0];
-    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
-    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
-    if (dx > 8 || dy > 8) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    touchStartPosRef.current = null;
-  };
+  const longPress = useLongPress(mobile, message.id, openMessageMenuAt);
 
   return (
     <div
@@ -165,12 +131,13 @@ export default React.memo(function MessageListCard({
       data-message-id={message.id}
       data-folder-role={message.folder_role}
       style={{ width: '100%', height: '100%', minHeight: '0px', display: 'block' }}
-      draggable
+      draggable={!mobile}
       onClick={() => onSelectMessage(message.id)}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
+      onTouchStart={longPress.onTouchStart}
+      onTouchMove={longPress.onTouchMove}
+      onTouchEnd={longPress.onTouchEnd}
+      onTouchCancel={longPress.onTouchCancel}
+      onClickCapture={longPress.onClickCapture}
       onDragStart={(event) => {
         const selectedMessageIds = selectedMessageIdsRef.current;
         const messageIds = isSelected && selectedMessageIds.length > 0
@@ -186,6 +153,7 @@ export default React.memo(function MessageListCard({
       }}
       onDragEnd={() => onSetDraggingMessageIds([])}
       onContextMenu={(event) => {
+        longPress.consumeContextGesture();
         event.preventDefault();
         openMessageMenuAt(event.clientX, event.clientY);
       }}
@@ -223,6 +191,7 @@ export default React.memo(function MessageListCard({
         <button
           type="button"
           className="message-mobile-menu-button"
+          data-no-long-press="true"
           aria-label={`打开邮件操作：${message.subject || '无主题'}`}
           onClick={(event) => {
             event.preventDefault();

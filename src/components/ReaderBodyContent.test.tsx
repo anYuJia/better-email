@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import ReaderBodyContent from './ReaderBodyContent';
 
+vi.mock('./reader/EmailShadowView', () => ({ default: ({ html }: { html: string }) => <div data-testid="full-html">{html}</div> }));
+
 afterEach(cleanup);
 
 function renderBody(overrides: Partial<React.ComponentProps<typeof ReaderBodyContent>> = {}) {
@@ -50,4 +52,22 @@ describe('ReaderBodyContent remote body states', () => {
     expect(screen.getByRole('status').textContent).toContain('无正文');
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
+  it('defers expensive HTML rendering without losing its tail', () => {
+    const html = `<div>${'长正文'.repeat(90_000)}</div><p>unique-tail</p>`;
+    renderBody({ hasRenderableHtml: true, readerHtml: html });
+    expect(screen.queryByTestId('full-html')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '加载完整邮件' }));
+    expect(screen.getByTestId('full-html').textContent).toBe(html);
+    expect(screen.getByTestId('full-html').textContent).toContain('unique-tail');
+  });
+
+  it('defers large plain text without truncating content after expansion', () => {
+    const body = '完整纯文本'.repeat(60_000) + '\nunique-plain-tail';
+    renderBody({ plainBodyForReader: body });
+    expect(document.body.textContent).not.toContain('unique-plain-tail');
+    fireEvent.click(screen.getByRole('button', { name: '加载完整邮件' }));
+    expect(document.body.textContent).toContain('unique-plain-tail');
+  });
+
 });

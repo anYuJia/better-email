@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type {
   AccountScope,
+  OutboxItem,
   Attachment,
   Folder,
   Label,
@@ -33,6 +34,7 @@ import useMessageTranslation from '../hooks/useMessageTranslation';
 import type { ReaderBodyFetchState } from '../hooks/useReaderBodyLoading';
 import EmailReaderSkeleton from './EmailReaderSkeleton';
 import DeferredSurface from './DeferredSurface';
+import ReaderDeliveryStatus from './reader/ReaderDeliveryStatus';
 
 const ImagePreviewOverlay = lazy(() => import('./reader/ImagePreviewOverlay'));
 const ThreadReaderList = lazy(() => import('./reader/ThreadReaderList'));
@@ -49,6 +51,8 @@ type ComposeNewFields = {
 };
 
 export type ReaderPaneProps = {
+  deliveryStatus?: OutboxItem;
+  onResolveDelivery?: (outboxId: number, delivered: boolean) => Promise<void>;
   activeThread: ThreadSummary | null;
   threadMessages: MessageSummary[];
   activeThreadSelected: Message | null;
@@ -124,6 +128,8 @@ function NarrowReaderNavigation({ onBack }: { onBack?: () => void }) {
 }
 
 function ReaderPane({
+  deliveryStatus,
+  onResolveDelivery,
   activeThread,
   threadMessages,
   activeThreadSelected,
@@ -442,6 +448,8 @@ if (activeThread && threadMessages.length > 0) {
           onEmptyTrash={onEmptyTrash}
           onMoveToFolder={onMoveToFolder}
         />
+
+        {deliveryStatus?.message_id === selected.id && <ReaderDeliveryStatus key={deliveryStatus.id} item={deliveryStatus} onResolve={onResolveDelivery} />}
 
         <div className="reader-meta">
           <span>{formatDate(selected.received_at)}</span>

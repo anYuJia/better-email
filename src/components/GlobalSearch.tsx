@@ -8,6 +8,7 @@ import {
 } from './messageListSearchSuggestions';
 import { useDetailsMenu } from '../hooks/useDetailsMenu';
 import { useWheelContainment } from '../hooks/useWheelContainment';
+import useCompositionGuard from '../hooks/useCompositionGuard';
 
 export type GlobalSearchProps = {
   searchInputRef: React.Ref<HTMLInputElement>;
@@ -38,6 +39,8 @@ export default function GlobalSearch({
   onClearSearchAndFilter,
   onApplySearchShortcut,
 }: GlobalSearchProps) {
+  const ime = useCompositionGuard();
+  const scopeHintId = React.useId();
   const [searchFocused, setSearchFocused] = React.useState(false);
   const [activeSearchSuggestionIndex, setActiveSearchSuggestionIndex] = React.useState(-1);
   const searchBlurTimerRef = React.useRef<number | null>(null);
@@ -84,6 +87,7 @@ export default function GlobalSearch({
     <form
       className="global-search-box search-box"
       onSubmit={(event) => {
+        if (ime.isComposing()) { event.preventDefault(); return; }
         setSearchFocused(false);
         onSearchSubmit(event);
       }}
@@ -110,7 +114,11 @@ export default function GlobalSearch({
             setSearchFocused(false);
           }, 120);
         }}
+        onCompositionStart={ime.onCompositionStart}
+        onCompositionEnd={ime.onCompositionEnd}
+        aria-describedby={scopeHintId}
         onKeyDown={(event) => {
+          if (ime.isComposing(event)) return;
           if (!showSearchSuggestions) return;
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
@@ -173,6 +181,7 @@ export default function GlobalSearch({
         </summary>
         <div data-floating-menu-panel="true">
           <span className="menu-section-title">搜索范围</span>
+          <p className="search-local-scope-hint">仅搜索已同步到本机的邮件；缺少邮件时请先刷新。</p>
           {searchScopeOptions.map((item) => (
             <button
               type="button"
@@ -191,6 +200,7 @@ export default function GlobalSearch({
           ))}
         </div>
       </details>
+      <span className="sr-only" id={scopeHintId}>{activeSearchScope.label}，仅搜索已同步到本机的邮件。</span>
       <span className="global-search-shortcut" aria-hidden="true">{shortcutLabel}</span>
       {showSearchSuggestions && (
         <div

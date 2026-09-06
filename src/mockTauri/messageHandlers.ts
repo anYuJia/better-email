@@ -1,3 +1,4 @@
+import { loadMockComposerRecovery, saveMockComposerRecovery, clearMockComposerRecovery } from './composerRecovery';
 import type { InvokeArgs, MockCommandHandler } from './types';
 import {
   messages,
@@ -123,10 +124,25 @@ export const handlers: Record<string, MockCommandHandler> = {
   'create_label': createMockLabel,
   'update_label': updateMockLabel,
   'delete_label': deleteMockLabel,
+  'load_composer_recovery': loadMockComposerRecovery,
+  'save_composer_recovery': saveMockComposerRecovery,
+  'clear_composer_recovery': clearMockComposerRecovery,
   'save_draft': saveMockDraft,
   'send_message': sendMockMessage,
   'queue_outbox_message': queueMockOutboxMessage,
   'cancel_outbox_item': cancelMockOutboxItem,
+  'resolve_outbox_outcome': (args) => {
+    const id = Number(args?.outboxId ?? args?.outbox_id ?? 0);
+    const item = outbox.find((entry) => entry.id === id);
+    if (!item) return null;
+    if (item.status !== 'send_unknown') throw new Error('该邮件不处于发送结果待确认状态');
+    const delivered = args?.delivered === true;
+    item.status = delivered ? 'sent_remote_pending' : 'cancelled';
+    item.next_attempt_at = delivered ? new Date().toISOString() : '';
+    item.last_error = delivered ? '用户已核对确认发送成功，等待保存远端副本' : '用户已核对确认未发送，已转回草稿；不会自动重发';
+    moveMockMessageToRole({ messageId: item.message_id, role: delivered ? 'sent' : 'drafts' });
+    return { ...item };
+  },
   'flush_outbox_dry_run': flushMockOutboxDryRun,
   'release_due_outbox_items': releaseMockDueOutboxItems,
   'flush_outbox_smtp': flushMockOutboxSmtp,

@@ -509,6 +509,15 @@ pub fn queue_outbox_message(
 }
 
 #[tauri::command]
+pub fn resolve_outbox_outcome(
+    store: State<'_, MailStore>,
+    outbox_id: i64,
+    delivered: bool,
+) -> MailResult<OutboxItem> {
+    store.resolve_outbox_outcome(outbox_id, delivered)
+}
+
+#[tauri::command]
 pub fn cancel_outbox_item(store: State<'_, MailStore>, outbox_id: i64) -> MailResult<OutboxItem> {
     let item = store.cancel_outbox_item(outbox_id)?;
     let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);

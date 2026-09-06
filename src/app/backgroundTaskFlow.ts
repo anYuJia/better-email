@@ -4,7 +4,7 @@ import type { OutboxItem } from './types';
 import { invoke } from '../tauriBridge';
 import { syncIntervalMs } from '../mailUtils';
 
-const scheduledOutboxStatuses = new Set(['scheduled']);
+const scheduledOutboxStatuses = new Set(['queued', 'scheduled', 'retry', 'sent_remote_pending']);
 
 export function syncModeStatus(syncMode: string) {
   const intervalMs = syncIntervalMs(syncMode);
@@ -41,8 +41,8 @@ export function nextOutboxWakeItem(items: OutboxItem[]): OutboxItem | null {
   let nextTimestamp = Number.POSITIVE_INFINITY;
 
   for (const item of items) {
-    if (!scheduledOutboxStatuses.has(item.status) || !item.next_attempt_at) continue;
-    const timestamp = Date.parse(item.next_attempt_at);
+    if (!scheduledOutboxStatuses.has(item.status)) continue;
+    const timestamp = item.next_attempt_at ? Date.parse(item.next_attempt_at) : 0;
     if (!Number.isFinite(timestamp) || timestamp >= nextTimestamp) continue;
     nextItem = item;
     nextTimestamp = timestamp;
@@ -52,24 +52,36 @@ export function nextOutboxWakeItem(items: OutboxItem[]): OutboxItem | null {
 }
 
 export function outboxFlushMessage(items: OutboxItem[]): string {
+  let uncertain = 0;
+  let sending = 0;
   let failed = 0;
   let blocked = 0;
   let pendingRetry = 0;
   let archivePending = 0;
 
   for (const item of items) {
-    if (item.status === 'retry') {
+    if (item.status === 'send_unknown') {
+      uncertain += 1;
+    } else if (item.status === 'sending') {
+      sending += 1;
+    } else if (item.status === 'retry') {
       failed += 1;
       if (item.next_attempt_at) pendingRetry += 1;
     } else if (item.status === 'failed') {
       blocked += 1;
-    } else if (item.status === 'sent_remote_pending') {
+    } else if ((item.status === 'sent_remote_pending' || item.status === 'archiving')) {
       archivePending += 1;
     }
   }
 
+  if (uncertain > 0) {
+    return `${uncertain} 封邮件的发送结果未确认，已停止自动重发，请先核对已发送文件夹或向收件人确认`;
+  }
+  if (sending > 0) {
+    return `仍有 ${sending} 封邮件正在发送，请勿重复提交`;
+  }
   if (blocked > 0) {
-    return `SMTP 发送暂停，${blocked} 封需要重新保存账号授权码`;
+    return `SMTP 发送暂停，${blocked} 封需要检查账号、收件人或附件`;
   }
   if (failed > 0) {
     return `SMTP 发送完成，${failed} 封需重试${pendingRetry > 0 ? '，已安排下次尝试' : ''}`;

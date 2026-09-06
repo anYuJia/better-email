@@ -243,3 +243,55 @@ describe('MessageListView pull gesture cancellation', () => {
     expect(screen.queryByText('正在同步…')).not.toBeNull();
   });
 });
+
+describe('real refresh lifecycle', () => {
+  it('keeps the indicator active beyond one second until synchronization settles', async () => {
+    vi.useFakeTimers();
+    let finish!: () => void;
+    const onRefresh = vi.fn(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const props = makeProps({ mobile: true, onRefresh });
+    const { container } = render(<MessageListView {...props} />);
+    const list = container.querySelector('.message-list')!;
+    fireEvent.touchStart(list, { touches: [touch(0)] });
+    fireEvent.touchMove(list, { touches: [touch(200)] });
+    fireEvent.touchEnd(list);
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(screen.getByText('正在同步…')).not.toBeNull();
+    expect(list.getAttribute('aria-busy')).toBe('true');
+    fireEvent.touchStart(list, { touches: [touch(0)] });
+    fireEvent.touchMove(list, { touches: [touch(200)] });
+    fireEvent.touchEnd(list);
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
+    expect(screen.queryByText('正在同步…')).toBeNull();
+    expect(list.getAttribute('aria-busy')).toBe('false');
+  });
+
+  it('shows refresh errors and permits retry instead of silently ending the spinner', async () => {
+    const onRefresh = vi.fn().mockRejectedValueOnce(new Error('离线')).mockResolvedValue(undefined);
+    const props = makeProps({ mobile: true, onRefresh });
+    const { container } = render(<MessageListView {...props} />);
+    const list = container.querySelector('.message-list')!;
+    fireEvent.touchStart(list, { touches: [touch(0)] });
+    fireEvent.touchMove(list, { touches: [touch(200)] });
+    await act(async () => fireEvent.touchEnd(list));
+    expect(screen.getByRole('alert').textContent).toContain('离线');
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '重试刷新' })));
+    expect(onRefresh).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('does not deliver an old mailbox refresh error into the new mailbox', async () => {
+    let fail!: (reason: Error) => void;
+    const props = makeProps({ mobile: true, onRefresh: () => new Promise<void>((_, reject) => { fail = reject; }) });
+    const view = render(<MessageListView {...props} />);
+    const list = view.container.querySelector('.message-list')!;
+    fireEvent.touchStart(list, { touches: [touch(0)] });
+    fireEvent.touchMove(list, { touches: [touch(200)] });
+    fireEvent.touchEnd(list);
+    view.rerender(<MessageListView {...props} listStateKey="other-mailbox" />);
+    await act(async () => fail(new Error('old request failed')));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByText('正在同步…')).toBeNull();
+  });
+});

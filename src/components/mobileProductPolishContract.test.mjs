@@ -6,13 +6,13 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (relative) => readFileSync(join(repoRoot, relative), 'utf8');
 const entryCss = read('src/ui-2026.css');
-const polishCss = read('src/styles/deai-product-polish.css');
+const polishCss = read('src/styles/product.css');
 
 describe('mobile product de-AI contract', () => {
   it('loads product polish after theme and compatibility layers', () => {
     const themeIndex = entryCss.indexOf("@import './styles/dark-mode.css';");
     const compatibilityIndex = entryCss.indexOf("@import './components/notifications.css';");
-    const polishIndex = entryCss.indexOf("@import './styles/deai-product-polish.css';");
+    const polishIndex = entryCss.indexOf("@import './styles/product.css';");
 
     expect(themeIndex).toBeGreaterThanOrEqual(0);
     expect(compatibilityIndex).toBeGreaterThan(themeIndex);

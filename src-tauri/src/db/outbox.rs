@@ -3,6 +3,7 @@ use super::attachments::attachments_for_message_conn;
 use super::folders::{folder_id_for_account_role, folder_id_for_message_role};
 use super::messages::{bool_to_int, normalized_subject, snippet_from_body};
 use super::*;
+use sha2::{Digest, Sha256};
 
 impl MailStore {
     pub fn list_outbox(&self) -> MailResult<Vec<OutboxItem>> {
@@ -13,12 +14,33 @@ impl MailStore {
     pub fn prepare_outbox_send(&self, input: DraftInput) -> MailResult<i64> {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
+            let account = account_for_conn(&transaction, (input.account_id > 0).then_some(input.account_id))?;
+            let identity = identity_for_draft_conn(&transaction, &account, input.identity_id)?;
+            let payload = serde_json::json!({
+                "account": account.id, "sender": identity.email, "to": input.to.trim(),
+                "cc": input.cc.trim(), "bcc": input.bcc.trim(), "subject": input.subject.trim(),
+                "body": input.body, "html": input.html_body, "attachments": input.attachments,
+            });
+            let fingerprint = format!("{:x}", Sha256::digest(payload.to_string().as_bytes()));
+            let previous = transaction.query_row(
+                "SELECT id, status FROM outbox_queue WHERE submission_fingerprint = ?1 AND status IN ('sending', 'send_unknown')",
+                params![fingerprint],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            ).optional()?;
+            if let Some((outbox_id, status)) = previous {
+                let detail = format!("相同邮件已有未结束的发送记录（发件箱 #{outbox_id}），请先在发件箱核对结果，不要重复提交。");
+                return Err(if status == "send_unknown" {
+                    MailError::SmtpOutcomeUnknown(detail)
+                } else {
+                    MailError::Smtp(detail)
+                });
+            }
             let message_id = create_outbound_message_for_conn(&transaction, input, "outbox")?;
             let now = Utc::now();
             transaction.execute(
-                "INSERT INTO outbox_queue(message_id, status, attempts, last_error, queued_at, next_attempt_at)
-                 VALUES (?1, 'sending', 0, '', ?2, ?3)",
-                params![message_id, now.to_rfc3339(), (now + Duration::minutes(5)).to_rfc3339()],
+                "INSERT INTO outbox_queue(message_id, status, attempts, last_error, queued_at, next_attempt_at, submission_fingerprint)
+                 VALUES (?1, 'sending', 0, '', ?2, ?3, ?4)",
+                params![message_id, now.to_rfc3339(), (now + Duration::minutes(5)).to_rfc3339(), fingerprint],
             )?;
             transaction.commit()?;
             Ok(message_id)
@@ -209,7 +231,7 @@ impl MailStore {
                     next_attempt_at = ''
                 WHERE status = 'scheduled'
                   AND next_attempt_at != ''
-                  AND next_attempt_at <= ?1
+                  AND julianday(next_attempt_at) <= julianday(?1)
                 ",
                 params![now],
             )?;
@@ -241,6 +263,43 @@ impl MailStore {
             Ok(item)
         })
     }
+    pub fn resolve_outbox_outcome(
+        &self,
+        outbox_id: i64,
+        delivered: bool,
+    ) -> MailResult<OutboxItem> {
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let item = get_outbox_item_for_conn(&transaction, outbox_id)?;
+            if item.status != "send_unknown" {
+                return Err(MailError::Smtp("该邮件不处于发送结果待确认状态，请刷新后重试".to_string()));
+            }
+            let role = if delivered { "sent" } else { "drafts" };
+            let folder_id = folder_id_for_message_role(&transaction, item.message_id, role)?;
+            let message = outbound_message_for_conn(&transaction, item.message_id)?;
+            let header = crate::smtp::outbound_message_id(&message);
+            let thread_key = thread_key_for_message(&message.subject, &header, &message.in_reply_to_header, &message.references_header);
+            transaction.execute(
+                "UPDATE outbox_queue SET status = ?2, last_error = ?3, next_attempt_at = ?4 WHERE id = ?1 AND status = 'send_unknown'",
+                params![outbox_id,
+                    if delivered { "sent_remote_pending" } else { "cancelled" },
+                    if delivered { "用户已核对确认发送成功，等待保存远端副本" } else { "用户已核对确认未发送，已转回草稿；不会自动重发" },
+                    if delivered { Utc::now().to_rfc3339() } else { String::new() }],
+            )?;
+            if delivered {
+                transaction.execute(
+                    "UPDATE messages SET folder_id = ?1, message_id_header = ?2, thread_key = ?3 WHERE id = ?4",
+                    params![folder_id, header, thread_key, item.message_id],
+                )?;
+            } else {
+                transaction.execute("UPDATE messages SET folder_id = ?1 WHERE id = ?2", params![folder_id, item.message_id])?;
+            }
+            let updated = get_outbox_item_for_conn(&transaction, outbox_id)?;
+            transaction.commit()?;
+            Ok(updated)
+        })
+    }
+
     pub fn mark_outbox_smtp_sent_pending_archive(
         &self,
         message_id: i64,
@@ -691,8 +750,11 @@ pub(super) fn list_outbox_for_conn(conn: &Connection) -> MailResult<Vec<OutboxIt
                q.last_error, q.queued_at, q.next_attempt_at
         FROM outbox_queue q
         JOIN messages m ON m.id = q.message_id
-        ORDER BY q.queued_at DESC
-        LIMIT 50
+        WHERE q.status NOT IN ('sent', 'cancelled') OR q.id IN (
+            SELECT id FROM outbox_queue WHERE status IN ('sent', 'cancelled')
+            ORDER BY queued_at DESC, id DESC LIMIT 50
+        )
+        ORDER BY q.queued_at DESC, q.id DESC
         ",
     )?;
     let items = stmt
@@ -754,7 +816,11 @@ mod claim_tests {
     fn concurrent_connections_claim_each_message_only_once() {
         let (dir, store) = fixture();
         let item = store.queue_outbox_message(draft()).unwrap();
-        let other = MailStore::open_at_with_seed(dir.path().join("test.sqlite3"), false).unwrap();
+        let other = MailStore::open_at_with_seed(dir.path().join("test.sqlite3"), true).unwrap();
+        assert_eq!(
+            other.get_message(item.message_id).unwrap().id,
+            item.message_id
+        );
         let barrier = Arc::new(Barrier::new(12));
         let workers = (0..12)
             .map(|index| {
@@ -894,5 +960,70 @@ mod claim_tests {
         input.send_at = (Utc::now() + Duration::days(1)).to_rfc3339();
         let item = store.queue_outbox_message(input).unwrap();
         assert!(!store.claim_outbox_message(item.message_id).unwrap());
+    }
+    #[test]
+    fn uncertain_submission_requires_explicit_reconciliation_before_resubmission() {
+        let (_dir, store) = fixture();
+        let id = store.prepare_outbox_send(draft()).unwrap();
+        assert!(store.prepare_outbox_send(draft()).is_err());
+        store
+            .mark_outbox_outcome_unknown(id, "connection lost after DATA")
+            .unwrap();
+        assert!(matches!(
+            store.prepare_outbox_send(draft()),
+            Err(MailError::SmtpOutcomeUnknown(_))
+        ));
+        let queued = store
+            .list_outbox()
+            .unwrap()
+            .into_iter()
+            .find(|item| item.message_id == id)
+            .unwrap();
+        let cancelled = store.resolve_outbox_outcome(queued.id, false).unwrap();
+        assert_eq!(cancelled.status, "cancelled");
+        assert_eq!(store.get_message(id).unwrap().folder_role, "drafts");
+        assert!(store.pending_outbox_messages().unwrap().is_empty());
+        assert!(store.resolve_outbox_outcome(queued.id, true).is_err());
+        assert!(store.prepare_outbox_send(draft()).is_ok());
+    }
+
+    #[test]
+    fn confirmed_delivery_only_enters_the_archive_queue() {
+        let (_dir, store) = fixture();
+        let id = store.prepare_outbox_send(draft()).unwrap();
+        store.mark_outbox_outcome_unknown(id, "reply lost").unwrap();
+        let item = store
+            .list_outbox()
+            .unwrap()
+            .into_iter()
+            .find(|item| item.message_id == id)
+            .unwrap();
+        let resolved = store.resolve_outbox_outcome(item.id, true).unwrap();
+        assert_eq!(resolved.status, "sent_remote_pending");
+        assert_eq!(store.get_message(id).unwrap().folder_role, "sent");
+        assert!(!store.claim_outbox_message(id).unwrap());
+        assert!(store.claim_outbox_archive(id).unwrap());
+    }
+
+    #[test]
+    fn active_outbox_items_are_not_hidden_by_terminal_history_limit() {
+        let (_dir, store) = fixture();
+        let active = store.queue_outbox_message(draft()).unwrap();
+        for index in 0..55 {
+            let mut input = draft();
+            input.subject = format!("History {index}");
+            let item = store.queue_outbox_message(input).unwrap();
+            store.cancel_outbox_item(item.id).unwrap();
+        }
+        let items = store.list_outbox().unwrap();
+        assert!(items.iter().any(|item| item.id == active.id));
+        assert_eq!(
+            items
+                .iter()
+                .filter(|item| item.status == "cancelled")
+                .count(),
+            50
+        );
+        assert_eq!(items.len(), 51);
     }
 }

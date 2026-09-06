@@ -300,6 +300,7 @@ describe('MessageListView theme-safe separators', () => {
     });
     list.scrollTop = 120;
     fireEvent.scroll(list);
+    act(() => vi.advanceTimersByTime(20));
 
     const thumb = container.querySelector('.message-list-scrollbar-thumb') as HTMLElement;
     expect(thumb.classList.contains('is-visible')).toBe(true);

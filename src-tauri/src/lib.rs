@@ -997,6 +997,7 @@ pub fn run() {
             commands::send_message,
             commands::queue_outbox_message,
             commands::cancel_outbox_item,
+            commands::resolve_outbox_outcome,
             commands::get_stats,
             commands::export_diagnostics,
             commands::export_local_backup,

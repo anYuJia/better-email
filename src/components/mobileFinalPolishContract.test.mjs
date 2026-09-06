@@ -6,16 +6,15 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (relative) => readFileSync(join(repoRoot, relative), 'utf8');
 const entryCss = read('src/ui-2026.css');
-const finalCss = read('src/styles/deai-final-polish.css');
+const finalCss = read('src/styles/product.css');
 const inboxHeader = read('src/components/mobile/MobileInboxHeader.tsx');
 const layoutTs = read('src/components/messageListLayout.ts');
 
 describe('final mobile polish contract', () => {
-  it('loads the final polish after the first product pass', () => {
-    const firstPass = entryCss.indexOf("@import './styles/deai-product-polish.css';");
-    const finalPass = entryCss.indexOf("@import './styles/deai-final-polish.css';");
-    expect(firstPass).toBeGreaterThanOrEqual(0);
-    expect(finalPass).toBeGreaterThan(firstPass);
+  it('loads one consolidated product layer without accumulating polish overrides', () => {
+    expect(entryCss.match(/@import '\.\/styles\/product\.css';/g)).toHaveLength(1);
+    expect(entryCss).not.toContain('deai-final-polish.css');
+    expect(entryCss).not.toContain('deai-product-polish.css');
   });
 
   it('uses one filter utility instead of a persistent mobile filter tab row', () => {

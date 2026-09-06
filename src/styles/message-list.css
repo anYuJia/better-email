@@ -2813,3 +2813,20 @@
 :root[data-theme="dark"] .message-date-range-backdrop {
   background: oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.55);
 }
+
+.message-list-refresh-error {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3);
+  color: var(--ui-danger);
+  background: var(--ui-surface);
+  border-bottom: 1px solid var(--ui-border);
+  overflow-wrap: anywhere;
+}
+.message-list-refresh-error button { min-height: var(--ui-control-height-touch); }
+
+.message-list { overflow-anchor: none; }

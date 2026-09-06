@@ -85,8 +85,23 @@ type UseMailboxDataOptions = {
   maybeRunBenchmarkSync: () => Promise<void>;
 };
 
+export type MailboxLoadRequest = {
+  folderId?: number | null;
+  query?: string;
+  filter?: FilterMode;
+  accountScope?: AccountScope;
+  refreshId?: number;
+  limit?: number;
+  searchScope?: SearchScope;
+  includeThreads?: boolean;
+  mailboxRequest?: MailboxRefreshRequest;
+  offset?: number;
+  returnPageOnly?: boolean;
+};
+
 export type MailboxDataController = {
   mailboxRefreshRef: MutableRefObject<number>;
+  loadMailbox: (request: MailboxLoadRequest) => Promise<MessageSummary[]>;
   loadMessages: (
     nextFolderId?: number | null,
     nextQuery?: string,
@@ -155,7 +170,8 @@ export default function useMailboxData({
   const threadRequestEpochRef = useRef(0);
   const messagePageBufferRef = useRef<{ key: string; messages: MessageSummary[] } | null>(null);
   const messageCountRequestRef = useRef(0);
-  const mailboxRefreshRef = mailboxRefreshRefProp ?? useRef(0);
+  const internalMailboxRefreshRef = useRef(0);
+  const mailboxRefreshRef = mailboxRefreshRefProp ?? internalMailboxRefreshRef;
   const activeMailboxScopeRef = useRef<AccountScope>(accountScope);
   activeMailboxScopeRef.current = accountScope;
 
@@ -186,6 +202,26 @@ export default function useMailboxData({
     nextOffset = 0,
     nextReturnPageOnly = false,
   ) {
+    return loadMailbox({
+      folderId: nextFolderId, query: nextQuery, filter: nextFilter, accountScope: nextScope,
+      refreshId, limit: nextLimit, searchScope: nextSearchScope, includeThreads: nextIncludeThreads,
+      mailboxRequest, offset: nextOffset, returnPageOnly: nextReturnPageOnly,
+    });
+  }
+
+  async function loadMailbox({
+    folderId: nextFolderId = folderId,
+    query: nextQuery = query,
+    filter: nextFilter = filter,
+    accountScope: nextScope = accountScope,
+    refreshId = mailboxRefreshRef.current,
+    limit: nextLimit,
+    searchScope: nextSearchScope = searchScope,
+    includeThreads: nextIncludeThreads = listMode === 'threads',
+    mailboxRequest,
+    offset: nextOffset = 0,
+    returnPageOnly: nextReturnPageOnly = false,
+  }: MailboxLoadRequest) {
     if (nextSearchScope === 'folder' && !nextFolderId) {
       mailboxFlowLog('loadMessages skipped: missing folder', {
         searchScope: nextSearchScope,
@@ -577,6 +613,7 @@ export default function useMailboxData({
 
   return {
     mailboxRefreshRef,
+    loadMailbox,
     loadMessages,
     loadMessagesWithVisibleFallback,
     loadThreads: threadLoader,

@@ -211,6 +211,7 @@ export default function StandaloneComposerApp() {
     closeComposer,
     forceCloseComposer,
     clearComposerAutosave,
+    retryComposerAutosave,
     insertSignatureIntoDraft,
     applyComposeTemplate,
     saveDraftAsTemplate,
@@ -539,6 +540,7 @@ export default function StandaloneComposerApp() {
           dropActive={isComposerDropActive}
           status={status}
           autosave={composerAutosave}
+            onRetryAutosave={retryComposerAutosave}
           onMinimize={() => undefined}
           onRestore={() => undefined}
           onClose={closeComposer}

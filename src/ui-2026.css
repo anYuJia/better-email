@@ -28,12 +28,11 @@
 @import './styles/mobile.css';
 @import './styles/mobile-reader.css';
 
-/* Dark theme is load-order dependent: must stay after every light sheet */
+/* Legacy theme mappings precede semantic product styles. */
 @import './styles/dark-mode.css';
 
 /* Compatibility and component layers */
 @import './components/notifications.css';
 
-/* Product hierarchy layers. */
-@import './styles/deai-product-polish.css';
-@import './styles/deai-final-polish.css';
+/* Consolidated product hierarchy; new features belong to their component styles. */
+@import './styles/product.css';

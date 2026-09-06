@@ -108,7 +108,15 @@ export function loadComposerAutosave(): ComposerAutosave | null {
   try {
     const stored = readAppStorage(composerAutosaveStorageKey);
     if (!stored) return null;
-    const parsed = JSON.parse(stored);
+    return parseComposerAutosave(JSON.parse(stored));
+  } catch {
+    return null;
+  }
+}
+
+export function parseComposerAutosave(value: unknown): ComposerAutosave | null {
+  try {
+    const parsed = value as Partial<ComposerAutosave> | null;
     const draft = normalizeDraftInput(parsed?.draft);
     if (!draft || isDraftEmpty(draft)) return null;
     return {

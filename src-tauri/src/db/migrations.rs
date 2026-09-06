@@ -517,6 +517,7 @@ impl MailStore {
                 "next_attempt_at",
                 "TEXT NOT NULL DEFAULT ''",
             )?;
+            add_column_if_missing(conn, "outbox_queue", "submission_fingerprint", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(conn, "contacts", "aliases", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(conn, "contacts", "vip", "INTEGER NOT NULL DEFAULT 0")?;
             add_column_if_missing(
@@ -587,6 +588,9 @@ impl MailStore {
                 CREATE INDEX IF NOT EXISTS idx_contacts_account_email ON contacts(account_id, email);
                 CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox_queue(status);
                 CREATE INDEX IF NOT EXISTS idx_outbox_due ON outbox_queue(status, next_attempt_at, queued_at);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_outbox_unconfirmed_submission
+                    ON outbox_queue(submission_fingerprint)
+                    WHERE submission_fingerprint != '' AND status IN ('sending', 'send_unknown');
                 CREATE TRIGGER IF NOT EXISTS outbox_inflight_message_delete
                 BEFORE DELETE ON messages
                 WHEN EXISTS (SELECT 1 FROM outbox_queue WHERE message_id = OLD.id AND status = 'sending')

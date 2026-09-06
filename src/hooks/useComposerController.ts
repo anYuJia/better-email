@@ -1,10 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   emptyDraft,
   isDraftEmpty,
-  loadComposerAutosave,
-  composerAutosaveStorageKey,
-  removeAppStorage,
   type SendUndoDelaySeconds,
 } from '../app/appConfig';
 import {
@@ -13,7 +10,6 @@ import {
 } from '../app/crossAccountRisk';
 import type {
   Account,
-  ComposerAutosave,
   Contact,
   DraftInput,
   Folder,
@@ -30,6 +26,7 @@ import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
 import useComposeFromMessage from './useComposeFromMessage';
 import useComposerSend from './useComposerSend';
+import useComposerRecovery from './useComposerRecovery';
 import useComposerTemplates from './useComposerTemplates';
 import useComposerAttachments from './useComposerAttachments';
 import { canonicalRecipientEmails, parseRecipientInput, parseRecipientToken } from '../components/composer/recipientAddresses';
@@ -87,19 +84,21 @@ export default function useComposerController({
   setSendProgressMessage,
   setAttachmentProgress,
 }: UseComposerControllerOptions) {
-  const COMPOSER_AUTOSAVE_DEBOUNCE_MS = 800;
   const [draft, setDraft] = useState<DraftInput>(emptyDraft);
   const [quickReplyBody, setQuickReplyBody] = useState('');
   const [isRichComposer, setRichComposer] = useState(true);
-  const [composerAutosave, setComposerAutosave] = useState<ComposerAutosave | null>(loadComposerAutosave);
-  const composerAutosaveTimerRef = useRef<number | null>(null);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isComposerMinimized, setComposerMinimized] = useState(false);
   const [composerFocusRequest, setComposerFocusRequest] = useState(0);
   const [composerCloseConfirmOpen, setComposerCloseConfirmOpen] = useState(false);
   const [composerContextAccountId, setComposerContextAccountId] = useState<number | null>(null);
   const [sendRiskConfirm, setSendRiskConfirm] = useState<CrossAccountRiskItem[] | null>(null);
-  const pendingComposerAutosaveRef = useRef<string | null>(null);
+  const fallbackRecoveryAccount = account?.id || accounts[0]?.id || 0;
+  const recoveryDraft = useMemo(() => ({
+    ...draft, account_id: draft.account_id || fallbackRecoveryAccount,
+  }), [draft, fallbackRecoveryAccount]);
+  const { composerAutosave, setComposerAutosave, clearComposerAutosave, retryComposerAutosave } =
+    useComposerRecovery(recoveryDraft, isRichComposer, isComposerOpen, setStatus);
   const {
     composeTemplates,
     setComposeTemplates,
@@ -333,11 +332,6 @@ export default function useComposerController({
     Promise.resolve(invoke<number>(IPC.CleanupTempAttachments)).catch(() => undefined);
   }
 
-  function clearComposerAutosave() {
-    removeAppStorage(composerAutosaveStorageKey);
-    setComposerAutosave(null);
-  }
-
   function draftInputForCurrentAccount(input: DraftInput): DraftInput {
     const resolvedAccountId = input.account_id || account?.id || accounts[0]?.id || 0;
     const resolvedIdentity = identityForDraft({ ...input, account_id: resolvedAccountId });
@@ -396,44 +390,6 @@ export default function useComposerController({
     setStatus('已插入当前发件身份签名');
   }
 
-  useEffect(() => {
-    if (!isComposerOpen || isDraftEmpty(draft)) return;
-    const autosave: ComposerAutosave = {
-      draft,
-      isRichComposer,
-      saved_at: new Date().toISOString(),
-    };
-    let nextAutosaveJson: string;
-    try {
-      nextAutosaveJson = JSON.stringify(autosave);
-    } catch {
-      return;
-    }
-    if (pendingComposerAutosaveRef.current === nextAutosaveJson) {
-      return;
-    }
-    if (composerAutosaveTimerRef.current !== null) {
-      window.clearTimeout(composerAutosaveTimerRef.current);
-    }
-    composerAutosaveTimerRef.current = window.setTimeout(() => {
-      try {
-        window.localStorage.setItem(composerAutosaveStorageKey, nextAutosaveJson);
-        pendingComposerAutosaveRef.current = nextAutosaveJson;
-        setComposerAutosave(autosave);
-      } catch {
-        // Ignore autosave persistence failures to avoid blocking typing.
-      }
-      composerAutosaveTimerRef.current = null;
-    }, COMPOSER_AUTOSAVE_DEBOUNCE_MS);
-
-    return () => {
-      if (composerAutosaveTimerRef.current !== null) {
-        window.clearTimeout(composerAutosaveTimerRef.current);
-      }
-    };
-  }, [draft, isRichComposer, isComposerOpen]);
-
-
   function removeDraftAttachment(index: number) {
     setDraft((current) => ({
       ...current,
@@ -487,6 +443,7 @@ export default function useComposerController({
     setTemplateName,
     composerAutosave,
     setComposerAutosave,
+    retryComposerAutosave,
     isComposerOpen,
     setComposerOpen,
     isComposerMinimized,

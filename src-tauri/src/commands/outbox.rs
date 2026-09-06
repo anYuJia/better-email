@@ -205,7 +205,7 @@ fn save_draft_blocking(
     let was_update = input.draft_id > 0;
     // 持久化前先校验 IPC 传入的附件：未授权路径 / symlink / 大小变化 / 总量超限
     // 都在这里被拒绝，未经授权的附件绝不可能被保存并同步到远端。
-    validate_outbound_attachment_inputs(&store, &input.attachments)?;
+    validate_outbound_attachment_inputs(store, &input.attachments)?;
     let previous_reference = if was_update {
         Some(store.get_message_remote_reference(input.draft_id)?)
     } else {
@@ -217,7 +217,7 @@ fn save_draft_blocking(
     let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
     let message = store.get_outbound_message(draft_id)?;
     // 渲染/上传前再次校验持久化后的附件（拦截保存后到同步前的文件替换 TOCTOU）。
-    let attachment_bytes = read_verified_outbound_message_attachments(&store, &message)?;
+    let attachment_bytes = read_verified_outbound_message_attachments(store, &message)?;
     let message_id_header = smtp::outbound_message_id(&message);
     let account = store.get_account_by_id(Some(message.account_id))?;
     let local_action = if was_update {

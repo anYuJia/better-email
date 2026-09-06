@@ -1315,35 +1315,29 @@ impl MailStore {
         }
         self.create_outbound_message(input, "drafts")
     }
-    pub fn send_message(&self, input: DraftInput) -> MailResult<i64> {
-        self.with_conn(|conn| {
-            let message_id = create_outbound_message_for_conn(conn, input, "outbox")?;
-            let queued_at = Utc::now().to_rfc3339();
-            conn.execute(
-                "INSERT INTO outbox_queue(message_id, status, attempts, last_error, queued_at, next_attempt_at)
-                 VALUES (?1, 'queued', 0, '', ?2, '')",
-                params![message_id, queued_at],
-            )?;
-            Ok(message_id)
-        })
-    }
     pub fn queue_outbox_message(&self, input: DraftInput) -> MailResult<OutboxItem> {
         self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
             let send_at = input.send_at.trim().to_string();
+            if !send_at.is_empty() && DateTime::parse_from_rfc3339(&send_at).is_err() {
+                return Err(MailError::Smtp("计划发送时间无效，请重新选择。".into()));
+            }
             let status = if send_at.is_empty() {
                 "queued"
             } else {
                 "scheduled"
             };
-            let message_id = create_outbound_message_for_conn(conn, input, "outbox")?;
+            let message_id = create_outbound_message_for_conn(&transaction, input, "outbox")?;
             let queued_at = Utc::now().to_rfc3339();
-            conn.execute(
+            transaction.execute(
                 "INSERT INTO outbox_queue(message_id, status, attempts, last_error, queued_at, next_attempt_at)
                  VALUES (?1, ?2, 0, '', ?3, ?4)",
                 params![message_id, status, queued_at, send_at],
             )?;
-            let id = conn.last_insert_rowid();
-            get_outbox_item_for_conn(conn, id)
+            let id = transaction.last_insert_rowid();
+            let item = get_outbox_item_for_conn(&transaction, id)?;
+            transaction.commit()?;
+            Ok(item)
         })
     }
     pub fn get_stats_for_account(&self, account_id: Option<i64>) -> MailResult<MailStats> {

@@ -1026,4 +1026,40 @@ mod claim_tests {
         );
         assert_eq!(items.len(), 51);
     }
+
+    #[test]
+    fn rejected_queue_insert_rolls_back_message_metadata() {
+        let (_dir, store) = fixture();
+        let before: i64 = store
+            .with_conn(|conn| {
+                Ok(conn.query_row("SELECT COUNT(*) FROM messages", [], |row| row.get(0))?)
+            })
+            .unwrap();
+        store
+            .with_conn(|conn| {
+                conn.execute_batch(
+                    "CREATE TRIGGER reject_queue BEFORE INSERT ON outbox_queue
+                BEGIN SELECT RAISE(ABORT, 'simulated disk failure'); END;",
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        assert!(store.queue_outbox_message(draft()).is_err());
+        let after: i64 = store
+            .with_conn(|conn| {
+                Ok(conn.query_row("SELECT COUNT(*) FROM messages", [], |row| row.get(0))?)
+            })
+            .unwrap();
+        assert_eq!(before, after);
+        assert!(store.list_outbox().unwrap().is_empty());
+    }
+
+    #[test]
+    fn malformed_schedule_does_not_create_an_unprocessable_outbox_item() {
+        let (_dir, store) = fixture();
+        let mut input = draft();
+        input.send_at = "not-a-time".into();
+        assert!(store.queue_outbox_message(input).is_err());
+        assert!(store.list_outbox().unwrap().is_empty());
+    }
 }

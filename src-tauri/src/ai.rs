@@ -110,6 +110,7 @@ pub fn call_chat_completion(
     let agent = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
         .http_status_as_error(false)
+        .max_redirects(0)
         .build()
         .new_agent();
     let mut request = agent.post(&url).header("Content-Type", "application/json");
@@ -329,6 +330,7 @@ impl McpClient {
             agent: ureq::Agent::config_builder()
                 .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
                 .http_status_as_error(false)
+                .max_redirects(0)
                 .build()
                 .new_agent(),
             next_id: 1,
@@ -947,5 +949,45 @@ mod tests {
         .expect_err("HTTP 500 must fail OpenAI-compatible request");
         server.join().expect("AI test server completes");
         assert!(error.contains("HTTP 500"), "actual error: {error}");
+    }
+
+    #[test]
+    fn redirect_cannot_forward_ai_mail_or_mcp_session_to_another_endpoint() {
+        for status in [301, 302, 303, 307, 308] {
+            let destination = TcpListener::bind("127.0.0.1:0").unwrap();
+            destination.set_nonblocking(true).unwrap();
+            let location = format!("http://{}/unapproved", destination.local_addr().unwrap());
+            for mcp in [false, true] {
+                let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+                let endpoint = format!("http://{}/api", listener.local_addr().unwrap());
+                let location = location.clone();
+                let server = std::thread::spawn(move || {
+                    let (mut stream, _) = listener.accept().unwrap();
+                    read_request(&mut stream);
+                    write!(stream, "HTTP/1.1 {status} Redirect\r\nLocation: {location}\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}") .unwrap();
+                });
+                let result = if mcp {
+                    run_mcp_tool_call(&mcp_input(&endpoint, "summarize")).map(|_| ())
+                } else {
+                    call_chat_completion(
+                        &endpoint,
+                        "secret-token",
+                        "test",
+                        &[AiChatCompletionInput {
+                            role: "user".into(),
+                            content: "private mail".into(),
+                        }],
+                        5,
+                    )
+                    .map(|_| ())
+                };
+                assert!(result.is_err());
+                server.join().unwrap();
+                assert_eq!(
+                    destination.accept().unwrap_err().kind(),
+                    std::io::ErrorKind::WouldBlock
+                );
+            }
+        }
     }
 }

@@ -231,7 +231,13 @@ fn post_form_capped(
     form: &[(String, String)],
     max_bytes: u64,
 ) -> Result<(u16, String), String> {
-    let mut response = ureq::post(endpoint)
+    let agent = ureq::Agent::config_builder()
+        .timeout_global(Some(std::time::Duration::from_secs(30)))
+        .max_redirects(0)
+        .build()
+        .new_agent();
+    let mut response = agent
+        .post(endpoint)
         .send_form(
             form.iter()
                 .map(|(key, value)| (key.as_str(), value.as_str())),

@@ -1538,7 +1538,7 @@ mod tests {
             })
             .unwrap();
         let sent_id = store
-            .send_message(DraftInput {
+            .queue_outbox_message(DraftInput {
                 draft_id: 0,
                 account_id: 0,
                 identity_id: 0,
@@ -1551,7 +1551,8 @@ mod tests {
                 send_at: String::new(),
                 attachments: Vec::new(),
             })
-            .unwrap();
+            .unwrap()
+            .message_id;
         let drafts = store
             .list_folders_for_account(Some(store.get_account().unwrap().id))
             .unwrap()
@@ -5304,7 +5305,7 @@ mod tests {
     fn draft_recipients_are_added_only_after_smtp_success_transition() {
         let store = test_store();
         let message_id = store
-            .send_message(DraftInput {
+            .queue_outbox_message(DraftInput {
                 draft_id: 0,
                 account_id: 0,
                 identity_id: 0,
@@ -5317,7 +5318,8 @@ mod tests {
                 send_at: String::new(),
                 attachments: Vec::new(),
             })
-            .unwrap();
+            .unwrap()
+            .message_id;
         let before = store.list_contacts().unwrap();
         assert!(before
             .iter()

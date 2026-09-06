@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
       - name: Apply checksum-verified final edits
         shell: python
         run: |
@@ -55,7 +56,6 @@ jobs:
               target.parent.mkdir(parents=True, exist_ok=True)
               target.write_bytes(result)
           pathlib.Path('/tmp/review-allowed.json').write_text(json.dumps(sorted(seen)))
-          print('Verified final edits', len(planned))
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -64,57 +64,77 @@ jobs:
         with:
           components: rustfmt, clippy
       - name: Install dependencies and format Rust
+        id: setup
         run: |
           npm ci
           cargo fmt --manifest-path src-tauri/Cargo.toml
           git diff --check
-      - name: Verify frontend before committing
-        run: |
-          npm run lint
-          npm test
-          npm run build:verify
-      - name: Commit verified source to the same review branch
+      - name: Export immutable source manifest without changing any branch
+        id: export
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
           mkdir -p review-result
           python3 - <<'PY'
-          import base64, json, pathlib, subprocess
+          import base64, hashlib, json, pathlib, subprocess
           allowed = set(json.load(open('/tmp/review-allowed.json')))
-          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()) | set(subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'], text=True).splitlines())
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          changed = set(git('diff', '--name-only').splitlines()) | set(git('ls-files', '--others', '--exclude-standard').splitlines())
           if changed - allowed:
               raise RuntimeError('Unplanned changes: ' + repr(changed - allowed))
-          source = sorted(p for p in allowed if not p.startswith('.github/'))
-          subprocess.run(['git', 'add', '--', *source], check=True)
-          pending = []
-          for name in sorted(p for p in allowed if p.startswith('.github/')):
-              data = json.dumps({'encoding': 'base64', 'content': base64.b64encode(pathlib.Path(name).read_bytes()).decode()})
-              value = json.loads(subprocess.check_output(['gh', 'api', '--method', 'POST', 'repos/anYuJia/better-email/git/blobs', '--input', '-'], input=data.encode()))
-              pending.append({'path': name, 'mode': '100644', 'type': 'blob', 'sha': value['sha']})
-          pathlib.Path('review-result/pending-workflows.json').write_text(json.dumps(pending, indent=2))
+          entries = []
+          for name in sorted(allowed):
+              data = pathlib.Path(name).read_bytes()
+              expected = hashlib.sha1(('blob ' + str(len(data)) + '\0').encode() + data).hexdigest()
+              payload = json.dumps({'encoding': 'base64', 'content': base64.b64encode(data).decode()})
+              value = json.loads(subprocess.check_output(['gh', 'api', '--method', 'POST', 'repos/anYuJia/better-email/git/blobs', '--input', '-'], input=payload.encode()))
+              if value['sha'] != expected:
+                  raise RuntimeError('Blob checksum mismatch: ' + name)
+              entries.append({'path': name, 'mode': '100644', 'type': 'blob', 'sha': value['sha']})
+          pathlib.Path('review-result/publish.json').write_text(json.dumps({'parent': git('rev-parse', 'HEAD'), 'base_tree': git('rev-parse', 'HEAD^{tree}'), 'entries': entries}, indent=2))
           PY
-          git -c user.name=yhan-sun -c user.email=304309934+yhan-sun@users.noreply.github.com commit -m 'feat:完成草稿同步交互边界与前端静态检查'
-          git push origin HEAD:refs/heads/fix/mobile-list-gestures-20260906
-          git rev-parse HEAD > review-result/HEAD.txt
-          git rev-parse HEAD^{tree} > review-result/tree.txt
-          git archive --format=tar.gz HEAD > review-result/source.tar.gz
+          tar -czf review-result/source.tar.gz src src-tauri/src scripts eslint.config.mjs .github/workflows/release.yml .github/workflows/android.yml
       - uses: actions/upload-artifact@v4
         with:
           name: review-final-source-${{ github.run_id }}
           path: review-result/
           retention-days: 2
+      - name: TypeScript and ESLint
+        if: '!cancelled() && steps.setup.outcome == ''success'''
+        run: |
+          mkdir -p review-result
+          set -o pipefail
+          npm run lint 2>&1 | tee review-result/lint.log
+      - name: Frontend regression tests
+        if: '!cancelled() && steps.setup.outcome == ''success'''
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee review-result/frontend.log
+      - name: Production build and structural budgets
+        if: '!cancelled() && steps.setup.outcome == ''success'''
+        run: |
+          set -o pipefail
+          npm run build:verify 2>&1 | tee review-result/build.log
       - name: Install native test dependencies
+        if: '!cancelled() && steps.setup.outcome == ''success'''
+        id: native_setup
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
       - uses: swatinem/rust-cache@v2
+        if: '!cancelled() && steps.native_setup.outcome == ''success'''
         with:
           workspaces: src-tauri
-      - name: Verify native regressions and strict lint
+      - name: Rust regression tests
+        if: '!cancelled() && steps.native_setup.outcome == ''success'''
         run: |
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml --locked 2>&1 | tee review-result/rust.log
+      - name: Strict native lint
+        if: '!cancelled() && steps.native_setup.outcome == ''success'''
+        run: |
+          set -o pipefail
           cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings 2>&1 | tee review-result/clippy.log
       - uses: actions/upload-artifact@v4
         if: always()

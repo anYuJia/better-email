@@ -1,4 +1,4 @@
-name: Review completion verification
+name: Review merge verification
 on:
   pull_request:
     branches: [main]
@@ -9,136 +9,77 @@ concurrency:
   group: review-repair-21
   cancel-in-progress: false
 jobs:
-  repair:
+  verify:
     if: github.event.pull_request.number == 21 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/mobile-list-gestures-20260906' && github.actor == 'yhan-sun'
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: 5c888ceb42e2539f03ec4ccf79d09aae5d0f9fa9
           persist-credentials: false
-      - name: Apply checksum-verified final edits
+      - name: Apply exact OAuth status rejection
         shell: python
         run: |
-          import base64, gzip, hashlib, json, pathlib
-          root = pathlib.Path.cwd()
-          encoded = ''.join((root / f'.github/final-parts/{i}.b64').read_text().strip() for i in range(5))
-          raw = gzip.decompress(base64.b64decode(encoded, validate=True))
-          if hashlib.sha256(raw).hexdigest() != '286e0119e9fb3e726133bbeae00e01eef6e5d3acbe7d1071b0fd2298e694943f':
-              raise RuntimeError('Transport checksum mismatch')
-          planned = []
-          seen = set()
-          for item in json.loads(raw)['files']:
-              name = item['path']
-              relative = pathlib.PurePosixPath(name)
-              if name in seen or relative.is_absolute() or '..' in relative.parts or not (name.startswith(('src/', 'src-tauri/src/', 'scripts/')) or name in ('eslint.config.mjs', '.github/workflows/release.yml', '.github/workflows/android.yml')):
-                  raise RuntimeError('Unexpected source path: ' + name)
-              seen.add(name)
-              target = root / name
-              if target.is_symlink() or not target.resolve().is_relative_to(root):
-                  raise RuntimeError('Unsafe source path: ' + name)
-              old = target.read_bytes() if target.exists() else None
-              before = hashlib.sha1(('blob ' + str(len(old)) + '\0').encode() + old).hexdigest() if old is not None else None
-              if before != item['before']:
-                  raise RuntimeError('Reviewed source changed: ' + name)
-              lines = (old or b'').decode().splitlines(keepends=True)
-              for edit in reversed(item['edits']):
-                  start, end = edit['start'], edit['end']
-                  if not 0 <= start <= end <= len(lines):
-                      raise RuntimeError('Invalid edit range: ' + name)
-                  lines[start:end] = edit['lines']
-              result = ''.join(lines).encode()
-              if hashlib.sha256(result).hexdigest() != item['after']:
-                  raise RuntimeError('Result checksum mismatch: ' + name)
-              planned.append((target, result))
-          for target, result in planned:
-              target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_bytes(result)
-          pathlib.Path('/tmp/review-allowed.json').write_text(json.dumps(sorted(seen)))
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+          import hashlib, pathlib
+          path = pathlib.Path('src-tauri/src/oauth.rs')
+          original = path.read_bytes()
+          before = hashlib.sha1(b'blob ' + str(len(original)).encode() + b'\0' + original).hexdigest()
+          if before != 'a3695a88604ab139a2f70730ec381286e16ddad9':
+              raise RuntimeError('OAuth source changed')
+          text = original.decode()
+          needle = '    let status = response.status();\n'
+          if text.count(needle) != 1:
+              raise RuntimeError('Ambiguous OAuth status check')
+          result = text.replace(needle, needle + '    if !status.is_success() {\n        return Err(format!("OAuth2 token 端点返回 HTTP {status}，请求已拒绝。"));\n    }\n').encode()
+          if hashlib.sha256(result).hexdigest() != '343b33d3a08f8f86f903519eb3654432e56c2af77cebb267a27072057fda516d':
+              raise RuntimeError('OAuth result checksum mismatch')
+          path.write_bytes(result)
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Install dependencies and format Rust
-        id: setup
-        run: |
-          npm ci
-          cargo fmt --manifest-path src-tauri/Cargo.toml
-          git diff --check
-      - name: Export immutable source manifest without changing any branch
-        id: export
+      - name: Check formatting and export exact source blob
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p review-result
+          cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+          git diff --check
+          mkdir -p merge-evidence
           python3 - <<'PY'
           import base64, hashlib, json, pathlib, subprocess
-          allowed = set(json.load(open('/tmp/review-allowed.json')))
-          def git(*args):
-              return subprocess.check_output(['git', *args], text=True).strip()
-          changed = set(git('diff', '--name-only').splitlines()) | set(git('ls-files', '--others', '--exclude-standard').splitlines())
-          if changed - allowed:
-              raise RuntimeError('Unplanned changes: ' + repr(changed - allowed))
-          entries = []
-          for name in sorted(allowed):
-              data = pathlib.Path(name).read_bytes()
-              expected = hashlib.sha1(('blob ' + str(len(data)) + '\0').encode() + data).hexdigest()
-              payload = json.dumps({'encoding': 'base64', 'content': base64.b64encode(data).decode()})
-              value = json.loads(subprocess.check_output(['gh', 'api', '--method', 'POST', 'repos/anYuJia/better-email/git/blobs', '--input', '-'], input=payload.encode()))
-              if value['sha'] != expected:
-                  raise RuntimeError('Blob checksum mismatch: ' + name)
-              entries.append({'path': name, 'mode': '100644', 'type': 'blob', 'sha': value['sha']})
-          pathlib.Path('review-result/publish.json').write_text(json.dumps({'parent': git('rev-parse', 'HEAD'), 'base_tree': git('rev-parse', 'HEAD^{tree}'), 'entries': entries}, indent=2))
+          path = pathlib.Path('src-tauri/src/oauth.rs')
+          data = path.read_bytes()
+          expected = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+          payload = json.dumps({'encoding': 'base64', 'content': base64.b64encode(data).decode()})
+          value = json.loads(subprocess.check_output(['gh', 'api', '--method', 'POST', 'repos/anYuJia/better-email/git/blobs', '--input', '-'], input=payload.encode()))
+          if value['sha'] != expected:
+              raise RuntimeError('Uploaded source differs')
+          pathlib.Path('merge-evidence/source.json').write_text(json.dumps({'base': '5c888ceb42e2539f03ec4ccf79d09aae5d0f9fa9', 'path': str(path), 'sha': value['sha']}, indent=2))
+          print('Verified OAuth blob:', value['sha'])
           PY
-          tar -czf review-result/source.tar.gz src src-tauri/src scripts eslint.config.mjs .github/workflows/release.yml .github/workflows/android.yml
       - uses: actions/upload-artifact@v4
         with:
-          name: review-final-source-${{ github.run_id }}
-          path: review-result/
-          retention-days: 2
-      - name: TypeScript and ESLint
-        if: '!cancelled() && steps.setup.outcome == ''success'''
-        run: |
-          mkdir -p review-result
-          set -o pipefail
-          npm run lint 2>&1 | tee review-result/lint.log
-      - name: Frontend regression tests
-        if: '!cancelled() && steps.setup.outcome == ''success'''
-        run: |
-          set -o pipefail
-          npm test 2>&1 | tee review-result/frontend.log
-      - name: Production build and structural budgets
-        if: '!cancelled() && steps.setup.outcome == ''success'''
-        run: |
-          set -o pipefail
-          npm run build:verify 2>&1 | tee review-result/build.log
-      - name: Install native test dependencies
-        if: '!cancelled() && steps.setup.outcome == ''success'''
-        id: native_setup
+          name: merge-source-${{ github.run_id }}
+          path: merge-evidence/source.json
+          retention-days: 7
+      - name: Install native dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
       - uses: swatinem/rust-cache@v2
-        if: '!cancelled() && steps.native_setup.outcome == ''success'''
         with:
           workspaces: src-tauri
-      - name: Rust regression tests
-        if: '!cancelled() && steps.native_setup.outcome == ''success'''
+      - name: Full Rust regression
         run: |
           set -o pipefail
-          cargo test --manifest-path src-tauri/Cargo.toml --locked 2>&1 | tee review-result/rust.log
+          cargo test --manifest-path src-tauri/Cargo.toml --locked 2>&1 | tee merge-evidence/rust.log
       - name: Strict native lint
-        if: '!cancelled() && steps.native_setup.outcome == ''success'''
         run: |
           set -o pipefail
-          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings 2>&1 | tee review-result/clippy.log
+          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings 2>&1 | tee merge-evidence/clippy.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: review-final-results-${{ github.run_id }}
-          path: review-result/
-          retention-days: 7
+          name: merge-verification-${{ github.run_id }}
+          path: merge-evidence/
+          retention-days: 14

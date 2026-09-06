@@ -109,9 +109,10 @@ export default function MessageListView({
   const newMessageExceededRef = useRef(false);
 
   const [viewportHeight, setViewportHeight] = useState(600);
-  const [isMobileViewport, setIsMobileViewport] = useState(
-    () => mobile || (typeof window !== 'undefined' && window.innerWidth <= 720),
+  const [isNarrowViewport, setIsNarrowViewport] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 720,
   );
+  const isMobileViewport = mobile || isNarrowViewport;
   const [, setScrollTop] = useState(initialScrollTop);
   const [heightCacheVersion, setHeightCacheVersion] = useState(0);
   const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
@@ -125,24 +126,32 @@ export default function MessageListView({
   } | null>(null);
   const messageRowHeight = isMobileViewport ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT;
 
-  useEffect(() => {
-    setIsMobileViewport(mobile || window.innerWidth <= 720);
-  }, [mobile]);
-
   const [pullDistance, setPullDistance] = useState(0);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const touchStartYRef = useRef<number | null>(null);
 
+  const handleTouchCancel = useCallback(() => {
+    touchStartYRef.current = null;
+    if (!pullRefreshing) setPullDistance(0);
+  }, [pullRefreshing]);
+
+  useEffect(() => {
+    handleTouchCancel();
+  }, [handleTouchCancel, isMobileViewport, listStateKey]);
+
   const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isMobileViewport || pullRefreshing) return;
+    handleTouchCancel();
+    if (!isMobileViewport || pullRefreshing || e.touches.length !== 1) return;
     if (listRef.current && listRef.current.scrollTop <= 0) {
       touchStartYRef.current = e.touches[0].clientY;
-    } else {
-      touchStartYRef.current = null;
     }
-  }, [isMobileViewport, pullRefreshing]);
+  }, [handleTouchCancel, isMobileViewport, pullRefreshing]);
 
   const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) {
+      handleTouchCancel();
+      return;
+    }
     if (touchStartYRef.current === null || !isMobileViewport || pullRefreshing) return;
     const currentY = e.touches[0].clientY;
     const diff = currentY - touchStartYRef.current;
@@ -152,12 +161,12 @@ export default function MessageListView({
     } else {
       setPullDistance(0);
     }
-  }, [isMobileViewport, pullRefreshing]);
+  }, [handleTouchCancel, isMobileViewport, pullRefreshing]);
 
   const handleTouchEnd = useCallback(() => {
     if (touchStartYRef.current === null || !isMobileViewport) return;
     touchStartYRef.current = null;
-    if (pullDistance >= 50 && !pullRefreshing) {
+    if (pullDistance >= 50 && !pullRefreshing && listRef.current && listRef.current.scrollTop <= 0) {
       setPullRefreshing(true);
       setPullDistance(44);
       onRefresh();
@@ -251,8 +260,9 @@ export default function MessageListView({
 
   useEffect(() => {
     const handleViewportResize = () => {
-      setIsMobileViewport(window.innerWidth <= 720);
+      setIsNarrowViewport(window.innerWidth <= 720);
     };
+    handleViewportResize();
     window.addEventListener('resize', handleViewportResize);
     return () => window.removeEventListener('resize', handleViewportResize);
   }, []);
@@ -635,7 +645,7 @@ export default function MessageListView({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onTouchCancel={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
       >
         {isMobileViewport && (pullDistance > 0 || pullRefreshing) && (
           <div

@@ -17,14 +17,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p diagnostics
-          gh api repos/anYuJia/better-email/actions/jobs/101475955052/logs > /tmp/compiler.log
+          gh api --allow-escape-sequences repos/anYuJia/better-email/actions/jobs/101475955052/logs > /tmp/compiler.log
           python3 - <<'PY'
-          import pathlib
-          lines = pathlib.Path('/tmp/compiler.log').read_text().splitlines()
+          import pathlib, re
+          lines = re.sub(r'\x1b\[[0-9;]*m', '', pathlib.Path('/tmp/compiler.log').read_text()).splitlines()
           chosen = set()
           for i, line in enumerate(lines):
-              if 'error' in line.lower() or 'FAILED' in line:
-                  chosen.update(range(max(0, i - 2), min(len(lines), i + 18)))
+              if re.search(r'error\[|error:|FAILED|panicked at', line):
+                  chosen.update(range(max(0, i - 2), min(len(lines), i + 24)))
           pathlib.Path('diagnostics/compiler-errors.txt').write_text('\n'.join(lines[i] for i in sorted(chosen)))
           PY
       - uses: actions/upload-artifact@v4

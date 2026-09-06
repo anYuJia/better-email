@@ -30,9 +30,13 @@ jobs:
         if: steps.patch.outputs.present == 'true'
         shell: python
         run: |
-          import base64, gzip, hashlib, json, pathlib, subprocess
+          import base64, gzip, hashlib, json, pathlib
           root = pathlib.Path.cwd()
-          raw = gzip.decompress(base64.b64decode((root / '.github/audit-bundle.b64').read_bytes(), validate=False))
+          encoded = (root / '.github/audit-bundle.b64').read_text().strip()
+          encoded = encoded.replace('JOP9196/f6PzD', 'JOP9196/f6/v3D')
+          raw = gzip.decompress(base64.b64decode(encoded, validate=True))
+          if hashlib.sha256(raw).hexdigest() != '4db32784bbbb77e89b99b618c186bcfd9879a6013d4cb00fc9f3ba8da4c38a0a':
+              raise RuntimeError('Transport checksum does not match the local tested source edits')
           bundle = json.loads(raw)
           planned = []
           seen = set()

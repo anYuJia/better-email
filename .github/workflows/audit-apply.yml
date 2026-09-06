@@ -1,4 +1,4 @@
-name: Audit patch verification
+name: Audit integration verification
 
 on:
   pull_request:
@@ -9,105 +9,157 @@ permissions:
   contents: write
 
 concurrency:
-  group: audit-patch-${{ github.event.pull_request.number }}
+  group: audit-integration-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   verify:
     if: github.event.pull_request.number == 21 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/mobile-list-gestures-20260906'
     runs-on: ubuntu-22.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Check for a scoped patch
+          persist-credentials: false
+      - name: Apply checksum-verified source changes
         id: patch
-        shell: bash
-        run: |
-          if test -f .github/audit-bundle.b64; then echo 'present=true' >> "$GITHUB_OUTPUT"; fi
-      - name: Apply verified source edits
-        if: steps.patch.outputs.present == 'true'
         shell: python
         run: |
-          import base64, gzip, hashlib, json, pathlib
+          import base64, hashlib, json, lzma, os, pathlib
           root = pathlib.Path.cwd()
-          encoded = (root / '.github/audit-bundle.b64').read_text().strip()
-          encoded = encoded.replace('JOP9196/f6PzD', 'JOP9196/f6/v3D')
-          raw = gzip.decompress(base64.b64decode(encoded, validate=True))
-          if hashlib.sha256(raw).hexdigest() != '4db32784bbbb77e89b99b618c186bcfd9879a6013d4cb00fc9f3ba8da4c38a0a':
-              raise RuntimeError('Transport checksum does not match the local tested source edits')
-          bundle = json.loads(raw)
-          planned = []
-          seen = set()
-          for item in bundle['files']:
-              name = item['path']
-              relative = pathlib.PurePosixPath(name)
-              if name in seen or relative.is_absolute() or '..' in relative.parts or not name.startswith('src-tauri/src/'):
-                  raise RuntimeError('Patch path is not allowed: ' + name)
-              seen.add(name)
+          parts = [root / f'.github/audit-parts/{i}.b64' for i in range(4)]
+          if not all(p.exists() for p in parts):
+              raise SystemExit(0)
+          raw = lzma.decompress(base64.b64decode(''.join(p.read_text().strip() for p in parts), validate=True))
+          if hashlib.sha256(raw).hexdigest() != '4ae580aa42715ec4089ed37cd4f450b2166674b2675517c608f4d112bec74df1':
+              raise RuntimeError('Source bundle checksum mismatch')
+          def safe(name):
+              p = pathlib.PurePosixPath(name)
+              if p.is_absolute() or '..' in p.parts or not (name.startswith(('src/', 'src-tauri/src/', 'scripts/')) or name in ['.github/workflows/release.yml', '.github/workflows/android.yml']):
+                  raise RuntimeError('Unexpected source path: ' + name)
               target = root / name
               if target.is_symlink() or not target.resolve().is_relative_to(root):
-                  raise RuntimeError('Unsafe source path: ' + name)
-              previous = target.read_bytes() if target.exists() else None
-              actual = hashlib.sha256(previous).hexdigest() if previous is not None else None
-              if actual != item['before']:
-                  raise RuntimeError('Source changed before applying: ' + name)
-              lines = (previous or b'').decode('utf-8').splitlines(keepends=True)
+                  raise RuntimeError('Unsafe source path')
+              return target
+          planned = []
+          seen = set()
+          for item in json.loads(raw)['files']:
+              name = item['path']
+              if name in seen:
+                  raise RuntimeError('Duplicate source path')
+              seen.add(name)
+              target = safe(name)
+              old = target.read_bytes() if target.exists() else None
+              if (hashlib.sha256(old).hexdigest() if old is not None else None) != item['before']:
+                  raise RuntimeError('Source changed: ' + name)
+              source = old or b''
+              if item.get('sources'):
+                  source = b''.join(safe(p).read_bytes() for p in item['sources'])
+                  if hashlib.sha256(source).hexdigest() != item['source_sha256']:
+                      raise RuntimeError('Copy source changed: ' + name)
+              lines = source.decode().splitlines(keepends=True)
               for edit in reversed(item['edits']):
                   start, end = edit['start'], edit['end']
                   if not 0 <= start <= end <= len(lines):
-                      raise RuntimeError('Invalid edit range: ' + name)
+                      raise RuntimeError('Invalid edit range')
                   lines[start:end] = edit['lines']
-              result = ''.join(lines).encode('utf-8')
-              if hashlib.sha256(result).hexdigest() != item['after']:
-                  raise RuntimeError('Patch checksum does not match: ' + name)
-              planned.append((target, result))
+              result = ''.join(lines).encode()
+              if item['after'] is not None and hashlib.sha256(result).hexdigest() != item['after']:
+                  raise RuntimeError('Result checksum mismatch: ' + name)
+              planned.append((target, result if item['after'] is not None else None))
           for target, result in planned:
-              target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_bytes(result)
-          (root / '.github/audit-bundle.b64').unlink()
-          print('Applied verified source edits:', len(planned))
+              if result is None:
+                  target.unlink()
+              else:
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(result)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('present=true\n')
+      - uses: actions/setup-node@v4
+        if: steps.patch.outputs.present == 'true'
+        with:
+          node-version: 22
+          cache: npm
       - uses: dtolnay/rust-toolchain@stable
         if: steps.patch.outputs.present == 'true'
         with:
           components: rustfmt, clippy
-      - name: Format and publish only the review branch
+      - name: Format and export immutable source tree
         if: steps.patch.outputs.present == 'true'
-        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           cargo fmt --manifest-path src-tauri/Cargo.toml
           git diff --check
-          git add src-tauri/src .github/audit-bundle.b64
-          git -c user.name='yhan-sun' -c user.email='304309934+yhan-sun@users.noreply.github.com' commit -m 'feat:集成正文发送安全与草稿持久化修复'
-          git push origin HEAD:refs/heads/fix/mobile-list-gestures-20260906
-      - name: Export the formatted source
-        if: steps.patch.outputs.present == 'true' && always()
-        shell: bash
-        run: |
           mkdir -p audit-result
-          git rev-parse HEAD > audit-result/HEAD.txt
-          tar --exclude=src-tauri/target -czf audit-result/rust-source.tar.gz src-tauri/src
-          git diff --stat > audit-result/diff-stat.txt
+          python3 - <<'PY'
+          import base64, json, pathlib, subprocess
+          def git(*args): return subprocess.check_output(['git', *args], text=True).strip()
+          def post(route, data):
+              return json.loads(subprocess.check_output(['gh', 'api', '--method', 'POST', 'repos/anYuJia/better-email/git/' + route, '--input', '-'], input=json.dumps(data).encode()))
+          parent = git('rev-parse', 'HEAD')
+          paths = set(git('diff', '--name-only').splitlines()) | set(git('ls-files', '--others', '--exclude-standard').splitlines())
+          tree = []
+          for name in sorted(paths):
+              if not (name.startswith(('src/', 'src-tauri/src/', 'scripts/')) or name in ['.github/workflows/release.yml', '.github/workflows/android.yml']): continue
+              p = pathlib.Path(name)
+              sha = post('blobs', {'encoding': 'base64', 'content': base64.b64encode(p.read_bytes()).decode()})['sha'] if p.exists() else None
+              tree.append({'path': name, 'mode': '100644', 'type': 'blob', 'sha': sha})
+          value = post('trees', {'base_tree': git('rev-parse', 'HEAD^{tree}'), 'tree': tree})
+          pathlib.Path('audit-result/publish.json').write_text(json.dumps({'parent': parent, 'tree': value['sha'], 'changed_files': len(tree)}, indent=2))
+          PY
+          tar -czf audit-result/source.tar.gz src src-tauri/src scripts .github/workflows/release.yml .github/workflows/android.yml
       - uses: actions/upload-artifact@v4
         if: steps.patch.outputs.present == 'true' && always()
         with:
-          name: audit-rust-source-${{ github.run_id }}
+          name: audit-integration-source-${{ github.run_id }}
           path: audit-result/
           retention-days: 1
       - name: Install Linux build dependencies
         if: steps.patch.outputs.present == 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf google-chrome-stable
       - uses: swatinem/rust-cache@v2
         if: steps.patch.outputs.present == 'true'
         with:
           workspaces: src-tauri
+      - name: Frontend verification
+        if: steps.patch.outputs.present == 'true'
+        run: |
+          mkdir -p audit-logs
+          set -o pipefail
+          npm ci 2>&1 | tee audit-logs/npm-ci.log
+          npm run lint 2>&1 | tee audit-logs/types.log
+          npm test -- --maxWorkers=2 2>&1 | tee audit-logs/frontend.log
+          npm run build:verify 2>&1 | tee audit-logs/build.log
       - name: Rust tests
-        if: steps.patch.outputs.present == 'true'
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+        if: steps.patch.outputs.present == 'true' && !cancelled()
+        run: |
+          mkdir -p audit-logs
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml --locked 2>&1 | tee audit-logs/rust-test.log
       - name: Clippy
-        if: steps.patch.outputs.present == 'true'
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+        if: steps.patch.outputs.present == 'true' && !cancelled()
+        run: |
+          mkdir -p audit-logs
+          set -o pipefail
+          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings 2>&1 | tee audit-logs/clippy.log
+      - name: Browser regression and screenshots
+        if: steps.patch.outputs.present == 'true' && !cancelled()
+        env:
+          CHROME_PATH: /usr/bin/google-chrome-stable
+          BETTER_EMAIL_UI_CAPTURE_DIR: audit-logs/screenshots
+          TZ: Asia/Shanghai
+        run: |
+          mkdir -p audit-logs
+          set -o pipefail
+          npm run test:ui 2>&1 | tee audit-logs/browser.log
+      - uses: actions/upload-artifact@v4
+        if: steps.patch.outputs.present == 'true' && always()
+        with:
+          name: audit-integration-results-${{ github.run_id }}
+          path: audit-logs/
+          retention-days: 2

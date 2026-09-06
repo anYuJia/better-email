@@ -31,6 +31,20 @@ impl MailStore {
                     created_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS composer_recovery (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    revision INTEGER NOT NULL,
+                    snapshot TEXT NOT NULL DEFAULT 'null' CHECK (json_valid(snapshot)),
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TRIGGER IF NOT EXISTS composer_recovery_account_deleted
+                AFTER DELETE ON accounts
+                BEGIN
+                    UPDATE composer_recovery SET snapshot = 'null', revision = revision + 1
+                    WHERE json_extract(snapshot, '$.draft.account_id') = OLD.id;
+                END;
+
                 CREATE TABLE IF NOT EXISTS account_credentials (
                     account_email TEXT PRIMARY KEY,
                     secret TEXT NOT NULL,
@@ -405,6 +419,7 @@ impl MailStore {
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_single_default
                  ON accounts(is_default) WHERE is_default = 1;",
             )?;
+            add_column_if_missing(conn, "messages", "sanitizer_version", "INTEGER NOT NULL DEFAULT 0")?;
             add_column_if_missing(conn, "messages", "cc", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(conn, "messages", "bcc", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(
@@ -571,6 +586,18 @@ impl MailStore {
                 CREATE INDEX IF NOT EXISTS idx_sync_runs_started ON sync_runs(started_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_contacts_account_email ON contacts(account_id, email);
                 CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox_queue(status);
+                CREATE INDEX IF NOT EXISTS idx_outbox_due ON outbox_queue(status, next_attempt_at, queued_at);
+                CREATE TRIGGER IF NOT EXISTS outbox_inflight_message_delete
+                BEFORE DELETE ON messages
+                WHEN EXISTS (SELECT 1 FROM outbox_queue WHERE message_id = OLD.id AND status = 'sending')
+                BEGIN SELECT RAISE(ABORT, '邮件正在发送，请等待结果后再删除'); END;
+                CREATE TRIGGER IF NOT EXISTS outbox_inflight_message_edit
+                BEFORE UPDATE OF account_id, folder_id, sender_name, sender_email, recipients, cc, bcc, subject, body, sanitized_html ON messages
+                WHEN EXISTS (SELECT 1 FROM outbox_queue WHERE message_id = OLD.id AND status = 'sending')
+                BEGIN SELECT RAISE(ABORT, '邮件正在发送，暂不能修改或移动'); END;
+                CREATE TRIGGER IF NOT EXISTS outbox_inflight_queue_delete
+                BEFORE DELETE ON outbox_queue WHEN OLD.status = 'sending'
+                BEGIN SELECT RAISE(ABORT, '邮件正在发送，请等待结果后再删除'); END;
                 CREATE INDEX IF NOT EXISTS idx_background_tasks_status_created ON background_tasks(status, created_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_imap_mailboxes_account ON imap_mailboxes(account_id, local_role);
                 CREATE INDEX IF NOT EXISTS idx_oauth_sessions_account_status ON oauth_sessions(account_id, status, created_at DESC);

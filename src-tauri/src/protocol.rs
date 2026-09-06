@@ -484,11 +484,10 @@ fn sanitize_html_inner(html: &str, allow_remote_images: bool) -> String {
     url_schemes.insert("http");
     url_schemes.insert("https");
 
-    let limited_html = html.chars().take(30_000).collect::<String>();
     let prepared_html = if allow_remote_images {
-        promote_https_background_images(&limited_html)
+        Cow::Owned(promote_https_background_images(html))
     } else {
-        limited_html
+        Cow::Borrowed(html)
     };
     let cleaned = Builder::default()
         .url_schemes(url_schemes)
@@ -514,11 +513,8 @@ fn sanitize_html_inner(html: &str, allow_remote_images: bool) -> String {
             }
             Some(Cow::Borrowed(value))
         })
-        .clean(&prepared_html)
-        .to_string()
-        .chars()
-        .take(20_000)
-        .collect::<String>();
+        .clean(prepared_html.as_ref())
+        .to_string();
     let cleaned = remove_sourceless_images(&cleaned);
     if html_has_visible_content(&cleaned) {
         cleaned
@@ -1305,5 +1301,48 @@ mod tests {
         );
 
         assert!(warnings.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod completeness_tests {
+    use super::*;
+
+    #[test]
+    fn long_html_keeps_complete_tail_and_balanced_markup() {
+        for length in [19_999, 20_000, 20_001, 29_999, 30_000, 30_001, 150_000] {
+            let html = format!(
+                "<div><p>{}</p><a href=\"https://example.com/tail\">完整邮件结尾</a></div>",
+                "邮".repeat(length)
+            );
+            for sanitized in [
+                sanitize_html(&html),
+                sanitize_html_with_remote_images(&html),
+            ] {
+                assert!(sanitized.contains("完整邮件结尾</a></div>"));
+                assert_eq!(sanitized.matches('邮').count(), length + 1);
+                assert!(sanitized.contains("https://example.com/tail"));
+            }
+        }
+    }
+
+    #[test]
+    fn unsafe_content_after_old_limits_is_still_sanitized() {
+        let html = format!("<p>{}</p><script>alert(1)</script><img src=\"https://tracker.example/open.png\" onerror=\"alert(2)\"><p>末尾</p>", "safe ".repeat(10_000));
+        let sanitized = sanitize_html(&html);
+        assert!(sanitized.ends_with("<p>末尾</p>"));
+        assert!(!sanitized.contains("<script"));
+        assert!(!sanitized.contains("onerror"));
+        assert!(!sanitized.contains("https://tracker.example/open.png"));
+    }
+
+    #[test]
+    fn verbose_markup_does_not_hide_late_visible_content() {
+        let html = format!(
+            "{}<table><tr><td>最后一行</td></tr></table>",
+            "<span></span>".repeat(4_000)
+        );
+        assert!(sanitize_html(&html).contains("最后一行"));
+        assert!(message_body_snippet("", &html, "").contains("最后一行"));
     }
 }

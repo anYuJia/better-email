@@ -1756,22 +1756,45 @@ fn preserve_attachment_download_state(
 }
 
 pub(super) fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult<Message> {
-    conn.query_row(
+    let (mut message, sanitizer_version) = conn.query_row(
         "
         SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
                m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
                m.received_at, m.is_read, m.is_starred, m.has_attachments,
                m.snoozed_until, m.remote_mailbox, m.remote_uid,
-               m.message_id_header, m.in_reply_to_header, m.references_header
+               m.message_id_header, m.in_reply_to_header, m.references_header, m.sanitizer_version
         FROM messages m
         JOIN accounts a ON a.id = m.account_id
         JOIN folders f ON f.id = m.folder_id
         WHERE m.id = ?1
         ",
         params![message_id],
-        |row| map_message_row(conn, row),
-    )
-    .map_err(Into::into)
+        |row| Ok((map_message_row(conn, row)?, row.get::<_, i64>(25)?)),
+    )?;
+    if sanitizer_version < 1 && !matches!(message.folder_role.as_str(), "drafts" | "outbox") {
+        let is_outbound: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM outbox_queue WHERE message_id = ?1)",
+            [message_id],
+            |row| row.get(0),
+        )?;
+        if !is_outbound && looks_like_html_fragment(&message.body) && message.body.len() > 20_000 {
+            message.sanitized_html =
+                if crate::protocol::html_has_remote_images(&message.sanitized_html) {
+                    crate::protocol::sanitize_html_with_remote_images(&message.body)
+                } else {
+                    crate::protocol::sanitize_html(&message.body)
+                };
+            conn.execute(
+                "UPDATE messages SET sanitized_html = ?2 WHERE id = ?1",
+                params![message_id, message.sanitized_html],
+            )?;
+        }
+        conn.execute(
+            "UPDATE messages SET sanitizer_version = 1 WHERE id = ?1",
+            [message_id],
+        )?;
+    }
+    Ok(message)
 }
 pub(super) fn decode_thread_participants(value: &str) -> String {
     value
@@ -2191,4 +2214,42 @@ pub(super) fn snippet_from_body(body: &str) -> String {
         .chars()
         .take(120)
         .collect()
+}
+
+#[cfg(test)]
+mod completeness_recovery_tests {
+    use super::*;
+
+    #[test]
+    fn opening_a_legacy_truncated_message_recovers_the_tail_from_preserved_html() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = MailStore::open_at_with_seed(dir.path().join("test.sqlite3"), true).unwrap();
+        let original = format!(
+            "<p>{}</p><p>UNIQUE_COMPLETE_TAIL</p>",
+            "正文".repeat(20_000)
+        );
+        let message_id = store.with_conn(|conn| {
+            let id: i64 = conn.query_row("SELECT m.id FROM messages m JOIN folders f ON f.id = m.folder_id WHERE f.role = 'inbox' LIMIT 1", [], |row| row.get(0))?;
+            conn.execute("UPDATE messages SET body = ?2, sanitized_html = '<p>truncated', sanitizer_version = 0 WHERE id = ?1", params![id, original])?;
+            Ok(id)
+        }).unwrap();
+        let restored = store.get_message(message_id).unwrap();
+        assert!(restored
+            .sanitized_html
+            .ends_with("UNIQUE_COMPLETE_TAIL</p>"));
+        let persisted = store
+            .with_conn(|conn| {
+                Ok(conn.query_row(
+                    "SELECT sanitizer_version FROM messages WHERE id = ?1",
+                    [message_id],
+                    |row| row.get::<_, i64>(0),
+                )?)
+            })
+            .unwrap();
+        assert_eq!(persisted, 1);
+        assert_eq!(
+            store.get_message(message_id).unwrap().sanitized_html,
+            restored.sanitized_html
+        );
+    }
 }

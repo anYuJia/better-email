@@ -106,8 +106,12 @@ impl MailStore {
                   AND a.local_path <> ''
                   AND (
                     f.role = 'drafts'
-                    OR q.status IN ('queued', 'retry', 'scheduled', 'failed', 'cancelled', 'sent_remote_pending')
+                    OR q.status IN ('queued', 'retry', 'scheduled', 'failed', 'cancelled', 'sending', 'send_unknown', 'archiving', 'sent_remote_pending')
                   )
+                UNION
+                SELECT json_extract(item.value, '$.local_path')
+                FROM composer_recovery recovery, json_each(recovery.snapshot, '$.draft.attachments') item
+                WHERE json_type(item.value, '$.local_path') = 'text'
                 ",
             )?;
             let rows = stmt

@@ -31,6 +31,7 @@ mod app_settings;
 mod attachments;
 mod background_tasks;
 mod backup;
+mod composer_recovery;
 mod contacts_rules;
 mod folders;
 mod labels;
@@ -64,6 +65,10 @@ pub enum MailError {
     MissingFolderRole(String),
     #[error("{0}")]
     Smtp(String),
+    #[error("{0}")]
+    SmtpPermanent(String),
+    #[error("[SEND_OUTCOME_UNKNOWN] {0}")]
+    SmtpOutcomeUnknown(String),
     #[error("{0}")]
     Imap(String),
     /// 系统对话框被用户取消（另存为/选择文件等）：不是失败，调用方应保持现状。

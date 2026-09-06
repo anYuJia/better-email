@@ -28,6 +28,8 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingRef = useRef(false);
+  const generation = useRef(0);
 
   const titleId = useId();
   const descId = useId();
@@ -38,9 +40,11 @@ export default function ConfirmDialog({
 
   // A reused dialog must not expose the previous attempt's transient state.
   useEffect(() => {
-    if (!open) return;
+    generation.current += 1;
+    pendingRef.current = false;
     setPending(false);
     setError(null);
+    return () => { generation.current += 1; };
   }, [open]);
 
   useModalAccessibility({
@@ -55,19 +59,23 @@ export default function ConfirmDialog({
   if (!open) return null;
 
   async function handleConfirm() {
-    if (pending) return;
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    const attempt = generation.current;
     setPending(true);
     setError(null);
     try {
       await onConfirm();
     } catch (err) {
+      if (attempt !== generation.current) return;
+      pendingRef.current = false;
       setError(err instanceof Error ? err.message : String(err));
       setPending(false); // Enable retry
     }
   }
 
   function handleCancelClick() {
-    if (pending) return;
+    if (pendingRef.current) return;
     onCancel();
   }
 
@@ -76,7 +84,7 @@ export default function ConfirmDialog({
       ref={backdropRef}
       className="dialog-backdrop"
       onClick={(event) => {
-        if (!pending && event.target === event.currentTarget) {
+        if (!pendingRef.current && event.target === event.currentTarget) {
           onCancel();
         }
       }}

@@ -240,3 +240,28 @@ describe('ConfirmDialog Component robust behaviors', () => {
     unmount();
   });
 });
+
+describe('confirmation operation isolation', () => {
+  afterEach(cleanup);
+  it('rejects two confirmations issued in the same render turn', async () => {
+    let resolve!: () => void;
+    const onConfirm = vi.fn(() => new Promise<void>((accept) => { resolve = accept; }));
+    render(<ConfirmDialog open title="删除" description="不可撤销" onConfirm={onConfirm} onCancel={vi.fn()} />);
+    const button = screen.getByRole('button', { name: '确认' });
+    act(() => { button.click(); button.click(); });
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    await act(async () => resolve());
+  });
+  it('does not expose an earlier operation error after close and reopen', async () => {
+    let reject!: (reason: Error) => void;
+    const onConfirm = vi.fn(() => new Promise<void>((_, fail) => { reject = fail; }));
+    const props = { title: '删除', description: '不可撤销', onConfirm, onCancel: vi.fn() };
+    const { rerender } = render(<ConfirmDialog {...props} open />);
+    fireEvent.click(screen.getByRole('button', { name: '确认' }));
+    rerender(<ConfirmDialog {...props} open={false} />);
+    rerender(<ConfirmDialog {...props} open />);
+    await act(async () => reject(new Error('过期请求失败')));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: '确认' }).hasAttribute('disabled')).toBe(false);
+  });
+});

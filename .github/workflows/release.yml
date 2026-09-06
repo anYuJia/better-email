@@ -18,7 +18,11 @@ on:
         default: 'v1.0.0'
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -55,7 +59,8 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            google-chrome-stable
+            google-chrome-stable \
+            fonts-noto-cjk
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -76,7 +81,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Type check (strict, including unused checks)
+      - name: TypeScript and ESLint (warnings as errors)
         run: npm run lint
 
       - name: Frontend unit tests
@@ -93,13 +98,29 @@ jobs:
 
       - name: UI smoke test (mock backend, headless browser)
         timeout-minutes: 45
-        run: npm run test:ui
+        run: |
+          mkdir -p quality-evidence
+          set -o pipefail
+          npm run test:ui 2>&1 | tee quality-evidence/browser.log
         env:
           CHROME_PATH: /usr/bin/google-chrome-stable
+          BETTER_EMAIL_UI_CAPTURE_DIR: quality-evidence/screenshots
           # Compose reference fixtures pin wall-clock expectations to UTC+8.
           # Keep Chromium/Node on the same timezone so CI does not render 03:05
           # while the fixture contract correctly expects 11:05.
           TZ: Asia/Shanghai
+
+      - name: Record list algorithm benchmark
+        run: npm run bench:list -- quality-evidence/list-benchmark.json
+
+      - name: Preserve browser and benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-evidence-${{ github.run_id }}
+          path: quality-evidence/
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked

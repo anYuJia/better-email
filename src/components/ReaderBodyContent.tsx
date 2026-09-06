@@ -40,8 +40,9 @@ export default function ReaderBodyContent({
   bodyFetchError = null,
   onRetryBodyFetch,
 }: ReaderBodyContentProps) {
-  const [expandedHtml, setExpandedHtml] = useState<string | null>(null);
-  const requiresExplicitRender = readerHtml.length > 256_000 && expandedHtml !== readerHtml;
+  const [expandedBody, setExpandedBody] = useState<string | null>(null);
+  const activeBody = hasRenderableHtml ? readerHtml : plainBodyForReader;
+  const requiresExplicitRender = activeBody.length > 256_000 && expandedBody !== activeBody;
   // While the next message's body is being prepared, show the loading skeleton
   // instead of stale content from the previously rendered message.
   if (bodyFetchStatus === 'loading') {
@@ -70,12 +71,12 @@ export default function ReaderBodyContent({
       />
     );
   }
-  if (hasRenderableHtml && requiresExplicitRender) {
+  if (requiresExplicitRender) {
     return (
       <EmptyMessageBody
         title="这封邮件较大，尚未渲染完整内容"
         detail="正文完整保存在本机，没有截断。加载完整邮件可能需要更多内存。"
-        action={<button type="button" className="reader-warning-primary-action" onClick={() => setExpandedHtml(readerHtml)}>加载完整邮件</button>}
+        action={<button type="button" className="reader-warning-primary-action" onClick={() => setExpandedBody(activeBody)}>加载完整邮件</button>}
       />
     );
   }

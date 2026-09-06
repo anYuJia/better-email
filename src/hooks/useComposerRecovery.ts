@@ -20,6 +20,7 @@ export default function useComposerRecovery(
   const revision = useRef(0);
   const generation = useRef(0);
   const hasLocalEdits = useRef(false);
+  const hadEditableContent = useRef(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const ready = useRef<Promise<void>>(Promise.resolve());
   const flush = useRef<(() => void) | null>(null);
@@ -59,10 +60,13 @@ export default function useComposerRecovery(
 
   useEffect(() => {
     const currentGeneration = ++generation.current;
-    if (!enabled || isDraftEmpty(draft)) {
+    const empty = isDraftEmpty(draft);
+    if (!enabled || (empty && !hadEditableContent.current)) {
+      if (!enabled) hadEditableContent.current = false;
       flush.current = null;
       return;
     }
+    if (!empty) hadEditableContent.current = true;
     hasLocalEdits.current = true;
     let started = false;
     let timer: number | null = null;
@@ -78,18 +82,21 @@ export default function useComposerRecovery(
         await ready.current;
         if (currentGeneration !== generation.current) return;
         const snapshot: ComposerAutosave = { draft, isRichComposer, saved_at: new Date().toISOString() };
-        const payloadJson = JSON.stringify(snapshot);
-        const accepted = await invoke<boolean>(IPC.SaveComposerRecovery, {
-          payloadJson, revision: nextRevision(),
-        });
+        const payloadJson = empty ? null : JSON.stringify(snapshot);
+        const accepted = empty
+          ? await invoke<boolean>(IPC.ClearComposerRecovery, { revision: nextRevision() })
+          : await invoke<boolean>(IPC.SaveComposerRecovery, { payloadJson, revision: nextRevision() });
         if (!accepted) throw new Error('存在更新的恢复点，未覆盖；请手动保存当前草稿。');
+        if (currentGeneration !== generation.current) return;
         try {
-          window.localStorage.setItem(composerAutosaveStorageKey, payloadJson);
+          if (payloadJson === null) window.localStorage.removeItem(composerAutosaveStorageKey);
+          else window.localStorage.setItem(composerAutosaveStorageKey, payloadJson);
         } catch {
           // The database acknowledgement remains the source of truth.
         }
+        if (empty) hadEditableContent.current = false;
         if (mounted.current && currentGeneration === generation.current) {
-          setComposerAutosave({ ...snapshot, save_state: 'saved' });
+          setComposerAutosave(empty ? null : { ...snapshot, save_state: 'saved' });
         }
       }).catch((error: unknown) => {
         if (!mounted.current || currentGeneration !== generation.current) return;
@@ -109,6 +116,7 @@ export default function useComposerRecovery(
 
   const clearComposerAutosave = useCallback(() => {
     generation.current += 1;
+    hadEditableContent.current = false;
     hasLocalEdits.current = true;
     flush.current = null;
     setComposerAutosave(null);

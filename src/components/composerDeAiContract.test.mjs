@@ -9,9 +9,6 @@ function readCss(relative) {
   return readFileSync(join(repoRoot, relative), 'utf8');
 }
 
-function readTs(relative) {
-  return readFileSync(join(repoRoot, relative), 'utf8');
-}
 
 /* Comment stripping keeps the contract focused on real rules, not prose. */
 function rulesOnly(css) {
@@ -26,7 +23,6 @@ const sharedMotionCss = rulesOnly(readCss('src/styles/shared-motion.css'));
 const contextMenuCss = rulesOnly(readCss('src/components/context-menu.css'));
 const dropdownsCss = rulesOnly(readCss('src/styles/dropdowns.css'));
 const snoozePickerCss = rulesOnly(readCss('src/components/snooze-picker.css'));
-const globalTooltipCss = rulesOnly(readCss('src/styles/global-tooltip.css'));
 
 /* ----------------------------------------------------------------------- *
  * Helpers

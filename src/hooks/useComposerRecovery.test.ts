@@ -110,4 +110,59 @@ describe('durable composer recovery', () => {
     await act(async () => { window.dispatchEvent(new Event('pagehide')); });
     expect(mockInvoke).toHaveBeenCalledWith(IPC.SaveComposerRecovery, expect.anything());
   });
+  it('removes a previous checkpoint when all edited content is deliberately erased', async () => {
+    const { result, rerender } = renderHook(({ value }) => useComposerRecovery(value, true, true, vi.fn()), { initialProps: { value: draft } });
+    await advance();
+    rerender({ value: { ...draft, subject: '', body: '' } });
+    await advance();
+    expect(mockInvoke).toHaveBeenCalledWith(IPC.ClearComposerRecovery, expect.anything());
+    expect(result.current.composerAutosave).toBeNull();
+    expect(localStorage.getItem(composerAutosaveStorageKey)).toBeNull();
+  });
+
+  it('never erases a stored recovery just because a fresh empty composer opens', async () => {
+    const stored = { draft, saved_at: '2026-09-06T10:00:00Z', isRichComposer: true };
+    mockInvoke.mockResolvedValue({ revision: 10, payload: stored });
+    const { result } = renderHook(() => useComposerRecovery(emptyDraft, true, true, vi.fn()));
+    await advance(1000);
+    expect(result.current.composerAutosave?.draft.body).toBe(draft.body);
+    expect(mockInvoke).not.toHaveBeenCalledWith(IPC.ClearComposerRecovery, expect.anything());
+  });
+
+  it('does not resurrect a cleared legacy cache when a pending save finishes', async () => {
+    let resolve!: (accepted: boolean) => void;
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === IPC.LoadComposerRecovery) return { revision: 0, payload: null };
+      if (command === IPC.SaveComposerRecovery) return new Promise<boolean>((accept) => { resolve = accept; });
+      return true;
+    });
+    const { result } = renderHook(() => useComposerRecovery(draft, true, true, vi.fn()));
+    await advance();
+    act(() => result.current.clearComposerAutosave());
+    await act(async () => resolve(true));
+    expect(result.current.composerAutosave).toBeNull();
+    expect(localStorage.getItem(composerAutosaveStorageKey)).toBeNull();
+    expect(mockInvoke).toHaveBeenCalledWith(IPC.ClearComposerRecovery, expect.anything());
+  });
+
+  it('retries a failed empty-draft tombstone instead of skipping the cleared content', async () => {
+    let fail = true;
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === IPC.LoadComposerRecovery) return { revision: 0, payload: null };
+      if (command === IPC.ClearComposerRecovery && fail) throw new Error('database full');
+      return true;
+    });
+    const { result, rerender } = renderHook(({ value }) => useComposerRecovery(value, true, true, vi.fn()), { initialProps: { value: draft } });
+    await advance();
+    rerender({ value: { ...draft, subject: '', body: '' } });
+    await advance();
+    expect(result.current.composerAutosave?.save_state).toBe('error');
+    fail = false;
+    act(() => result.current.retryComposerAutosave());
+    await advance();
+    expect(mockInvoke.mock.calls.filter(([command]) => command === IPC.ClearComposerRecovery)).toHaveLength(2);
+    expect(result.current.composerAutosave).toBeNull();
+    expect(localStorage.getItem(composerAutosaveStorageKey)).toBeNull();
+  });
+
 });

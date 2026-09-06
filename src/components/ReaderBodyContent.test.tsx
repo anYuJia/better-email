@@ -62,4 +62,12 @@ describe('ReaderBodyContent remote body states', () => {
     expect(screen.getByTestId('full-html').textContent).toContain('unique-tail');
   });
 
+  it('defers large plain text without truncating content after expansion', () => {
+    const body = '完整纯文本'.repeat(60_000) + '\nunique-plain-tail';
+    renderBody({ plainBodyForReader: body });
+    expect(document.body.textContent).not.toContain('unique-plain-tail');
+    fireEvent.click(screen.getByRole('button', { name: '加载完整邮件' }));
+    expect(document.body.textContent).toContain('unique-plain-tail');
+  });
+
 });

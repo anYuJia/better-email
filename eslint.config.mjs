@@ -34,6 +34,7 @@ export default [
   },
   {
     files: [
+      'src/hooks/lint-contract-*.ts',
       'src/hooks/useComposerRecovery.ts',
       'src/hooks/useMailFeedback.ts',
       'src/hooks/useMobileVisualViewport.ts',

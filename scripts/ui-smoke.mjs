@@ -1798,7 +1798,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.filter-menu summary')?.textContent.includes('未读') && document.querySelector('.message-card.is-unread')");
     await openDetails(cdp, '.sort-menu');
     await clickButton(cdp, '最早优先', "document.querySelector('.sort-menu')");
-    await waitForExpression(cdp, "document.querySelector('.sort-menu summary')?.textContent.includes('时间') && document.querySelector('.sort-menu [aria-checked=\"true\"]')?.textContent.includes('最早优先')");
+    await waitForExpression(cdp, "document.querySelector('.sort-menu summary')?.textContent.includes('排序') && document.querySelector('.sort-menu [aria-checked=\"true\"]')?.textContent.includes('最早优先')");
     await evalInPage(
       cdp,
       "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"inbox\"]'); const badge = folder?.querySelector('.badge'); if (!folder || !badge || Number(badge.textContent) <= 0) throw new Error('Inbox unread folder target not found'); window.__folderUnreadBefore = Number(badge.textContent); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 180, button: 2 })); })()",
@@ -1811,7 +1811,7 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.filter-menu summary')?.textContent.includes('全部') && !document.querySelector('.view-menu') && document.body.innerText.includes('已显示')");
     await openDetails(cdp, '.sort-menu');
     await clickButton(cdp, '最新优先', "document.querySelector('.sort-menu')");
-    await waitForExpression(cdp, "document.querySelector('.sort-menu summary')?.textContent.includes('时间') && document.querySelector('.sort-menu [aria-checked=\"true\"]')?.textContent.includes('最新优先')");
+    await waitForExpression(cdp, "document.querySelector('.sort-menu summary')?.textContent.includes('排序') && document.querySelector('.sort-menu [aria-checked=\"true\"]')?.textContent.includes('最新优先')");
     await evalInPage(
       cdp,
       "(() => { const folder = document.querySelector('.primary-folder-list .folder[data-folder-role=\"trash\"]'); if (!folder) throw new Error('Trash folder context target not found'); folder.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 220, clientY: 380, button: 2 })); })()",
@@ -1882,7 +1882,7 @@ async function main() {
     await clickButton(cdp, '设置', "document.querySelector('.sidebar-footer')");
     await waitForExpression(cdp, "document.querySelector('.settings-modal') && document.querySelector('.settings-nav')");
     await openSettingsSection(cdp, '通讯录', 'contacts', '.settings-page[data-settings-page="contacts"]');
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"contacts\"]')?.innerText.includes('还没有联系人')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"contacts\"]')?.innerText.includes('暂无联系人')");
     await openContactCreateDialog(cdp);
     await fillInput(cdp, '.contact-create-form input[placeholder="联系人名称"]', 'Ada');
     await fillInput(cdp, '.contact-create-form input[placeholder="name@example.com"]', 'ada@example.com');
@@ -1994,8 +1994,9 @@ async function main() {
     await clickButton(cdp, '写邮件');
     await waitForExpression(cdp, "document.querySelector('.composer input[aria-label=\"主题\"]').value === 'Smoke Draft Flow' && document.body.innerText.includes('已从恢复点还原邮件')");
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('保存草稿路径验证'); const plain = document.querySelector('.composer textarea[placeholder=\"正文\"]'); return Boolean(plain && (plain.value ?? '').includes('保存草稿路径验证')); })()");
+    await evalInPage(cdp, "document.querySelector('.composer .composer-contact-toggle[aria-pressed=\"false\"]')?.click()");
     await waitForExpression(cdp, "document.querySelector('.composer.has-contacts-panel .composer-contacts-panel') && document.querySelector('.composer-contacts-search input')");
-    await waitForExpression(cdp, "!document.querySelector('.composer .composer-contact-toggle') && !document.querySelector('.composer-contacts-panel .composer-contacts-close') && document.querySelector('.composer-contacts-tabs [role=\"tab\"][aria-selected=\"true\"]')");
+    await waitForExpression(cdp, "document.querySelector('.composer .composer-contact-toggle[aria-pressed=\"true\"]') && document.querySelector('.composer-contacts-panel .composer-contacts-close') && document.querySelector('.composer-contacts-tabs [role=\"tab\"][aria-selected=\"true\"]')");
     const composeGeometry = await evalInPage(cdp, `(() => {
       const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect() ?? null;
       const editor = rect('.composer-editor-pane');
@@ -2036,14 +2037,14 @@ async function main() {
           && document.querySelectorAll('.composer header button[aria-label="关闭写信窗口"]').length === 1
           && document.querySelectorAll('.composer-contacts-panel [aria-label="收起写信"]').length === 0
           && document.querySelectorAll('.composer-contacts-panel [aria-label="关闭写信窗口"]').length === 0
-          && document.querySelectorAll('.composer-contacts-panel [aria-label="关闭联系人面板"]').length === 0
-          && document.querySelectorAll('.composer .composer-contact-toggle').length === 0,
+          && document.querySelectorAll('.composer-contacts-panel [aria-label="关闭联系人面板"]').length === 1
+          && document.querySelectorAll('.composer .composer-contact-toggle[aria-pressed="true"]').length === 1,
         ranges: Boolean(
           within(contacts?.width, ${COMPOSE_CONTACTS_WIDTH - 4}, ${COMPOSE_CONTACTS_WIDTH + 4})
           && within(sender?.height, 0, 60)
           && within(recipient?.height, 0, 68)
           && within(subject?.height, 0, 60)
-          && within(toolbar?.height, 0, 50)
+          && (!toolbar || within(toolbar.height, 0, 50))
           && (body?.height ?? 0) >= 220
           && (!rows.length || (rows[0].getBoundingClientRect().height <= 70))
           && (contactsFooter?.height ?? 0) <= 68
@@ -2080,7 +2081,7 @@ async function main() {
       mobile: false,
     });
     await waitForExpression(cdp, 'window.innerWidth === 1440 && document.querySelector(\'.composer-editor-pane\')');
-    await waitForExpression(cdp, "document.querySelector('.composer-contacts-panel') && !document.querySelector('.composer .composer-contact-toggle') && !document.querySelector('.composer-contacts-panel .composer-contacts-close')");
+    await waitForExpression(cdp, "document.querySelector('.composer-contacts-panel') && document.querySelector('.composer .composer-contact-toggle[aria-pressed=\"true\"]') && document.querySelector('.composer-contacts-panel .composer-contacts-close')");
     await fillInput(cdp, '.composer-contacts-search input', 'nobody@example.com');
     await waitForExpression(cdp, "document.querySelector('.composer-contacts-empty')?.innerText.includes('没有找到匹配联系人')");
     await evalInPage(cdp, "document.querySelector('.composer-contacts-search button[aria-label=\"清除联系人搜索\"]')?.click()");
@@ -2145,6 +2146,8 @@ async function main() {
     await waitForExpression(cdp, "(() => { const link = document.querySelector('.composer-richtext-body a'); return link?.classList.contains('composer-auto-link') && link.getAttribute('href') === 'https://example.com/path?x=1&y=2' && link.textContent === 'https://example.com/path?x=1&y=2'; })()");
     await waitForExpression(cdp, "!document.querySelector('.composer-link-popover') && !document.querySelector('.composer-rich-toolbar button[aria-label=\"插入链接\"]')");
     await captureScreenshot(cdp, 'compose-final-polish-auto-link');
+    await clickButton(cdp, '格式', "document.querySelector('.composer .composer-footer-tool-group')");
+    await waitForExpression(cdp, "document.querySelector('.composer-rich-toolbar') && document.querySelector('.composer .composer-footer-tool-group button[aria-label=\"格式\"]')?.getAttribute('aria-pressed') === 'true'");
     await evalInPage(cdp, `(() => {
       const editor = document.querySelector('.composer-richtext-body');
       if (!editor) return false;
@@ -2694,7 +2697,7 @@ async function main() {
     await waitForExpression(cdp, "document.body.innerText.includes('/tmp/better-email-backup.json') && document.body.innerText.includes('凭据未包含')");
 
     await openSettingsSection(cdp, '通讯录', 'contacts', '.settings-page[data-settings-page="contacts"]');
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"contacts\"] .contact-transfer-actions') && (document.querySelectorAll('.contact-tool-row').length > 0 || document.querySelector('.settings-page[data-settings-page=\"contacts\"]')?.innerText.includes('还没有联系人'))");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"contacts\"] .contact-transfer-actions') && (document.querySelectorAll('.contact-tool-row').length > 0 || document.querySelector('.settings-page[data-settings-page=\"contacts\"]')?.innerText.includes('暂无联系人'))");
     await evalInPage(cdp, `(() => {
       const transparent = (value) => value === 'rgba(0, 0, 0, 0)' || value === 'transparent';
       const transferLabels = [...document.querySelectorAll('.contact-transfer-actions button')]
@@ -3021,7 +3024,7 @@ async function main() {
       "(() => { const host = document.querySelector('.reader-html'); const image = host?.shadowRoot?.querySelector('img[src=\"/inline-image-preview.svg\"]'); const attachmentText = document.querySelector('.attachments')?.innerText || ''; return image?.complete && image.naturalWidth > 0 && document.querySelectorAll('.attachments > div').length === 1 && attachmentText.includes('security-checklist.pdf') && !attachmentText.includes('better-email-inline-logo'); })()",
       15_000,
     );
-    await clickButton(cdp, '下载全部 1 个', "document.querySelector('.attachment-section-header')");
+    await clickButton(cdp, '下载', "document.querySelector('.attachments')");
     await waitForExpression(cdp, "document.querySelector('.attachment-transfer-status')?.innerText.includes('64 KB 下载进度') && [...document.querySelectorAll('.attachments button')].some((item) => item.textContent.includes('重试')) && document.body.innerText.includes('附件下载失败')");
     await evalInPage(cdp, "document.querySelectorAll('details[open]').forEach((item) => { item.open = false; }); document.querySelector('button[aria-label=\"关闭撤销提示\"]')?.click();");
     await captureScreenshot(cdp, 'attachment-download-retry');

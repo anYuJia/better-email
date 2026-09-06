@@ -1930,7 +1930,7 @@ function MailboxApp({
             <MobileSettingsRoot
               account={account}
               accounts={accounts}
-              onBack={() => navigateMobileScreen('mail')}
+              onBack={backMobileScreen}
               onOpenSection={openMobileSettingsSection}
             />
           )}

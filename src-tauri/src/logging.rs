@@ -16,6 +16,11 @@ use std::sync::Mutex;
 /// 测试可替换的输出目标；`None` 表示输出到 stderr。
 static LOG_WRITER: Mutex<Option<Box<dyn Write + Send>>> = Mutex::new(None);
 
+#[cfg(test)]
+thread_local! {
+    static THREAD_LOG_WRITER: std::cell::RefCell<Option<Box<dyn Write>>> = const { std::cell::RefCell::new(None) };
+}
+
 /// 生成统一格式的时间戳：`2026-08-12 14:32:08.417 +08:00`。
 fn format_timestamp(now: chrono::DateTime<chrono::Local>) -> String {
     now.format("%Y-%m-%d %H:%M:%S%.3f %:z").to_string()
@@ -29,6 +34,21 @@ pub fn format_line(message: &str) -> String {
 /// 统一日志入口：在输出时生成时间戳并写入 stderr（测试时可替换输出目标）。
 pub fn log_line(message: impl AsRef<str>) {
     let line = format_line(message.as_ref());
+    #[cfg(test)]
+    {
+        let handled = THREAD_LOG_WRITER.with(|cell| {
+            let mut borrow = cell.borrow_mut();
+            if let Some(writer) = borrow.as_mut() {
+                let _ = writeln!(writer, "{line}");
+                true
+            } else {
+                false
+            }
+        });
+        if handled {
+            return;
+        }
+    }
     let mut writer = LOG_WRITER
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -79,9 +99,11 @@ pub(crate) mod test_util {
     pub(crate) fn with_capture(action: impl FnOnce()) -> String {
         let _guard = CAPTURE_LOCK.lock().unwrap_or_else(|p| p.into_inner());
         let capture = CaptureWriter(Arc::new(Mutex::new(Vec::new())));
+        super::THREAD_LOG_WRITER.with(|cell| *cell.borrow_mut() = Some(Box::new(capture.clone())));
         set_log_writer(Some(Box::new(capture.clone())));
         action();
         set_log_writer(None);
+        super::THREAD_LOG_WRITER.with(|cell| *cell.borrow_mut() = None);
         let bytes = capture.0.lock().unwrap_or_else(|p| p.into_inner()).clone();
         String::from_utf8(bytes).expect("captured logs are utf8")
     }
@@ -154,25 +176,17 @@ mod tests {
             log_line("[better-email][sync] command failed error=boom");
         });
         let lines: Vec<&str> = text.lines().collect();
-        assert!(
-            lines
+        let targets = [
+            "[better-email][db] open ok",
+            "[better-email][sync] plan account_id=Some(1) total_accounts=1",
+            "[better-email][sync] command failed error=boom",
+        ];
+        for target in targets {
+            let line = lines
                 .iter()
-                .any(|line| line.ends_with("[better-email][db] open ok")),
-            "缺少 db 日志行：{text}"
-        );
-        assert!(
-            lines.iter().any(|line| line
-                .ends_with("[better-email][sync] plan account_id=Some(1) total_accounts=1")),
-            "缺少 sync 日志行：{text}"
-        );
-        // 错误日志同样带时间戳
-        assert!(
-            lines
-                .iter()
-                .any(|line| line.ends_with("[better-email][sync] command failed error=boom")),
-            "缺少错误日志行：{text}"
-        );
-        for line in &lines {
+                .copied()
+                .find(|line| line.ends_with(target))
+                .unwrap_or_else(|| panic!("缺少日志行：{target}，实际输出：{text}"));
             let stamp = parse_timestamp(line).unwrap_or_else(|| panic!("缺少时间戳前缀：{line}"));
             assert!(
                 timestamp_matches_shape(stamp),
@@ -188,14 +202,29 @@ mod tests {
             log_line("first");
             log_line("second");
         });
-        let stamps: Vec<String> = text
+        let first_line = text
             .lines()
-            .filter_map(|line| parse_timestamp(line).map(str::to_string))
-            .collect();
-        assert_eq!(stamps.len(), 2, "应生成两行日志：{text}");
+            .find(|line| line.ends_with("first"))
+            .unwrap_or_else(|| panic!("缺少 first 日志行：{text}"));
+        let second_line = text
+            .lines()
+            .find(|line| line.ends_with("second"))
+            .unwrap_or_else(|| panic!("缺少 second 日志行：{text}"));
+        let first_stamp = parse_timestamp(first_line)
+            .unwrap_or_else(|| panic!("缺少 first 时间戳：{first_line}"));
+        let second_stamp = parse_timestamp(second_line)
+            .unwrap_or_else(|| panic!("缺少 second 时间戳：{second_line}"));
         assert!(
-            stamps[0] <= stamps[1],
-            "第二次输出的时间戳不应早于第一次：{stamps:?}"
+            timestamp_matches_shape(first_stamp),
+            "第一条时间戳格式不符：{first_stamp}"
+        );
+        assert!(
+            timestamp_matches_shape(second_stamp),
+            "第二条时间戳格式不符：{second_stamp}"
+        );
+        assert!(
+            first_stamp <= second_stamp,
+            "第二次输出的时间戳不应早于第一次：{first_stamp} vs {second_stamp}"
         );
     }
 }

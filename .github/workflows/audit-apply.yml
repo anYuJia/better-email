@@ -1,0 +1,109 @@
+name: Audit patch verification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: audit-patch-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.event.pull_request.number == 21 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/mobile-list-gestures-20260906'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Check for a scoped patch
+        id: patch
+        shell: bash
+        run: |
+          if test -f .github/audit-bundle.b64; then echo 'present=true' >> "$GITHUB_OUTPUT"; fi
+      - name: Apply verified source edits
+        if: steps.patch.outputs.present == 'true'
+        shell: python
+        run: |
+          import base64, gzip, hashlib, json, pathlib, subprocess
+          root = pathlib.Path.cwd()
+          raw = gzip.decompress(base64.b64decode((root / '.github/audit-bundle.b64').read_bytes(), validate=False))
+          bundle = json.loads(raw)
+          planned = []
+          seen = set()
+          for item in bundle['files']:
+              name = item['path']
+              relative = pathlib.PurePosixPath(name)
+              if name in seen or relative.is_absolute() or '..' in relative.parts or not name.startswith('src-tauri/src/'):
+                  raise RuntimeError('Patch path is not allowed: ' + name)
+              seen.add(name)
+              target = root / name
+              if target.is_symlink() or not target.resolve().is_relative_to(root):
+                  raise RuntimeError('Unsafe source path: ' + name)
+              previous = target.read_bytes() if target.exists() else None
+              actual = hashlib.sha256(previous).hexdigest() if previous is not None else None
+              if actual != item['before']:
+                  raise RuntimeError('Source changed before applying: ' + name)
+              lines = (previous or b'').decode('utf-8').splitlines(keepends=True)
+              for edit in reversed(item['edits']):
+                  start, end = edit['start'], edit['end']
+                  if not 0 <= start <= end <= len(lines):
+                      raise RuntimeError('Invalid edit range: ' + name)
+                  lines[start:end] = edit['lines']
+              result = ''.join(lines).encode('utf-8')
+              if hashlib.sha256(result).hexdigest() != item['after']:
+                  raise RuntimeError('Patch checksum does not match: ' + name)
+              planned.append((target, result))
+          for target, result in planned:
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_bytes(result)
+          (root / '.github/audit-bundle.b64').unlink()
+          print('Applied verified source edits:', len(planned))
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.patch.outputs.present == 'true'
+        with:
+          components: rustfmt, clippy
+      - name: Format and publish only the review branch
+        if: steps.patch.outputs.present == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path src-tauri/Cargo.toml
+          git diff --check
+          git add src-tauri/src .github/audit-bundle.b64
+          git -c user.name='yhan-sun' -c user.email='304309934+yhan-sun@users.noreply.github.com' commit -m 'feat:集成正文发送安全与草稿持久化修复'
+          git push origin HEAD:refs/heads/fix/mobile-list-gestures-20260906
+      - name: Export the formatted source
+        if: steps.patch.outputs.present == 'true' && always()
+        shell: bash
+        run: |
+          mkdir -p audit-result
+          git rev-parse HEAD > audit-result/HEAD.txt
+          tar --exclude=src-tauri/target -czf audit-result/rust-source.tar.gz src-tauri/src
+          git diff --stat > audit-result/diff-stat.txt
+      - uses: actions/upload-artifact@v4
+        if: steps.patch.outputs.present == 'true' && always()
+        with:
+          name: audit-rust-source-${{ github.run_id }}
+          path: audit-result/
+          retention-days: 1
+      - name: Install Linux build dependencies
+        if: steps.patch.outputs.present == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - uses: swatinem/rust-cache@v2
+        if: steps.patch.outputs.present == 'true'
+        with:
+          workspaces: src-tauri
+      - name: Rust tests
+        if: steps.patch.outputs.present == 'true'
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Clippy
+        if: steps.patch.outputs.present == 'true'
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings

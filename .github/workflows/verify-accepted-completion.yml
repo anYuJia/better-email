@@ -1,0 +1,101 @@
+name: Verify accepted completion
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+permissions:
+  contents: write
+jobs:
+  verify:
+    if: github.event.pull_request.number == 21 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'fix/mobile-list-gestures-20260906'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Apply exact reviewed completion boundary
+        shell: python
+        run: |
+          from pathlib import Path
+          import hashlib
+          p=Path('src-tauri/src/commands/outbox.rs')
+          s=p.read_text()
+          if hashlib.sha256(s.encode()).hexdigest() != 'eae35adf7af8e901d7f5bb79b5a04d04e45bbec559c976efdc84139e28c8dd66':
+              raise RuntimeError('Reviewed source changed; no patch applied')
+          helper='''fn finish_accepted_send<F>(message_id: i64, finish: F) -> i64
+          where
+              F: FnOnce() -> MailResult<()>,
+          {
+              if let Err(error) = finish() {
+                  crate::logging::log_line(format!(
+                      "[better-email][send] accepted message_id={message_id}; completion deferred: {error}"
+                  ));
+              }
+              message_id
+          }
+
+          '''
+          s=s.replace('fn send_message_blocking(',helper+'fn send_message_blocking(',1)
+          start=s.index('    if let Some(task_progress) = task_progress {\n        task_progress.set(store, 88,')
+          end=s.index('    command_info(format!(\n        "[better-email][send] direct smtp ok',start)
+          block=s[start:end]
+          s=s[:start]+'    let message_id = finish_accepted_send(message_id, || {\n'+''.join('    '+line if line.strip() else line for line in block.splitlines(keepends=True))+'        Ok(())\n    });\n'+s[end:]
+          needle='    static TEST_DATABASE_COUNTER: AtomicU64 = AtomicU64::new(0);\n'
+          s=s.replace(needle,needle+'''
+              #[test]
+              fn accepted_send_keeps_its_result_when_completion_fails() {
+                  let id = super::finish_accepted_send(42, || Err(crate::db::MailError::DatabaseLockPoisoned));
+                  assert_eq!(id, 42);
+              }
+
+              #[test]
+              fn accepted_send_runs_completion_once_and_keeps_the_message_id() {
+                  let mut calls = 0;
+                  let id = super::finish_accepted_send(43, || {
+                      calls += 1;
+                      Ok(())
+                  });
+                  assert_eq!(id, 43);
+                  assert_eq!(calls, 1);
+              }
+          ''',1)
+          if hashlib.sha256(s.encode()).hexdigest() != '459a5e604fb4080262d0294758d60a1b415188db51070a9430b5169d24fca9ca':
+              raise RuntimeError('Review checksum mismatch; no patch applied')
+          p.write_text(s)
+      - name: Format and commit only source on the review branch
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path src-tauri/Cargo.toml
+          git diff --check
+          git add src-tauri/src/commands/outbox.rs
+          git -c user.name='yhan-sun' -c user.email='304309934+yhan-sun@users.noreply.github.com' commit -m 'feat:保持服务器已接受邮件的成功结果'
+          git push origin HEAD:refs/heads/fix/mobile-list-gestures-20260906
+          mkdir -p verification
+          git rev-parse HEAD > verification/HEAD.txt
+          cp src-tauri/src/commands/outbox.rs verification/outbox.rs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: accepted-completion-source
+          path: verification/
+          retention-days: 1
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Verify native source
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml --locked 2>&1 | tee verification/rust.log
+          cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings 2>&1 | tee verification/clippy.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: accepted-completion-results
+          path: verification/
+          retention-days: 2

@@ -1,0 +1,34 @@
+name: Audit diagnostics
+on:
+  pull_request:
+    branches: [main]
+    types: [synchronize]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnostics:
+    if: github.event.pull_request.number == 21 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Collect compiler errors
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p diagnostics
+          gh api repos/anYuJia/better-email/actions/jobs/101475955052/logs > /tmp/compiler.log
+          python3 - <<'PY'
+          import pathlib
+          lines = pathlib.Path('/tmp/compiler.log').read_text().splitlines()
+          chosen = set()
+          for i, line in enumerate(lines):
+              if 'error' in line.lower() or 'FAILED' in line:
+                  chosen.update(range(max(0, i - 2), min(len(lines), i + 18)))
+          pathlib.Path('diagnostics/compiler-errors.txt').write_text('\n'.join(lines[i] for i in sorted(chosen)))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audit-compiler-diagnostics
+          path: diagnostics/
+          retention-days: 1

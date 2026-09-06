@@ -18,13 +18,18 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Apply exact reviewed edits
+        id: apply
         shell: python
         run: |
-          import hashlib, json, pathlib, subprocess
+          import hashlib, json, pathlib
           root = pathlib.Path.cwd()
+          output = root / 'review-results'
+          output.mkdir(exist_ok=True)
+          raw = (root / '.github/review-edits.json').read_bytes()
+          (output / 'received-manifest.json').write_bytes(raw)
           planned = []
           seen = set()
-          for item in json.loads((root / '.github/review-edits.json').read_text())['files']:
+          for item in json.loads(raw)['files']:
               name = item['path']
               relative = pathlib.PurePosixPath(name)
               if name in seen or relative.is_absolute() or '..' in relative.parts or not (name.startswith(('src/', 'src-tauri/src/', 'scripts/')) or name in ('package.json', 'eslint.config.mjs')):
@@ -37,16 +42,29 @@ jobs:
               actual = hashlib.sha1(('blob ' + str(len(previous)) + '\0').encode() + previous).hexdigest() if previous is not None else None
               if actual != item['before']:
                   raise RuntimeError('Reviewed source changed: ' + name + ' ' + str(actual))
-              lines = (previous or b'').decode().splitlines(keepends=True)
-              for edit in reversed(item['edits']):
-                  start, end = edit['start'], edit['end']
-                  if not 0 <= start <= end <= len(lines):
-                      raise RuntimeError('Invalid edit range: ' + name)
-                  lines[start:end] = edit['lines']
-              result = ''.join(lines).encode()
-              if hashlib.sha256(result).hexdigest() != item['after']:
+              matched = None
+              for decode_transport in (False, True):
+                  lines = (previous or b'').decode().splitlines(keepends=True)
+                  try:
+                      for edit in reversed(item['edits']):
+                          start, end = edit['start'], edit['end']
+                          if not 0 <= start <= end <= len(lines):
+                              raise RuntimeError('Invalid edit range: ' + name)
+                          replacement = [json.loads('"' + line + '"') for line in edit['lines']] if decode_transport else edit['lines']
+                          lines[start:end] = replacement
+                      result = ''.join(lines).encode()
+                  except json.JSONDecodeError:
+                      continue
+                  digest = hashlib.sha256(result).hexdigest()
+                  print(name, decode_transport, digest, item['after'])
+                  if digest == item['after']:
+                      matched = result
+                      break
+                  (output / (name.replace('/', '_') + '.after')).write_bytes(result)
+              if matched is None:
+                  (output / (name.replace('/', '_') + '.before')).write_bytes(previous or b'')
                   raise RuntimeError('Edited source checksum mismatch: ' + name)
-              planned.append((target, result))
+              planned.append((target, matched))
           for target, result in planned:
               target.parent.mkdir(parents=True, exist_ok=True)
               target.write_bytes(result)
@@ -71,13 +89,15 @@ jobs:
           import json, subprocess
           allowed = {item['path'] for item in json.load(open('.github/review-edits.json'))['files']} | {'package-lock.json'}
           changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()) | set(subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'], text=True).splitlines())
-          if changed - allowed:
-              raise RuntimeError('Unplanned changes: ' + repr(changed - allowed))
+          unexpected = {name for name in changed - allowed if not name.startswith('review-results/')}
+          if unexpected:
+              raise RuntimeError('Unplanned changes: ' + repr(unexpected))
           subprocess.run(['git', 'add', '--', *sorted(allowed)], check=True)
           PY
           git -c user.name=yhan-sun -c user.email=304309934+yhan-sun@users.noreply.github.com commit -m 'feat:补齐发送事务安全与静态检查门禁'
           git push origin HEAD:refs/heads/fix/mobile-list-gestures-20260906
       - name: Export exact source and local lint dependencies
+        id: export
         run: |
           mkdir -p review-workspace review-results
           git rev-parse HEAD > review-workspace/HEAD.txt
@@ -100,15 +120,15 @@ jobs:
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml --locked 2>&1 | tee review-results/rust.log
       - name: Strict native lint
-        if: '!cancelled()'
+        if: '!cancelled() && steps.export.outcome == ''success'''
         run: |
           set -o pipefail
           cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings 2>&1 | tee review-results/clippy.log
       - name: Inspect frontend lint results
-        if: '!cancelled()'
+        if: '!cancelled() && steps.export.outcome == ''success'''
         run: npx eslint . --format=json --output-file review-results/eslint.json
       - name: Frontend regressions
-        if: '!cancelled()'
+        if: '!cancelled() && steps.export.outcome == ''success'''
         run: |
           set -o pipefail
           npm test 2>&1 | tee review-results/frontend.log

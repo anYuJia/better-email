@@ -1,0 +1,42 @@
+name: Audit workspace
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-workspace-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  workspace:
+    if: github.event.pull_request.number == 21 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Export public source and locked frontend dependencies
+        run: |
+          mkdir -p audit-workspace
+          git rev-parse HEAD > audit-workspace/HEAD.txt
+          git archive --format=tar.gz --output=audit-workspace/source.tar.gz HEAD
+          tar -czf audit-workspace/node-modules.tar.gz node_modules
+          sha256sum audit-workspace/*.tar.gz > audit-workspace/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audit-workspace-${{ github.event.pull_request.head.sha }}
+          path: audit-workspace/
+          retention-days: 1
+          if-no-files-found: error

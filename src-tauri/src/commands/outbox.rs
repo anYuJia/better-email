@@ -374,6 +374,18 @@ pub async fn send_message(
     })?
 }
 
+fn finish_accepted_send<F>(message_id: i64, finish: F) -> i64
+where
+    F: FnOnce() -> MailResult<()>,
+{
+    if let Err(error) = finish() {
+        crate::logging::log_line(format!(
+            "[better-email][send] accepted message_id={message_id}; completion deferred: {error}"
+        ));
+    }
+    message_id
+}
+
 fn send_message_blocking(
     store: &MailStore,
     input: DraftInput,
@@ -437,37 +449,40 @@ fn send_message_blocking(
                 "服务器已接受邮件，但本地状态保存失败；请勿重复发送：{error}"
             ))
         })?;
-    if let Some(task_progress) = task_progress {
-        task_progress.set(store, 88, "服务器已接受，正在保存已发送副本")?;
-    }
-    if let Err(error) = store.sync_contacts_from_sent_message(message_id) {
-        crate::logging::log_line(format!(
-            "[better-email][send] contact sync deferred message_id={} error={}",
-            message_id, error
-        ));
-    }
-    if let Some(task_progress) = task_progress {
-        task_progress.set(store, 92, "正在保存远端已发送副本")?;
-    }
-    archive_sent_message(store, &account, &secret, &message, &raw_message)?;
-    // 只有远端 Sent 留档已经成功并切换为 sent 后，这次直接发送的临时附件才
-    // 不再有引用，立即清理。归档失败会保持 sent_remote_pending，从而保留附件。
-    let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
-    if let Some(task_progress) = task_progress {
-        let pending = store
-            .list_outbox()?
-            .iter()
-            .any(|item| item.message_id == message_id && item.status != "sent");
-        task_progress.set(
-            store,
-            100,
-            if pending {
-                "邮件已发送，已发送副本待重试"
-            } else {
-                "邮件已发送，副本已保存"
-            },
-        )?;
-    }
+    let message_id = finish_accepted_send(message_id, || {
+        if let Some(task_progress) = task_progress {
+            task_progress.set(store, 88, "服务器已接受，正在保存已发送副本")?;
+        }
+        if let Err(error) = store.sync_contacts_from_sent_message(message_id) {
+            crate::logging::log_line(format!(
+                "[better-email][send] contact sync deferred message_id={} error={}",
+                message_id, error
+            ));
+        }
+        if let Some(task_progress) = task_progress {
+            task_progress.set(store, 92, "正在保存远端已发送副本")?;
+        }
+        archive_sent_message(store, &account, &secret, &message, &raw_message)?;
+        // 只有远端 Sent 留档已经成功并切换为 sent 后，这次直接发送的临时附件才
+        // 不再有引用，立即清理。归档失败会保持 sent_remote_pending，从而保留附件。
+        let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
+        if let Some(task_progress) = task_progress {
+            let pending = store
+                .list_outbox()?
+                .iter()
+                .any(|item| item.message_id == message_id && item.status != "sent");
+            task_progress.set(
+                store,
+                100,
+                if pending {
+                    "邮件已发送，已发送副本待重试"
+                } else {
+                    "邮件已发送，副本已保存"
+                },
+            )?;
+        }
+        Ok(())
+    });
     command_info(format!(
         "[better-email][send] direct smtp ok message_id={} account_id={} duration_ms={}",
         message_id,
@@ -757,6 +772,24 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEST_DATABASE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn accepted_send_keeps_its_result_when_completion_fails() {
+        let id =
+            super::finish_accepted_send(42, || Err(crate::db::MailError::DatabaseLockPoisoned));
+        assert_eq!(id, 42);
+    }
+
+    #[test]
+    fn accepted_send_runs_completion_once_and_keeps_the_message_id() {
+        let mut calls = 0;
+        let id = super::finish_accepted_send(43, || {
+            calls += 1;
+            Ok(())
+        });
+        assert_eq!(id, 43);
+        assert_eq!(calls, 1);
+    }
 
     fn unique_test_database_path() -> std::path::PathBuf {
         let unique = TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed);

@@ -6,7 +6,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: audit-integration-${{ github.event.pull_request.number }}
@@ -85,30 +85,23 @@ jobs:
         if: steps.patch.outputs.present == 'true'
         with:
           components: rustfmt, clippy
-      - name: Format and export immutable source tree
+      - name: Format and export source manifest
         if: steps.patch.outputs.present == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           cargo fmt --manifest-path src-tauri/Cargo.toml
           git diff --check
           mkdir -p audit-result
           python3 - <<'PY'
-          import base64, json, pathlib, subprocess
+          import json, pathlib, subprocess
           def git(*args): return subprocess.check_output(['git', *args], text=True).strip()
-          def post(route, data):
-              return json.loads(subprocess.check_output(['gh', 'api', '--method', 'POST', 'repos/anYuJia/better-email/git/' + route, '--input', '-'], input=json.dumps(data).encode()))
-          parent = git('rev-parse', 'HEAD')
           paths = set(git('diff', '--name-only').splitlines()) | set(git('ls-files', '--others', '--exclude-standard').splitlines())
           tree = []
           for name in sorted(paths):
               if not (name.startswith(('src/', 'src-tauri/src/', 'scripts/')) or name in ['.github/workflows/release.yml', '.github/workflows/android.yml']): continue
-              p = pathlib.Path(name)
-              sha = post('blobs', {'encoding': 'base64', 'content': base64.b64encode(p.read_bytes()).decode()})['sha'] if p.exists() else None
+              sha = git('hash-object', name) if pathlib.Path(name).exists() else None
               tree.append({'path': name, 'mode': '100644', 'type': 'blob', 'sha': sha})
-          value = post('trees', {'base_tree': git('rev-parse', 'HEAD^{tree}'), 'tree': tree})
-          pathlib.Path('audit-result/publish.json').write_text(json.dumps({'parent': parent, 'tree': value['sha'], 'changed_files': len(tree)}, indent=2))
+          pathlib.Path('audit-result/publish.json').write_text(json.dumps({'parent': git('rev-parse', 'HEAD'), 'base_tree': git('rev-parse', 'HEAD^{tree}'), 'tree_elements': tree}, indent=2))
           PY
           tar -czf audit-result/source.tar.gz src src-tauri/src scripts .github/workflows/release.yml .github/workflows/android.yml
       - uses: actions/upload-artifact@v4

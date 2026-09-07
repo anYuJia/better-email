@@ -354,25 +354,27 @@ impl MailStore {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
             let conn = &transaction;
-            conn.execute(
+            let affected = conn.execute(
                 "
                 UPDATE outbox_queue
                 SET status = 'sent',
                     last_error = '',
                     next_attempt_at = ''
-                WHERE message_id = ?1
+                WHERE message_id = ?1 AND status IN ('sent_remote_pending', 'archiving')
                 ",
                 params![message_id],
             )?;
-            conn.execute(
-                "
+            if affected == 1 {
+                conn.execute(
+                    "
                 UPDATE messages
                 SET remote_mailbox = ?1,
                     remote_uid = ?2
                 WHERE id = ?3
                 ",
-                params![remote_mailbox.trim(), remote_uid.max(0), message_id],
-            )?;
+                    params![remote_mailbox.trim(), remote_uid.max(0), message_id],
+                )?;
+            }
             transaction.commit()?;
             Ok(())
         })
@@ -390,9 +392,13 @@ impl MailStore {
                 SET status = 'sent_remote_pending',
                     last_error = ?1,
                     next_attempt_at = ?2
-                WHERE message_id = ?3
+                WHERE message_id = ?3 AND status IN ('sent_remote_pending', 'archiving')
                 ",
-                params![error.trim(), next_attempt_at, message_id],
+                params![
+                    error.trim().chars().take(500).collect::<String>(),
+                    next_attempt_at,
+                    message_id
+                ],
             )?;
             Ok(())
         })
@@ -444,17 +450,12 @@ impl MailStore {
     }
     pub fn flush_outbox_dry_run(&self) -> MailResult<Vec<OutboxItem>> {
         self.with_conn(|conn| {
-            let now = Utc::now().to_rfc3339();
-            conn.execute(
-                "
-                UPDATE outbox_queue
-                SET status = 'sent_dry_run', attempts = attempts + 1, last_error = '', next_attempt_at = ''
-                WHERE status IN ('queued', 'retry', 'scheduled')
-                  AND (next_attempt_at = '' OR next_attempt_at <= ?1)
-                ",
-                params![now],
+            let transaction = rusqlite::Transaction::new_unchecked(
+                conn,
+                rusqlite::TransactionBehavior::Immediate,
             )?;
-            conn.execute(
+            let now = Utc::now().to_rfc3339();
+            transaction.execute(
                 "
                 UPDATE messages
                 SET folder_id = (
@@ -463,23 +464,25 @@ impl MailStore {
                     WHERE f.account_id = messages.account_id AND f.role = 'sent'
                     LIMIT 1
                 )
-                WHERE id IN (SELECT message_id FROM outbox_queue WHERE status = 'sent_dry_run')
+                WHERE id IN (
+                    SELECT message_id FROM outbox_queue
+                    WHERE status IN ('queued', 'retry', 'scheduled')
+                      AND (next_attempt_at = '' OR julianday(next_attempt_at) <= julianday(?1))
+                )
                 ",
-                [],
+                params![now],
             )?;
-            let mut stmt = conn.prepare(
+            transaction.execute(
                 "
-                SELECT q.id, q.message_id, m.recipients, m.subject, q.status, q.attempts,
-                       q.last_error, q.queued_at, q.next_attempt_at
-                FROM outbox_queue q
-                JOIN messages m ON m.id = q.message_id
-                ORDER BY q.queued_at DESC
-                LIMIT 50
+                UPDATE outbox_queue
+                SET status = 'sent_dry_run', attempts = attempts + 1, last_error = '', next_attempt_at = ''
+                WHERE status IN ('queued', 'retry', 'scheduled')
+                  AND (next_attempt_at = '' OR julianday(next_attempt_at) <= julianday(?1))
                 ",
+                params![now],
             )?;
-            let items = stmt
-                .query_map([], map_outbox_item)?
-                .collect::<Result<Vec<_>, _>>()?;
+            let items = list_outbox_for_conn(&transaction)?;
+            transaction.commit()?;
             Ok(items)
         })
     }
@@ -1063,3 +1066,7 @@ mod claim_tests {
         assert!(store.list_outbox().unwrap().is_empty());
     }
 }
+
+#[cfg(test)]
+#[path = "outbox_lifecycle_tests.rs"]
+mod lifecycle_tests;

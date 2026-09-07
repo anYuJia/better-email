@@ -71,7 +71,7 @@ function MessageListToolbar({
     <header
       className="list-control-strip"
       aria-label="邮件列表控制"
-      data-toolbar-height="52"
+      data-toolbar-min-height="52"
       data-toolbar-mode={isSelectionMode ? 'selection' : 'normal'}
     >
       <div className="list-summary-row">

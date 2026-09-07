@@ -2002,11 +2002,11 @@
   position: relative;
   z-index: 20;
   box-sizing: border-box;
-  flex: 0 0 52px;
+  flex: 0 0 auto;
   width: 100%;
-  height: 52px;
+  height: auto;
   min-height: 52px;
-  max-height: 52px;
+  max-height: none;
   padding: 6px 14px;
   display: flex;
   flex-direction: row;
@@ -2074,6 +2074,7 @@
   min-width: 0;
   min-height: 34px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -2091,7 +2092,8 @@
 .app-shell .list-control-tabs {
   flex: 0 0 auto;
   --list-tab-gap: 6px;
-  --list-tab-indicator-width: 64px;
+  --list-tab-indicator-width: max(64px, 4.5em);
+  font-size: var(--ui-font-size-secondary);
   position: relative;
   gap: var(--list-tab-gap);
   padding-bottom: 3px;
@@ -2116,7 +2118,11 @@
 }
 
 .app-shell .list-control-menus {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-inline-start: auto;
 }
 
 .app-shell .list-control-tabs > button {
@@ -2124,14 +2130,15 @@
   width: var(--list-tab-indicator-width);
   min-width: var(--list-tab-indicator-width);
   min-height: 32px;
-  height: 32px;
-  padding-inline: 8px;
+  height: auto;
+  padding: 4px 8px;
+  line-height: var(--ui-line-height-tight);
   border: 0;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 13px;
+  font-size: inherit;
   font-weight: 500;
 }
 
@@ -2161,7 +2168,7 @@
 
 .compact-dropdown > summary {
   min-height: 32px;
-  height: 32px;
+  height: auto;
   max-width: 100%;
   padding: 0 8px;
   display: inline-flex;
@@ -2301,7 +2308,8 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 32px;
-  height: 32px;
+  height: auto;
+  flex-wrap: wrap;
   padding: 0;
   display: flex;
   align-items: center;
@@ -2379,10 +2387,10 @@
 
 @media (max-width: 720px) {
   .app-shell .list-control-strip {
-    flex: 0 0 96px;
-    height: 96px;
+    flex: 0 0 auto;
+    height: auto;
     min-height: 96px;
-    max-height: 96px;
+    max-height: none;
     padding: 13px 12px 10px;
     flex-direction: column;
     align-items: stretch;

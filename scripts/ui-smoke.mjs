@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { WebSocket as UndiciWebSocket } from 'undici';
+import { testInitialHeaderLayout } from './ui-header-layout.mjs';
 
 function resolveCdpWebSocket() {
   if (typeof globalThis.WebSocket === 'function') {
@@ -1562,6 +1563,10 @@ async function main() {
       "localStorage.setItem('better-email.appLayout.v2', JSON.stringify({ sidebar: 244, list: 388 })); location.reload()",
     );
     await waitForExpression(cdp, "(() => { const shell = document.querySelector('.app-shell'); if (!shell) return false; const style = getComputedStyle(shell); return style.getPropertyValue('--app-sidebar-width').trim() === '244px' && style.getPropertyValue('--app-list-width').trim() === '388px'; })()");
+
+    await withStep('Fresh-boot header geometry, narrow panes, long input and enlarged text', () => testInitialHeaderLayout({
+      cdp, evaluate: evalInPage, wait: waitForExpression, viewport: setUiViewport, screenshot: captureScreenshot,
+    }));
 
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length <= 40 && document.querySelectorAll('.message-card').length > 5 && document.querySelector('.message-date-header') && document.body.innerText.includes('已显示 40 封') && document.body.innerText.includes('加载更多')");
     await cdp.send('Emulation.setDeviceMetricsOverride', {

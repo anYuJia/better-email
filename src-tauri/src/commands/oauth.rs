@@ -1,5 +1,4 @@
 use super::common::validate_external_url;
-use crate::credentials;
 use crate::db::{MailResult, MailStore};
 use crate::models::{
     OAuthCallbackInput, OAuthCallbackReport, OAuthLocalCallbackInput, OAuthRefreshInput,
@@ -15,9 +14,20 @@ pub fn start_oauth2_pkce(
     app: AppHandle,
     store: State<'_, MailStore>,
     input: OAuthStartInput,
+    account_id: Option<i64>,
 ) -> MailResult<OAuthStartReport> {
+    let account = store.get_account_by_id(account_id)?;
+    if account.email != input.login_hint.trim().to_lowercase() {
+        return Err(crate::db::MailError::Imap(
+            "OAuth2 登录提示与所选账号不匹配。".into(),
+        ));
+    }
     let draft = oauth::start_pkce_authorization(input).map_err(crate::db::MailError::Imap)?;
-    let report = store.save_oauth_session(draft.report, &draft.code_verifier)?;
+    let report = store.save_oauth_session_for_account(
+        draft.report,
+        &draft.code_verifier,
+        Some(account.id),
+    )?;
     app.shell()
         .open(report.authorization_url.clone(), None)
         .map_err(|error| crate::db::MailError::Imap(format!("无法打开 OAuth2 授权页：{error}")))?;
@@ -25,8 +35,11 @@ pub fn start_oauth2_pkce(
 }
 
 #[tauri::command]
-pub fn list_oauth_sessions(store: State<'_, MailStore>) -> MailResult<Vec<OAuthSession>> {
-    store.list_oauth_sessions()
+pub fn list_oauth_sessions(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<Vec<OAuthSession>> {
+    store.list_oauth_sessions_for_account(account_id)
 }
 
 #[tauri::command]
@@ -41,9 +54,10 @@ pub fn complete_oauth2_callback(
 pub async fn wait_for_oauth2_callback(
     store: State<'_, MailStore>,
     input: OAuthLocalCallbackInput,
+    account_id: Option<i64>,
 ) -> MailResult<OAuthCallbackReport> {
     // 只接受匹配当前待处理会话 state 的回调：随机探测、错误 state 不会终止监听。
-    let sessions = store.list_oauth_sessions()?;
+    let sessions = store.list_oauth_sessions_for_account(account_id)?;
     let expected_states = sessions
         .into_iter()
         .filter(|session| session.status == "pending")
@@ -62,20 +76,29 @@ pub async fn wait_for_oauth2_callback(
 pub async fn exchange_oauth2_token(
     store: State<'_, MailStore>,
     input: OAuthTokenExchangeInput,
+    account_id: Option<i64>,
 ) -> MailResult<OAuthTokenExchangeReport> {
     let session = store.oauth_session_for_token_exchange(input.session_id)?;
+    let account = store.oauth_account_for_session(session.id)?;
+    if account_id.is_some_and(|id| id != account.id) {
+        return Err(crate::db::MailError::Imap(
+            "OAuth2 会话不属于所选账号。".into(),
+        ));
+    }
+    let previous = store.credential_snapshot_optional(&account)?;
     match oauth::exchange_token(&session, &input.client_id, &input.client_secret) {
         Ok(bundle) => {
             let expires_at = bundle.expires_at.clone();
             let secret = serde_json::to_string(&bundle).map_err(|error| {
                 crate::db::MailError::Imap(format!("OAuth2 token 序列化失败：{error}"))
             })?;
-            let status = store.store_account_secret(&session.account_email, &secret)?;
-            if !status.exists {
-                let report = store.mark_oauth_token_exchange_failed(session.id, &status.message)?;
-                return Err(crate::db::MailError::Imap(report.message));
-            }
-            store.mark_oauth_token_stored(session.id, &expires_at)
+            store.store_oauth_exchange_result(
+                &account,
+                &session,
+                previous.as_deref(),
+                &secret,
+                &expires_at,
+            )
         }
         Err(error) => {
             let report = store.mark_oauth_token_exchange_failed(session.id, &error)?;
@@ -88,27 +111,11 @@ pub async fn exchange_oauth2_token(
 pub async fn refresh_oauth2_token(
     store: State<'_, MailStore>,
     input: OAuthRefreshInput,
+    account_id: Option<i64>,
 ) -> MailResult<OAuthRefreshReport> {
-    let account = store.get_account()?;
-    let raw = store.get_account_secret_raw(&account)?;
-    let secret = credentials::account_secret_from_raw(&account.auth_type, &raw)
-        .map_err(crate::db::MailError::Imap)?;
-    let bundle = match secret {
-        credentials::AccountSecret::OAuth2(bundle) => bundle,
-        credentials::AccountSecret::Password(_) => {
-            return Err(crate::db::MailError::Imap(
-                "当前账号不是 OAuth2 模式，无法刷新 token。".to_string(),
-            ));
-        }
-    };
-    let refreshed = oauth::refresh_token(&bundle, &input.client_id, &input.client_secret)
-        .map_err(crate::db::MailError::Imap)?;
-    let secret = serde_json::to_string(&refreshed)
-        .map_err(|error| crate::db::MailError::Imap(format!("OAuth2 token 序列化失败：{error}")))?;
-    let status = store.store_account_secret(&account.email, &secret)?;
-    if !status.exists {
-        return Err(crate::db::MailError::Imap(status.message));
-    }
+    let account = store.get_account_by_id(account_id)?;
+    let refreshed =
+        store.refresh_account_oauth_secret(&account, &input.client_id, &input.client_secret)?;
     Ok(OAuthRefreshReport {
         provider: refreshed.provider,
         status: "token_refreshed".to_string(),

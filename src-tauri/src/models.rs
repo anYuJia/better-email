@@ -667,6 +667,7 @@ pub struct SyncRun {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SyncSchedulePlan {
+    pub credential_issues: Vec<CredentialStatus>,
     pub max_accounts_per_batch: i64,
     pub total_accounts: i64,
     pub batch_accounts: Vec<Account>,

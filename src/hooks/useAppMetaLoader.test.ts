@@ -556,3 +556,11 @@ describe('useAppMetaLoader', () => {
     expect(trayCalls[0][1]).toEqual({ unreadCount: 5 });
   });
 });
+
+
+it('loads OAuth sessions for the requested nondefault metadata scope', async () => {
+  setupInvokeMocks();
+  const { result } = renderMetaLoader({ accountScope: 2 });
+  await act(async () => { await result.current.loadMeta(null, 2, { mode: 'full' }); });
+  expect(mockInvoke).toHaveBeenCalledWith('list_oauth_sessions', { accountId: 2 });
+});

@@ -184,7 +184,18 @@ impl MailStore {
         account_id: Option<i64>,
         max_accounts_per_batch: usize,
     ) -> MailResult<SyncSchedulePlan> {
-        let accounts = self.accounts_for_header_sync(account_id)?;
+        let candidates = self.accounts_for_header_sync(account_id)?;
+        let total_accounts = candidates.len() as i64;
+        let mut accounts = Vec::new();
+        let mut credential_issues = Vec::new();
+        for account in candidates {
+            let health = self.check_account_secret(&account.email)?;
+            if health.exists {
+                accounts.push(account);
+            } else {
+                credential_issues.push(health);
+            }
+        }
         let max_accounts_per_batch = max_accounts_per_batch.max(1);
         let batch_accounts = accounts
             .iter()
@@ -206,7 +217,8 @@ impl MailStore {
         };
         Ok(SyncSchedulePlan {
             max_accounts_per_batch: max_accounts_per_batch as i64,
-            total_accounts: accounts.len() as i64,
+            total_accounts,
+            credential_issues,
             batch_accounts,
             delayed_accounts,
             strategy,

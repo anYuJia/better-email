@@ -257,8 +257,8 @@ describe('useAccountProvisioning createNewAccount', () => {
           return Promise.resolve(created);
         case 'store_account_secret':
           return Promise.resolve({ exists: true, status: 'stored', message: 'saved' });
-        case 'verify_account_credentials_with_secret':
-          return Promise.resolve({ authenticated: true, status: 'ok', message: 'verified' });
+        case 'verify_account_credentials':
+          return Promise.resolve({ account_email: created.email, authenticated: true, status: 'ok', message: 'verified' });
         default:
           return Promise.reject(new Error(`unexpected invoke: ${String(command)}`));
       }
@@ -326,7 +326,7 @@ describe('useAccountProvisioning createNewAccount', () => {
   it('rolls back the account when credential verification fails', async () => {
     vi.useFakeTimers();
     verifyInvoke({
-      verify_account_credentials_with_secret: () => Promise.resolve({
+      verify_account_credentials: () => Promise.resolve({
         authenticated: false,
         status: 'credential_error',
         message: '授权码无效',
@@ -346,10 +346,10 @@ describe('useAccountProvisioning createNewAccount', () => {
     expect(setters.setAccounts).not.toHaveBeenCalled();
   });
 
-  it('rolls back the account when the credential store fails', async () => {
+  it('never exposes an account when atomic credential persistence fails', async () => {
     vi.useFakeTimers();
     verifyInvoke({
-      store_account_secret: () => Promise.resolve({ exists: false, status: 'failed', message: '本地写入失败' }),
+      create_account: () => Promise.reject(new Error('本地写入失败')),
       delete_account: () => Promise.resolve(null),
     });
     const { utils, setters } = renderCreationHook(newForm());
@@ -360,7 +360,48 @@ describe('useAccountProvisioning createNewAccount', () => {
       await vi.runAllTimersAsync();
       await assertion;
     });
-    expect(invoke).toHaveBeenCalledWith('delete_account', { accountId: 7 });
+    expect(invoke).not.toHaveBeenCalledWith('delete_account', expect.anything());
     expect(setters.setAccount).not.toHaveBeenCalled();
   });
+  it('rejects a blank credential without creating an account', async () => {
+    const { utils } = renderCreationHook(newForm());
+    await act(async () => { await expect(utils.result.current.createNewAccount('  ')).rejects.toThrow(); });
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('rolls back after a thrown saved-verification error', async () => {
+    verifyInvoke({ verify_account_credentials: () => Promise.reject(new Error('read failed')), delete_account: () => Promise.resolve(null) });
+    const { utils, setters } = renderCreationHook(newForm());
+    await act(async () => { await expect(utils.result.current.createNewAccount('code')).rejects.toThrow('read failed'); });
+    expect(invoke).toHaveBeenCalledWith('delete_account', { accountId: created.id });
+    expect(setters.setAccount).not.toHaveBeenCalled();
+  });
+
+  it('sends the credential in atomic creation but verifies only persisted data', async () => {
+    verifyInvoke();
+    const { utils } = renderCreationHook(newForm());
+    await act(() => utils.result.current.createNewAccount('code'));
+    expect(invoke).toHaveBeenCalledWith('create_account', { input: newForm(), secret: 'code' });
+    expect(invoke).toHaveBeenCalledWith('verify_account_credentials', { accountId: created.id });
+    expect(vi.mocked(invoke).mock.calls.some(([name]) => name === 'verify_account_credentials_with_secret')).toBe(false);
+  });
+
+  it('coalesces double submission before React publishes the running state', async () => {
+    let resolve!: (value: Account) => void;
+    const createdLater = new Promise<Account>((done) => { resolve = done; });
+    verifyInvoke({ create_account: () => createdLater });
+    const { utils } = renderCreationHook(newForm());
+    let pending!: ReturnType<typeof utils.result.current.createNewAccount>;
+    act(() => { pending = utils.result.current.createNewAccount('code'); expect(utils.result.current.createNewAccount('code')).toBe(pending); });
+    await act(async () => { resolve(created); await pending; });
+    expect(vi.mocked(invoke).mock.calls.filter(([name]) => name === 'create_account')).toHaveLength(1);
+  });
+
+  it('does not remove a verified account when a downstream UI callback fails', async () => {
+    verifyInvoke();
+    const { utils } = renderCreationHook(newForm(), undefined, () => { throw new Error('UI failure'); });
+    await act(async () => { expect(await utils.result.current.createNewAccount('code')).toEqual(created); });
+    expect(vi.mocked(invoke).mock.calls.some(([name]) => name === 'delete_account')).toBe(false);
+  });
+
 });

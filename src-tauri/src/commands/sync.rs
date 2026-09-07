@@ -37,19 +37,84 @@ pub async fn verify_account_credentials(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<CredentialVerificationReport> {
-    let account = store.get_account_by_id(account_id)?;
-    let secret = match store.get_account_secret(&account) {
+    let store = store.inner().clone();
+    let guard = VerificationWorkerGuard::acquire()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = guard;
+        let account = store.get_account_by_id(account_id)?;
+        verify_saved_credentials(&store, &account, |account, secret| {
+            (
+                verify_incoming_credentials(account, secret),
+                smtp::verify_credentials(account, secret).map_err(|error| error.to_string()),
+            )
+        })
+    })
+    .await
+    .map_err(|_| crate::db::MailError::Imap("登录验证任务异常中断，请重试。".into()))?
+}
+
+static ACTIVE_VERIFICATION_WORKERS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+struct VerificationWorkerGuard;
+impl VerificationWorkerGuard {
+    fn acquire() -> MailResult<Self> {
+        use std::sync::atomic::Ordering;
+        ACTIVE_VERIFICATION_WORKERS
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+                (count < 4).then_some(count + 1)
+            })
+            .map_err(|_| crate::db::MailError::Imap("登录验证任务繁忙，请稍后重试。".into()))?;
+        Ok(Self)
+    }
+}
+impl Drop for VerificationWorkerGuard {
+    fn drop(&mut self) {
+        ACTIVE_VERIFICATION_WORKERS.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+    }
+}
+
+fn same_secret(left: &AccountSecret, right: &AccountSecret) -> bool {
+    match (left, right) {
+        (AccountSecret::Password(left), AccountSecret::Password(right)) => left == right,
+        (AccountSecret::OAuth2(left), AccountSecret::OAuth2(right)) => {
+            matches!((serde_json::to_value(left), serde_json::to_value(right)), (Ok(left), Ok(right)) if left == right)
+        }
+        _ => false,
+    }
+}
+
+fn verify_saved_credentials(
+    store: &MailStore,
+    account: &Account,
+    verify: impl FnOnce(&Account, &AccountSecret) -> (Result<(), String>, Result<(), String>),
+) -> MailResult<CredentialVerificationReport> {
+    let secret = match store.get_account_secret(account) {
         Ok(secret) => secret,
-        Err(error) => return Ok(credential_error_report(&account, error.to_string())),
+        Err(error) => return Ok(credential_error_report(account, error.to_string())),
     };
-    let incoming_result = verify_incoming_credentials(&account, &secret);
-    let smtp_result =
-        smtp::verify_credentials(&account, &secret).map_err(|error| error.to_string());
-    Ok(credential_verification_report(
-        &account,
-        incoming_result,
-        smtp_result,
-    ))
+    let (incoming, smtp) = verify(account, &secret);
+    let unchanged = store
+        .get_account_by_id(Some(account.id))
+        .is_ok_and(|current| {
+            current.imap_host == account.imap_host
+                && current.smtp_host == account.smtp_host
+                && current.incoming_protocol == account.incoming_protocol
+                && current.auth_type == account.auth_type
+        })
+        && store
+            .get_account_secret_raw(account)
+            .ok()
+            .and_then(|raw| credentials::account_secret_from_raw(&account.auth_type, &raw).ok())
+            .is_some_and(|current| same_secret(&secret, &current));
+    if !unchanged {
+        let message = "登录验证期间账号配置或凭据已改变，本次结果已作废，请重新验证。".to_string();
+        let mut report =
+            credential_verification_report(account, Err(message.clone()), Err(message.clone()));
+        report.status = "verification_stale".into();
+        report.message = message;
+        return Ok(report);
+    }
+    Ok(credential_verification_report(account, incoming, smtp))
 }
 
 #[tauri::command]
@@ -293,7 +358,11 @@ pub async fn sync_imap_headers(
     let mut new_messages = 0;
     let mut new_message_ids = Vec::new();
     let mut synced_accounts = 0;
-    let mut failures = Vec::new();
+    let mut failures: Vec<String> = plan
+        .credential_issues
+        .iter()
+        .map(|issue| format!("{}: {}", issue.account_email, issue.message))
+        .collect();
     let mut warnings = Vec::new();
 
     for (index, account) in accounts.iter().enumerate() {
@@ -1204,6 +1273,44 @@ mod tests {
             last_seen_at: String::new(),
             last_sync_at: String::new(),
         }
+    }
+
+    #[test]
+    fn verification_rejects_credentials_changed_while_network_is_in_flight() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = crate::db::MailStore::open_at(dir.path().join("mail.sqlite3")).unwrap();
+        let input =
+            serde_json::from_value(serde_json::to_value(sample_account()).unwrap()).unwrap();
+        let account = store.create_account_with_secret(input, "original").unwrap();
+        let report = super::verify_saved_credentials(&store, &account, |_, _| {
+            store.store_account_secret(&account.email, "newer").unwrap();
+            (Ok(()), Ok(()))
+        })
+        .unwrap();
+        assert!(!report.authenticated);
+        assert_eq!(report.status, "verification_stale");
+        assert_eq!(store.get_account_secret_raw(&account).unwrap(), "newer");
+    }
+
+    #[test]
+    fn verification_reads_the_saved_credential_and_does_not_connect_when_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = crate::db::MailStore::open_at(dir.path().join("mail.sqlite3")).unwrap();
+        let input =
+            serde_json::from_value(serde_json::to_value(sample_account()).unwrap()).unwrap();
+        let account = store.create_account_with_secret(input, "saved").unwrap();
+        let good = super::verify_saved_credentials(&store, &account, |_, secret| {
+            assert!(matches!(secret, crate::credentials::AccountSecret::Password(value) if value == "saved"));
+            (Ok(()), Ok(()))
+        }).unwrap();
+        assert!(good.authenticated);
+        store.delete_account_secret(&account.email).unwrap();
+        let missing = super::verify_saved_credentials(&store, &account, |_, _| {
+            panic!("must not connect without saved credentials")
+        })
+        .unwrap();
+        assert_eq!(missing.status, "credential_error");
+        assert!(!missing.authenticated);
     }
 
     #[test]

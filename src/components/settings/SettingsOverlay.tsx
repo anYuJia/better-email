@@ -90,6 +90,7 @@ export type SettingsOverlayProps = {
   oauthSessions: OAuthSession[];
   authTypeChanged: boolean;
   authTypeChangeNotice: string | null;
+  credentialBusy?: boolean;
   credentialSecret: string;
   credentialStatus: CredentialStatus | null;
   notificationPolicy: NotificationPolicy;
@@ -266,10 +267,12 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   ]);
 
   const credentialProps = useMemo(() => ({
+    credentialBusy: props.credentialBusy,
     credentialSecret: props.credentialSecret,
     credentialStatus: props.credentialStatus,
     authTypeChangeNotice: props.authTypeChangeNotice,
   }), [
+    props.credentialBusy,
     props.credentialSecret,
     props.credentialStatus,
     props.authTypeChangeNotice,

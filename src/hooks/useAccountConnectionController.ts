@@ -291,25 +291,37 @@ export default function useAccountConnectionController({
     }
   }, [accountForm, setConnectionReport, setStatus]);
 
-  const verifyAccountCredentials = useCallback(async () => {
-    const report = await invoke<CredentialVerificationReport>(IPC.VerifyAccountCredentials, {
-      accountId: accountForm?.id,
-    });
-    setCredentialVerification(report);
-    if (accountForm && report.status !== 'credential_error') {
-      updateProviderVerification(
-        accountForm.provider,
-        credentialVerificationPatch(report, accountForm.auth_type),
-      );
-    }
-    setStatus(report.message);
-    return report;
-  }, [
-    accountForm,
-    setCredentialVerification,
-    setStatus,
-    updateProviderVerification,
-  ]);
+  const verifyContextRef = useRef({ accountForm, generation: 0 });
+  const verifyPromiseRef = useRef<Promise<CredentialVerificationReport> | null>(null);
+  if (verifyContextRef.current.accountForm !== accountForm) {
+    verifyContextRef.current = { accountForm, generation: verifyContextRef.current.generation + 1 };
+    verifyPromiseRef.current = null;
+  }
+  useEffect(() => () => { verifyContextRef.current.generation += 1; }, []);
+  const verifyAccountCredentials = useCallback((): Promise<CredentialVerificationReport> => {
+    if (verifyPromiseRef.current) return verifyPromiseRef.current;
+    if (!accountForm) return Promise.reject(new Error('请先选择要验证的邮箱账号。'));
+    const target = accountForm;
+    const generation = verifyContextRef.current.generation;
+    const isCurrent = () => generation === verifyContextRef.current.generation;
+    const pending = invoke<CredentialVerificationReport>(IPC.VerifyAccountCredentials, { accountId: target.id })
+      .then((report) => {
+        if (!isCurrent()) return report;
+        if (report.account_email !== target.email) throw new Error('登录验证返回了不匹配的账号，请重新验证。');
+        setCredentialVerification(report);
+        if (!['credential_error', 'verification_stale'].includes(report.status)) {
+          updateProviderVerification(target.provider, credentialVerificationPatch(report, target.auth_type));
+        }
+        setStatus(report.message);
+        return report;
+      }).catch((error): CredentialVerificationReport => {
+        if (isCurrent()) throw error;
+        return { account_email: target.email, authenticated: false, status: 'verification_stale',
+          checked_at: new Date().toISOString(), checks: [], message: '已忽略过期的登录验证结果。' };
+      }).finally(() => { if (isCurrent()) verifyPromiseRef.current = null; });
+    verifyPromiseRef.current = pending;
+    return pending;
+  }, [accountForm, setCredentialVerification, setStatus, updateProviderVerification]);
 
   return {
     isDirty,

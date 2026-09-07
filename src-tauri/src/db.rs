@@ -24,6 +24,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 
+mod account_credentials;
 mod accounts;
 pub(crate) mod ai_settings;
 mod app_settings;
@@ -2888,6 +2889,11 @@ mod tests {
             })
             .unwrap();
 
+        for account in [&first_account, &second_account, &third_account] {
+            store
+                .store_account_secret(&account.email, "test-password")
+                .unwrap();
+        }
         let priority = store.accounts_for_header_sync(None).unwrap();
         let plan = store.header_sync_schedule_plan(None, 2).unwrap();
         assert_eq!(plan.max_accounts_per_batch, 2);

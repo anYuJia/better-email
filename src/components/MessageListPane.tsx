@@ -31,6 +31,7 @@ import {
 export type { BulkMessageAction, MessageContextAction } from './messageContextMenu';
 
 export type MessageListPaneProps = {
+  notice?: React.ReactNode;
   mobile?: boolean;
   showAccountSource?: boolean;
   appliedQuery: string;
@@ -86,6 +87,7 @@ export type MessageListPaneProps = {
 };
 
 function MessageListPane({
+  notice,
   mobile = false,
   showAccountSource = false,
   appliedQuery,
@@ -310,6 +312,7 @@ function MessageListPane({
           onToggleBulkLabel={onToggleBulkLabel}
         />
       )}
+      {notice}
       {listMode === 'threads' ? (
         <ThreadListView
           threads={threads}

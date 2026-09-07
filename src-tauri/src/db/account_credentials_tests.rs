@@ -571,3 +571,26 @@ fn oauth_exchange_does_not_overwrite_newer_manual_login() {
         token("manual")
     );
 }
+
+#[test]
+fn oauth_exchange_rejects_a_session_snapshot_for_another_email() {
+    let (_dir, store) = fixture();
+    let account = oauth_account(&store);
+    let mut session = session(&store, &account);
+    let previous = store.credential_snapshot_optional(&account).unwrap();
+    session.account_email = "other@example.com".into();
+    assert!(store
+        .store_oauth_exchange_result(&account, &session, previous.as_deref(), &token("late"), "")
+        .is_err());
+    assert_eq!(
+        store.get_account_secret_raw(&account).unwrap(),
+        token("first")
+    );
+    assert_eq!(
+        store
+            .oauth_session_for_token_exchange(session.id)
+            .unwrap()
+            .status,
+        "code_received"
+    );
+}

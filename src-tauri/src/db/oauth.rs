@@ -230,6 +230,7 @@ impl MailStore {
                 )
                 .optional()?;
             if current.email != account.email
+                || current.email != session.account_email
                 || current.auth_type != "oauth2"
                 || !current.provider.eq_ignore_ascii_case(&session.provider)
                 || saved.as_deref() != previous
@@ -271,41 +272,6 @@ impl MailStore {
         })
     }
 
-    #[cfg(test)]
-    pub fn mark_oauth_token_stored(
-        &self,
-        session_id: i64,
-        expires_at: &str,
-    ) -> MailResult<OAuthTokenExchangeReport> {
-        self.with_conn(|conn| {
-            let (id, provider): (i64, String) = conn.query_row(
-                "SELECT id, provider FROM oauth_sessions WHERE id = ?1",
-                params![session_id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )?;
-            let now = Utc::now().to_rfc3339();
-            let message = "OAuth2 token 已交换并保存到本地应用数据库。";
-            conn.execute(
-                "
-                UPDATE oauth_sessions
-                SET status = 'token_stored',
-                    completed_at = ?2,
-                    message = ?3,
-                    code_verifier = '',
-                    authorization_code = ''
-                WHERE id = ?1
-                ",
-                params![id, now, message],
-            )?;
-            Ok(OAuthTokenExchangeReport {
-                session_id: id,
-                provider,
-                status: "token_stored".to_string(),
-                expires_at: expires_at.to_string(),
-                message: message.to_string(),
-            })
-        })
-    }
     pub fn mark_oauth_token_exchange_failed(
         &self,
         session_id: i64,

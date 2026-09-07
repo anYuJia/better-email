@@ -320,7 +320,7 @@ export default function useAppMetaLoader({
         invoke<SyncSchedulePlan>(IPC.GetSyncSchedulePlan, { accountId: nextAccountId }),
         invoke<RemoteImageTrust[]>(IPC.ListRemoteImageTrusts, { accountId: nextAccountId }),
         invoke<ImapMailboxState[]>(IPC.ListImapMailboxes),
-        invoke<OAuthSession[]>(IPC.ListOauthSessions),
+        invoke<OAuthSession[]>(IPC.ListOauthSessions, { accountId: nextAccountId }),
       ]);
       const resolvedFolderId =
         nextFolders.length > 0 && nextFolderId && nextFolders.some((folder) => folder.id === nextFolderId)

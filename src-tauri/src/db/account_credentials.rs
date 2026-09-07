@@ -83,6 +83,7 @@ impl MailStore {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn store_account_secret(&self, email: &str, secret: &str) -> MailResult<CredentialStatus> {
         self.store_account_secret_bound(email, secret, None, None)
     }

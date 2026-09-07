@@ -1,3 +1,4 @@
+import { findBrowserExecutable } from './browserExecutable.mjs';
 import { testCredentialRecovery } from './ui-credential-recovery.mjs';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -171,14 +172,7 @@ async function waitForHttp(target, timeoutMs = 15_000, expectedChild = null) {
 }
 
 async function findChrome() {
-  return withStep('findChrome', async () => {
-    for (const candidate of chromeCandidates) {
-      const child = spawn(candidate, ['--version'], { stdio: 'ignore' });
-      const code = await new Promise((resolve) => child.once('exit', resolve));
-      if (code === 0) return candidate;
-    }
-    throw new Error('Chrome/Chromium executable not found; set CHROME_PATH to run UI smoke tests.');
-  });
+  return withStep('findChrome', () => findBrowserExecutable(chromeCandidates));
 }
 
 async function chromeJson(debugPort, path) {
@@ -1554,7 +1548,7 @@ async function main() {
 
     await withStep('credential recovery lifecycle', () => testCredentialRecovery({
       cdp, evaluate: evalInPage, wait: waitForExpression, screenshot: captureScreenshot,
-      fill: fillInput, click: clickButton,
+      fill: fillInput, click: clickButton, openAccountSwitcher: openAccountSwitcherMenu,
     }));
 
     await evalInPage(

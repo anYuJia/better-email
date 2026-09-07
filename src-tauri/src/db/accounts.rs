@@ -15,6 +15,7 @@ impl MailStore {
             Ok(accounts)
         })
     }
+    #[cfg(test)]
     pub fn get_account(&self) -> MailResult<Account> {
         self.get_account_by_id(None)
     }

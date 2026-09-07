@@ -351,7 +351,7 @@ export function resetMockMessages() {
   messages = initialMessages.map((message) => ({ ...message }));
 }
 
-export const mockSavedSecretEmails = new Set<string>();
+export const mockSavedSecretEmails = new Set(mockAccounts.map((account) => account.email));
 
 export let nextMessageId = Math.max(...messages.map((message) => message.id)) + 1;
 export let nextAttachmentId = 3;

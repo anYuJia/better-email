@@ -1,11 +1,12 @@
-export async function testCredentialRecovery({ cdp, evaluate, wait, screenshot, fill, click }) {
+export async function testCredentialRecovery({ cdp, evaluate, wait, screenshot, fill, click, openAccountSwitcher }) {
   await wait(cdp, "document.querySelectorAll('.message-card').length > 0");
   await evaluate(cdp, `(async () => {
     const { invoke } = await import('/src/tauriBridge.ts');
     const accounts = await invoke('list_accounts');
     const target = accounts.find((account) => account.id === 2);
     if (!target) throw new Error('Recovery fixture missing');
-    window.__credentialRecovery = { target, count: accounts.length };
+    window.__credentialRecovery = { target, count: accounts.length,
+      scope: document.querySelector('.account-switcher')?.getAttribute('data-account-scope') ?? 'all' };
     await invoke('delete_account_secret', { accountEmail: target.email });
     window.dispatchEvent(new Event('better-email:credentials-changed'));
   })()`);
@@ -29,7 +30,7 @@ export async function testCredentialRecovery({ cdp, evaluate, wait, screenshot, 
   await screenshot(cdp, 'credential-repair-mobile');
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 980, deviceScaleFactor: 1, mobile: false });
   await wait(cdp, "!document.querySelector('.app-shell.is-mobile-app')");
-  await click(cdp, '修复登录', "document.querySelector('.account-login-recovery')");
+  await click(cdp, '修复登录', "[...document.querySelectorAll('.account-login-recovery-row')].find(row => row.querySelector('b')?.textContent === 'design@better-email.local')");
   await wait(cdp, "document.querySelector('.settings-page[data-settings-page=auth] .settings-credential-panel')?.innerText.includes('design@better-email.local')");
   await screenshot(cdp, 'credential-repair-bound-account');
   await fill(cdp, '.settings-credential-panel input', 'test-only-recovery-code');
@@ -47,4 +48,9 @@ export async function testCredentialRecovery({ cdp, evaluate, wait, screenshot, 
   await screenshot(cdp, 'credential-repair-verified');
   await evaluate(cdp, "document.querySelector('.settings-modal [aria-label=\"关闭设置\"]').click()");
   await wait(cdp, "!document.querySelector('.settings-modal') && !document.querySelector('.account-login-recovery') && document.querySelector('.message-list')");
+  const scope = await evaluate(cdp, 'window.__credentialRecovery.scope');
+  const item = `[data-context-item="account-scope-${scope}"]`;
+  await openAccountSwitcher(cdp, item);
+  await evaluate(cdp, `document.querySelector(${JSON.stringify(item)}).click()`);
+  await wait(cdp, `document.querySelector('.account-switcher[data-account-scope="${scope}"]') && document.querySelectorAll('.message-card').length > 0`);
 }

@@ -56,7 +56,8 @@ function readHeaderLayout() {
       const box = rect(element);
       const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
       return { name: element.getAttribute('aria-label') || element.textContent.trim(), rect: box,
-        clientWidth: element.clientWidth, scrollWidth: element.scrollWidth, hit: element === hit || element.contains(hit) };
+        clientWidth: element.clientWidth, scrollWidth: element.scrollWidth,
+        hitElement: hit?.tagName + '.' + hit?.className, hit: element === hit || element.contains(hit) };
     }),
     documentWidth: document.documentElement.scrollWidth,
     viewportWidth: innerWidth,
@@ -79,11 +80,13 @@ export async function testInitialHeaderLayout({ cdp, evaluate, wait, viewport, s
   const setQuery = async (value) => {
     await evaluate(cdp, `(() => {
       const input = document.querySelector('.global-search-box input');
+      input.focus();
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, ${JSON.stringify(value)});
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.blur();
       return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     })()`);
+    await wait(cdp, "!document.querySelector('.app-titlebar .search-suggestion-panel')");
   };
   try {
     for (const [width, height] of [[1440, 900], [1280, 800], [1024, 768]]) {
@@ -104,7 +107,8 @@ export async function testInitialHeaderLayout({ cdp, evaluate, wait, viewport, s
               await setQuery(query);
               const snapshot = await evaluate(cdp, `(${readHeaderLayout.toString()})()`);
               try { assertHeaderLayout(snapshot); } catch (error) {
-                throw new Error(`Header ${width}x${height}, list=${listWidth}, text=${scale}, ${theme}: ${error.message}`);
+                await screenshot(cdp, `header-failed-${width}-${theme}-${scale}-${listWidth}`);
+                throw new Error(`Header ${width}x${height}, list=${listWidth}, text=${scale}, ${theme}: ${error.message}; snapshot=${JSON.stringify(snapshot)}`);
               }
             }
             if (listWidth === 320 && scale === 1.5) {

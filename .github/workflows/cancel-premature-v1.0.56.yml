@@ -1,4 +1,4 @@
-name: Cancel premature v1.0.56
+name: Cancel duplicate v1.0.56 checks
 on:
   push:
     branches: [work/cancel-premature-v1.0.56]
@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
-      - name: Cancel incomplete release runs
+      - name: Cancel non-release duplicate runs
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api --method POST repos/${GITHUB_REPOSITORY}/actions/runs/34088889459/cancel || true
-          gh api --method POST repos/${GITHUB_REPOSITORY}/actions/runs/34088889424/cancel || true
+          gh api --method POST repos/${GITHUB_REPOSITORY}/actions/runs/34090446503/cancel || true
+          gh api --method POST repos/${GITHUB_REPOSITORY}/actions/runs/34090446501/cancel || true

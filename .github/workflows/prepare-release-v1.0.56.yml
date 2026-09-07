@@ -1,0 +1,90 @@
+name: Prepare v1.0.56 release
+on:
+  push:
+    branches: [work/release-v1.0.56]
+permissions:
+  contents: write
+concurrency:
+  group: prepare-release-v1.0.56
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'anYuJia/better-email' && github.actor == 'yhan-sun'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact merged main
+        uses: actions/checkout@v4
+        with:
+          ref: da0f318cdae3b13c95244efdc193dff3d0c4fb5b
+          fetch-depth: 0
+      - name: Verify release base
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'da0f318cdae3b13c95244efdc193dff3d0c4fb5b'
+          test "$(cat .github/release-version)" = 'v1.0.55'
+          test "$(node -p "require('./package.json').version")" = '1.0.55'
+      - name: Bump all version sources and align release gate
+        run: |
+          set -euo pipefail
+          npm version 1.0.56 --no-git-tag-version
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text()
+              actual = text.count(old)
+              if actual != count:
+                  raise RuntimeError(f'{path}: expected {count} occurrences, found {actual}')
+              p.write_text(text.replace(old, new))
+
+          replace_exact('src-tauri/Cargo.toml', 'version = "1.0.55"', 'version = "1.0.56"')
+          replace_exact('src-tauri/Cargo.lock', '[[package]]\nname = "better-email"\nversion = "1.0.55"', '[[package]]\nname = "better-email"\nversion = "1.0.56"')
+          replace_exact('src-tauri/tauri.conf.json', '"version": "1.0.55"', '"version": "1.0.56"')
+          Path('.github/release-version').write_text('v1.0.56\n')
+
+          workflow = Path('.github/workflows/release.yml')
+          text = workflow.read_text()
+          old = "startsWith(github.event.head_commit.message, 'release: v')"
+          new = "(startsWith(github.event.head_commit.message, 'release: v') || startsWith(github.event.head_commit.message, 'feat:发布新版本v'))"
+          if text.count(old) != 2:
+              raise RuntimeError('release.yml release commit gate changed unexpectedly')
+          workflow.write_text(text.replace(old, new))
+          PY
+      - name: Verify exact release diff
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+          expected = {
+              '.github/release-version',
+              '.github/workflows/release.yml',
+              'package-lock.json',
+              'package.json',
+              'src-tauri/Cargo.lock',
+              'src-tauri/Cargo.toml',
+              'src-tauri/tauri.conf.json',
+          }
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+          if changed != expected:
+              raise RuntimeError(f'unexpected release diff: {sorted(changed ^ expected)}')
+          PY
+          node scripts/check-release-source.mjs
+          node - <<'NODE'
+          const fs = require('fs');
+          const pkg = require('./package.json');
+          const lock = require('./package-lock.json');
+          const conf = require('./src-tauri/tauri.conf.json');
+          if (pkg.version !== '1.0.56' || lock.version !== '1.0.56' || lock.packages[''].version !== '1.0.56' || conf.version !== '1.0.56') throw new Error('JS/Tauri version mismatch');
+          if (fs.readFileSync('.github/release-version', 'utf8').trim() !== 'v1.0.56') throw new Error('release-version mismatch');
+          NODE
+          git diff --check
+      - name: Push compliant release commit to main
+        run: |
+          set -euo pipefail
+          git config user.name yhan-sun
+          git config user.email 304309934+yhan-sun@users.noreply.github.com
+          git add .github/release-version .github/workflows/release.yml package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
+          git commit -m 'feat:发布新版本v1.0.56'
+          git push origin HEAD:refs/heads/main

@@ -13,18 +13,19 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
-      - name: Checkout exact merged main
+      - name: Checkout exact release-ready main
         uses: actions/checkout@v4
         with:
-          ref: da0f318cdae3b13c95244efdc193dff3d0c4fb5b
+          ref: 06d75ecf5808c2fc89f7d4326acd7a51b35a3f1f
           fetch-depth: 0
       - name: Verify release base
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = 'da0f318cdae3b13c95244efdc193dff3d0c4fb5b'
+          test "$(git rev-parse HEAD)" = '06d75ecf5808c2fc89f7d4326acd7a51b35a3f1f'
           test "$(cat .github/release-version)" = 'v1.0.55'
           test "$(node -p "require('./package.json').version")" = '1.0.55'
-      - name: Bump all version sources and align release gate
+          grep -F "feat:发布新版本v" .github/workflows/release.yml >/dev/null
+      - name: Bump all version sources
         run: |
           set -euo pipefail
           npm version 1.0.56 --no-git-tag-version
@@ -43,14 +44,6 @@ jobs:
           replace_exact('src-tauri/Cargo.lock', '[[package]]\nname = "better-email"\nversion = "1.0.55"', '[[package]]\nname = "better-email"\nversion = "1.0.56"')
           replace_exact('src-tauri/tauri.conf.json', '"version": "1.0.55"', '"version": "1.0.56"')
           Path('.github/release-version').write_text('v1.0.56\n')
-
-          workflow = Path('.github/workflows/release.yml')
-          text = workflow.read_text()
-          old = "startsWith(github.event.head_commit.message, 'release: v')"
-          new = "(startsWith(github.event.head_commit.message, 'release: v') || startsWith(github.event.head_commit.message, 'feat:发布新版本v'))"
-          if text.count(old) != 2:
-              raise RuntimeError('release.yml release commit gate changed unexpectedly')
-          workflow.write_text(text.replace(old, new))
           PY
       - name: Verify exact release diff
         run: |
@@ -59,7 +52,6 @@ jobs:
           import subprocess
           expected = {
               '.github/release-version',
-              '.github/workflows/release.yml',
               'package-lock.json',
               'package.json',
               'src-tauri/Cargo.lock',
@@ -85,6 +77,6 @@ jobs:
           set -euo pipefail
           git config user.name yhan-sun
           git config user.email 304309934+yhan-sun@users.noreply.github.com
-          git add .github/release-version .github/workflows/release.yml package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
+          git add .github/release-version package.json package-lock.json src-tauri/Cargo.toml src-tauri/Cargo.lock src-tauri/tauri.conf.json
           git commit -m 'feat:发布新版本v1.0.56'
           git push origin HEAD:refs/heads/main

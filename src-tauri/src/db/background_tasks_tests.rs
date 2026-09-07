@@ -1,12 +1,39 @@
 use super::*;
 use std::sync::{Arc, Barrier};
 
-fn fixture() -> (tempfile::TempDir, MailStore, MailStore) {
+fn fixture() -> (tempfile::TempDir, MailStore, MailStore, [i64; 2]) {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("tasks.sqlite3");
     let first = MailStore::open_at_with_seed(path.clone(), false).unwrap();
+    let create_account = |email: &str| {
+        first
+            .create_account(crate::models::AccountCreateInput {
+                email: email.into(),
+                display_name: email.into(),
+                provider: "custom".into(),
+                imap_host: "imap.example.com:993".into(),
+                smtp_host: "smtp.example.com:587".into(),
+                incoming_protocol: "imap".into(),
+                auth_type: "password".into(),
+                sync_mode: "manual".into(),
+                remote_images_allowed: false,
+                signature: String::new(),
+                cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
+                auto_download_attachments: false,
+                fetch_history_attachments: false,
+                warn_external_senders: false,
+            })
+            .unwrap()
+            .id
+    };
+    let accounts = [
+        create_account("first@example.com"),
+        create_account("second@example.com"),
+    ];
     let second = MailStore::open_at_with_seed(path, false).unwrap();
-    (dir, first, second)
+    (dir, first, second, accounts)
 }
 
 fn input(kind: &str, account_id: Option<i64>) -> BackgroundTaskInput {
@@ -19,7 +46,7 @@ fn input(kind: &str, account_id: Option<i64>) -> BackgroundTaskInput {
 
 #[test]
 fn concurrent_connections_enqueue_one_active_task_per_scope() {
-    let (_dir, first, second) = fixture();
+    let (_dir, first, second, accounts) = fixture();
     let barrier = Arc::new(Barrier::new(16));
     let workers: Vec<_> = (0..16)
         .map(|index| {
@@ -32,30 +59,28 @@ fn concurrent_connections_enqueue_one_active_task_per_scope() {
             std::thread::spawn(move || {
                 barrier.wait();
                 store
-                    .enqueue_background_task(input("sync", Some(42)))
+                    .enqueue_background_task(input("sync", Some(accounts[0])))
                     .unwrap()
                     .id
             })
         })
         .collect();
-    let ids: Vec<_> = workers
-        .into_iter()
-        .map(|worker| worker.join().unwrap())
-        .collect();
+    let results: Vec<_> = workers.into_iter().map(|worker| worker.join()).collect();
+    let ids: Vec<_> = results.into_iter().map(Result::unwrap).collect();
     assert!(ids.iter().all(|id| *id == ids[0]));
     assert_eq!(first.list_background_tasks().unwrap().len(), 1);
 }
 
 #[test]
 fn retry_reuses_newer_active_task_instead_of_resurrecting_failed_work() {
-    let (_dir, first, second) = fixture();
+    let (_dir, first, second, accounts) = fixture();
     let old = first
-        .enqueue_background_task(input("sync", Some(42)))
+        .enqueue_background_task(input("sync", Some(accounts[0])))
         .unwrap();
     first.mark_background_task_running(old.id).unwrap();
     first.fail_background_task(old.id, "offline").unwrap();
     let active = second
-        .enqueue_background_task(input("sync", Some(42)))
+        .enqueue_background_task(input("sync", Some(accounts[0])))
         .unwrap();
     let retried = first.retry_background_task(old.id).unwrap();
     assert_eq!(retried.id, active.id);
@@ -67,7 +92,7 @@ fn retry_reuses_newer_active_task_instead_of_resurrecting_failed_work() {
 
 #[test]
 fn concurrent_retry_and_enqueue_share_the_same_active_task() {
-    let (_dir, first, second) = fixture();
+    let (_dir, first, second, _accounts) = fixture();
     let old = first.enqueue_background_task(input("sync", None)).unwrap();
     first.cancel_background_task(old.id).unwrap();
     let barrier = Arc::new(Barrier::new(2));
@@ -83,12 +108,12 @@ fn concurrent_retry_and_enqueue_share_the_same_active_task() {
 
 #[test]
 fn deduplication_keeps_accounts_and_task_kinds_independent() {
-    let (_dir, first, _) = fixture();
+    let (_dir, first, _, accounts) = fixture();
     for (kind, account) in [
         ("sync", None),
-        ("sync", Some(1)),
-        ("sync", Some(2)),
-        ("outbox-smtp", Some(1)),
+        ("sync", Some(accounts[0])),
+        ("sync", Some(accounts[1])),
+        ("outbox-smtp", Some(accounts[0])),
     ] {
         first.enqueue_background_task(input(kind, account)).unwrap();
     }
@@ -97,7 +122,7 @@ fn deduplication_keeps_accounts_and_task_kinds_independent() {
 
 #[test]
 fn active_tasks_remain_visible_after_many_newer_terminal_tasks() {
-    let (_dir, first, _) = fixture();
+    let (_dir, first, _, _accounts) = fixture();
     let queued = first
         .enqueue_background_task(input("outbox-smtp", None))
         .unwrap();
@@ -126,7 +151,7 @@ fn active_tasks_remain_visible_after_many_newer_terminal_tasks() {
 
 #[test]
 fn progress_is_bounded_monotonic_and_does_not_replace_cancellation() {
-    let (_dir, first, _) = fixture();
+    let (_dir, first, _, _accounts) = fixture();
     let task = first.enqueue_background_task(input("sync", None)).unwrap();
     first.mark_background_task_running(task.id).unwrap();
     assert_eq!(
@@ -160,7 +185,7 @@ fn progress_is_bounded_monotonic_and_does_not_replace_cancellation() {
 
 #[test]
 fn cancellation_does_not_downgrade_a_completed_task() {
-    let (_dir, first, second) = fixture();
+    let (_dir, first, second, _accounts) = fixture();
     let task = first.enqueue_background_task(input("sync", None)).unwrap();
     first.mark_background_task_running(task.id).unwrap();
     first.complete_background_task(task.id, "finished").unwrap();
@@ -173,7 +198,7 @@ fn cancellation_does_not_downgrade_a_completed_task() {
 
 #[test]
 fn retry_without_active_replacement_resets_progress_and_timestamps() {
-    let (_dir, first, _) = fixture();
+    let (_dir, first, _, _accounts) = fixture();
     let task = first.enqueue_background_task(input("sync", None)).unwrap();
     first.mark_background_task_running(task.id).unwrap();
     first
@@ -189,7 +214,7 @@ fn retry_without_active_replacement_resets_progress_and_timestamps() {
 
 #[test]
 fn task_queries_use_partial_indexes_instead_of_scanning_terminal_history() {
-    let (_dir, store, _) = fixture();
+    let (_dir, store, _, _accounts) = fixture();
     store
         .with_conn(|conn| {
             let scope_plan: String = conn.query_row(
@@ -218,4 +243,13 @@ fn task_queries_use_partial_indexes_instead_of_scanning_terminal_history() {
             Ok(())
         })
         .unwrap();
+}
+
+#[test]
+fn enqueue_rejects_missing_account_without_creating_task() {
+    let (_dir, store, _, _accounts) = fixture();
+    assert!(store
+        .enqueue_background_task(input("sync", Some(999)))
+        .is_err());
+    assert!(store.list_background_tasks().unwrap().is_empty());
 }

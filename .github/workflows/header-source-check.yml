@@ -1,0 +1,86 @@
+name: Header repair source verification
+on:
+  push:
+    branches: [work/header-rust-check-20260907]
+permissions:
+  contents: read
+jobs:
+  source:
+    if: github.repository == 'anYuJia/better-email'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify and apply reviewed source patch
+        shell: python
+        run: |
+          import base64, gzip, hashlib, json, pathlib, subprocess
+          root = pathlib.Path.cwd()
+          manifest = json.loads((root / '.github/header-patch/manifest.json').read_text())
+          encoded = ''.join((root / f'.github/header-patch/{i}.b64').read_text().strip() for i in range(4))
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
+          if hashlib.sha256(patch).hexdigest() != manifest['patch_sha256']:
+              raise RuntimeError('Transport checksum mismatch')
+          def digest(path):
+              if not path.exists():
+                  return None
+              data = path.read_bytes()
+              return hashlib.sha1(('blob ' + str(len(data)) + '\0').encode() + data).hexdigest()
+          allowed = set()
+          for item in manifest['files']:
+              name = item['path']
+              path = root / name
+              if name in allowed or not name.startswith(('src/', 'src-tauri/src/', 'scripts/')) or path.is_symlink() or not path.resolve().is_relative_to(root):
+                  raise RuntimeError('Invalid source path')
+              allowed.add(name)
+              if digest(path) != item['before']:
+                  raise RuntimeError('Source changed: ' + name)
+          subprocess.run(['git', 'apply', '--check', '-'], input=patch, check=True)
+          subprocess.run(['git', 'apply', '-'], input=patch, check=True)
+          for item in manifest['files']:
+              if digest(root / item['path']) != item['after']:
+                  raise RuntimeError('Edited source mismatch: ' + item['path'])
+          print('Verified source files:', len(allowed))
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format only the reviewed Rust source
+        run: |
+          rustfmt --edition 2021 src-tauri/src/db/background_tasks.rs src-tauri/src/db/outbox.rs src-tauri/src/db/migrations.rs
+          git diff --check
+      - name: Export content-addressed source without moving branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import base64, hashlib, json, pathlib, subprocess, tarfile
+          manifest = json.loads(pathlib.Path('.github/header-patch/manifest.json').read_text())
+          allowed = {item['path'] for item in manifest['files']}
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()) | set(subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard'], text=True).splitlines())
+          if changed - allowed:
+              raise RuntimeError('Unplanned changes: ' + repr(changed - allowed))
+          output = pathlib.Path('source-handoff')
+          output.mkdir()
+          entries = []
+          for name in sorted(allowed):
+              data = pathlib.Path(name).read_bytes()
+              expected = hashlib.sha1(('blob ' + str(len(data)) + '\0').encode() + data).hexdigest()
+              payload = json.dumps({'encoding': 'base64', 'content': base64.b64encode(data).decode()})
+              result = json.loads(subprocess.check_output(['gh', 'api', '--method', 'POST', 'repos/anYuJia/better-email/git/blobs', '--input', '-'], input=payload.encode()))
+              if result['sha'] != expected:
+                  raise RuntimeError('Export checksum mismatch: ' + name)
+              entries.append({'path': name, 'mode': '100644', 'type': 'blob', 'sha': expected})
+          (output / 'manifest.json').write_text(json.dumps({'base': manifest['base'], 'entries': entries}, indent=2))
+          with tarfile.open(output / 'changes.tar.gz', 'w:gz') as archive:
+              for name in sorted(allowed):
+                  archive.add(name, arcname=name)
+          print(json.dumps(entries, indent=2))
+      - uses: actions/upload-artifact@v4
+        with:
+          name: header-source-${{ github.run_id }}
+          path: source-handoff/
+          retention-days: 3

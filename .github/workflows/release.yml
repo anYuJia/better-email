@@ -147,9 +147,9 @@ jobs:
   build:
     name: Build installers (${{ matrix.platform }})
     needs: validate
-    # Tags/workflow_dispatch remain supported. A main push is release-capable
-    # only when the dedicated release commit uses the exact release: v prefix.
-    if: "startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: v'))"
+    # Tags/workflow_dispatch remain supported. Main release commits accept
+    # both the legacy release: v prefix and the repository-standard feat:发布新版本v prefix.
+    if: "startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && (startsWith(github.event.head_commit.message, 'release: v') || startsWith(github.event.head_commit.message, 'feat:发布新版本v')))"
     strategy:
       fail-fast: false
       matrix:
@@ -218,7 +218,7 @@ jobs:
   build-android:
     name: Build Android (APK and AAB)
     needs: validate
-    if: "startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: v'))"
+    if: "startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && (startsWith(github.event.head_commit.message, 'release: v') || startsWith(github.event.head_commit.message, 'feat:发布新版本v')))"
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:

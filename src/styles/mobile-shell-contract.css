@@ -1,0 +1,132 @@
+/*
+ * Mobile shell contracts that must remain stable even when product-level
+ * density/polish rules change. These rules intentionally load after
+ * product.css so navigation, sender identity and reader reachability cannot
+ * be removed by visual-only refinements.
+ */
+@media (max-width: 720px) {
+  /* Keep sender identity visible in the mobile message list. */
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-card {
+    padding: 8px 58px 8px 64px;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-leading {
+    display: block;
+  }
+
+  /* The persistent bottom navigation is a primary app control, not a FAB. */
+  .app-shell.is-mobile-app .mobile-bottom-nav {
+    position: relative;
+    inset: auto;
+    z-index: 30;
+    width: 100%;
+    height: auto;
+    min-height: calc(64px + env(safe-area-inset-bottom));
+    flex: 0 0 calc(64px + env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: start;
+    padding: 5px 8px env(safe-area-inset-bottom);
+    border: 0;
+    border-top: 1px solid var(--ui-border);
+    background: var(--ui-surface);
+    pointer-events: auto;
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-nav > button {
+    position: static;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    min-height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-direction: column;
+    gap: 3px;
+    padding: 4px 2px 0;
+    border: 0;
+    border-radius: 0;
+    color: var(--ui-text-tertiary);
+    background: transparent;
+    box-shadow: none;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: auto;
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-nav > button.active {
+    color: var(--ui-accent);
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-nav > .mobile-bottom-compose {
+    right: auto;
+    bottom: auto;
+    z-index: auto;
+    width: auto;
+    min-width: 0;
+    height: auto;
+    min-height: 54px;
+    display: flex;
+    padding: 4px 2px 0;
+    border: 0;
+    border-radius: 0;
+    color: var(--ui-accent) !important;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-compose-icon {
+    width: 44px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--ui-radius-control);
+    color: var(--color-text-on-accent);
+    background: var(--ui-accent);
+  }
+
+  .app-shell.is-mobile-app .mobile-bottom-compose > span:last-child {
+    display: inline;
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-list, .thread-list) {
+    padding-bottom: 8px;
+  }
+
+  /* Constrain the reader chrome to the viewport while keeping oversized HTML
+     email content horizontally reachable inside its own scroll surface. */
+  .app-shell.is-mobile-app .mobile-reader-surface,
+  .app-shell.is-mobile-app .mobile-reader-surface > .reader-panel,
+  .app-shell.is-mobile-app .mobile-reader-surface .reader,
+  .app-shell.is-mobile-app .mobile-reader-surface .reader-header,
+  .app-shell.is-mobile-app .mobile-reader-surface .reader-html-container,
+  .app-shell.is-mobile-app .mobile-reader-surface .reader-html {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .app-shell.is-mobile-app .mobile-reader-surface > .reader-panel {
+    overflow-x: hidden;
+    overflow-y: auto;
+    touch-action: pan-x pan-y;
+  }
+
+  .app-shell.is-mobile-app .mobile-reader-surface .reader-actions {
+    width: 100%;
+    max-width: 100%;
+    margin-inline: 0;
+    padding: 4px 0;
+  }
+
+  .app-shell.is-mobile-app .mobile-reader-surface .reader-html-container {
+    overflow-x: auto;
+    overflow-y: visible;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+  }
+}

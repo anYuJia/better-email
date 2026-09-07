@@ -603,6 +603,12 @@ impl MailStore {
                 BEFORE DELETE ON outbox_queue WHEN OLD.status = 'sending'
                 BEGIN SELECT RAISE(ABORT, '邮件正在发送，请等待结果后再删除'); END;
                 CREATE INDEX IF NOT EXISTS idx_background_tasks_status_created ON background_tasks(status, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_background_tasks_active_scope
+                    ON background_tasks(kind, COALESCE(account_id, 0), created_at, id)
+                    WHERE status IN ('queued', 'running');
+                CREATE INDEX IF NOT EXISTS idx_background_tasks_terminal_history
+                    ON background_tasks(created_at DESC, id DESC)
+                    WHERE status NOT IN ('queued', 'running');
                 CREATE INDEX IF NOT EXISTS idx_imap_mailboxes_account ON imap_mailboxes(account_id, local_role);
                 CREATE INDEX IF NOT EXISTS idx_oauth_sessions_account_status ON oauth_sessions(account_id, status, created_at DESC);
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_remote_uid

@@ -12,36 +12,27 @@ impl MailStore {
             let kind = normalize_background_task_kind(&input.kind);
             let source = normalize_background_task_source(&input.source);
             let account_id = input.account_id.filter(|id| *id > 0);
-            let active_task = conn
-                .query_row(
-                    &format!(
-                        "
-                        SELECT {BACKGROUND_TASK_COLUMNS}
-                        FROM background_tasks
-                        WHERE kind = ?1 AND status IN ('queued', 'running')
-                          AND COALESCE(account_id, 0) = COALESCE(?2, 0)
-                        ORDER BY created_at ASC
-                        LIMIT 1
-                        "
-                    ),
-                    params![kind, account_id],
-                    map_background_task,
-                )
-                .optional()?;
-            if let Some(task) = active_task {
+            let transaction = rusqlite::Transaction::new_unchecked(
+                conn,
+                rusqlite::TransactionBehavior::Immediate,
+            )?;
+            if let Some(task) = active_background_task_for_conn(&transaction, kind, account_id)? {
+                transaction.commit()?;
                 return Ok(task);
             }
 
             let created_at = Utc::now().to_rfc3339();
             let title = background_task_title(kind, source);
-            conn.execute(
+            transaction.execute(
                 "
                 INSERT INTO background_tasks(kind, title, source, status, message, created_at, account_id)
                 VALUES (?1, ?2, ?3, 'queued', '等待执行', ?4, ?5)
                 ",
                 params![kind, title, source, created_at, account_id],
             )?;
-            get_background_task_for_conn(conn, conn.last_insert_rowid())
+            let task = get_background_task_for_conn(&transaction, transaction.last_insert_rowid())?;
+            transaction.commit()?;
+            Ok(task)
         })
     }
     pub fn list_background_tasks(&self) -> MailResult<Vec<BackgroundTask>> {
@@ -58,7 +49,7 @@ impl MailStore {
                     SELECT {BACKGROUND_TASK_COLUMNS}
                     FROM background_tasks
                     WHERE status = 'queued'
-                    ORDER BY created_at ASC
+                    ORDER BY created_at ASC, id ASC
                     LIMIT 1
                     "
                 ),
@@ -140,27 +131,18 @@ impl MailStore {
     /// 由执行方在安全检查点（任务边界）消费后落为 cancelled。
     pub fn cancel_background_task(&self, task_id: i64) -> MailResult<BackgroundTask> {
         self.with_conn(|conn| {
-            let task = get_background_task_for_conn(conn, task_id)?;
-            if task.status == "queued" {
-                let finished_at = Utc::now().to_rfc3339();
-                conn.execute(
-                    "
-                    UPDATE background_tasks
-                    SET status = 'cancelled', message = '已取消', finished_at = ?1
-                    WHERE id = ?2
-                    ",
-                    params![finished_at, task_id],
-                )?;
-            } else if task.status == "running" {
-                conn.execute(
-                    "
-                    UPDATE background_tasks
-                    SET cancel_requested = 1, message = '正在取消…'
-                    WHERE id = ?1
-                    ",
-                    params![task_id],
-                )?;
-            }
+            let finished_at = Utc::now().to_rfc3339();
+            conn.execute(
+                "
+                UPDATE background_tasks
+                SET status = CASE WHEN status = 'queued' THEN 'cancelled' ELSE status END,
+                    message = CASE WHEN status = 'queued' THEN '已取消' ELSE '正在取消…' END,
+                    cancel_requested = CASE WHEN status = 'running' THEN 1 ELSE 0 END,
+                    finished_at = CASE WHEN status = 'queued' THEN ?1 ELSE finished_at END
+                WHERE id = ?2 AND status IN ('queued', 'running')
+                ",
+                params![finished_at, task_id],
+            )?;
             get_background_task_for_conn(conn, task_id)
         })
     }
@@ -168,39 +150,48 @@ impl MailStore {
     /// 返回 true 表示执行方应放弃本次结果。
     pub fn consume_background_task_cancel(&self, task_id: i64) -> MailResult<bool> {
         self.with_conn(|conn| {
-            let task = get_background_task_for_conn(conn, task_id)?;
-            if task.status != "running" || !task.cancel_requested {
-                return Ok(false);
-            }
             let finished_at = Utc::now().to_rfc3339();
-            conn.execute(
+            let affected = conn.execute(
                 "
                 UPDATE background_tasks
                 SET status = 'cancelled', message = '已取消', cancel_requested = 0, finished_at = ?1
-                WHERE id = ?2
+                WHERE id = ?2 AND status = 'running' AND cancel_requested = 1
                 ",
                 params![finished_at, task_id],
             )?;
-            Ok(true)
+            Ok(affected == 1)
         })
     }
     /// 失败/已取消的任务重新排队，供用户重试。
     pub fn retry_background_task(&self, task_id: i64) -> MailResult<BackgroundTask> {
         self.with_conn(|conn| {
-            let task = get_background_task_for_conn(conn, task_id)?;
+            let transaction = rusqlite::Transaction::new_unchecked(
+                conn,
+                rusqlite::TransactionBehavior::Immediate,
+            )?;
+            let task = get_background_task_for_conn(&transaction, task_id)?;
             if !matches!(task.status.as_str(), "failed" | "cancelled") {
+                transaction.commit()?;
                 return Ok(task);
             }
-            conn.execute(
+            if let Some(active) =
+                active_background_task_for_conn(&transaction, &task.kind, task.account_id)?
+            {
+                transaction.commit()?;
+                return Ok(active);
+            }
+            transaction.execute(
                 "
                 UPDATE background_tasks
                 SET status = 'queued', message = '等待执行', cancel_requested = 0,
                     progress = 0, started_at = '', finished_at = ''
-                WHERE id = ?1
+                WHERE id = ?1 AND status IN ('failed', 'cancelled')
                 ",
                 params![task_id],
             )?;
-            get_background_task_for_conn(conn, task_id)
+            let task = get_background_task_for_conn(&transaction, task_id)?;
+            transaction.commit()?;
+            Ok(task)
         })
     }
     /// 运行中任务的进度更新（文件夹/批次级）。仅 running 任务可更新。
@@ -215,9 +206,10 @@ impl MailStore {
                 "
                 UPDATE background_tasks
                 SET progress = ?1, message = ?2
-                WHERE id = ?3 AND status = 'running'
+                WHERE id = ?3 AND status = 'running' AND cancel_requested = 0
+                  AND progress <= ?1
                 ",
-                params![progress, message, task_id],
+                params![progress.clamp(0, 100), message, task_id],
             )?;
             get_background_task_for_conn(conn, task_id)
         })
@@ -229,6 +221,27 @@ impl MailStore {
             Ok(task.status == "running" && task.cancel_requested)
         })
     }
+}
+
+fn active_background_task_for_conn(
+    conn: &Connection,
+    kind: &str,
+    account_id: Option<i64>,
+) -> MailResult<Option<BackgroundTask>> {
+    conn.query_row(
+        &format!(
+            "SELECT {BACKGROUND_TASK_COLUMNS}
+             FROM background_tasks
+             WHERE kind = ?1 AND status IN ('queued', 'running')
+               AND COALESCE(account_id, 0) = COALESCE(?2, 0)
+             ORDER BY created_at ASC, id ASC
+             LIMIT 1"
+        ),
+        params![kind, account_id],
+        map_background_task,
+    )
+    .optional()
+    .map_err(Into::into)
 }
 
 pub(super) fn get_background_task_for_conn(
@@ -253,8 +266,13 @@ pub(super) fn list_background_tasks_for_conn(conn: &Connection) -> MailResult<Ve
         "
             SELECT {BACKGROUND_TASK_COLUMNS}
             FROM background_tasks
-            ORDER BY created_at DESC
-            LIMIT 10
+            WHERE status IN ('queued', 'running') OR id IN (
+                SELECT id FROM background_tasks
+                WHERE status NOT IN ('queued', 'running')
+                ORDER BY created_at DESC, id DESC
+                LIMIT 10
+            )
+            ORDER BY created_at DESC, id DESC
             "
     ))?;
     let tasks = stmt
@@ -302,3 +320,7 @@ pub(super) fn background_task_title(kind: &str, source: &str) -> &'static str {
         _ => "后台任务",
     }
 }
+
+#[cfg(test)]
+#[path = "background_tasks_tests.rs"]
+mod tests;

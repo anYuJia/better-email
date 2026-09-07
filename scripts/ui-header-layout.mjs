@@ -114,7 +114,8 @@ export async function testInitialHeaderLayout({ cdp, evaluate, wait, viewport, s
             if (listWidth === 320 && scale === 1.5) {
               await screenshot(cdp, `header-${width}-${theme}-150pct-320`);
               await evaluate(cdp, "document.querySelector('.sort-menu > summary').click()");
-              await wait(cdp, "document.querySelector('.sort-menu').open && document.querySelector('.sort-menu [role=menu]').getBoundingClientRect().height > 0");
+              await wait(cdp, "document.querySelector('.sort-menu[open][data-menu-positioned] [role=menu]')?.getBoundingClientRect().height > 0");
+              await screenshot(cdp, `header-sort-${width}-${theme}-150pct-320`);
               await evaluate(cdp, `(() => {
                 const panel = document.querySelector('.sort-menu [role=menu]');
                 const box = panel.getBoundingClientRect();
@@ -122,7 +123,7 @@ export async function testInitialHeaderLayout({ cdp, evaluate, wait, viewport, s
                 for (const button of panel.querySelectorAll('button')) {
                   const rect = button.getBoundingClientRect();
                   const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-                  if (hit !== button && !button.contains(hit)) throw new Error('Sort option clipped by pane');
+                  if (hit !== button && !button.contains(hit)) throw new Error('Sort option clipped by pane: ' + JSON.stringify({ option: button.textContent, hit: hit?.outerHTML, rect: rect.toJSON(), panel: box.toJSON() }));
                 }
                 document.querySelector('.sort-menu > summary').click();
               })()`);

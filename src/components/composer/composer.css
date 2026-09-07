@@ -41,17 +41,6 @@
   background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.22);
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
 .composer {
   width: min(760px, calc(100vw - 44px));
   height: min(680px, calc(100vh - 44px));

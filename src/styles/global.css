@@ -35,6 +35,18 @@ body { margin: 0; overflow: hidden; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Keep native WebView selection inside copyable content. Selecting across
  * mailbox chrome paints every crossed grid/flex line box, including its
  * whitespace, which makes an ordinary drag look like a broken page overlay. */

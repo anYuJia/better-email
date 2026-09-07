@@ -170,8 +170,8 @@ body[data-image-preview-modal='1'] .window-chrome {
 .app-titlebar .global-search-box {
   position: relative;
   z-index: 3;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   width: 100%;
   max-width: var(--global-search-width);
@@ -206,7 +206,8 @@ body[data-image-preview-modal='1'] .window-chrome {
 }
 
 .app-titlebar .global-search-box input {
-  width: 100%;
+  flex: 1 1 0;
+  width: 0;
   min-width: 0;
   height: 36px;
   padding: 0 2px;
@@ -272,6 +273,7 @@ body[data-image-preview-modal='1'] .window-chrome {
 }
 
 .global-search-shortcut {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   min-width: 42px;

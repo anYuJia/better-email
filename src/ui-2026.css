@@ -36,3 +36,6 @@
 
 /* Consolidated product hierarchy; new features belong to their component styles. */
 @import './styles/product.css';
+
+/* Mobile navigation/identity/reader behavior is a shell contract, not polish. */
+@import './styles/mobile-shell-contract.css';

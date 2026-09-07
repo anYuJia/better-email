@@ -1,0 +1,20 @@
+name: Cancel premature v1.0.56
+on:
+  push:
+    branches: [work/cancel-premature-v1.0.56]
+permissions:
+  actions: write
+  contents: read
+jobs:
+  cancel:
+    if: github.repository == 'anYuJia/better-email' && github.actor == 'yhan-sun'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Cancel incomplete release runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST repos/${GITHUB_REPOSITORY}/actions/runs/34088889459/cancel || true
+          gh api --method POST repos/${GITHUB_REPOSITORY}/actions/runs/34088889424/cancel || true

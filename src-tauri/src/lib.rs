@@ -1022,6 +1022,7 @@ pub fn run() {
             commands::list_sync_runs,
             commands::store_account_secret,
             commands::check_account_secret,
+            commands::list_account_credential_statuses,
             commands::delete_account_secret,
             commands::start_oauth2_pkce,
             commands::list_oauth_sessions,

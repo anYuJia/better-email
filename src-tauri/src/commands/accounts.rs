@@ -22,6 +22,7 @@ pub fn get_account(
 pub async fn create_account(
     store: State<'_, MailStore>,
     input: AccountCreateInput,
+    secret: Option<String>,
 ) -> MailResult<Account> {
     command_info(format!(
         "[better-email][account] create command start email={} provider={} protocol={} imap_host={} smtp_host={}",
@@ -31,7 +32,11 @@ pub async fn create_account(
         input.imap_host.trim(),
         input.smtp_host.trim(),
     ));
-    match store.create_account(input) {
+    let result = match secret {
+        Some(secret) => store.create_account_with_secret(input, &secret),
+        None => store.create_account(input),
+    };
+    match result {
         Ok(account) => {
             command_info(format!(
                 "[better-email][account] create command ok account_id={} email={} default={}",
@@ -234,13 +239,20 @@ pub fn delete_identity(store: State<'_, MailStore>, identity_id: i64) -> MailRes
 pub fn store_account_secret(
     store: State<'_, MailStore>,
     input: CredentialInput,
+    account_id: Option<i64>,
+    auth_type: Option<String>,
 ) -> CredentialStatus {
     command_info(format!(
         "[better-email][credential] store start email={} has_secret={}",
         mask_email(&input.account_email),
         !input.secret.trim().is_empty(),
     ));
-    let status = match store.store_account_secret(&input.account_email, &input.secret) {
+    let status = match store.store_account_secret_bound(
+        &input.account_email,
+        &input.secret,
+        account_id,
+        auth_type.as_deref(),
+    ) {
         Ok(status) => status,
         Err(error) => CredentialStatus {
             account_email: input.account_email.trim().to_ascii_lowercase(),
@@ -299,4 +311,11 @@ pub fn delete_account_secret(
         status.message,
     ));
     status
+}
+
+#[tauri::command]
+pub fn list_account_credential_statuses(
+    store: State<'_, MailStore>,
+) -> MailResult<Vec<CredentialStatus>> {
+    store.list_account_credential_statuses()
 }

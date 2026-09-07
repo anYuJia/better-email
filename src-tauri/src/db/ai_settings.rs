@@ -2,14 +2,18 @@ use super::*;
 
 impl MailStore {
     pub fn save_ai_settings(&self, record: &AiSettingsRecord) -> MailResult<()> {
-        let mut record = record.clone();
-        // 应用层加密 API key / MCP key，数据库文件单独被读取时是密文。
-        record.api_key = crate::secret_crypto::encrypt_secret(&self.data_dir, &record.api_key)
-            .map_err(MailError::Io)?;
-        record.mcp_api_key =
-            crate::secret_crypto::encrypt_secret(&self.data_dir, &record.mcp_api_key)
-                .map_err(MailError::Io)?;
-        self.with_conn(|conn| store_ai_settings_for_conn(conn, &record))
+        self.with_conn(|conn| {
+            let transaction = rusqlite::Transaction::new_unchecked(
+                conn,
+                rusqlite::TransactionBehavior::Immediate,
+            )?;
+            let mut record = record.clone();
+            record.api_key = self.encrypt_local_secret(&transaction, &record.api_key)?;
+            record.mcp_api_key = self.encrypt_local_secret(&transaction, &record.mcp_api_key)?;
+            store_ai_settings_for_conn(&transaction, &record)?;
+            transaction.commit()?;
+            Ok(())
+        })
     }
 
     pub fn load_ai_settings(&self) -> MailResult<AiSettingsRecord> {

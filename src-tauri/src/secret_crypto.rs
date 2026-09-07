@@ -78,11 +78,29 @@ fn key_path(data_dir: &Path) -> PathBuf {
 }
 
 /// 用每实例密钥加密纯文本，返回带标记的密文（base64）。
+#[cfg(test)]
 pub(crate) fn encrypt_secret(data_dir: &Path, plaintext: &str) -> std::io::Result<String> {
+    encrypt_secret_preserving_key(data_dir, plaintext, false)
+}
+
+pub(crate) fn encrypt_secret_preserving_key(
+    data_dir: &Path,
+    plaintext: &str,
+    require_existing: bool,
+) -> std::io::Result<String> {
     if plaintext.is_empty() {
         return Ok(String::new());
     }
-    let key = load_or_create_key(data_dir)?;
+    let key = if require_existing {
+        read_existing_key(&key_path(data_dir)).map_err(|error| {
+            std::io::Error::new(
+                error.kind(),
+                "原凭据密钥缺失或损坏，已保留数据库；请恢复 credentials.key 备份，未生成新密钥。",
+            )
+        })?
+    } else {
+        load_or_create_key(data_dir)?
+    };
     let cipher = ChaCha20Poly1305::new((&key).into());
     let mut nonce_bytes = [0_u8; 12];
     #[allow(clippy::io_other_error)]

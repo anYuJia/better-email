@@ -1,3 +1,4 @@
+import AccountLoginRecovery from './components/AccountLoginRecovery';
 import useOnboardingAccount from './hooks/useOnboardingAccount';
 import useMobileVisualViewport from './hooks/useMobileVisualViewport';
 import useMailFeedback from './hooks/useMailFeedback';
@@ -1409,6 +1410,7 @@ function MailboxApp({
   } = useRuleManagement({ rules, setRules, setStatus, accountId: scopedAccountId });
   const {
     credentialSecret,
+    credentialBusy,
     setCredentialSecret,
     storeAndVerifyCredential,
     deleteCredential,
@@ -1714,6 +1716,9 @@ function MailboxApp({
   const messageListContent = (
     <AppErrorBoundary>
       <MessageListPane
+        notice={<AccountLoginRecovery accounts={accounts} accountScope={accountScope}
+          nativeSettings={useNativeSettingsWindow} changeAccountScope={changeAccountScope}
+          selectSettingsAccount={selectSettingsAccount} openSection={openMobileSettingsSection} />}
         mobile={isMobileApp}
         showAccountSource={accountScope === 'all'}
         appliedQuery={appliedQuery}
@@ -2155,6 +2160,7 @@ function MailboxApp({
             oauthSessions={oauthSessions}
             authTypeChanged={authTypeChanged}
             authTypeChangeNotice={authTypeChangeNotice}
+            credentialBusy={credentialBusy}
             credentialSecret={credentialSecret}
             credentialStatus={credentialStatus}
             notificationPolicy={notificationPolicy}

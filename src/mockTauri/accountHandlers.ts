@@ -45,15 +45,16 @@ function testConnection(args?: InvokeArgs) {
 function verifyAccountCredentials(args?: InvokeArgs) {
   const targetAccount = mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account;
   const incomingName = targetAccount.incoming_protocol === 'pop3' ? 'POP3' : 'IMAP';
+  const ready = mockSavedSecretEmails.has(targetAccount.email);
   return {
     account_email: targetAccount.email,
     checked_at: now,
-    authenticated: true,
-    status: 'ok',
-    message: `${incomingName} 与 SMTP 登录验证通过，未发送任何邮件。`,
+    authenticated: ready,
+    status: ready ? 'ok' : 'credential_error',
+    message: !ready ? '本机未保存该账号登录凭据，请重新保存并验证。' : `${incomingName} 与 SMTP 登录验证通过，未发送任何邮件。`,
     checks: [
-      { name: incomingName, address: targetAccount.imap_host, authenticated: true, message: `${incomingName} 登录认证成功。` },
-      { name: 'SMTP', address: targetAccount.smtp_host, authenticated: true, message: 'SMTP 登录认证成功。' },
+      { name: incomingName, address: targetAccount.imap_host, authenticated: ready, message: ready ? `${incomingName} 登录认证成功。` : '未发起登录：本机凭据不可用。' },
+      { name: 'SMTP', address: targetAccount.smtp_host, authenticated: ready, message: ready ? 'SMTP 登录认证成功。' : '未发起登录：本机凭据不可用。' },
     ],
   };
 }
@@ -96,16 +97,33 @@ export const handlers: Record<string, MockCommandHandler> = {
       ? mockAccounts.find((item) => item.id === Number(args?.accountId)) ?? account
       : account;
   },
-  'create_account': createMockAccount,
+  'create_account': (args) => {
+    if (args?.secret !== undefined && !String(args.secret).trim()) throw new Error('登录凭据不能为空。');
+    const created = createMockAccount(args);
+    if (args?.secret !== undefined) mockSavedSecretEmails.add(created.email);
+    return created;
+  },
   'store_account_secret': (args) => {
     const input = (args?.input ?? {}) as { account_email?: string; secret?: string };
     const email = String(input.account_email ?? '').trim().toLowerCase();
-    if (email) mockSavedSecretEmails.add(email);
+    const target = mockAccounts.find((account) => account.email === email);
+    if (!email || !String(input.secret ?? '').trim()) return { account_email: email, exists: false, status: 'invalid_input', message: '邮箱和凭据不能为空。' };
+    if (args?.accountId !== undefined && (!target || target.id !== args.accountId || (args.authType !== undefined && target.auth_type !== args.authType))) {
+      return { account_email: email, exists: false, status: 'failed', message: '账号或认证方式已改变。' };
+    }
+    mockSavedSecretEmails.add(email);
     return {
+      account_email: email,
       exists: true,
+      status: 'exists',
       message: '本机凭据已安全保存。',
     };
   },
+  'list_account_credential_statuses': () => mockAccounts.map((account) => ({
+    account_email: account.email, exists: mockSavedSecretEmails.has(account.email),
+    status: mockSavedSecretEmails.has(account.email) ? 'exists' : 'not_found',
+    message: mockSavedSecretEmails.has(account.email) ? '本机凭据可读取。' : '本机未保存登录凭据，请重新保存并验证；无需删除账号。',
+  })),
   'check_account_secret': (args) => {
     const email = String(args?.accountEmail ?? '').trim().toLowerCase();
     const exists = mockSavedSecretEmails.has(email);

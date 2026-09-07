@@ -7,6 +7,7 @@ export const IPC = {
   ResolveOutboxOutcome: 'resolve_outbox_outcome',
   CancelBackgroundTask: 'cancel_background_task',
   CheckAccountSecret: 'check_account_secret',
+  ListAccountCredentialStatuses: 'list_account_credential_statuses',
   CleanupTempAttachments: 'cleanup_temp_attachments',
   ClearAttachmentCache: 'clear_attachment_cache',
   CommitContactImportEntries: 'commit_contact_import_entries',

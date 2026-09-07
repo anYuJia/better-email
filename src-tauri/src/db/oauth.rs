@@ -2,13 +2,31 @@ use super::accounts::account_for_conn;
 use super::*;
 
 impl MailStore {
+    #[cfg(test)]
     pub fn save_oauth_session(
+        &self,
+        report: OAuthStartReport,
+        code_verifier: &str,
+    ) -> MailResult<OAuthStartReport> {
+        self.save_oauth_session_for_account(report, code_verifier, None)
+    }
+
+    pub fn save_oauth_session_for_account(
         &self,
         mut report: OAuthStartReport,
         code_verifier: &str,
+        account_id: Option<i64>,
     ) -> MailResult<OAuthStartReport> {
         self.with_conn(|conn| {
-            let account = account_for_conn(conn, None)?;
+            let account = account_for_conn(conn, account_id)?;
+            if account_id.is_some()
+                && (account.auth_type != "oauth2"
+                    || !account.provider.eq_ignore_ascii_case(&report.provider))
+            {
+                return Err(MailError::Imap(
+                    "OAuth2 会话与当前账号认证方式或服务商不匹配。".into(),
+                ));
+            }
             let created_at = Utc::now().to_rfc3339();
             conn.execute(
                 "
@@ -36,18 +54,25 @@ impl MailStore {
         })
     }
     pub fn list_oauth_sessions(&self) -> MailResult<Vec<OAuthSession>> {
+        self.list_oauth_sessions_for_account(None)
+    }
+    pub fn list_oauth_sessions_for_account(
+        &self,
+        account_id: Option<i64>,
+    ) -> MailResult<Vec<OAuthSession>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
                 "
                 SELECT id, provider, authorization_url, redirect_uri, state, code_challenge,
                        scopes, status, created_at, completed_at, message
                 FROM oauth_sessions
+                WHERE ?1 IS NULL OR account_id = ?1
                 ORDER BY created_at DESC
                 LIMIT 10
                 ",
             )?;
             let sessions = stmt
-                .query_map([], |row| {
+                .query_map(params![account_id], |row| {
                     let scopes: String = row.get(6)?;
                     Ok(OAuthSession {
                         id: row.get(0)?,
@@ -98,17 +123,22 @@ impl MailStore {
             }
             let now = Utc::now().to_rfc3339();
             let message = "OAuth2 授权码已接收；下一步执行 token 交换并写入本地 SQLite 凭据。";
-            conn.execute(
+            let changed = conn.execute(
                 "
                 UPDATE oauth_sessions
                 SET authorization_code = ?2,
                     status = 'code_received',
                     completed_at = ?3,
                     message = ?4
-                WHERE id = ?1
+                WHERE id = ?1 AND status = 'pending'
                 ",
                 params![id, code, now, message],
             )?;
+            if changed != 1 {
+                return Err(MailError::Imap(
+                    "OAuth2 回调已被处理，未覆盖现有结果。".into(),
+                ));
+            }
             Ok(OAuthCallbackReport {
                 session_id: id,
                 provider,
@@ -167,6 +197,81 @@ impl MailStore {
             Ok(session)
         })
     }
+    pub fn oauth_account_for_session(&self, session_id: i64) -> MailResult<Account> {
+        self.with_conn(|conn| {
+            let id = conn.query_row(
+                "SELECT account_id FROM oauth_sessions WHERE id = ?1",
+                params![session_id],
+                |row| row.get::<_, i64>(0),
+            )?;
+            account_for_conn(conn, Some(id))
+        })
+    }
+
+    pub fn store_oauth_exchange_result(
+        &self,
+        account: &Account,
+        session: &OAuthTokenExchangeSession,
+        previous: Option<&str>,
+        secret: &str,
+        expires_at: &str,
+    ) -> MailResult<OAuthTokenExchangeReport> {
+        self.with_conn(|conn| {
+            let transaction = rusqlite::Transaction::new_unchecked(
+                conn,
+                rusqlite::TransactionBehavior::Immediate,
+            )?;
+            let current = account_for_conn(&transaction, Some(account.id))?;
+            let saved: Option<String> = transaction
+                .query_row(
+                    "SELECT secret FROM account_credentials WHERE account_email = ?1",
+                    params![account.email],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if current.email != account.email
+                || current.auth_type != "oauth2"
+                || !current.provider.eq_ignore_ascii_case(&session.provider)
+                || saved.as_deref() != previous
+            {
+                return Err(MailError::Imap(
+                    "授权期间账号或凭据已改变，已保留较新的登录状态。".into(),
+                ));
+            }
+            crate::credentials::account_secret_from_raw("oauth2", secret)
+                .map_err(MailError::Imap)?;
+            let message = "OAuth2 token 已加密保存并读回校验。";
+            let changed = transaction.execute(
+                "UPDATE oauth_sessions SET status = 'token_stored', completed_at = ?1,
+                message = ?2, code_verifier = '', authorization_code = ''
+                WHERE id = ?3 AND account_id = ?4 AND authorization_code = ?5
+                AND status IN ('code_received', 'token_exchange_failed')",
+                params![
+                    Utc::now().to_rfc3339(),
+                    message,
+                    session.id,
+                    account.id,
+                    session.authorization_code
+                ],
+            )?;
+            if changed != 1 {
+                return Err(MailError::Imap(
+                    "OAuth2 会话已改变或已完成，未覆盖凭据。".into(),
+                ));
+            }
+            self.store_secret_for_conn(&transaction, &account.email, secret)?;
+            transaction.commit()?;
+            Ok(OAuthTokenExchangeReport {
+                session_id: session.id,
+                provider: session.provider.clone(),
+                status: "token_stored".into(),
+                expires_at: expires_at.into(),
+                message: message.into(),
+            })
+        })
+    }
+
+    #[cfg(test)]
     pub fn mark_oauth_token_stored(
         &self,
         session_id: i64,
@@ -220,7 +325,7 @@ impl MailStore {
                 SET status = 'token_exchange_failed',
                     completed_at = ?2,
                     message = ?3
-                WHERE id = ?1
+                WHERE id = ?1 AND status IN ('code_received', 'token_exchange_failed')
                 ",
                 params![id, now, &message],
             )?;

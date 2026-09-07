@@ -1,3 +1,4 @@
+import { testCredentialRecovery } from './ui-credential-recovery.mjs';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -1550,6 +1551,11 @@ async function main() {
       mobile: false,
     });
     await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('Better Email')");
+
+    await withStep('credential recovery lifecycle', () => testCredentialRecovery({
+      cdp, evaluate: evalInPage, wait: waitForExpression, screenshot: captureScreenshot,
+      fill: fillInput, click: clickButton,
+    }));
 
     await evalInPage(
       cdp,

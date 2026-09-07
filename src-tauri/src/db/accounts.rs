@@ -27,213 +27,14 @@ impl MailStore {
     ) -> MailResult<Option<Account>> {
         self.with_conn(|conn| account_for_conn_optional(conn, account_id))
     }
-    pub fn get_account_secret_raw(&self, account: &Account) -> MailResult<String> {
-        // 凭据只保存在应用自己的 SQLite 数据库（app 数据目录，0600 权限），
-        // 不再使用系统凭据库，避免 macOS 弹出 Keychain 授权提示。
-        // 存储值经每实例密钥加密，读取时解密；升级前纯文本遗留值原样返回。
-        let stored = self.with_conn(|conn| account_secret_raw_for_conn(conn, account))?;
-        crate::secret_crypto::decrypt_secret(&self.data_dir, &stored).map_err(MailError::Io)
-    }
-    pub fn get_account_secret(
-        &self,
-        account: &Account,
-    ) -> MailResult<crate::credentials::AccountSecret> {
-        let raw = self.get_account_secret_raw(account)?;
-        let secret = crate::credentials::account_secret_from_raw(&account.auth_type, &raw)
-            .map_err(MailError::Imap)?;
-        let crate::credentials::AccountSecret::OAuth2(bundle) = &secret else {
-            return Ok(secret);
-        };
-        if !crate::oauth::token_needs_refresh(bundle) {
-            return Ok(secret);
-        }
-        let refreshed = crate::oauth::refresh_token(bundle, "", "").map_err(MailError::Imap)?;
-        let serialized = serde_json::to_string(&refreshed)
-            .map_err(|error| MailError::Imap(format!("OAuth2 token 序列化失败：{error}")))?;
-        let status = self.store_account_secret(&account.email, &serialized)?;
-        if !status.exists {
-            return Err(MailError::Imap(status.message));
-        }
-        Ok(crate::credentials::AccountSecret::OAuth2(refreshed))
-    }
-    pub fn store_account_secret(
-        &self,
-        account_email: &str,
-        secret: &str,
-    ) -> MailResult<CredentialStatus> {
-        let email = account_email.trim().to_ascii_lowercase();
-        let secret = secret.trim().to_string();
-        if email.is_empty() {
-            return Ok(CredentialStatus {
-                account_email: email,
-                exists: false,
-                status: "invalid_input".to_string(),
-                message: "账号邮箱不能为空。".to_string(),
-            });
-        }
-        if secret.is_empty() {
-            return Ok(CredentialStatus {
-                account_email: email,
-                exists: false,
-                status: "invalid_input".to_string(),
-                message: "授权码不能为空。".to_string(),
-            });
-        }
-        // 凭据只写入应用自己的 SQLite 数据库，不触碰系统凭据库，
-        // 保证任何路径（启动、设置页、查看邮件、同步、发送）都不会
-        // 触发 macOS Keychain 访问或授权提示。落库前用每实例密钥做
-        // 应用层加密，数据库文件单独被读取时凭据列是密文。
-        let encrypted =
-            crate::secret_crypto::encrypt_secret(&self.data_dir, &secret).map_err(MailError::Io)?;
-        self.with_conn(|conn| {
-            let now = Utc::now().to_rfc3339();
-            conn.execute(
-                "
-                INSERT INTO account_credentials(account_email, secret, updated_at)
-                VALUES (?1, ?2, ?3)
-                ON CONFLICT(account_email) DO UPDATE
-                SET secret = excluded.secret,
-                    updated_at = excluded.updated_at
-                ",
-                params![email, encrypted, now],
-            )?;
-            Ok(())
-        })?;
-        Ok(CredentialStatus {
-            account_email: email,
-            exists: true,
-            status: "exists".to_string(),
-            message: "授权码已保存到本地应用数据库（仅本机，数据库权限 0600）。".to_string(),
-        })
-    }
-    pub fn check_account_secret(&self, account_email: &str) -> MailResult<CredentialStatus> {
-        let email = account_email.trim().to_ascii_lowercase();
-        let exists = self.with_conn(|conn| {
-            Ok(conn
-                .query_row(
-                    "SELECT length(secret) > 0 FROM account_credentials WHERE account_email = ?1",
-                    params![email],
-                    |row| row.get::<_, bool>(0),
-                )
-                .optional()?
-                .unwrap_or(false))
-        })?;
-        Ok(CredentialStatus {
-            account_email: email,
-            exists,
-            status: if exists {
-                "exists".to_string()
-            } else {
-                "not_found".to_string()
-            },
-            message: if exists {
-                "本地应用数据库中已保存该账号授权码。".to_string()
-            } else {
-                "未保存该账号授权码。".to_string()
-            },
-        })
-    }
-    pub fn delete_account_secret(&self, account_email: &str) -> MailResult<CredentialStatus> {
-        let email = account_email.trim().to_ascii_lowercase();
-        let rows_affected = self.with_conn(|conn| {
-            Ok(conn.execute(
-                "DELETE FROM account_credentials WHERE account_email = ?1",
-                params![email],
-            )?)
-        })?;
-        if rows_affected == 0 {
-            Ok(CredentialStatus {
-                account_email: email,
-                exists: false,
-                status: "not_found".to_string(),
-                message: "本地凭据中未找到对应凭据。".to_string(),
-            })
-        } else {
-            Ok(CredentialStatus {
-                account_email: email,
-                exists: false,
-                status: "deleted".to_string(),
-                message: "本地凭据已删除。".to_string(),
-            })
-        }
-    }
     pub fn create_account(&self, input: AccountCreateInput) -> MailResult<Account> {
         self.with_conn(|conn| {
-            let email = input.email.trim().to_lowercase();
-            db_info(format!(
-                "[better-email][db] create_account start email={} provider={} protocol={} imap_host={} smtp_host={}",
-                mask_email_for_log(&email),
-                input.provider.trim(),
-                normalize_incoming_protocol(&input.incoming_protocol),
-                input.imap_host.trim(),
-                input.smtp_host.trim(),
-            ));
-            if email.is_empty() || !email.contains('@') {
-                crate::logging::log_line("[better-email][db] create_account invalid email");
-                return Err(MailError::Imap("请输入有效邮箱地址。".to_string()));
-            }
-            let display_name = if input.display_name.trim().is_empty() {
-                email.clone()
-            } else {
-                input.display_name.trim().to_string()
-            };
-            let is_default =
-                conn.query_row("SELECT COUNT(*) = 0 FROM accounts", [], |row| row.get::<_, bool>(0))?;
-            let now = Utc::now().to_rfc3339();
-            conn.execute(
-                "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, fetch_history_attachments, warn_external_senders, is_default, created_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
-                params![
-                    email,
-                    display_name,
-                    input.provider.trim(),
-                    input.imap_host.trim(),
-                    input.smtp_host.trim(),
-                    normalize_incoming_protocol(&input.incoming_protocol),
-                    normalize_auth_type(&input.auth_type),
-                    normalize_sync_mode(&input.sync_mode),
-                    bool_to_int(input.remote_images_allowed),
-                    input.signature,
-                    bool_to_int(input.cross_account_risk_warning),
-                    bool_to_int(input.block_external_mailboxes),
-                    bool_to_int(input.intercept_https_links),
-                    bool_to_int(input.auto_download_attachments),
-                    bool_to_int(input.fetch_history_attachments),
-                    bool_to_int(input.warn_external_senders),
-                    bool_to_int(is_default),
-                    now
-                ],
-            )
-            .map_err(|error| {
-                if is_unique_constraint_error(&error) {
-                    crate::logging::log_line(format!(
-                        "[better-email][db] create_account duplicate email={}",
-                        mask_email_for_log(&email),
-                    ));
-                    MailError::Imap("该邮箱账号已存在。".to_string())
-                } else {
-                    crate::logging::log_line(format!(
-                        "[better-email][db] create_account insert failed error={error}"
-                    ));
-                    MailError::Database(error)
-                }
-            })?;
-            let account_id = conn.last_insert_rowid();
-            create_default_folders_for_account(conn, account_id)?;
-            ensure_default_identity_for_account_conn(
+            let transaction = rusqlite::Transaction::new_unchecked(
                 conn,
-                account_id,
-                &display_name,
-                &email,
-                &input.signature,
+                rusqlite::TransactionBehavior::Immediate,
             )?;
-            let account = account_for_conn(conn, Some(account_id))?;
-            db_info(format!(
-                "[better-email][db] create_account ok account_id={} email={} default={}",
-                account.id,
-                mask_email_for_log(&account.email),
-                account.is_default,
-            ));
+            let account = create_account_for_conn(&transaction, input)?;
+            transaction.commit()?;
             Ok(account)
         })
     }
@@ -403,19 +204,87 @@ impl MailStore {
     }
 }
 
-pub(super) fn account_secret_raw_for_conn(
+pub(super) fn create_account_for_conn(
     conn: &Connection,
-    account: &Account,
-) -> MailResult<String> {
-    let raw = conn
-        .query_row(
-            "SELECT secret FROM account_credentials WHERE account_email = ?1",
-            params![account.email.trim().to_ascii_lowercase()],
-            |row| row.get::<_, String>(0),
-        )
-        .optional()?;
-    raw.filter(|secret| !secret.trim().is_empty())
-        .ok_or_else(|| MailError::Imap("未保存该账号授权码。".to_string()))
+    input: AccountCreateInput,
+) -> MailResult<Account> {
+    let email = input.email.trim().to_lowercase();
+    db_info(format!(
+        "[better-email][db] create_account start email={} provider={} protocol={} imap_host={} smtp_host={}",
+        mask_email_for_log(&email),
+        input.provider.trim(),
+        normalize_incoming_protocol(&input.incoming_protocol),
+        input.imap_host.trim(),
+        input.smtp_host.trim(),
+    ));
+    if email.is_empty() || !email.contains('@') {
+        crate::logging::log_line("[better-email][db] create_account invalid email");
+        return Err(MailError::Imap("请输入有效邮箱地址。".to_string()));
+    }
+    let display_name = if input.display_name.trim().is_empty() {
+        email.clone()
+    } else {
+        input.display_name.trim().to_string()
+    };
+    let is_default = conn.query_row("SELECT COUNT(*) = 0 FROM accounts", [], |row| {
+        row.get::<_, bool>(0)
+    })?;
+    let now = Utc::now().to_rfc3339();
+    conn.execute(
+        "INSERT INTO accounts(email, display_name, provider, imap_host, smtp_host, incoming_protocol, auth_type, sync_mode, remote_images_allowed, signature, cross_account_risk_warning, block_external_mailboxes, intercept_https_links, auto_download_attachments, fetch_history_attachments, warn_external_senders, is_default, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+        params![
+            email,
+            display_name,
+            input.provider.trim(),
+            input.imap_host.trim(),
+            input.smtp_host.trim(),
+            normalize_incoming_protocol(&input.incoming_protocol),
+            normalize_auth_type(&input.auth_type),
+            normalize_sync_mode(&input.sync_mode),
+            bool_to_int(input.remote_images_allowed),
+            input.signature,
+            bool_to_int(input.cross_account_risk_warning),
+            bool_to_int(input.block_external_mailboxes),
+            bool_to_int(input.intercept_https_links),
+            bool_to_int(input.auto_download_attachments),
+            bool_to_int(input.fetch_history_attachments),
+            bool_to_int(input.warn_external_senders),
+            bool_to_int(is_default),
+            now
+        ],
+    )
+    .map_err(|error| {
+        if is_unique_constraint_error(&error) {
+            crate::logging::log_line(format!(
+                "[better-email][db] create_account duplicate email={}",
+                mask_email_for_log(&email),
+            ));
+            MailError::Imap("该邮箱账号已存在。".to_string())
+        } else {
+            crate::logging::log_line(format!(
+                "[better-email][db] create_account insert failed error={error}"
+            ));
+            MailError::Database(error)
+        }
+    })?;
+    let account_id = conn.last_insert_rowid();
+    create_default_folders_for_account(conn, account_id)?;
+    ensure_default_identity_for_account_conn(
+        conn,
+        account_id,
+        &display_name,
+        &email,
+        &input.signature,
+    )?;
+    let account = account_for_conn(conn, Some(account_id))?;
+    db_info(format!(
+        "[better-email][db] create_account ok account_id={} email={} default={}",
+        account.id,
+        mask_email_for_log(&account.email),
+        account.is_default,
+    ));
+    Ok(account)
 }
 pub(super) fn normalize_auth_type(auth_type: &str) -> &str {
     match auth_type.trim() {
@@ -445,7 +314,7 @@ pub(super) fn is_unique_constraint_error(error: &rusqlite::Error) -> bool {
         error,
         rusqlite::Error::SqliteFailure(code, _)
             if code.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE
-                || code.code == rusqlite::ErrorCode::ConstraintViolation
+                || code.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_PRIMARYKEY
     )
 }
 pub(super) fn map_account(row: &rusqlite::Row<'_>) -> rusqlite::Result<Account> {

@@ -83,7 +83,7 @@ export type CredentialVerificationReport = {
   checked_at: string;
   checks: CredentialProtocolCheck[];
   authenticated: boolean;
-  status: 'ok' | 'partial' | 'error' | 'credential_error';
+  status: 'ok' | 'partial' | 'error' | 'credential_error' | 'verification_stale';
   message: string;
 };
 

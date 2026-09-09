@@ -164,10 +164,14 @@ export default function useMessageTranslation(
       }));
       const result = await translateMessage(preparedSource.content, '中文', aiConfig);
       if (requestId !== requestIdRef.current) return;
-      const restoredTranslation = preparedSource.restore(result.content);
-      const translation = preparedSource.format === 'html'
-        ? sanitizeTranslatedHtml(restoredTranslation)
-        : restoredTranslation;
+      // Clean the model-produced tokenized payload *before* restoring the
+      // already-sanitized original HTML tags. This blocks HTML/remote-resource
+      // injection by the AI provider without deleting original image/link tags
+      // that remain governed by the reader's normal remote-content policy.
+      const safeModelOutput = preparedSource.format === 'html'
+        ? sanitizeTranslatedHtml(result.content)
+        : result.content;
+      const translation = preparedSource.restore(safeModelOutput);
       if (cacheKey) cacheTranslation(cacheKey, translation);
       setState({
         messageId: message.id,

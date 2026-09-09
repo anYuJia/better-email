@@ -127,20 +127,23 @@ export async function loadEffectiveAiServiceConfig(): Promise<AiServiceConfig> {
 
 /** 保存 AI 设置到后端（密钥只写入应用本地数据库）。 */
 export async function saveAiSettingsToBackend(config: AiServiceConfig): Promise<string> {
+  const apiKey = config.apiKey.trim();
+  const mcpApiKey = (config.mcpApiKey ?? '').trim();
   const input: AiSettingsInput = {
     enabled: config.enabled,
     service_type: config.serviceType,
     endpoint: config.endpoint.trim(),
-    // 空值表示「保持现有密钥」；只有用户显式点击清除才删除。
-    api_key: config.apiKey,
+    // 空值表示「保持现有密钥」；只有用户显式点击清除、且本次没有输入替换密钥时才删除。
+    // 这一层再做一次冲突消解，避免调用方构造出 clear=true + non-empty key 的危险状态。
+    api_key: apiKey,
     model: config.defaultModel.trim() || 'gpt-4o-mini',
     timeout_seconds: config.timeoutSeconds,
     privacy_acknowledged: config.privacyAcknowledged,
     mcp_enabled: config.mcpEnabled === true,
     mcp_endpoint: (config.mcpEndpoint ?? '').trim(),
-    mcp_api_key: config.mcpApiKey ?? '',
-    clear_api_key: config.clearApiKey === true,
-    clear_mcp_api_key: config.clearMcpApiKey === true,
+    mcp_api_key: mcpApiKey,
+    clear_api_key: config.clearApiKey === true && apiKey.length === 0,
+    clear_mcp_api_key: config.clearMcpApiKey === true && mcpApiKey.length === 0,
   };
   return invoke<string>(IPC.SaveAiSettings, { input });
 }

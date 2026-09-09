@@ -8,7 +8,8 @@ import {
   type TranslationSourceFormat,
 } from '../app/translation';
 import { aiErrorMessage, isOfflineAiResult, translateMessage } from '../app/aiService';
-import type { AiRequestError } from '../app/types/ai';
+import { loadEffectiveAiServiceConfig } from '../app/aiServiceConfig';
+import type { AiRequestError, AiServiceConfig } from '../app/types/ai';
 
 export type TranslationStatus = 'idle' | 'translating' | 'success' | 'failed';
 export type MessageTranslationFormat = TranslationSourceFormat;
@@ -30,18 +31,43 @@ type MessageTranslationOptions = {
   sourceHtml?: string;
 };
 
+const MAX_TRANSLATION_CACHE_ENTRIES = 64;
 const translationCache = new Map<string, string>();
 
 export function cacheTranslation(key: string, content: string): void {
+  // Refresh insertion order so the map behaves as a tiny LRU instead of an
+  // unbounded process-lifetime cache in a long-running mail client.
+  translationCache.delete(key);
   translationCache.set(key, content);
+  while (translationCache.size > MAX_TRANSLATION_CACHE_ENTRIES) {
+    const oldest = translationCache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    translationCache.delete(oldest);
+  }
 }
 
 export function getCachedTranslation(key: string): string | undefined {
-  return translationCache.get(key);
+  const value = translationCache.get(key);
+  if (value === undefined) return undefined;
+  translationCache.delete(key);
+  translationCache.set(key, value);
+  return value;
 }
 
 export function clearTranslationCache(): void {
   translationCache.clear();
+}
+
+function translationProviderFingerprint(config: AiServiceConfig, targetLanguage: string): string {
+  const endpoint = config.serviceType === 'mcp'
+    ? config.mcpEndpoint ?? ''
+    : config.endpoint;
+  return [
+    config.serviceType,
+    endpoint.trim().replace(/\/+$/, ''),
+    config.defaultModel.trim(),
+    targetLanguage.trim(),
+  ].join('|');
 }
 
 export default function useMessageTranslation(
@@ -79,7 +105,7 @@ export default function useMessageTranslation(
     return `${preparedSource.format}:${preparedSource.content.length}:${hash >>> 0}`;
   }, [preparedSource]);
 
-  const cacheKey = useMemo(() => (
+  const messageCacheKey = useMemo(() => (
     message ? `${message.account_id}:${message.id}:${sourceFingerprint}` : null
   ), [message, sourceFingerprint]);
 
@@ -109,30 +135,34 @@ export default function useMessageTranslation(
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    const cachedTranslation = cacheKey ? getCachedTranslation(cacheKey) : undefined;
-    if (cachedTranslation !== undefined && !isOfflineAiResult(cachedTranslation)) {
-      setState({
-        messageId: message.id,
-        status: 'success',
-        translation: cachedTranslation,
-        format: preparedSource.format,
-        serviceType: 'cached',
-        error: '',
-        showTranslation: true,
-      });
-      return;
-    }
-
-    setState((current) => ({
-      ...current,
-      messageId: message.id,
-      status: 'translating',
-      format: preparedSource.format,
-      serviceType: '',
-      error: '',
-    }));
     try {
-      const result = await translateMessage(preparedSource.content, '中文');
+      const aiConfig = await loadEffectiveAiServiceConfig();
+      if (requestId !== requestIdRef.current) return;
+      const providerFingerprint = translationProviderFingerprint(aiConfig, '中文');
+      const cacheKey = messageCacheKey ? `${messageCacheKey}:${providerFingerprint}` : null;
+      const cachedTranslation = cacheKey ? getCachedTranslation(cacheKey) : undefined;
+      if (cachedTranslation !== undefined && !isOfflineAiResult(cachedTranslation)) {
+        setState({
+          messageId: message.id,
+          status: 'success',
+          translation: cachedTranslation,
+          format: preparedSource.format,
+          serviceType: 'cached',
+          error: '',
+          showTranslation: true,
+        });
+        return;
+      }
+
+      setState((current) => ({
+        ...current,
+        messageId: message.id,
+        status: 'translating',
+        format: preparedSource.format,
+        serviceType: '',
+        error: '',
+      }));
+      const result = await translateMessage(preparedSource.content, '中文', aiConfig);
       if (requestId !== requestIdRef.current) return;
       const restoredTranslation = preparedSource.restore(result.content);
       const translation = preparedSource.format === 'html'
@@ -161,7 +191,7 @@ export default function useMessageTranslation(
       if (options.onError) options.onError(errorMessage);
       else options.setStatus?.(errorMessage);
     }
-  }, [message, needsTranslation, preparedSource, cacheKey, state.status, options.onError, options.setStatus]);
+  }, [message, needsTranslation, preparedSource, messageCacheKey, state.status, options.onError, options.setStatus]);
 
   const toggleTranslation = useCallback(() => {
     if (state.status !== 'success') return;

@@ -244,10 +244,17 @@ export function prepareTranslationSource(
   };
 }
 
+function isRemoteResourceUrl(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized.startsWith('http://') || normalized.startsWith('https://') || normalized.startsWith('//');
+}
+
 /**
  * AI output is untrusted even when the input HTML was sanitized. Remove the
  * elements that could execute or load active document content before it is
- * handed to the isolated email renderer.
+ * handed to the isolated email renderer. Remote visual resources introduced
+ * by the model are stripped as well; original remote-image behavior remains
+ * governed by the mail reader's normal trust policy rather than AI output.
  */
 export function sanitizeTranslatedHtml(html: string): string {
   if (typeof DOMParser === 'undefined') return html;
@@ -257,7 +264,26 @@ export function sanitizeTranslatedHtml(html: string): string {
   });
   document.querySelectorAll<HTMLElement>('*').forEach((element) => {
     [...element.attributes].forEach((attribute) => {
-      if (/^on/i.test(attribute.name)) element.removeAttribute(attribute.name);
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value;
+      if (/^on/i.test(name)) {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+      if (name === 'style' && /(?:url|image-set)\s*\(/i.test(value)) {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+      if (['src', 'poster', 'background'].includes(name) && isRemoteResourceUrl(value)) {
+        element.removeAttribute(attribute.name);
+        return;
+      }
+      if (name === 'srcset') {
+        const candidates = value.split(',').map((part) => part.trim().split(/\s+/)[0] ?? '');
+        if (candidates.some(isRemoteResourceUrl)) {
+          element.removeAttribute(attribute.name);
+        }
+      }
     });
   });
   return document.body.innerHTML;

@@ -27,10 +27,9 @@ function externalError(message: string): AiRequestError {
 }
 
 /**
- * The Rust HTTP adapter appends `/chat/completions` to base endpoints. Reject
- * endpoint shapes that it cannot safely normalize instead of silently sending
- * a malformed request or posting a chat payload to the legacy `/completions`
- * route.
+ * Validate endpoint shapes before IPC. Query parameters are intentionally
+ * allowed because the Rust URL normalizer preserves them for OpenAI-compatible
+ * gateways; URL fragments and legacy `/completions` are not valid targets.
  */
 export function validateAiEndpointForRequest(endpoint: string): string {
   const trimmed = endpoint.trim();
@@ -41,8 +40,8 @@ export function validateAiEndpointForRequest(endpoint: string): string {
   } catch {
     throw externalError('AI 服务地址不是合法 URL，请检查协议、主机和路径。');
   }
-  if (parsed.search || parsed.hash) {
-    throw externalError('AI 服务地址暂不支持查询参数或 URL 片段；请填写稳定的基础地址或 /chat/completions 地址。');
+  if (parsed.hash) {
+    throw externalError('AI 服务地址不允许包含 URL 片段（#...）。');
   }
   const path = parsed.pathname.replace(/\/+$/, '');
   if (path.endsWith('/completions') && !path.endsWith('/chat/completions')) {
@@ -277,10 +276,7 @@ export async function testAiConnection(config: AiServiceConfig): Promise<AiTestC
         latencyMs: report.latency_ms,
       };
     }
-    const message = config.serviceType === 'mcp' && report.ok
-      ? `${report.message} 已完成协议握手；具体翻译/摘要工具能力将在首次调用时继续校验。`
-      : report.message;
-    return { ok: report.ok, message, latencyMs: report.latency_ms };
+    return { ok: report.ok, message: report.message, latencyMs: report.latency_ms };
   } catch (error) {
     const message = typeof error === 'object' && error !== null && 'kind' in error
       ? aiErrorMessage(error as AiRequestError)

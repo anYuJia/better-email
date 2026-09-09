@@ -97,11 +97,11 @@ describe('aiService', () => {
     });
   });
 
-  it('tests MCP connections with the MCP endpoint and token', async () => {
+  it('tests MCP connections with the MCP endpoint, token and native capability report', async () => {
     invokeMock.mockResolvedValueOnce({
       ok: true,
       service_type: 'mcp',
-      message: 'MCP 服务连接正常。',
+      message: 'MCP 服务连接正常。已发现 3 个工具；可用能力：翻译、摘要、模板生成。',
       latency_ms: 4,
     });
     const config: AiServiceConfig = {
@@ -116,7 +116,7 @@ describe('aiService', () => {
 
     await expect(testAiConnection(config)).resolves.toMatchObject({
       ok: true,
-      message: expect.stringContaining('协议握手'),
+      message: expect.stringContaining('可用能力'),
     });
     expect(invokeMock).toHaveBeenCalledWith(IPC.TestAiConnection, expect.objectContaining({
       serviceType: 'mcp',
@@ -224,11 +224,25 @@ describe('aiService', () => {
     expect(aiErrorMessage({ kind: 'external', message: 'boom' })).toBe('boom');
   });
 
-  it('rejects legacy completions and query-string endpoints instead of misrouting requests', () => {
-    expect(() => validateAiEndpointForRequest('https://api.example.com/v1/completions'))
-      .toThrow(expect.objectContaining({ kind: 'external' }));
-    expect(() => validateAiEndpointForRequest('https://api.example.com/v1?api-version=1'))
-      .toThrow(expect.objectContaining({ kind: 'external' }));
+  it('rejects legacy completions/fragments while allowing query-bearing base endpoints', () => {
+    let legacyError: unknown;
+    try {
+      validateAiEndpointForRequest('https://api.example.com/v1/completions');
+    } catch (error) {
+      legacyError = error;
+    }
+    expect(legacyError).toMatchObject({ kind: 'external', message: expect.stringContaining('/completions') });
+
+    let fragmentError: unknown;
+    try {
+      validateAiEndpointForRequest('https://api.example.com/v1#bad');
+    } catch (error) {
+      fragmentError = error;
+    }
+    expect(fragmentError).toMatchObject({ kind: 'external', message: expect.stringContaining('片段') });
+
+    expect(validateAiEndpointForRequest('https://api.example.com/v1?api-version=1'))
+      .toBe('https://api.example.com/v1?api-version=1');
     expect(validateAiEndpointForRequest('https://api.example.com/v1/chat/completions'))
       .toBe('https://api.example.com/v1/chat/completions');
   });

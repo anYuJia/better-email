@@ -1,10 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   aiErrorMessage,
   checkAiConfig,
   generateTemplate,
+  splitAiInput,
   testAiConnection,
   translateMessage,
+  validateAiEndpointForRequest,
 } from './aiService';
 import { defaultAiServiceConfig } from './aiServiceConfig';
 import type { AiServiceConfig } from './types/ai';
@@ -18,6 +20,10 @@ vi.mock('../tauriBridge', () => ({
 }));
 
 describe('aiService', () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+  });
+
   it('throws clear error when AI service is not configured', async () => {
     const config: AiServiceConfig = {
       ...defaultAiServiceConfig,
@@ -108,7 +114,10 @@ describe('aiService', () => {
       privacyAcknowledged: true,
     };
 
-    await expect(testAiConnection(config)).resolves.toMatchObject({ ok: true });
+    await expect(testAiConnection(config)).resolves.toMatchObject({
+      ok: true,
+      message: expect.stringContaining('协议握手'),
+    });
     expect(invokeMock).toHaveBeenCalledWith(IPC.TestAiConnection, expect.objectContaining({
       serviceType: 'mcp',
       endpoint: 'http://127.0.0.1:8080/mcp',
@@ -130,7 +139,6 @@ describe('aiService', () => {
   });
 
   it('hydrates runtime requests from the saved backend provider', async () => {
-    invokeMock.mockReset();
     invokeMock
       .mockResolvedValueOnce({
         configured: true,
@@ -215,9 +223,77 @@ describe('aiService', () => {
     expect(aiErrorMessage({ kind: 'privacy_not_acknowledged' })).toContain('隐私说明');
     expect(aiErrorMessage({ kind: 'external', message: 'boom' })).toBe('boom');
   });
+
+  it('rejects legacy completions and query-string endpoints instead of misrouting requests', () => {
+    expect(() => validateAiEndpointForRequest('https://api.example.com/v1/completions'))
+      .toThrow(expect.objectContaining({ kind: 'external' }));
+    expect(() => validateAiEndpointForRequest('https://api.example.com/v1?api-version=1'))
+      .toThrow(expect.objectContaining({ kind: 'external' }));
+    expect(validateAiEndpointForRequest('https://api.example.com/v1/chat/completions'))
+      .toBe('https://api.example.com/v1/chat/completions');
+  });
+
+  it('splits long translation input without cutting protected HTML tokens', () => {
+    const token = '__BETTER_EMAIL_TAG_123__';
+    const source = `${'a'.repeat(19_990)}${token}${'b'.repeat(21_000)}`;
+    const chunks = splitAiInput(source, 20_000);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.join('')).toBe(source);
+    expect(chunks.some((chunk) => chunk.endsWith('__BETTER_EMAIL_TA'))).toBe(false);
+    expect(chunks.some((chunk) => chunk.startsWith('G_123__'))).toBe(false);
+  });
+
+  it('translates long input in multiple real-provider requests instead of silently truncating', async () => {
+    invokeMock
+      .mockResolvedValueOnce({ operation: 'translate', content: '甲', service_type: 'http', truncated: false })
+      .mockResolvedValueOnce({ operation: 'translate', content: '乙', service_type: 'http', truncated: false });
+    const config: AiServiceConfig = {
+      ...defaultAiServiceConfig,
+      enabled: true,
+      serviceType: 'http',
+      endpoint: 'https://api.example.com/v1',
+      privacyAcknowledged: true,
+    };
+    const source = `${'x'.repeat(19_000)}\n${'y'.repeat(19_000)}`;
+
+    const result = await translateMessage(source, '中文', config);
+
+    expect(result.content).toBe('甲乙');
+    expect(invokeMock).toHaveBeenCalledTimes(2);
+    expect(invokeMock).toHaveBeenNthCalledWith(1, IPC.AiRequest, expect.objectContaining({
+      input: expect.objectContaining({ operation: 'translate' }),
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(2, IPC.AiRequest, expect.objectContaining({
+      input: expect.objectContaining({ operation: 'translate' }),
+    }));
+  });
+
+  it('rejects truncated provider output instead of rendering an incomplete result', async () => {
+    invokeMock.mockResolvedValueOnce({
+      operation: 'translate',
+      content: 'partial',
+      service_type: 'http',
+      truncated: true,
+    });
+    const config: AiServiceConfig = {
+      ...defaultAiServiceConfig,
+      enabled: true,
+      serviceType: 'http',
+      endpoint: 'https://api.example.com/v1',
+      privacyAcknowledged: true,
+    };
+    await expect(translateMessage('hello', '中文', config)).rejects.toMatchObject({
+      kind: 'external',
+      message: expect.stringContaining('不完整结果'),
+    });
+  });
 });
 
 describe('template generation chain', () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+  });
+
   it('generateTemplate result parses into subject and body', async () => {
     invokeMock.mockResolvedValueOnce({
       operation: 'generate_template',

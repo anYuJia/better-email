@@ -129,7 +129,19 @@ export default function useAiService({ setStatus, onNotify, serviceType }: UseAi
   const maskedApiKey = useMemo(() => maskApiKey(config.apiKey), [config.apiKey]);
 
   const patchConfig = useCallback((patch: Partial<AiServiceConfig>) => {
-    setConfig((current) => ({ ...current, ...patch }));
+    setConfig((current) => {
+      const nextPatch = { ...patch };
+      // A newly typed secret always cancels a previous one-shot clear intent.
+      // Without this, "clear saved key → type replacement key → save" would
+      // still send clear=true and silently discard the replacement secret.
+      if (typeof patch.apiKey === 'string' && patch.apiKey.trim()) {
+        nextPatch.clearApiKey = false;
+      }
+      if (typeof patch.mcpApiKey === 'string' && patch.mcpApiKey.trim()) {
+        nextPatch.clearMcpApiKey = false;
+      }
+      return { ...current, ...nextPatch };
+    });
     setTestResult(null);
     setSaveError(null);
   }, []);

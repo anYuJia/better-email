@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import useAiService from './useAiService';
 import { aiServiceStorageKey } from '../app/aiServiceConfig';
 import { IPC } from '../ipc/commands';
@@ -103,5 +103,27 @@ describe('useAiService', () => {
     await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
     expect(invokeMock).toHaveBeenCalledWith(IPC.SaveAiSettings, expect.anything());
     expect(loadCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it('cancels one-shot clear flags when a replacement HTTP or MCP key is typed', async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === IPC.LoadAiSettings) return report(true);
+      throw new Error(`Unexpected IPC command: ${command}`);
+    });
+
+    const { result } = renderHook(() => useAiService({ serviceType: 'http' }));
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+
+    act(() => {
+      result.current.patchConfig({ clearApiKey: true, hasApiKey: false });
+      result.current.patchConfig({ apiKey: 'sk-replacement' });
+      result.current.patchConfig({ clearMcpApiKey: true, hasMcpApiKey: false });
+      result.current.patchConfig({ mcpApiKey: 'mcp-replacement' });
+    });
+
+    expect(result.current.config.apiKey).toBe('sk-replacement');
+    expect(result.current.config.clearApiKey).toBe(false);
+    expect(result.current.config.mcpApiKey).toBe('mcp-replacement');
+    expect(result.current.config.clearMcpApiKey).toBe(false);
   });
 });

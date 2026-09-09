@@ -10,6 +10,7 @@ import packageJson from '../../../package.json';
 import SettingsSection from './shared/SettingsSection';
 import SettingsRow from './shared/SettingsRow';
 import SettingsButton from './shared/SettingsButton';
+import type { MessageToast } from '../MessageToastStack';
 
 const repositoryUrl = 'https://github.com/anYuJia/better-email';
 const releasesUrl = `${repositoryUrl}/releases`;
@@ -25,19 +26,21 @@ function isTauriRuntime() {
     && Boolean((window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__);
 }
 
-export default function AboutSettings() {
+type AboutSettingsProps = {
+  onNotify?: (message: string, tone?: MessageToast['tone']) => void;
+};
+
+export default function AboutSettings({ onNotify = () => undefined }: AboutSettingsProps) {
   const [checking, setChecking] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<AvailableUpdate | null>(null);
 
   async function handleCheckUpdates() {
     if (checking) return;
     setChecking(true);
-    setStatus(null);
     setAvailableUpdate(null);
 
     if (!isTauriRuntime()) {
-      setStatus('开发预览无法访问桌面更新服务，请在已安装的 Better Email 中检查更新。');
+      onNotify('开发预览无法访问桌面更新服务，请在已安装的 Better Email 中检查更新。', 'info');
       setChecking(false);
       return;
     }
@@ -45,7 +48,7 @@ export default function AboutSettings() {
     try {
       const update = await check();
       if (!update) {
-        setStatus('当前已是最新版本。');
+        onNotify('当前已是最新版本。', 'success');
         return;
       }
       setAvailableUpdate({
@@ -53,10 +56,10 @@ export default function AboutSettings() {
         date: update.date,
         body: update.body,
       });
-      setStatus(`发现新版本 ${update.version}。`);
+      onNotify(`发现新版本 ${update.version}。`, 'info');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setStatus(`更新检查失败：${message}。`);
+      onNotify(`更新检查失败：${message}。`, 'error');
     } finally {
       setChecking(false);
     }
@@ -123,9 +126,6 @@ export default function AboutSettings() {
           </SettingsButton>
         )}
       >
-        {status && (
-          <p className="settings-about-update-status" role="status" aria-live="polite">{status}</p>
-        )}
         {availableUpdate && (
           <div className="settings-about-update-result">
             <div>

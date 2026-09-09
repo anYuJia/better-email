@@ -227,7 +227,7 @@ impl MailStore {
                 CREATE TABLE IF NOT EXISTS ai_settings (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     enabled INTEGER NOT NULL DEFAULT 0,
-                    service_type TEXT NOT NULL DEFAULT 'mock',
+                    service_type TEXT NOT NULL DEFAULT 'http',
                     endpoint TEXT NOT NULL DEFAULT '',
                     api_key TEXT NOT NULL DEFAULT '',
                     model TEXT NOT NULL DEFAULT '',

@@ -1423,9 +1423,11 @@
 .message-account-source {
   position: relative;
   z-index: 2;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 96px;
+  /* Keep the account identity readable in the list. The preview yields
+     first, while a long address still clips with its full value in title. */
+  max-width: min(180px, calc(100% - 64px));
   margin: 1px 0 0 auto;
   padding: 0 4px;
   border-radius: var(--ui-radius-control, 4px);
@@ -2376,6 +2378,38 @@
   .compact-dropdown > summary {
     padding-inline: 6px;
     gap: 4px;
+  }
+}
+
+/* A manually resized list can be narrow even in a wide window. Keep the
+ * mailbox controls stable according to the pane that owns them, not the
+ * viewport that happens to surround them. */
+@container message-list (max-width: 400px) {
+  .app-shell .list-control-actions {
+    /* Normal text fits one row; enlarged text may wrap the mode and menu
+       groups as a unit so each control keeps its readable label. */
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+
+  .app-shell .list-control-menus {
+    flex-wrap: nowrap;
+    gap: 1px;
+  }
+
+  .app-shell .list-control-tabs {
+    --list-tab-gap: 2px;
+    --list-tab-indicator-width: 50px;
+  }
+
+  .app-shell .list-control-tabs > button {
+    padding-inline: 2px;
+  }
+
+  .compact-dropdown > summary {
+    padding-inline: 2px;
+    gap: 2px;
+    font-size: var(--ui-font-size-aux);
   }
 }
 

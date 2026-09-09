@@ -2,8 +2,14 @@ import { useState } from 'react';
 import EmailReaderSkeleton from './EmailReaderSkeleton';
 import EmailShadowView from './reader/EmailShadowView';
 import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
-import { parseMailtoUrl } from '../mailUtils';
+import type { MessageTranslationFormat } from '../hooks/useMessageTranslation';
+import { htmlHasRenderableContent, parseMailtoUrl } from '../mailUtils';
 import { logWarn } from '../app/logger';
+
+export type ReaderTranslationContent = {
+  format: MessageTranslationFormat;
+  content: string;
+};
 
 type ReaderBodyContentProps = {
   isBodyRenderReady: boolean;
@@ -18,6 +24,7 @@ type ReaderBodyContentProps = {
   onAllowRemoteImagesOnce: () => void;
   onOpenLink: (href: string) => void;
   onComposeNew: (fields?: { to?: string; cc?: string; bcc?: string; subject?: string; body?: string }) => void;
+  translation?: ReaderTranslationContent | null;
   bodyFetchStatus?: 'loading' | 'error' | null;
   bodyFetchError?: string | null;
   onRetryBodyFetch?: () => void | Promise<void>;
@@ -36,12 +43,23 @@ export default function ReaderBodyContent({
   onAllowRemoteImagesOnce,
   onOpenLink,
   onComposeNew,
+  translation = null,
   bodyFetchStatus = null,
   bodyFetchError = null,
   onRetryBodyFetch,
 }: ReaderBodyContentProps) {
   const [expandedBody, setExpandedBody] = useState<string | null>(null);
-  const activeBody = hasRenderableHtml ? readerHtml : plainBodyForReader;
+  const translatedHtml = translation?.format === 'html' ? translation.content : '';
+  const translatedPlain = translation?.format === 'plain' ? translation.content : '';
+  const translatedHtmlReady = Boolean(
+    translatedHtml.trim() && htmlHasRenderableContent(translatedHtml),
+  );
+  const translatedPlainReady = Boolean(translatedPlain.trim());
+  const useTranslation = translatedHtmlReady || translatedPlainReady;
+  const activeHasRenderableHtml = useTranslation ? translatedHtmlReady : hasRenderableHtml;
+  const activeReaderHtml = useTranslation && translatedHtmlReady ? translatedHtml : readerHtml;
+  const activePlainBody = useTranslation && translatedPlainReady ? translatedPlain : plainBodyForReader;
+  const activeBody = activeHasRenderableHtml ? activeReaderHtml : activePlainBody;
   const requiresExplicitRender = activeBody.length > 256_000 && expandedBody !== activeBody;
   // While the next message's body is being prepared, show the loading skeleton
   // instead of stale content from the previously rendered message.
@@ -80,12 +98,12 @@ export default function ReaderBodyContent({
       />
     );
   }
-  if (hasRenderableHtml) {
+  if (activeHasRenderableHtml) {
     return (
       <div className="reader-html-container">
         <EmailShadowView
           className="reader-html"
-          html={readerHtml}
+          html={activeReaderHtml}
           linksHidden={linksHidden}
           onClick={handleReaderHtmlClick}
           onContextMenuCapture={handleReaderHtmlContextMenu}
@@ -120,7 +138,7 @@ export default function ReaderBodyContent({
       </div>
     );
   }
-  if (shouldOfferRemoteContent) {
+  if (!useTranslation && shouldOfferRemoteContent) {
     return (
       <EmptyMessageBody
         title="正文主要由远程图片组成"
@@ -137,5 +155,5 @@ export default function ReaderBodyContent({
       />
     );
   }
-  return <PlainMessageBody body={plainBodyForReader} linksHidden={linksHidden} />;
+  return <PlainMessageBody body={activePlainBody} linksHidden={linksHidden} />;
 }

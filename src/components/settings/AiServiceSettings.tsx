@@ -1,12 +1,11 @@
 import {
-  CheckCircle2,
   KeyRound,
   PlugZap,
   Save,
   ShieldAlert,
-  XCircle,
 } from 'lucide-react';
 import useAiService from '../../hooks/useAiService';
+import type { MessageToast } from '../MessageToastStack';
 import {
   AnimatedDisclosure,
   SettingsBadge,
@@ -19,21 +18,34 @@ import {
 
 const AVAILABLE_FEATURES = ['翻译', '摘要', '模板生成'];
 
-export default function AiServiceSettings() {
+type AiServiceSettingsProps = {
+  onNotify?: (message: string, tone?: MessageToast['tone']) => void;
+};
+
+export default function AiServiceSettings({ onNotify = () => undefined }: AiServiceSettingsProps) {
   const {
     config,
     patchConfig,
     testing,
     saving,
-    saveError,
-    testResult,
     saveConfig,
     runTestConnection,
-  } = useAiService({ setStatus: () => undefined, serviceType: 'http' });
+  } = useAiService({ onNotify, serviceType: 'http' });
 
   const connectorEnabled = config.enabled;
   const providerEndpoint = config.endpoint;
   const providerHasApiKey = config.hasApiKey;
+
+  const handleEnabledChange = (enabled: boolean) => {
+    const previousValue = config.enabled;
+    patchConfig({ enabled });
+    // The feature gate is shared with the mail reader, which may live in a
+    // different native window. Persist this switch immediately so the reader
+    // cannot observe the old disabled value while this page shows it enabled.
+    saveConfig({ enabled }).catch(() => {
+      patchConfig({ enabled: previousValue });
+    });
+  };
 
   return (
     <div className="settings-ai-page-stack">
@@ -47,9 +59,10 @@ export default function AiServiceSettings() {
       >
         <SettingsSwitch
           label="启用 AI 功能"
-          description="使用时，邮件内容可能会发送到你配置的外部 AI 服务。"
+          description="使用时，邮件内容可能会发送到你配置的外部 AI 服务；开关会立即保存。"
           checked={connectorEnabled}
-          onChange={(checked) => patchConfig({ enabled: checked })}
+          disabled={saving}
+          onChange={handleEnabledChange}
         />
       </SettingsSection>
 
@@ -165,19 +178,6 @@ export default function AiServiceSettings() {
             </SettingsButton>
           </div>
 
-          {saveError && (
-            <p className="settings-ai-save-error" role="alert">{saveError}</p>
-          )}
-
-          {testResult && (
-            <div className={`settings-ai-test-result${testResult.ok ? ' ok' : ' fail'}`}>
-              {testResult.ok ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-              <span>{testResult.message}</span>
-              {typeof testResult.latencyMs === 'number' && testResult.latencyMs > 0 && (
-                <em>{testResult.latencyMs} ms</em>
-              )}
-            </div>
-          )}
         </SettingsSection>
       </div>
     </div>

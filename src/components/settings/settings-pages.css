@@ -32,15 +32,6 @@
   gap: 14px;
 }
 
-.settings-modal .settings-page-content .settings-inline-status {
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--st-radius-md);
-  color: var(--st-text-secondary);
-  background: var(--st-info-soft);
-  font-size: var(--st-font-size-secondary);
-}
-
 /* --- About application --- */
 .settings-modal .settings-about-stack {
   display: grid;
@@ -114,13 +105,6 @@
   color: var(--st-accent-hover);
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.settings-modal .settings-about-update-status {
-  margin: 0;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.5;
 }
 
 .settings-modal .settings-about-update-result {
@@ -3472,36 +3456,6 @@
   white-space: nowrap;
 }
 
-.settings-modal .settings-ai-test-result {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  color: var(--st-text-secondary);
-  background: var(--st-surface-subtle);
-  font-size: var(--st-font-size-secondary);
-}
-
-.settings-modal .settings-ai-test-result.ok {
-  border-color: var(--st-success);
-  color: var(--st-success);
-  background: var(--st-success-soft);
-}
-
-.settings-modal .settings-ai-test-result.fail {
-  border-color: var(--st-danger);
-  color: var(--st-danger);
-  background: var(--st-danger-soft);
-}
-
-.settings-modal .settings-ai-test-result em {
-  margin-left: auto;
-  font-style: normal;
-  font-weight: 500;
-}
-
 /* --- MCP connection page and setup guide --- */
 .settings-modal .settings-mcp-page-stack {
   width: 100%;
@@ -3920,12 +3874,6 @@
   flex: 0 0 auto;
   display: flex;
   gap: 8px;
-}
-
-.settings-modal .settings-mcp-copy-error {
-  margin: 0;
-  color: var(--st-danger);
-  font-size: var(--st-font-size-aux);
 }
 
 @keyframes settings-mcp-guide-enter {

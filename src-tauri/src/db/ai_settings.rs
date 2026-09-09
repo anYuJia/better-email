@@ -1,6 +1,17 @@
 use super::*;
 
 impl MailStore {
+    pub fn has_ai_settings(&self) -> MailResult<bool> {
+        self.with_conn(|conn| {
+            let exists = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM ai_settings WHERE id = 1)",
+                [],
+                |row| row.get::<_, i64>(0),
+            )?;
+            Ok(exists != 0)
+        })
+    }
+
     pub fn save_ai_settings(&self, record: &AiSettingsRecord) -> MailResult<()> {
         self.with_conn(|conn| {
             let transaction = rusqlite::Transaction::new_unchecked(
@@ -122,7 +133,7 @@ pub fn load_ai_settings_for_conn(conn: &Connection) -> MailResult<AiSettingsReco
     else {
         return Ok(AiSettingsRecord {
             enabled: false,
-            service_type: "mock".to_string(),
+            service_type: "http".to_string(),
             endpoint: String::new(),
             api_key: String::new(),
             model: String::new(),
@@ -132,6 +143,14 @@ pub fn load_ai_settings_for_conn(conn: &Connection) -> MailResult<AiSettingsReco
             mcp_endpoint: String::new(),
             mcp_api_key: String::new(),
         });
+    };
+    // Normalize values written by older versions. The persisted connector
+    // model now has only HTTP and MCP; legacy/unknown values are HTTP so they
+    // cannot re-enable an offline AI provider.
+    let service_type = if service_type == "mcp" {
+        "mcp".to_string()
+    } else {
+        "http".to_string()
     };
     Ok(AiSettingsRecord {
         enabled: enabled != 0,

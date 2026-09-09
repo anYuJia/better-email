@@ -38,6 +38,7 @@ import {
   SettingsSwitch,
 } from './shared';
 import { IPC } from '../../ipc/commands';
+import type { MessageToast } from '../MessageToastStack';
 
 type TemplateEditor = {
   id: string;
@@ -54,6 +55,7 @@ type TemplateSettingsProps = {
   accountScope?: AccountScope;
   accounts?: Account[];
   onNavigateToAi?: () => void;
+  onNotify?: (message: string, tone?: MessageToast['tone']) => void;
 };
 
 const emptyEditor: TemplateEditor = {
@@ -99,6 +101,7 @@ export default function TemplateSettings({
   accountScope = 'all',
   accounts: accountOptions,
   onNavigateToAi,
+  onNotify = () => undefined,
 }: TemplateSettingsProps) {
   const [templates, setTemplates] = useState<ComposeTemplate[]>(() => loadTemplates());
   const [loadedAccounts, setLoadedAccounts] = useState<Account[]>([]);
@@ -106,7 +109,6 @@ export default function TemplateSettings({
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [editor, setEditor] = useState<TemplateEditor>(emptyEditor);
   const [editing, setEditing] = useState(false);
-  const [status, setStatus] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const [aiPreview, setAiPreview] = useState<{ subject: string; body: string } | null>(null);
@@ -144,24 +146,21 @@ export default function TemplateSettings({
 
   function refresh(next: ComposeTemplate[]) {
     setTemplates(next);
-    setStatus('');
   }
 
   function startCreate() {
     setEditor({ ...emptyEditor, account_id: accountScope === 'all' ? 0 : accountScope });
     setEditing(true);
-    setStatus('');
   }
 
   function startEdit(template: ComposeTemplate) {
     setEditor(editorFromTemplate(template));
     setEditing(true);
-    setStatus('');
   }
 
   function saveEditor() {
     if (!editor.name.trim()) {
-      setStatus('请填写模板名称');
+      onNotify('请填写模板名称。', 'error');
       return;
     }
     const existing = editor.id ? loadTemplates().find((template) => template.id === editor.id) : null;
@@ -186,14 +185,14 @@ export default function TemplateSettings({
     refresh(next);
     setEditing(false);
     setEditor(emptyEditor);
-    setStatus(`模板已保存：${editor.name}`);
+    onNotify(`模板已保存：${editor.name}`, 'success');
   }
 
   function duplicate(template: ComposeTemplate) {
     const copy = duplicateTemplate(template.id);
     if (copy) {
       refresh(loadTemplates());
-      setStatus(`已复制模板：${copy.name}`);
+      onNotify(`已复制模板：${copy.name}`, 'success');
     }
   }
 
@@ -202,7 +201,7 @@ export default function TemplateSettings({
     const target = templates.find((template) => template.id === confirmDeleteId);
     refresh(deleteTemplate(confirmDeleteId));
     setConfirmDeleteId(null);
-    if (target) setStatus(`模板已删除：${target.name}`);
+    if (target) onNotify(`模板已删除：${target.name}`, 'success');
   }
 
   function openAiGenerator() {
@@ -215,9 +214,9 @@ export default function TemplateSettings({
     try {
       const result = await generateTemplate(aiPrompt);
       setAiPreview(parseAiGeneratedTemplate(result.content));
-      setStatus('AI 已生成模板，请确认后保存');
+      onNotify('AI 已生成模板，请确认后保存。', 'info');
     } catch (error) {
-      setStatus(aiErrorMessage(error as AiRequestError));
+      onNotify(aiErrorMessage(error as AiRequestError), 'error');
     } finally {
       setAiBusy(false);
     }
@@ -241,7 +240,7 @@ export default function TemplateSettings({
     refresh(next);
     setAiPreview(null);
     setAiPrompt('');
-    setStatus('AI 生成的模板已保存');
+    onNotify('AI 生成的模板已保存。', 'success');
   }
 
   function insertVariable(variableName: string) {
@@ -299,8 +298,6 @@ export default function TemplateSettings({
           新建模板
         </SettingsButton>
       </div>
-
-      {status && <div className="settings-inline-status">{status}</div>}
 
       <div className={`template-ai-generator${aiOpen ? '' : ' is-collapsed'}`}>
         <button

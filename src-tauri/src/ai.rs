@@ -238,7 +238,12 @@ fn prompt_for_operation(
                     role: "system".to_string(),
                     content: format!(
                         "你是专业的邮件翻译助手。把用户提供的邮件内容翻译成{target}，\
-                         保持原文语气与格式，只输出译文，不要解释。"
+                         保持原文语气、段落和格式，只输出译文，不要解释。\
+                         原文中的 URL、邮箱地址、路径、代码、模板变量、产品名、品牌名、\
+                         人名和组织名保持原样（除非原文明确给出了官方译名）。\
+                         其中形如 __BETTER_EMAIL_TAG_0__、__BETTER_EMAIL_URL_1__ 的标记代表 HTML 标签或不可翻译内容，\
+                         所有 __BETTER_EMAIL_*_数字__ 标记都必须逐字保留、顺序不变，不要翻译、删除、转义、\
+                         包裹 Markdown 代码块，也不要新增标记。"
                     ),
                 },
                 AiChatCompletionInput {
@@ -639,8 +644,8 @@ pub fn test_ai_connection(
 mod tests {
     use super::MAX_AI_RESPONSE_BYTES;
     use super::{
-        call_chat_completion, run_mcp_tool_call, validate_ai_endpoint, AiChatCompletionInput,
-        AiRequestInput,
+        call_chat_completion, prompt_for_operation, run_mcp_tool_call, validate_ai_endpoint,
+        AiChatCompletionInput, AiRequestInput,
     };
     use crate::http::read_response_capped;
     use serde_json::Value;
@@ -781,6 +786,17 @@ mod tests {
 
         let private = validate_ai_endpoint("http://10.0.0.5/v1");
         assert!(private.is_err());
+    }
+
+    #[test]
+    fn translation_prompt_requires_every_protected_placeholder_to_stay_exact() {
+        let messages = prompt_for_operation("translate", "source", "中文", "");
+        let system_prompt = &messages[0].content;
+
+        assert!(system_prompt.contains("__BETTER_EMAIL_TAG_0__"));
+        assert!(system_prompt.contains("__BETTER_EMAIL_URL_1__"));
+        assert!(system_prompt.contains("__BETTER_EMAIL_*_数字__"));
+        assert!(system_prompt.contains("逐字保留"));
     }
 
     #[test]

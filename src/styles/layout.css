@@ -60,6 +60,7 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  container: message-list / inline-size;
 }
 
 .app-shell .message-list-panel {

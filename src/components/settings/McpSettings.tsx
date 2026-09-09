@@ -1,6 +1,5 @@
 import {
   Check,
-  CheckCircle2,
   Copy,
   KeyRound,
   Link2,
@@ -9,12 +8,12 @@ import {
   Save,
   ShieldAlert,
   X,
-  XCircle,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import type { AiServiceConfig } from '../../app/types/ai';
 import { copyTextToClipboard } from '../../app/clipboard';
+import type { MessageToast } from '../MessageToastStack';
 import useAiService from '../../hooks/useAiService';
 import useModalAccessibility from '../../hooks/useModalAccessibility';
 import {
@@ -46,16 +45,11 @@ type McpConnectionGuideProps = {
   openedFromEnable: boolean;
   testing: boolean;
   saving: boolean;
-  saveError: string | null;
-  testResult: {
-    ok: boolean;
-    message: string;
-    latencyMs?: number;
-  } | null;
   patchConfig: (patch: Partial<AiServiceConfig>) => void;
   onTestConnection: () => void;
   onSave: () => void;
   onClose: () => void;
+  onNotify?: (message: string, tone?: MessageToast['tone']) => void;
 };
 
 function McpConnectionGuide({
@@ -64,16 +58,14 @@ function McpConnectionGuide({
   openedFromEnable,
   testing,
   saving,
-  saveError,
-  testResult,
   patchConfig,
   onTestConnection,
   onSave,
   onClose,
+  onNotify,
 }: McpConnectionGuideProps) {
   const [activeTab, setActiveTab] = useState<McpGuideTab>('connection');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [copyError, setCopyError] = useState(false);
   const dialogRef = useRef<HTMLElement | null>(null);
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -109,7 +101,6 @@ function McpConnectionGuide({
     try {
       await copyTextToClipboard(value);
       setCopiedKey(key);
-      setCopyError(false);
       if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
       copyTimerRef.current = window.setTimeout(() => {
         copyTimerRef.current = null;
@@ -117,7 +108,7 @@ function McpConnectionGuide({
       }, 1800);
     } catch {
       setCopiedKey(null);
-      setCopyError(true);
+      onNotify?.('复制失败，请手动选择文本复制。', 'error');
     }
   };
 
@@ -311,17 +302,6 @@ function McpConnectionGuide({
                 )}
               </div>
 
-              {testResult && (
-                <div className={`settings-ai-test-result${testResult.ok ? ' ok' : ' fail'}`} role={testResult.ok ? 'status' : 'alert'}>
-                  {testResult.ok ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>{testResult.message}</span>
-                  {typeof testResult.latencyMs === 'number' && testResult.latencyMs > 0 && (
-                    <em>{testResult.latencyMs} ms</em>
-                  )}
-                </div>
-              )}
-
-              {saveError && <p className="settings-ai-save-error" role="alert">{saveError}</p>}
             </div>
           ) : (
             <div
@@ -377,9 +357,6 @@ function McpConnectionGuide({
                 })}
               </div>
 
-              {copyError && (
-                <p className="settings-mcp-copy-error" role="alert">复制失败，请手动选择文本复制。</p>
-              )}
             </div>
           )}
         </div>
@@ -415,17 +392,20 @@ function getMcpStatus(
   return { tone: 'info', label: '待测试' };
 }
 
-export default function McpSettings() {
+type McpSettingsProps = {
+  onNotify?: (message: string, tone?: MessageToast['tone']) => void;
+};
+
+export default function McpSettings({ onNotify }: McpSettingsProps = {}) {
   const {
     config,
     patchConfig,
     testing,
     saving,
-    saveError,
     testResult,
     saveConfig,
     runTestConnection,
-  } = useAiService({ setStatus: () => undefined, serviceType: 'mcp' });
+  } = useAiService({ onNotify, serviceType: 'mcp' });
   const [guideOpen, setGuideOpen] = useState(false);
   const [openedFromEnable, setOpenedFromEnable] = useState(false);
   const guideSnapshotRef = useRef<AiServiceConfig | null>(null);
@@ -529,12 +509,11 @@ export default function McpSettings() {
           openedFromEnable={openedFromEnable}
           testing={testing}
           saving={saving}
-          saveError={saveError}
-          testResult={testResult}
           patchConfig={patchConfig}
           onTestConnection={runTestConnection}
           onSave={saveAndCloseGuide}
           onClose={closeGuide}
+          onNotify={onNotify}
         />
       )}
     </div>

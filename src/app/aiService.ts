@@ -5,50 +5,22 @@ import type {
   AiServiceConfig,
   AiTestConnectionResult,
 } from './types/ai';
-import { loadAiServiceConfig } from './aiServiceConfig';
-import { mockMode, invoke } from '../tauriBridge';
+import { loadEffectiveAiServiceConfig } from './aiServiceConfig';
+import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
 
 const MAX_INPUT_CHARS = 40_000;
 
+/** Detect legacy offline payloads so they can never be rendered as a result. */
+export function isOfflineAiResult(content: string): boolean {
+  const normalized = content.trimStart();
+  return normalized.startsWith('【mock ')
+    || normalized.includes('Better Email 离线模拟')
+    || normalized.includes('离线模拟摘要');
+}
+
 function truncateInput(text: string): string {
   return text.length > MAX_INPUT_CHARS ? text.slice(0, MAX_INPUT_CHARS) : text;
-}
-
-function mockTranslation(text: string, targetLanguage: string): string {
-  const source = truncateInput(text).trim();
-  if (!source) return '';
-  const head = source.length > 200 ? `${source.slice(0, 200)}…` : source;
-  const target = targetLanguage.trim() || '中文';
-  return `【mock 译文 · ${target}】\n${head}\n\n（这是 Better Email 离线模拟的稳定翻译结果，配置真实 AI 服务后可获得完整译文。）`;
-}
-
-function mockGeneratedTemplate(prompt: string): string {
-  const topic = prompt.trim() || '通用商务邮件';
-  return `主题：${topic}跟进\n\n正文：\n您好 {{contact.name}}，\n\n感谢您对 ${topic} 的关注。我们希望确认接下来的安排，如您有任何疑问，请随时回复。\n\n祝好，\n{{account.email}}`;
-}
-
-function mockSummary(text: string): string {
-  const source = truncateInput(text).trim();
-  if (!source) return '';
-  const head = source.length > 300 ? `${source.slice(0, 300)}…` : source;
-  return `【mock 摘要】\n${head}\n\n（离线模拟摘要，配置真实 AI 服务后可用。）`;
-}
-
-export function mockAiResult(operation: AiOperation, text: string, prompt: string, targetLanguage: string): AiRequestResult {
-  let content = '';
-  switch (operation) {
-    case 'translate':
-      content = mockTranslation(text, targetLanguage);
-      break;
-    case 'generate_template':
-      content = mockGeneratedTemplate(prompt);
-      break;
-    case 'summarize':
-      content = mockSummary(text);
-      break;
-  }
-  return { operation, content, service_type: 'mock', truncated: false };
 }
 
 export function aiErrorMessage(error: AiRequestError): string {
@@ -67,9 +39,6 @@ export function aiErrorMessage(error: AiRequestError): string {
 }
 
 export function checkAiConfig(config: AiServiceConfig, external: boolean): AiRequestError | null {
-  if (config.serviceType === 'mock') {
-    return config.enabled ? null : { kind: 'disabled' };
-  }
   if (!config.enabled) return { kind: 'disabled' };
   if (config.serviceType === 'mcp' && config.mcpEnabled !== true) {
     return { kind: 'mcp_disabled' };
@@ -101,7 +70,14 @@ async function requestExternal(
     timeout_seconds: config.timeoutSeconds,
     service_type: config.serviceType,
   };
-  return invoke<AiRequestResult>(IPC.AiRequest, { input });
+  const result = await invoke<AiRequestResult>(IPC.AiRequest, { input });
+  if (result.service_type !== config.serviceType || isOfflineAiResult(result.content)) {
+    throw {
+      kind: 'external',
+      message: 'AI 请求返回了非真实服务结果，已拒绝显示；请检查桌面端版本和 AI 接入配置。',
+    } satisfies AiRequestError;
+  }
+  return result;
 }
 
 export async function runAiOperation(
@@ -109,19 +85,10 @@ export async function runAiOperation(
   options: { text?: string; prompt?: string; targetLanguage?: string },
   config?: AiServiceConfig,
 ): Promise<AiRequestResult> {
-  const resolved = config ?? loadAiServiceConfig();
-  const external = resolved.serviceType !== 'mock';
-  const gateError = checkAiConfig(resolved, external);
+  const resolved = config ?? await loadEffectiveAiServiceConfig();
+  const gateError = checkAiConfig(resolved, true);
   if (gateError) {
     throw gateError;
-  }
-  if (!external) {
-    return mockAiResult(
-      operation,
-      options.text ?? '',
-      options.prompt ?? '',
-      options.targetLanguage ?? '',
-    );
   }
   return requestExternal(
     operation,
@@ -145,13 +112,6 @@ export function summarizeMessage(text: string, config?: AiServiceConfig): Promis
 }
 
 export async function testAiConnection(config: AiServiceConfig): Promise<AiTestConnectionResult> {
-  if (config.serviceType === 'mock') {
-    const mockGateError = checkAiConfig(config, false);
-    if (mockGateError) {
-      return { ok: false, message: aiErrorMessage(mockGateError), latencyMs: 0 };
-    }
-    return { ok: true, message: '模拟 AI 服务连接正常（mock 模式不需要网络）。', latencyMs: 2 };
-  }
   const gateError = checkAiConfig(config, false);
   if (gateError) {
     return { ok: false, message: aiErrorMessage(gateError), latencyMs: 0 };
@@ -168,14 +128,15 @@ export async function testAiConnection(config: AiServiceConfig): Promise<AiTestC
         timeoutSeconds: config.timeoutSeconds,
       },
     );
+    if (report.service_type !== config.serviceType || isOfflineAiResult(report.message)) {
+      return {
+        ok: false,
+        message: '连接测试返回了非真实服务结果，已拒绝；请检查桌面端版本和 AI 接入配置。',
+        latencyMs: report.latency_ms,
+      };
+    }
     return { ok: report.ok, message: report.message, latencyMs: report.latency_ms };
   } catch (error) {
     return { ok: false, message: `测试连接失败：${String(error)}`, latencyMs: 0 };
   }
 }
-
-export function isAiExternal(config: AiServiceConfig): boolean {
-  return config.serviceType !== 'mock';
-}
-
-export { mockMode };

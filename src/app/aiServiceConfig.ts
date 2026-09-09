@@ -1,4 +1,4 @@
-import type { AiServiceConfig } from './types/ai';
+import type { AiServiceConfig, AiServiceType } from './types/ai';
 import { readAppStorage } from './storageConfig';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
@@ -18,6 +18,17 @@ export const defaultAiServiceConfig: AiServiceConfig = {
   mcpApiKey: '',
 };
 
+export function isNativeAiRuntime(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
+
+function normalizeAiServiceType(value: unknown): AiServiceType {
+  if (value === 'mcp') return 'mcp';
+  // Values written by older builds are treated as the regular HTTP connector;
+  // no third, offline AI provider exists anymore.
+  return 'http';
+}
+
 export type AiSettingsInput = {
   enabled: boolean;
   service_type: string;
@@ -35,6 +46,8 @@ export type AiSettingsInput = {
 
 /** 后端返回的 AI 设置报告：绝不含完整密钥，只有「是否已配置」标志。 */
 export type AiSettingsReport = {
+  /** False means the backend has no saved row; local fallback remains valid. */
+  configured?: boolean;
   enabled: boolean;
   service_type: string;
   endpoint: string;
@@ -47,6 +60,41 @@ export type AiSettingsReport = {
   has_mcp_api_key: boolean;
 };
 
+export function hasPersistedAiSettings(report: AiSettingsReport): boolean {
+  if (report.configured !== undefined) return report.configured;
+  // Compatibility with an older backend that did not expose `configured`.
+  return report.enabled
+    || Boolean(report.endpoint.trim())
+    || report.has_api_key
+    || Boolean(report.model.trim())
+    || report.privacy_acknowledged
+    || report.mcp_enabled
+    || Boolean(report.mcp_endpoint.trim())
+    || report.has_mcp_api_key;
+}
+
+export function mergePersistedAiSettings(
+  current: AiServiceConfig,
+  report: AiSettingsReport,
+): AiServiceConfig {
+  if (!hasPersistedAiSettings(report)) return current;
+  return {
+    ...current,
+    enabled: report.enabled,
+    serviceType: normalizeAiServiceType(report.service_type),
+    endpoint: report.endpoint,
+    apiKey: '',
+    hasApiKey: report.has_api_key,
+    defaultModel: report.model || current.defaultModel,
+    timeoutSeconds: report.timeout_seconds || current.timeoutSeconds,
+    privacyAcknowledged: report.privacy_acknowledged,
+    mcpEnabled: report.mcp_enabled,
+    mcpEndpoint: report.mcp_endpoint || current.mcpEndpoint,
+    mcpApiKey: '',
+    hasMcpApiKey: report.has_mcp_api_key,
+  };
+}
+
 /** 从后端读取 AI 设置（密钥只保存在应用本地数据库，不落 localStorage）。 */
 export async function loadAiSettingsFromBackend(): Promise<AiSettingsReport | null> {
   try {
@@ -55,6 +103,26 @@ export async function loadAiSettingsFromBackend(): Promise<AiSettingsReport | nu
   } catch {
     return null;
   }
+}
+
+/**
+ * Runtime AI requests may run in the main window while settings are edited in
+ * a native settings window. Read the local database at the point of use so a
+ * stale window-local configuration cannot disable or replace the saved
+ * external provider.
+ */
+export async function loadEffectiveAiServiceConfig(): Promise<AiServiceConfig> {
+  const current = loadAiServiceConfig();
+  const report = await loadAiSettingsFromBackend();
+  if (report && !hasPersistedAiSettings(report)) {
+    // In the native app, localStorage is only a non-secret mirror. Without a
+    // saved backend row there is no key/configuration that Rust can authorize.
+    // Keeping it as an external runtime config would produce a misleading
+    // request failure; keeping a stale local value would produce a misleading
+    // request failure or hide the fact that the service is not configured.
+    return isNativeAiRuntime() ? { ...defaultAiServiceConfig } : current;
+  }
+  return report ? mergePersistedAiSettings(current, report) : current;
 }
 
 /** 保存 AI 设置到后端（密钥只写入应用本地数据库）。 */
@@ -93,9 +161,7 @@ export function loadAiServiceConfig(): AiServiceConfig {
     const parsed = JSON.parse(stored) as Partial<AiServiceConfig>;
     return {
       enabled: parsed.enabled ?? defaultAiServiceConfig.enabled,
-      serviceType: parsed.serviceType === 'mcp' || parsed.serviceType === 'mock'
-        ? parsed.serviceType
-        : 'http',
+      serviceType: normalizeAiServiceType(parsed.serviceType),
       endpoint: typeof parsed.endpoint === 'string' ? parsed.endpoint : '',
       apiKey: '',
       defaultModel: typeof parsed.defaultModel === 'string' && parsed.defaultModel.trim()

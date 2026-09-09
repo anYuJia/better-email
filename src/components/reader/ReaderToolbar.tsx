@@ -162,6 +162,12 @@ function ReaderToolbar({
     'copy-message-info',
   ].includes(item.id));
   const isMobileViewport = typeof window !== 'undefined' && window.innerWidth <= 720;
+  const canToggleTranslation = translationCompleted;
+  const translationActionLabel = translationActive
+    ? '显示原文'
+    : translationCompleted
+      ? '显示译文'
+      : '翻译邮件';
   const extraItems: ContextMenuItem[] = [
     {
       id: 'export-eml',
@@ -194,11 +200,11 @@ function ReaderToolbar({
                 }]
               : []),
           ...(!isDraft && needsTranslation
-            ? [{
+              ? [{
                 id: 'menu-translate',
-                label: translationActive ? '显示原文' : '翻译邮件',
+                label: translationActionLabel,
                 icon: <Languages size={15} />,
-                onSelect: translationCompleted ? onToggleTranslation : onTranslateMessage,
+                onSelect: canToggleTranslation ? onToggleTranslation : onTranslateMessage,
               }]
             : []),
         ]
@@ -329,8 +335,8 @@ function ReaderToolbar({
             type="button"
             className={`reader-translate-action${translationActive ? ' active' : ''}`}
             title="检测到外语邮件，点击翻译为中文"
-            aria-label={translationActive ? '显示原文' : '翻译为中文'}
-            onClick={translationCompleted ? onToggleTranslation : onTranslateMessage}
+            aria-label={translationActionLabel === '翻译邮件' ? '翻译为中文' : translationActionLabel}
+            onClick={canToggleTranslation ? onToggleTranslation : onTranslateMessage}
             disabled={translationLoading}
           >
             {translationLoading ? (
@@ -338,7 +344,7 @@ function ReaderToolbar({
             ) : (
               <Languages size={15} />
             )}
-            <span>{translationActive ? '显示原文' : '翻译为中文'}</span>
+            <span>{translationActive ? '显示原文' : translationCompleted ? '显示译文' : '翻译为中文'}</span>
           </button>
         )}
         {!isDraft && (

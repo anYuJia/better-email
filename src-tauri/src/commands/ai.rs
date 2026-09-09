@@ -29,6 +29,8 @@ pub struct AiSettingsSaveInput {
 /// 前端可见的 AI 设置报告：绝不回传完整密钥，只返回「是否已配置」。
 #[derive(Debug, Clone, Serialize)]
 pub struct AiSettingsReport {
+    /// Distinguishes a genuinely saved empty configuration from a fresh store.
+    pub configured: bool,
     pub enabled: bool,
     pub service_type: String,
     pub endpoint: String,
@@ -43,7 +45,14 @@ pub struct AiSettingsReport {
 
 impl From<AiSettingsRecord> for AiSettingsReport {
     fn from(record: AiSettingsRecord) -> Self {
+        Self::from_record(record, true)
+    }
+}
+
+impl AiSettingsReport {
+    fn from_record(record: AiSettingsRecord, configured: bool) -> Self {
         AiSettingsReport {
+            configured,
             enabled: record.enabled,
             service_type: record.service_type,
             endpoint: record.endpoint,
@@ -123,9 +132,14 @@ pub fn save_ai_settings(
     // 但密钥仍不能跟随 endpoint 变化而被静默沿用，否则旧 key 可能被发到新的端点。
     let existing = store.load_ai_settings().ok();
     let (api_key, mcp_api_key) = resolve_ai_secrets_for_save(existing.as_ref(), &input)?;
+    let service_type = if input.service_type == "mcp" {
+        "mcp".to_string()
+    } else {
+        "http".to_string()
+    };
     let record = AiSettingsRecord {
         enabled: input.enabled,
-        service_type: input.service_type,
+        service_type,
         endpoint: input.endpoint,
         api_key,
         model: input.model,
@@ -147,6 +161,19 @@ pub fn save_ai_settings(
 /// 端点匹配（末尾斜杠差异视为同一目标，不构成密钥泄露）。
 fn normalized_endpoint(endpoint: &str) -> String {
     endpoint.trim().trim_end_matches('/').to_string()
+}
+
+/// Treat legacy non-MCP rows with a configured MCP endpoint as MCP during the
+/// transition. HTTP rows are normalized by the database loader, so there is
+/// no offline connector that can satisfy an AI request.
+fn saved_service_type_matches(record: &AiSettingsRecord, service_type: &str) -> bool {
+    if record.service_type == service_type {
+        return true;
+    }
+    service_type == "mcp"
+        && record.service_type != "mcp"
+        && record.mcp_enabled
+        && !record.mcp_endpoint.trim().is_empty()
 }
 
 /// 解析保存时的密钥（返回 (api_key, mcp_api_key)）。两类密钥分别绑定到自己的
@@ -200,10 +227,11 @@ fn resolve_bound_secret_key(
 
 #[tauri::command]
 pub fn load_ai_settings(store: State<'_, MailStore>) -> Result<AiSettingsReport, String> {
-    store
+    let configured = store.has_ai_settings().map_err(|error| error.to_string())?;
+    let record = store
         .load_ai_settings()
-        .map(AiSettingsReport::from)
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    Ok(AiSettingsReport::from_record(record, configured))
 }
 
 /// 后端安全边界：校验一次外部 AI/MCP 请求是否可以使用保存的密钥。
@@ -229,7 +257,7 @@ fn enforce_saved_http_request(
     if !saved.enabled {
         return Err("AI 服务已关闭，请先在设置中开启。".to_string());
     }
-    if saved.service_type != service_type {
+    if !saved_service_type_matches(&saved, service_type) {
         return Err(format!(
             "AI 服务类型与已保存配置不一致（当前 {service_type}，已保存为 {}），已拒绝请求。",
             saved.service_type
@@ -281,7 +309,7 @@ fn test_connection_key(
     }
     let saved = store.load_ai_settings().ok();
     let matches_saved = saved.as_ref().is_some_and(|record| {
-        record.service_type == service_type
+        saved_service_type_matches(record, service_type)
             && normalized_endpoint(endpoint)
                 == if service_type == "mcp" {
                     normalized_endpoint(&record.mcp_endpoint)

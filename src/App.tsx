@@ -24,7 +24,6 @@ import ContactSyncLoadingDialog from './components/ContactSyncLoadingDialog';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import type { PendingSendUndo } from './components/UndoSnackbarStack';
-import type { MessageToast } from './components/MessageToastStack';
 import useAppLayout, { APP_LAYOUT_BOUNDS } from './hooks/useAppLayout';
 import { logError } from './app/logger';
 import useAppShortcuts from './hooks/useAppShortcuts';
@@ -43,6 +42,7 @@ import useAppMetaLoader from './hooks/useAppMetaLoader';
 import useUnreadFocusSync from './hooks/useUnreadFocusSync';
 import useComposerController, { type OpenComposerOptions } from './hooks/useComposerController';
 import useCredentialManagement from './hooks/useCredentialManagement';
+import useMessageToastQueue from './hooks/useMessageToastQueue';
 import useFolderManagement from './hooks/useFolderManagement';
 import useIdentityManagement from './hooks/useIdentityManagement';
 import useLabelManagement from './hooks/useLabelManagement';
@@ -229,15 +229,7 @@ function MailboxApp({
   useAutoHideScrollbars();
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>(requestedSettingsSection);
   const [status, setStatus] = useState('本地原型已就绪');
-  const [messageToasts, setMessageToasts] = useState<MessageToast[]>([]);
-  const messageToastIdRef = useRef(0);
-  const showMessageToast = useCallback((text: string, tone: MessageToast['tone'] = 'success') => {
-    const id = ++messageToastIdRef.current;
-    setMessageToasts((current) => [...current, { id, text, tone }]);
-    window.setTimeout(() => {
-      setMessageToasts((current) => current.filter((toast) => toast.id !== id));
-    }, tone === 'error' ? 5000 : 3000);
-  }, []);
+  const { toasts: messageToasts, showToast: showMessageToast } = useMessageToastQueue();
   const [composerSendProgress, setComposerSendProgress] = useState<number | null>(null);
   const [composerSendProgressMessage, setComposerSendProgressMessage] = useState<string | null>(null);
   const [composerAttachmentProgress, setComposerAttachmentProgress] = useState<number | null>(null);
@@ -1800,6 +1792,7 @@ function MailboxApp({
         selectedWarnExternalSender={selectedWarnExternalSender}
         selectedInterceptsHttps={selectedInterceptsHttps}
         onOpenHttpsLink={handleOpenHttpsLink}
+        onAiError={(message) => showMessageToast(message, 'error')}
         quickReplyBody={quickReplyBody}
         onSelectMessage={selectMessageForReading}
         onComposeNew={handleComposeNew}
@@ -2190,6 +2183,7 @@ function MailboxApp({
             contactEditAliases={contactEditAliases}
             contactTransferBusy={contactTransferBusy}
             setStatus={setStatus}
+            onNotify={showMessageToast}
             onNavigate={isMobileApp ? openMobileSettingsSection : scrollSettingsSection}
             onClose={closeSettingsSurface}
             onTestConnection={() => {

@@ -70,4 +70,15 @@ describe('ReaderBodyContent remote body states', () => {
     expect(document.body.textContent).toContain('unique-plain-tail');
   });
 
+  it('renders the translated body in place of the original body', () => {
+    renderBody({
+      hasRenderableHtml: true,
+      readerHtml: '<p>Original body</p>',
+      translation: { format: 'html', content: '<p>译文正文</p><a href="https://example.com">链接</a>' },
+    });
+
+    expect(screen.getByTestId('full-html').textContent).toContain('译文正文');
+    expect(screen.getByTestId('full-html').textContent).not.toContain('Original body');
+  });
+
 });

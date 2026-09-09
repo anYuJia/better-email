@@ -3023,17 +3023,13 @@ async function main() {
     await waitForExpression(cdp, "!document.querySelector('.reader-translate-action')");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Design review invitation')).click()");
     await waitForExpression(cdp, "document.querySelector('.reader-translate-action')");
-    await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: true, serviceType: 'mock', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false })); location.reload()");
+    await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: false, serviceType: 'http', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false })); location.reload()");
     await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('Better Email')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Design review invitation'))");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Design review invitation')).click()");
     await waitForExpression(cdp, "document.querySelector('.reader-translate-action')");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.reader-actions button[aria-label=\"翻译为中文\"]'); if (!button) throw new Error('Translate button not found'); button.click(); })()");
-    await waitForExpression(cdp, "document.querySelector('.reader-translation-panel')?.innerText.includes('mock 译文') && !document.querySelector('.reader-translation-panel')?.innerText.includes('Design review')");
-    await clickButton(cdp, '查看原文', "document.querySelector('.reader-translation-header')");
-    await waitForExpression(cdp, "document.querySelector('.reader-translation-panel')?.innerText.includes('已翻译为中文')");
-    await clickButton(cdp, '显示译文', "document.querySelector('.reader-translation-banner')");
-    await waitForExpression(cdp, "document.querySelector('.reader-translation-panel')?.innerText.includes('mock 译文')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('[role=\"alert\"]')].some((item) => item.textContent.includes('AI 服务已关闭')) && !document.body.innerText.includes('mock 译文')");
 
     await evalInPage(cdp, "(() => { const button = document.querySelector('.reader-actions button[title=\"回复\"]') ?? document.querySelector('.reader-actions button[aria-label=\"回复\"]'); if (!button) throw new Error('Reply button not found'); button.click(); })()");
     await waitForExpression(cdp, "document.querySelector('.composer') && [...document.querySelectorAll('.composer-recipient-chip-copy')].some((item) => item.getAttribute('title') === 'alice@partner.example.com')");
@@ -3080,8 +3076,8 @@ async function main() {
     await evalInPage(cdp, "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "!document.querySelector('.settings-mcp-guide') && document.querySelector('.settings-page[data-settings-page=\"mcp\"] input[aria-label=\"启用 MCP\"]')?.checked");
     await openSettingsSection(cdp, 'AI 接入', 'ai', '.settings-page[data-settings-page="ai"]');
-    // 浏览器冒烟测试只在内部注入 mock，不把“本地演示”作为用户可选的接入方式。
-    await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: true, serviceType: 'mock', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false }));");
+    // 浏览器冒烟测试不伪造 AI 结果；真实 AI 请求只在 Tauri 桌面端执行。
+    await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: false, serviceType: 'http', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false }));");
     await openSettingsSection(cdp, '模板', 'templates', '.settings-page[data-settings-page="templates"]');
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-page[data-settings-page=\"templates\"] button')].some((item) => item.textContent.includes('新建模板'))");
     await clickButton(cdp, '新建模板', "document.querySelector('.settings-page[data-settings-page=\"templates\"]')");
@@ -3096,9 +3092,7 @@ async function main() {
     await fillInput(cdp, '.template-ai-generator input[placeholder^="描述模板用途"]', '向新客户介绍产品');
     await clickButton(cdp, 'AI 生成', "document.querySelector('.template-ai-generator')");
     await sleep(1000);
-    await waitForExpression(cdp, "document.querySelector('.template-ai-preview textarea')?.value.includes('{{contact.name}}') && document.querySelector('.template-ai-preview input')?.value.includes('跟进')");
-    await clickButton(cdp, '保存为模板', "document.querySelector('.template-ai-preview')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('AI 生成的模板已保存') && document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('向新客户介绍产品模板')");
+    await waitForExpression(cdp, "!document.querySelector('.template-ai-preview') && /AI 服务已关闭|请先配置 AI 服务|浏览器预览不执行真实 AI 请求|MCP 服务未开启/.test(document.querySelector('.settings-inline-status')?.textContent ?? '')");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
 

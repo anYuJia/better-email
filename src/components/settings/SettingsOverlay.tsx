@@ -41,6 +41,7 @@ import type { NotificationPolicy } from '../../mailUtils';
 import type { ThemeMode } from '../../hooks/useThemeMode';
 import type { SettingsSectionId } from './SettingsFrame';
 import type { SettingsAccountValueChange, SettingsAccountValues } from './accountScopeTypes';
+import type { MessageToast } from '../MessageToastStack';
 import DeferredSurface from '../DeferredSurface';
 import SettingsFrame from './SettingsFrame';
 import { createSettingsHandlers } from './settingsOverlayHandlers';
@@ -120,6 +121,7 @@ export type SettingsOverlayProps = {
   contactEditAliases: string;
   contactTransferBusy: boolean;
   setStatus: Dispatch<SetStateAction<string>>;
+  onNotify?: (message: string, tone?: MessageToast['tone']) => void;
   onNavigate: (section: SettingsSectionId) => void;
   onClose: () => void;
   onTestConnection: () => void;
@@ -478,20 +480,21 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
             <MemoizedTools onNavigate={handlers.onNavigate} />
           )}
           {activeSettingsSection === 'ai' && (
-            <MemoizedAiService />
+            <MemoizedAiService onNotify={props.onNotify} />
           )}
           {activeSettingsSection === 'mcp' && (
-            <MemoizedMcp />
+            <MemoizedMcp onNotify={props.onNotify} />
           )}
           {activeSettingsSection === 'templates' && (
             <MemoizedTemplates
               accountScope={props.accountScope}
               accounts={props.accounts}
               onNavigateToAi={() => handlers.onNavigate('ai')}
+              onNotify={props.onNotify}
             />
           )}
           {activeSettingsSection === 'about' && (
-            <MemoizedAbout />
+            <MemoizedAbout onNotify={props.onNotify} />
           )}
         </Suspense>
       </SettingsFrame>

@@ -139,4 +139,15 @@ describe('translation language detection', () => {
     expect(safe).not.toContain('onclick');
     expect(safe).not.toContain('<script>');
   });
+
+  it('strips remote visual resources introduced by an AI translation', () => {
+    const safe = sanitizeTranslatedHtml(
+      '<p style="background:url(https://tracker.example/pixel)">你好</p>'
+      + '<img src="https://tracker.example/pixel.png" srcset="https://tracker.example/a.png 1x">'
+      + '<img src="cid:logo@example.com">',
+    );
+    expect(safe).not.toContain('tracker.example');
+    expect(safe).not.toContain('background:url');
+    expect(safe).toContain('cid:logo@example.com');
+  });
 });

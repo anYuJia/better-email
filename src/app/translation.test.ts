@@ -150,4 +150,19 @@ describe('translation language detection', () => {
     expect(safe).not.toContain('background:url');
     expect(safe).toContain('cid:logo@example.com');
   });
+
+  it('blocks AI-injected remote resources before restoring original sanitized mail tags', () => {
+    const source = prepareTranslationSource(
+      '',
+      '<p>Hello</p><img src="https://original.example/pixel.png">',
+    );
+    const safeModelOutput = sanitizeTranslatedHtml(
+      `${source.content}<img src="https://evil.example/pixel.png"><script>bad()</script>`,
+    );
+    const restored = source.restore(safeModelOutput);
+
+    expect(restored).toContain('https://original.example/pixel.png');
+    expect(restored).not.toContain('evil.example');
+    expect(restored).not.toContain('<script>');
+  });
 });

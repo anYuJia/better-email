@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const source = readFileSync(join(process.cwd(), 'src/tauriBridge.ts'), 'utf8');
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+const source = readFileSync(join(repoRoot, 'src/tauriBridge.ts'), 'utf8');
 
 describe('Tauri bridge production/mock boundary', () => {
   it('never enables mock mode merely because the native runtime is missing', () => {

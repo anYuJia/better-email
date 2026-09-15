@@ -57,7 +57,10 @@ pub use error::{MailError, MailResult};
 const VERBOSE_DB_LOG_ENV: &str = "BETTER_EMAIL_VERBOSE_COMMAND_LOGS";
 
 fn verbose_db_logs_enabled() -> bool {
+    // Release test binaries still need the unified log path enabled because
+    // logging tests validate the emitted timestamped line itself.
     cfg!(debug_assertions)
+        || cfg!(test)
         || std::env::var(VERBOSE_DB_LOG_ENV)
             .map(|value| matches!(value.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
             .unwrap_or(false)
@@ -575,46 +578,6 @@ mod tests {
     }
 
     #[test]
-    fn opening_store_does_not_move_legacy_secrets_to_keychain() {
-        // 回归测试：旧版本保存在 SQLite account_credentials 中的明文凭据，
-        // 在启动路径上必须原样保留，不得被迁移进系统凭据库（那会触发
-        // Keychain 写入/授权提示）。迁移只允许在用户执行邮件操作时惰性发生。
-        let db_path = test_database_path("better-email-no-startup-migration");
-        let store = MailStore::open_at(db_path.clone()).expect("store opens");
-        store
-            .with_conn(|conn| {
-                conn.execute(
-                    "INSERT INTO accounts(id, email, display_name, provider, created_at)
-                     VALUES (900, 'legacy@example.com', 'Legacy', 'gmail', '2026-07-15')",
-                    [],
-                )?;
-                conn.execute(
-                    "INSERT INTO account_credentials(account_email, secret, updated_at)
-                     VALUES ('legacy@example.com', 'LEGACY_PLAINTEXT_SECRET', '2026-07-15')",
-                    [],
-                )?;
-                Ok(())
-            })
-            .expect("legacy secret seeded");
-
-        let reopened = MailStore::open_at(db_path).expect("store reopens");
-        let remaining: i64 = reopened
-            .with_conn(|conn| {
-                Ok(conn.query_row(
-                    "SELECT COUNT(*) FROM account_credentials
-                     WHERE account_email = 'legacy@example.com' AND secret = 'LEGACY_PLAINTEXT_SECRET'",
-                    [],
-                    |row| row.get::<_, i64>(0),
-                )?)
-            })
-            .expect("legacy row still queryable");
-        assert_eq!(
-            remaining, 1,
-            "startup must not migrate or erase SQLite secrets"
-        );
-    }
-
-    #[test]
     fn legacy_messages_missing_columns_upgrade_in_place() {
         // 回归测试：旧版本 messages 表缺少 remote_uid/remote_mailbox 等列时，
         // 打开数据库必须先补齐兼容列、再创建依赖这些列的索引/触发器/FTS，
@@ -683,7 +646,12 @@ mod tests {
         }
 
         let store = MailStore::open_at(db_path.clone()).expect("legacy database migrates");
-        let (has_remote_uid, has_remote_mailbox, has_message_id_header) = store
+        let (
+            has_remote_uid,
+            has_remote_mailbox,
+            has_message_id_header,
+            has_attachment_metadata_synced,
+        ) = store
             .with_conn(|conn| {
                 let mut stmt = conn.prepare("PRAGMA table_info(messages)")?;
                 let names = stmt
@@ -693,12 +661,17 @@ mod tests {
                     names.contains(&"remote_uid".to_string()),
                     names.contains(&"remote_mailbox".to_string()),
                     names.contains(&"message_id_header".to_string()),
+                    names.contains(&"attachment_metadata_synced".to_string()),
                 ))
             })
             .expect("messages columns inspected");
         assert!(has_remote_uid, "remote_uid 列应已补齐");
         assert!(has_remote_mailbox, "remote_mailbox 列应已补齐");
         assert!(has_message_id_header, "message_id_header 列应已补齐");
+        assert!(
+            has_attachment_metadata_synced,
+            "attachment_metadata_synced 列应已补齐"
+        );
 
         let index_exists = store
             .with_conn(|conn| {
@@ -3025,6 +2998,8 @@ mod tests {
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
                 recipients: "demo@better-email.local".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -3078,6 +3053,8 @@ mod tests {
             sender_name: "Remote".to_string(),
             sender_email: "remote@example.com".to_string(),
             recipients: "demo@better-email.local".to_string(),
+            cc: String::new(),
+            bcc: String::new(),
             snippet: "header only".to_string(),
             received_at: Utc::now().to_rfc3339(),
             is_read: false,
@@ -3155,6 +3132,8 @@ mod tests {
                     sender_name: "Alice".to_string(),
                     sender_email: "alice@example.com".to_string(),
                     recipients: "demo@better-email.local".to_string(),
+                    cc: String::new(),
+                    bcc: String::new(),
                     snippet: "Root message".to_string(),
                     received_at: "2026-07-10T08:00:00Z".to_string(),
                     is_read: true,
@@ -3169,6 +3148,8 @@ mod tests {
                     sender_name: "Bob".to_string(),
                     sender_email: "bob@example.com".to_string(),
                     recipients: "demo@better-email.local".to_string(),
+                    cc: String::new(),
+                    bcc: String::new(),
                     snippet: "Reply with a different subject".to_string(),
                     received_at: "2026-07-10T08:05:00Z".to_string(),
                     is_read: false,
@@ -3223,6 +3204,8 @@ mod tests {
             sender_name: "Remote".to_string(),
             sender_email: "remote@example.com".to_string(),
             recipients: "demo@better-email.local".to_string(),
+            cc: String::new(),
+            bcc: String::new(),
             snippet: "snapshot header".to_string(),
             received_at: Utc::now().to_rfc3339(),
             is_read: false,
@@ -3307,6 +3290,8 @@ mod tests {
             sender_name: "Remote".to_string(),
             sender_email: "remote@example.com".to_string(),
             recipients: "demo@better-email.local".to_string(),
+            cc: String::new(),
+            bcc: String::new(),
             snippet: "history header".to_string(),
             received_at: Utc::now().to_rfc3339(),
             is_read: false,
@@ -3400,6 +3385,8 @@ mod tests {
                     sender_name: "Remote".to_string(),
                     sender_email: "remote@example.com".to_string(),
                     recipients: "demo@better-email.local".to_string(),
+                    cc: String::new(),
+                    bcc: String::new(),
                     snippet: "uid validity".to_string(),
                     received_at: Utc::now().to_rfc3339(),
                     is_read: false,
@@ -3469,6 +3456,8 @@ mod tests {
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
                 recipients: "demo@better-email.local".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "moved header".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -3548,6 +3537,8 @@ mod tests {
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
                 recipients: "demo@better-email.local".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "batch header".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -3601,6 +3592,8 @@ mod tests {
                         sender_name: "Remote".to_string(),
                         sender_email: "remote@example.com".to_string(),
                         recipients: "demo@better-email.local".to_string(),
+                        cc: String::new(),
+                        bcc: String::new(),
                         snippet: "custom header".to_string(),
                         received_at: Utc::now().to_rfc3339(),
                         is_read: false,
@@ -3687,6 +3680,8 @@ mod tests {
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
                 recipients: account.email.clone(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "mapped custom header".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -3761,6 +3756,8 @@ mod tests {
                 sender_name: "Customer Team".to_string(),
                 sender_email: "customer@example.com".to_string(),
                 recipients: "demo@better-email.local".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "Please review".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -3815,6 +3812,8 @@ mod tests {
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
                 recipients: "demo@better-email.local".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -3882,6 +3881,8 @@ mod tests {
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
                 recipients: "demo@better-email.local".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -3946,6 +3947,8 @@ mod tests {
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
                 recipients: "demo@better-email.local".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -4036,6 +4039,8 @@ mod tests {
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
                 recipients: "demo@better-email.local".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "header only".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -4782,6 +4787,8 @@ mod tests {
                 sender_name: "G".to_string(),
                 sender_email: "g@example.com".to_string(),
                 recipients: "me@example.com".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "gamma".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -4898,6 +4905,8 @@ mod tests {
                 sender_name: "Remote".to_string(),
                 sender_email: "remote@example.com".to_string(),
                 recipients: "demo@better-email.local".to_string(),
+                cc: String::new(),
+                bcc: String::new(),
                 snippet: "header".to_string(),
                 received_at: Utc::now().to_rfc3339(),
                 is_read: false,
@@ -5284,27 +5293,6 @@ mod tests {
             .unwrap()
             .iter()
             .all(|contact| contact.id != deleted.id));
-    }
-
-    #[test]
-    fn sent_header_scan_is_explicit_idempotent_and_initial_scan_runs_once() {
-        let store = test_store();
-        assert!(store.should_auto_scan_recent_contacts().unwrap());
-
-        let first = store.scan_recent_contacts(true).unwrap();
-        assert!(!first.skipped);
-        assert!(first.scanned_messages >= 1);
-        assert!(store
-            .list_contacts()
-            .unwrap()
-            .iter()
-            .any(|contact| contact.email == "team@example.com"));
-        assert!(!store.should_auto_scan_recent_contacts().unwrap());
-
-        let repeated_initial = store.scan_recent_contacts(true).unwrap();
-        assert!(repeated_initial.skipped);
-        let manual = store.scan_recent_contacts(false).unwrap();
-        assert!(!manual.skipped);
     }
 
     #[test]
@@ -6323,6 +6311,8 @@ mod tests {
                         sender_name: "Workflow Customer".to_string(),
                         sender_email: "workflow-customer@example.com".to_string(),
                         recipients: account.email.clone(),
+                        cc: String::new(),
+                        bcc: String::new(),
                         subject: "Rule stop workflow".to_string(),
                         snippet: "Rule engine should apply actions and stop.".to_string(),
                         received_at: "2026-07-09T13:00:00+08:00".to_string(),
@@ -7108,4 +7098,6 @@ mod tests {
             })
             .expect("migrated trigger inspected");
     }
+
+    include!("db/regression_tests.rs");
 }

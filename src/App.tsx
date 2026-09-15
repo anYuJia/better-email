@@ -235,12 +235,21 @@ function MailboxApp({
   const [composerAttachmentProgress, setComposerAttachmentProgress] = useState<number | null>(null);
   const [initialAccountListLoaded, setInitialAccountListLoaded] = useState(false);
   const [isAccountLoginProvisioning, setAccountLoginProvisioning] = useState(false);
+  const completedOnboardingAccountIdsRef = useRef<Set<number>>(new Set());
   const needsAccountLogin = initialAccountListLoaded && accounts.length === 0;
   const isAccountLoginActive = needsAccountLogin || isAccountLoginProvisioning;
   // 仅对「新完成登录且尚未完成首次引导」的账号展示引导。
   const pendingOnboardingAccount = useMemo(
-    () => (account && !account.onboarding_completed ? account : null),
-    [account],
+    () => (
+      // 独立设置窗口是二级产品面，不得再次挂载首次引导。
+      !standaloneSettingsWindow
+      && account
+      && !account.onboarding_completed
+      && !completedOnboardingAccountIdsRef.current.has(account.id)
+        ? account
+        : null
+    ),
+    [account, completedOnboardingAccountIdsRef, standaloneSettingsWindow],
   );
   // 登录遮罩或首次引导期间，应用整体进入门禁状态：
   // 快捷键、托盘命令、写邮件、切换账号、设置都不能穿透。
@@ -534,6 +543,7 @@ function MailboxApp({
     folderId,
     accountScope,
     mailboxRefreshRef,
+    completedOnboardingAccountIdsRef,
     setAccounts,
     setAccount,
     setAccountForm,
@@ -1506,7 +1516,14 @@ function MailboxApp({
   });
 
   const { handleOnboardingAccountPatch, completeOnboarding } = useOnboardingAccount({
-    account, accounts, setAccount, setAccountForm, setAccounts, setStatus, mailboxRefreshRef,
+    account,
+    accounts,
+    setAccount,
+    setAccountForm,
+    setAccounts,
+    setStatus,
+    mailboxRefreshRef,
+    completedOnboardingAccountIdsRef,
   });
 
   const handleMoveBulkToFolder = useCallback((folder: Folder) => {

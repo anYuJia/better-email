@@ -73,4 +73,22 @@ describe('modal 层叠层级契约', () => {
     const componentSource = readCss('src/components/settings/ContactImportDialog.tsx');
     expect(componentSource).toContain('contact-import-backdrop');
   });
+
+  it('联系人导入 portal 在视口内居中并保留可点击的遮罩层', () => {
+    expect(importCss).toMatch(
+      /\.contact-import-backdrop\s*\{[^}]*position:\s*fixed;[^}]*inset:\s*0;[^}]*display:\s*flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;/s,
+    );
+  });
+});
+
+describe('浮动菜单几何契约', () => {
+  it('展开菜单使用统一宽度 token，不会被长标题撑满屏幕', () => {
+    const popoversCss = readCss('src/styles/popovers.css');
+    expect(popoversCss).toMatch(
+      /details\[data-floating-menu="true"\]\[open\][^}]*>[^}]*width:\s*min\(var\(--ui-menu-width\),\s*calc\(100vw - 16px\)\);/s,
+    );
+    expect(popoversCss).not.toMatch(
+      /details\[data-floating-menu="true"\]\[open\][^}]*>[^}]*width:\s*max-content/s,
+    );
+  });
 });

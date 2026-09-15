@@ -2723,7 +2723,16 @@
 /* 层级契约见 styles/2026/workspace-hierarchy.css：
  * 联系人导入 portal 必须显示在设置（200）与首次引导（2500）之上。 */
 .contact-import-backdrop {
+  position: fixed;
+  inset: 0;
   z-index: 2600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.35);
 }
 
 /* 导入失败/解析失败/空文件/格式错误/超过大小限制等错误的可见反馈与重试入口。 */

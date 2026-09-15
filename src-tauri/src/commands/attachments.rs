@@ -1385,7 +1385,8 @@ mod tests {
         authorize_outbound_path, create_private_temp_attachment_file, ensure_private_temp_dir,
         max_base64_encoded_len, read_verified_outbound_attachment, render_eml_message,
         split_extension, unique_download_path, validate_outbound_attachment,
-        validate_outbound_attachment_inputs, MAX_OUTBOUND_TOTAL_BYTES,
+        validate_outbound_attachment_inputs, MAX_OUTBOUND_ATTACHMENT_BYTES,
+        MAX_OUTBOUND_TOTAL_BYTES,
     };
     #[cfg(unix)]
     use super::{
@@ -2064,6 +2065,35 @@ mod tests {
             "总大小超限应被拒绝：{err}"
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn maximum_supported_attachment_round_trips_through_authorization_and_verification() {
+        // 压力路径：恰好达到单附件上限时仍应完成「复制、摘要授权、再次校验、读取」；
+        // 这覆盖大文件发送前最容易出现的大小截断与授权失配问题。
+        let store =
+            crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
+        let dir = tempfile::tempdir().expect("source temp dir");
+        let source = dir.path().join("maximum-supported.bin");
+        let mut file = fs::File::create(&source).expect("source created");
+        let chunk = [0x5a_u8; 64 * 1024];
+        let mut remaining = MAX_OUTBOUND_ATTACHMENT_BYTES as usize;
+        while remaining > 0 {
+            let length = remaining.min(chunk.len());
+            std::io::Write::write_all(&mut file, &chunk[..length]).expect("chunk written");
+            remaining -= length;
+        }
+        file.sync_all().expect("source synced");
+
+        let input = authorize_outbound_path(&store, &source, 0).expect("maximum file authorized");
+        assert_eq!(input.size_bytes, MAX_OUTBOUND_ATTACHMENT_BYTES);
+        let attachment =
+            sample_attachment("maximum-supported.bin", &input.local_path, input.size_bytes);
+        let verified =
+            read_verified_outbound_attachment(&store, &attachment).expect("maximum file verified");
+        assert_eq!(verified.len(), MAX_OUTBOUND_ATTACHMENT_BYTES as usize);
+        assert_eq!(verified.first(), Some(&0x5a));
+        assert_eq!(verified.last(), Some(&0x5a));
     }
 
     fn outbound_input(

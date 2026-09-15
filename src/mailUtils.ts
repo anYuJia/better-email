@@ -360,6 +360,8 @@ export type NewMailMessageSummary = {
   sender_email: string;
   sender_name: string;
   subject: string;
+  /** Header-only sync carries the first body line as a bounded preview. */
+  snippet?: string;
 };
 
 export type NotificationPolicy = {
@@ -474,6 +476,28 @@ export function newMailNotificationDecision(
       threadMutedMatches,
     };
   }
+
+  // A single incoming message is actionable enough to show its actual content
+  // directly. Keep the body short and plain-text so HTML/header-only previews
+  // never leak implementation details into a system notification.
+  if (activeMessages.length === 1) {
+    const first = activeMessages[0];
+    const subject = first.subject.trim() || '(无主题)';
+    const sender = first.sender_name.trim() || first.sender_email;
+    const preview = plainTextPreview(first.snippet ?? '').trim();
+    const content = preview && preview !== remoteHeaderOnlySnippet
+      ? preview.slice(0, 160)
+      : subject;
+    return {
+      body: `${sender} · ${content}`,
+      reason: 'send',
+      vipMatches: vipMessages.length,
+      priorityMatches: priorityMessages.length,
+      mutedMatches,
+      threadMutedMatches,
+    };
+  }
+
   if (vipMessages.length > 0) {
     const first = vipMessages[0];
     const subject = first.subject.trim() || '(无主题)';
@@ -499,20 +523,6 @@ export function newMailNotificationDecision(
       reason: 'send',
       vipMatches: 0,
       priorityMatches: priorityMessages.length,
-      mutedMatches,
-      threadMutedMatches,
-    };
-  }
-
-  if (activeMessages.length === 1) {
-    const first = activeMessages[0];
-    const subject = first.subject.trim() || '(无主题)';
-    const sender = first.sender_name.trim() || first.sender_email;
-    return {
-      body: `${sender} · ${subject}`,
-      reason: 'send',
-      vipMatches: 0,
-      priorityMatches: 0,
       mutedMatches,
       threadMutedMatches,
     };

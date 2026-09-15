@@ -65,6 +65,8 @@ type UseAppMetaLoaderOptions = {
   folderId: number | null;
   accountScope: AccountScope;
   mailboxRefreshRef?: MutableRefObject<number>;
+  /** Account ids completed locally while an older metadata request is still in flight. */
+  completedOnboardingAccountIdsRef?: MutableRefObject<Set<number>>;
   setAccounts: Dispatch<SetStateAction<Account[]>>;
   setAccount: Dispatch<SetStateAction<Account | null>>;
   setAccountForm: Dispatch<SetStateAction<Account | null>>;
@@ -103,6 +105,7 @@ export default function useAppMetaLoader({
   folderId,
   accountScope,
   mailboxRefreshRef,
+  completedOnboardingAccountIdsRef,
   setAccounts,
   setAccount,
   setAccountForm,
@@ -134,6 +137,20 @@ export default function useAppMetaLoader({
   // 不复用 mailboxRefreshRef（那是邮件视图刷新，语义不同）。
   const unreadRefreshSeqRef = useRef(0);
   const activeUnreadRefreshRef = useRef<UnreadRefreshRequest | null>(null);
+
+  const normalizeAccount = (nextAccount: Account | null): Account | null => {
+    if (
+      !nextAccount
+      || nextAccount.onboarding_completed
+      || !completedOnboardingAccountIdsRef?.current.has(nextAccount.id)
+    ) {
+      return nextAccount;
+    }
+    // A mailbox refresh can finish after the onboarding mutation and return a
+    // stale account snapshot. Keep the local completion gate monotonic until
+    // the next server response includes the completed flag.
+    return { ...nextAccount, onboarding_completed: true };
+  };
 
   const isMailboxRefreshCurrent = useCallback(
     (mailboxRequest?: MailboxRefreshRequest): boolean => {
@@ -205,9 +222,10 @@ export default function useAppMetaLoader({
     });
     try {
       const nextAccountsPromise = invoke<Account[]>(IPC.ListAccounts).then((nextAccounts) => {
-        setAccounts(nextAccounts);
+        const normalizedAccounts = nextAccounts.map((item) => normalizeAccount(item) ?? item);
+        setAccounts(normalizedAccounts);
         onAccountListLoaded?.();
-        return nextAccounts;
+        return normalizedAccounts;
       });
       const releasedPromise = releaseDueSnoozedMessages();
       if (mode === 'mailbox') {
@@ -260,8 +278,9 @@ export default function useAppMetaLoader({
         if (released.released_count > 0) {
           setStatus(`已恢复 ${released.released_count} 封到期稍后邮件`);
         }
-        setAccount(nextAccount);
-        setAccountForm(nextAccount);
+        const nextAccountForState = normalizeAccount(nextAccount);
+        setAccount(nextAccountForState);
+        setAccountForm(nextAccountForState);
         setFolders(nextFolders);
         setLabels(nextLabels);
         setStats(nextStats);
@@ -278,7 +297,7 @@ export default function useAppMetaLoader({
         if (mode === 'mailbox') void reportStartupMilestone('mailbox_metadata_ready');
         appFlowLog('loadMeta done', {
           accountCount: nextAccounts.length,
-          activeAccountId: nextAccount?.id ?? null,
+          activeAccountId: nextAccountForState?.id ?? null,
           folderCount: nextFolders.length,
           requestedFolderId: nextFolderId,
           resolvedFolderId,
@@ -340,8 +359,9 @@ export default function useAppMetaLoader({
       if (released.released_count > 0) {
         setStatus(`已恢复 ${released.released_count} 封到期稍后邮件`);
       }
-      setAccount(nextAccount);
-      setAccountForm(nextAccount);
+      const nextAccountForState = normalizeAccount(nextAccount);
+      setAccount(nextAccountForState);
+      setAccountForm(nextAccountForState);
       setFolders(nextFolders);
       setLabels(nextLabels);
       setStats(nextStats);
@@ -360,7 +380,7 @@ export default function useAppMetaLoader({
       if (mode === 'full') void reportStartupMilestone('mailbox_metadata_ready');
       appFlowLog('loadMeta done', {
         accountCount: nextAccounts.length,
-        activeAccountId: nextAccount?.id ?? null,
+        activeAccountId: nextAccountForState?.id ?? null,
         folderCount: nextFolders.length,
         requestedFolderId: nextFolderId,
         resolvedFolderId,

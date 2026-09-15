@@ -849,6 +849,99 @@ mod claim_tests {
     }
 
     #[test]
+    fn concurrent_workers_claim_high_volume_retry_items_only_once() {
+        // 压力路径：多个发送 worker 同时处理一批已进入 retry 的邮件时，
+        // 每个 message 只能被一个 worker 抢到，避免重复投递。
+        const MESSAGE_COUNT: usize = 128;
+        const WORKER_COUNT: usize = 16;
+        let (dir, store) = fixture();
+        let other = MailStore::open_at_with_seed(dir.path().join("test.sqlite3"), true).unwrap();
+        let message_ids = (0..MESSAGE_COUNT)
+            .map(|index| {
+                let mut input = draft();
+                input.subject = format!("Retry pressure {index}");
+                let item = store.queue_outbox_message(input).unwrap();
+                store
+                    .mark_outbox_failed(item.message_id, "simulated temporary SMTP failure")
+                    .unwrap();
+                item.message_id
+            })
+            .collect::<Vec<_>>();
+        // 让这一轮 retry 立即到期，模拟调度器在重试窗口到达后的批量唤醒。
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE outbox_queue SET next_attempt_at = '' WHERE status = 'retry'",
+                    [],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        let barrier = Arc::new(Barrier::new(WORKER_COUNT));
+        let workers = (0..WORKER_COUNT)
+            .map(|index| {
+                let worker_store = if index % 2 == 0 {
+                    store.clone()
+                } else {
+                    other.clone()
+                };
+                let ids = message_ids.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    ids.into_iter()
+                        .filter(|message_id| {
+                            worker_store.claim_outbox_message(*message_id).unwrap()
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut claimed_ids = workers
+            .into_iter()
+            .flat_map(|worker| worker.join().expect("worker joined"))
+            .collect::<Vec<_>>();
+        claimed_ids.sort_unstable();
+        let mut expected_ids = message_ids.clone();
+        expected_ids.sort_unstable();
+        assert_eq!(claimed_ids, expected_ids);
+        assert!(store.pending_outbox_messages().unwrap().is_empty());
+    }
+
+    #[test]
+    fn repeated_transient_failures_advance_retry_attempts_without_duplicate_rows() {
+        let (_dir, store) = fixture();
+        let item = store.queue_outbox_message(draft()).unwrap();
+
+        for expected_attempts in 1..=8 {
+            store
+                .mark_outbox_failed(item.message_id, "simulated temporary SMTP failure")
+                .unwrap();
+            let current = store
+                .list_outbox()
+                .unwrap()
+                .into_iter()
+                .find(|candidate| candidate.id == item.id)
+                .expect("retry row remains visible");
+            assert_eq!(current.status, "retry");
+            assert_eq!(current.attempts, expected_attempts);
+            assert!(!current.next_attempt_at.is_empty());
+        }
+
+        let row_count: i64 = store
+            .with_conn(|conn| {
+                Ok(conn.query_row(
+                    "SELECT COUNT(*) FROM outbox_queue WHERE message_id = ?1",
+                    params![item.message_id],
+                    |row| row.get(0),
+                )?)
+            })
+            .unwrap();
+        assert_eq!(row_count, 1, "重试只更新原队列记录，不应产生重复发件记录");
+    }
+
+    #[test]
     fn cancelling_before_claim_prevents_smtp_and_preserves_draft() {
         let (_dir, store) = fixture();
         let item = store.queue_outbox_message(draft()).unwrap();

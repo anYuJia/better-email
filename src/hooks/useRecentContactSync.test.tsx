@@ -40,7 +40,7 @@ describe('useRecentContactSync', () => {
       scanPromise = result.current.scanRecentContacts();
     });
     expect(result.current.scanBusy).toBe(true);
-    expect(setStatus).toHaveBeenCalledWith('正在扫描已发送邮件头并同步最近联系人…');
+    expect(setStatus).toHaveBeenCalledWith('正在扫描所有邮件头并同步联系人…');
 
     resolveScan?.({
       scanned_messages: 4,

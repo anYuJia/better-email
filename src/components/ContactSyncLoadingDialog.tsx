@@ -19,7 +19,7 @@ export default function ContactSyncLoadingDialog({ open }: ContactSyncLoadingDia
         <RefreshCw size={20} aria-hidden="true" />
         <div>
           <strong id="contact-sync-loading-title">正在同步最近联系人</strong>
-          <p id="contact-sync-loading-description">正在从已发送邮件中扫描同步最近联系人，加入最近联系人列表</p>
+          <p id="contact-sync-loading-description">正在从所有邮件中扫描联系人，保存姓名、邮箱和别名</p>
         </div>
       </section>
     </div>

@@ -541,6 +541,8 @@ pub struct RemoteMessageHeader {
     pub sender_name: String,
     pub sender_email: String,
     pub recipients: String,
+    pub cc: String,
+    pub bcc: String,
     pub snippet: String,
     pub received_at: String,
     pub is_read: bool,

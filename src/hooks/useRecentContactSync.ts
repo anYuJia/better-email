@@ -33,7 +33,7 @@ export default function useRecentContactSync({
     if (scanBusyRef.current) return;
     scanBusyRef.current = true;
     setScanBusy(true);
-    setStatus('正在扫描已发送邮件头并同步最近联系人…');
+    setStatus('正在扫描所有邮件头并同步联系人…');
     try {
       const scanArgs = accountId === undefined
         ? { initialOnly: false }
@@ -68,10 +68,10 @@ export default function useRecentContactSync({
         scanBusyRef.current = true;
         setScanBusy(true);
         try {
-          const scanArgs = accountId === undefined
-            ? { initialOnly: true }
-            : { initialOnly: true, accountId };
-          await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, scanArgs);
+          // The first pass is intentionally global: a newly logged-in user
+          // should get contacts from every mailbox/account, not only the
+          // currently selected account or Sent folder.
+          await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, { initialOnly: true });
           if (active) await refreshContacts();
         } catch (error) {
           logError(error);

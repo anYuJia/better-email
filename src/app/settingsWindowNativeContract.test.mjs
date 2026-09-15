@@ -57,6 +57,7 @@ describe('standalone settings native-window lifecycle contract', () => {
     expect(rootSource).toContain('<StandaloneSettingsApp />');
     expect(appSource).toContain('{standaloneSettingsWindow ? null : isMobileApp ? (');
     expect(appSource).toContain('standalone={standaloneSettingsWindow}');
+    expect(appSource).toMatch(/const pendingOnboardingAccount = useMemo\([\s\S]*?!standaloneSettingsWindow/);
   });
 
   it('defaults every settings entry point to the general page', () => {

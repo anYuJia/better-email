@@ -757,48 +757,12 @@ mod delivery_outcome_tests {
     use super::*;
     use std::io::{BufRead, BufReader, Write};
     use std::net::TcpListener;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     fn send_to_local_test_server(
         final_response: Option<&'static str>,
     ) -> Result<Vec<u8>, MailError> {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let port = listener.local_addr().unwrap().port();
-        let server = std::thread::spawn(move || {
-            let (mut socket, _) = listener.accept().unwrap();
-            socket
-                .set_read_timeout(Some(Duration::from_secs(5)))
-                .unwrap();
-            let mut reader = BufReader::new(socket.try_clone().unwrap());
-            socket.write_all(b"220 local-test ESMTP\r\n").unwrap();
-            let mut in_data = false;
-            loop {
-                let mut line = String::new();
-                if reader.read_line(&mut line).unwrap_or(0) == 0 {
-                    break;
-                }
-                if in_data {
-                    if line == ".\r\n" {
-                        if let Some(response) = final_response {
-                            socket.write_all(response.as_bytes()).unwrap();
-                        }
-                        break;
-                    }
-                    continue;
-                }
-                if line.starts_with("EHLO") || line.starts_with("HELO") {
-                    socket.write_all(b"250 local-test\r\n").unwrap();
-                } else if line.starts_with("DATA") {
-                    in_data = true;
-                    socket.write_all(b"354 end with dot\r\n").unwrap();
-                } else {
-                    socket.write_all(b"250 OK\r\n").unwrap();
-                }
-            }
-        });
-        let transport = SmtpTransport::builder_dangerous("127.0.0.1")
-            .port(port)
-            .timeout(Some(Duration::from_secs(5)))
-            .build();
         let message = OutboundMessage {
             id: 11,
             account_id: 1,
@@ -815,15 +779,112 @@ mod delivery_outcome_tests {
             references_header: String::new(),
             attachments: Vec::new(),
         };
-        let result = send_outbound_with_transport(&transport, &message, &[]);
+        send_to_local_test_server_with_message(message, &[], final_response).0
+    }
+
+    fn send_to_local_test_server_with_message(
+        message: OutboundMessage,
+        attachment_bytes: &[Vec<u8>],
+        final_response: Option<&'static str>,
+    ) -> (Result<Vec<u8>, MailError>, usize) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let received_data_bytes = Arc::new(AtomicUsize::new(0));
+        let server_received_data_bytes = received_data_bytes.clone();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut reader = BufReader::new(socket.try_clone().unwrap());
+            socket.write_all(b"220 local-test ESMTP\r\n").unwrap();
+            let mut in_data = false;
+            let mut data_bytes = 0_usize;
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                    break;
+                }
+                if in_data {
+                    if line == ".\r\n" {
+                        server_received_data_bytes.store(data_bytes, Ordering::Release);
+                        if let Some(response) = final_response {
+                            socket.write_all(response.as_bytes()).unwrap();
+                        }
+                        break;
+                    }
+                    data_bytes = data_bytes.saturating_add(line.len());
+                    continue;
+                }
+                if line.starts_with("EHLO") || line.starts_with("HELO") {
+                    socket.write_all(b"250 local-test\r\n").unwrap();
+                } else if line.starts_with("DATA") {
+                    in_data = true;
+                    socket.write_all(b"354 end with dot\r\n").unwrap();
+                } else {
+                    socket.write_all(b"250 OK\r\n").unwrap();
+                }
+            }
+        });
+        let transport = SmtpTransport::builder_dangerous("127.0.0.1")
+            .port(port)
+            .timeout(Some(Duration::from_secs(5)))
+            .build();
+        let result = send_outbound_with_transport(&transport, &message, attachment_bytes);
         drop(transport);
         server.join().unwrap();
-        result
+        (result, received_data_bytes.load(Ordering::Acquire))
     }
 
     #[test]
     fn accepted_smtp_data_has_a_confirmed_result() {
         assert!(send_to_local_test_server(Some("250 accepted\r\n")).is_ok());
+    }
+
+    #[test]
+    fn sends_maximum_supported_attachment_to_local_smtp_server() {
+        // 真实走一次本地 SMTP DATA：验证最大受支持附件不会被 MIME 构建或网络写入
+        // 截断，并且服务端确实收到了完整邮件数据。
+        const MAX_ATTACHMENT_BYTES: usize = 25 * 1024 * 1024;
+        let payload = vec![0x5a_u8; MAX_ATTACHMENT_BYTES];
+        let message = OutboundMessage {
+            id: 12,
+            account_id: 1,
+            sender_name: "Test".into(),
+            sender_email: "sender@example.com".into(),
+            reply_to: String::new(),
+            recipients: "recipient@example.com".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "Maximum attachment".into(),
+            body: "Body".into(),
+            html_body: String::new(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
+            attachments: vec![Attachment {
+                id: 1,
+                message_id: 12,
+                filename: "maximum.bin".into(),
+                mime_type: "application/octet-stream".into(),
+                size_bytes: MAX_ATTACHMENT_BYTES as i64,
+                is_downloaded: true,
+                local_path: String::new(),
+                content_id: String::new(),
+                is_inline: false,
+            }],
+        };
+        let (result, received_data_bytes) =
+            send_to_local_test_server_with_message(message, &[payload], Some("250 accepted\r\n"));
+        let raw = result.expect("maximum attachment accepted by local SMTP server");
+        assert!(raw.len() > MAX_ATTACHMENT_BYTES, "MIME 应包含编码与附件头");
+        assert!(raw
+            .windows(b"maximum.bin".len())
+            .any(|window| window == b"maximum.bin"));
+        assert!(
+            received_data_bytes >= raw.len(),
+            "服务端收到的数据不应少于客户端渲染的邮件字节数：received={received_data_bytes} raw={}",
+            raw.len()
+        );
     }
 
     #[test]

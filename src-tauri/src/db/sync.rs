@@ -1,6 +1,6 @@
 use super::accounts::account_for_conn;
 use super::accounts::map_account;
-use super::contacts_rules::apply_enabled_rules_for_message;
+use super::contacts_rules::{apply_enabled_rules_for_message, sync_contacts_from_message_headers};
 use super::folders::{folder_for_conn, folder_id_for_account_role, is_custom_folder_role};
 use super::messages::{bool_to_int, has_pending_remote_write_for_conn, thread_key_for_message};
 use super::*;
@@ -570,13 +570,29 @@ pub(super) fn import_imap_headers_for_conn(
             conn.execute(
                 "
                 UPDATE messages
-                SET message_id_header = ?1,
-                    in_reply_to_header = ?2,
-                    references_header = ?3,
-                    thread_key = ?4
-                WHERE id = ?5
+                SET sender_name = ?1,
+                    sender_email = ?2,
+                    recipients = ?3,
+                    cc = ?4,
+                    bcc = ?5,
+                    subject = ?6,
+                    snippet = ?7,
+                    received_at = ?8,
+                    message_id_header = ?9,
+                    in_reply_to_header = ?10,
+                    references_header = ?11,
+                    thread_key = ?12
+                WHERE id = ?13
                 ",
                 params![
+                    header.sender_name,
+                    header.sender_email,
+                    header.recipients,
+                    header.cc,
+                    header.bcc,
+                    header.subject,
+                    header.snippet,
+                    header.received_at,
                     header.message_id,
                     header.in_reply_to,
                     header.references,
@@ -584,18 +600,29 @@ pub(super) fn import_imap_headers_for_conn(
                     message_id
                 ],
             )?;
+            sync_contacts_from_message_headers(
+                conn,
+                message_id,
+                account_id,
+                &header.sender_name,
+                &header.sender_email,
+                &header.recipients,
+                &header.cc,
+                &header.bcc,
+                &header.received_at,
+            )?;
             continue;
         }
 
         let changed = conn.execute(
             "
             INSERT OR IGNORE INTO messages(
-                account_id, folder_id, sender_name, sender_email, recipients, subject,
+                account_id, folder_id, sender_name, sender_email, recipients, cc, bcc, subject,
                 snippet, body, received_at, is_read, is_starred, has_attachments,
                 thread_key, remote_mailbox, remote_uid, message_id_header,
                 in_reply_to_header, references_header
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, '', ?8, ?9, ?10, 0, ?11, ?12, ?13, ?14, ?15, ?16)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, '', ?10, ?11, ?12, 0, ?13, ?14, ?15, ?16, ?17, ?18)
             ",
             params![
                 account_id,
@@ -603,6 +630,8 @@ pub(super) fn import_imap_headers_for_conn(
                 header.sender_name,
                 header.sender_email,
                 header.recipients,
+                header.cc,
+                header.bcc,
                 header.subject,
                 header.snippet,
                 header.received_at,
@@ -619,6 +648,17 @@ pub(super) fn import_imap_headers_for_conn(
         if changed > 0 {
             let message_id = conn.last_insert_rowid();
             apply_enabled_rules_for_message(conn, message_id)?;
+            sync_contacts_from_message_headers(
+                conn,
+                message_id,
+                account_id,
+                &header.sender_name,
+                &header.sender_email,
+                &header.recipients,
+                &header.cc,
+                &header.bcc,
+                &header.received_at,
+            )?;
             if previous_highest_uid > 0 && header.remote_uid > previous_highest_uid {
                 new_messages += 1;
                 new_message_ids.push(message_id);

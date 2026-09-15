@@ -157,7 +157,7 @@ export default function StandaloneComposerApp() {
     if (contactScanBusyRef.current) return;
     contactScanBusyRef.current = true;
     setContactScanBusy(true);
-    setStatus('正在扫描已发送邮件头并同步最近联系人…');
+    setStatus('正在扫描所有邮件头并同步联系人…');
     try {
       const report = await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, {
         initialOnly: false,

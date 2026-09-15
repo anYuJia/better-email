@@ -148,7 +148,7 @@ export default function ComposerContactsPanel({
           <button
             type="button"
             className="composer-contacts-scan"
-            title="通过扫描已发送邮件头，获取联系人的姓名(若设置了别名)、邮箱地址等"
+            title="扫描所有邮件头，收集联系人姓名、邮箱和别名"
             aria-label="扫描同步最近联系人"
             disabled={scanBusy}
             onClick={async () => {

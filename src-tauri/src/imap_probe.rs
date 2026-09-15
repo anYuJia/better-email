@@ -8,7 +8,6 @@ use crate::models::{
 use crate::protocol;
 use base64::Engine as _;
 use chrono::Utc;
-use imap_proto::parser::bodystructure::BodyStructParser;
 use imap_proto::types::{
     BodyStructure, ContentDisposition, ContentEncoding, SectionPath, UidSetMember,
 };
@@ -442,6 +441,68 @@ pub fn fetch_message_bodies(
     })
 }
 
+/// 只读取远端 BODYSTRUCTURE，用于给已经缓存正文的历史邮件补齐附件信息。
+/// 不读取正文分段，也不会因为补元数据改写本地正文。
+pub fn fetch_attachment_metadata(
+    account: &Account,
+    secret: &AccountSecret,
+    remote_name: &str,
+    remote_uids: &[i64],
+) -> Result<Vec<(i64, Vec<RemoteAttachmentMetadata>)>, MailError> {
+    if remote_uids.is_empty() {
+        return Ok(Vec::new());
+    }
+    imap_info(format!(
+        "[better-email][imap] attachment metadata fetch start account_id={} mailbox={} uids={}",
+        account.id,
+        remote_name,
+        remote_uids.len()
+    ));
+    with_selected_mailbox(account, secret, remote_name, |session| {
+        fetch_attachment_metadata_from_selected(session, remote_uids, account, remote_name)
+    })
+}
+
+fn fetch_attachment_metadata_from_selected(
+    session: &mut imap::Session<imap::Connection>,
+    remote_uids: &[i64],
+    account: &Account,
+    remote_name: &str,
+) -> Result<Vec<(i64, Vec<RemoteAttachmentMetadata>)>, MailError> {
+    let uid_set = remote_uids
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    let fetches = session
+        .uid_fetch(uid_set, "(UID BODYSTRUCTURE)")
+        .map_err(|error| MailError::Imap(format!("IMAP 拉取附件结构失败：{error}")))?;
+    let mut metadata_by_uid = std::collections::BTreeMap::new();
+    for fetch in fetches.iter() {
+        let (Some(uid), Some(bodystructure)) = (fetch.uid, fetch.bodystructure()) else {
+            continue;
+        };
+        let metadata = message_structure_metadata(bodystructure);
+        metadata_by_uid.insert(i64::from(uid), metadata.attachments);
+    }
+
+    let mut results = Vec::with_capacity(remote_uids.len());
+    for remote_uid in remote_uids {
+        let Some(attachments) = metadata_by_uid.remove(remote_uid) else {
+            continue;
+        };
+        imap_info(format!(
+            "[better-email][imap] attachment metadata fetch ok account_id={} mailbox={} uid={} attachments={}",
+            account.id,
+            remote_name,
+            remote_uid,
+            attachments.len()
+        ));
+        results.push((*remote_uid, attachments));
+    }
+    Ok(results)
+}
+
 fn fetch_message_bodies_from_selected(
     session: &mut imap::Session<imap::Connection>,
     remote_uids: &[i64],
@@ -529,7 +590,11 @@ fn collect_message_structure_metadata(
             let filename =
                 attachment_filename_from_bodystructure(bodystructure).unwrap_or_default();
             let content_id = protocol::normalize_content_id(other.id.as_deref());
-            let is_text_body = type_name == "text" && filename.is_empty() && content_id.is_empty();
+            let is_attachment = bodystructure_is_attachment(bodystructure);
+            let is_text_body = type_name == "text"
+                && filename.is_empty()
+                && content_id.is_empty()
+                && !is_attachment;
             if is_text_body {
                 metadata.text_parts.push(TextPartMetadata {
                     path: path.to_vec(),
@@ -537,7 +602,7 @@ fn collect_message_structure_metadata(
                     transfer_encoding: imap_content_transfer_encoding(&other.transfer_encoding),
                     charset: bodystructure_charset(common.ty.params.as_deref()),
                 });
-            } else if !filename.is_empty() || !content_id.is_empty() {
+            } else if is_attachment {
                 metadata.attachments.push(RemoteAttachmentMetadata {
                     filename: if filename.is_empty() {
                         protocol::inline_attachment_filename(
@@ -551,7 +616,8 @@ fn collect_message_structure_metadata(
                     mime_type: format!("{type_name}/{subtype}"),
                     size_bytes: i64::from(other.octets),
                     content_id: content_id.clone(),
-                    is_inline: !content_id.is_empty(),
+                    is_inline: !content_id.is_empty()
+                        && !bodystructure_has_attachment_disposition(bodystructure),
                 });
             }
         }
@@ -560,7 +626,7 @@ fn collect_message_structure_metadata(
             let filename =
                 attachment_filename_from_bodystructure(bodystructure).unwrap_or_default();
             let content_id = protocol::normalize_content_id(other.id.as_deref());
-            if filename.is_empty() && content_id.is_empty() {
+            if !bodystructure_is_attachment(bodystructure) {
                 return;
             }
             let mime_type = format!("{}/{}", common.ty.ty, common.ty.subtype).to_ascii_lowercase();
@@ -577,7 +643,8 @@ fn collect_message_structure_metadata(
                 mime_type,
                 size_bytes: i64::from(other.octets),
                 content_id: content_id.clone(),
-                is_inline: !content_id.is_empty(),
+                is_inline: !content_id.is_empty()
+                    && !bodystructure_has_attachment_disposition(bodystructure),
             });
         }
     }
@@ -1342,21 +1409,16 @@ fn attachment_part_metadata(
     filename: &str,
     content_id: &str,
 ) -> Option<AttachmentPartMetadata> {
-    let parser = BodyStructParser::new(bodystructure);
     let requested = filename.trim();
     let requested_content_id = protocol::normalize_content_id(Some(content_id));
-    let path = parser.search(|body| {
-        if !requested_content_id.is_empty() {
-            return attachment_content_id_from_bodystructure(body)
-                .is_some_and(|value| value == requested_content_id);
-        }
-        if !requested.is_empty() {
-            return attachment_filename_from_bodystructure(body)
-                .is_some_and(|name| name == requested);
-        }
-        attachment_filename_from_bodystructure(body).is_some()
-            || attachment_content_id_from_bodystructure(body).is_some()
-    })?;
+    let mut attachment_index = 0_usize;
+    let path = find_attachment_part_path(
+        bodystructure,
+        &[],
+        requested,
+        &requested_content_id,
+        &mut attachment_index,
+    )?;
     let body = bodystructure_at_path(bodystructure, &path)?;
     let other = match body {
         BodyStructure::Basic { other, .. }
@@ -1369,6 +1431,63 @@ fn attachment_part_metadata(
         transfer_encoding: AttachmentTransferEncoding::from_imap(&other.transfer_encoding),
         encoded_octets: i64::from(other.octets),
     })
+}
+
+fn find_attachment_part_path(
+    bodystructure: &BodyStructure<'_>,
+    path: &[u32],
+    requested_filename: &str,
+    requested_content_id: &str,
+    attachment_index: &mut usize,
+) -> Option<Vec<u32>> {
+    match bodystructure {
+        BodyStructure::Multipart { bodies, .. } => {
+            for (index, body) in bodies.iter().enumerate() {
+                let mut child_path = path.to_vec();
+                child_path.push((index + 1) as u32);
+                if let Some(found) = find_attachment_part_path(
+                    body,
+                    &child_path,
+                    requested_filename,
+                    requested_content_id,
+                    attachment_index,
+                ) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        _ if !bodystructure_is_attachment(bodystructure) => None,
+        _ => {
+            let filename = attachment_filename_from_bodystructure(bodystructure);
+            let content_id =
+                attachment_content_id_from_bodystructure(bodystructure).unwrap_or_default();
+            let mime_type = bodystructure_mime_type(bodystructure);
+            let fallback_filename =
+                protocol::inline_attachment_filename(&mime_type, &content_id, *attachment_index);
+            let matches = if !requested_content_id.is_empty() {
+                content_id == requested_content_id
+            } else if !requested_filename.is_empty() {
+                filename.as_deref() == Some(requested_filename)
+                    || filename.is_none() && fallback_filename == requested_filename
+            } else {
+                true
+            };
+            *attachment_index += 1;
+            matches.then(|| path.to_vec())
+        }
+    }
+}
+
+fn bodystructure_mime_type(bodystructure: &BodyStructure<'_>) -> String {
+    match bodystructure {
+        BodyStructure::Basic { common, .. }
+        | BodyStructure::Text { common, .. }
+        | BodyStructure::Message { common, .. } => {
+            format!("{}/{}", common.ty.ty, common.ty.subtype).to_ascii_lowercase()
+        }
+        BodyStructure::Multipart { .. } => String::new(),
+    }
 }
 
 fn attachment_content_id_from_bodystructure(bodystructure: &BodyStructure<'_>) -> Option<String> {
@@ -1640,6 +1759,22 @@ fn attachment_filename_from_bodystructure(bodystructure: &BodyStructure<'_>) -> 
         .or_else(|| filename_from_params(common.ty.params.as_deref()))
 }
 
+fn bodystructure_has_attachment_disposition(bodystructure: &BodyStructure<'_>) -> bool {
+    let disposition = match bodystructure {
+        BodyStructure::Basic { common, .. }
+        | BodyStructure::Text { common, .. }
+        | BodyStructure::Message { common, .. } => common.disposition.as_ref(),
+        BodyStructure::Multipart { .. } => return false,
+    };
+    disposition.is_some_and(|value| value.ty.eq_ignore_ascii_case("attachment"))
+}
+
+fn bodystructure_is_attachment(bodystructure: &BodyStructure<'_>) -> bool {
+    bodystructure_has_attachment_disposition(bodystructure)
+        || attachment_filename_from_bodystructure(bodystructure).is_some()
+        || attachment_content_id_from_bodystructure(bodystructure).is_some()
+}
+
 fn filename_from_disposition(disposition: &ContentDisposition<'_>) -> Option<String> {
     filename_from_params(disposition.params.as_deref())
 }
@@ -1804,6 +1939,18 @@ fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageH
         .map(protocol::format_address_list)
         .or_else(|| header_field("to"))
         .unwrap_or_default();
+    let cc = parsed
+        .as_ref()
+        .and_then(|message| message.cc())
+        .map(protocol::format_address_list)
+        .or_else(|| header_field("cc"))
+        .unwrap_or_default();
+    let bcc = parsed
+        .as_ref()
+        .and_then(|message| message.bcc())
+        .map(protocol::format_address_list)
+        .or_else(|| header_field("bcc"))
+        .unwrap_or_default();
     let message_id = header_field("message-id").unwrap_or_else(|| format!("imap-{uid}"));
     let in_reply_to = header_field("in-reply-to").unwrap_or_default();
     let references = header_field("references").unwrap_or_default();
@@ -1823,6 +1970,8 @@ fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageH
         sender_name: display_name_from_address(&from),
         sender_email: email_from_address(&from),
         recipients: to,
+        cc,
+        bcc,
         snippet: "远端邮件头已同步，正文将在按需读取阶段拉取。".to_string(),
         received_at,
         is_read: flags.contains("Seen"),
@@ -2114,15 +2263,17 @@ fn parse_attachment_payload_from_raw(
     let payload = attachments.into_iter().find_map(|(index, part)| {
         let part_name = part.attachment_name().unwrap_or("");
         let part_content_id = protocol::normalize_content_id(part.content_id());
+        let mime_type = part_mime_type(part);
+        let fallback_name =
+            protocol::inline_attachment_filename(&mime_type, &part_content_id, index);
         let matches = if !requested_content_id.is_empty() {
             part_content_id == requested_content_id
         } else {
-            part_name == requested
+            part_name == requested || part_name.is_empty() && fallback_name == requested
         };
         if matches {
-            let mime_type = part_mime_type(part);
             let payload_filename = if part_name.is_empty() {
-                protocol::inline_attachment_filename(&mime_type, &part_content_id, index)
+                fallback_name
             } else {
                 crate::mime::decode_attachment_filename(part_name)
             };
@@ -2570,6 +2721,34 @@ mod tests {
     }
 
     #[test]
+    fn parses_nameless_attachment_and_uses_the_same_fallback_name_for_download() {
+        let raw = concat!(
+            "Subject: Nameless attachment\r\n",
+            "MIME-Version: 1.0\r\n",
+            "Content-Type: multipart/mixed; boundary=\"b\"\r\n",
+            "\r\n",
+            "--b\r\n",
+            "Content-Type: text/plain; charset=utf-8\r\n",
+            "\r\n",
+            "body\r\n",
+            "--b\r\n",
+            "Content-Type: application/octet-stream\r\n",
+            "Content-Disposition: attachment\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "YXR0YWNobWVudCBieXRlcw==\r\n",
+            "--b--\r\n",
+        );
+        let body = parse_body_from_raw(raw.as_bytes());
+        assert_eq!(body.attachments.len(), 1);
+        assert!(body.attachments[0].filename.starts_with("inline-"));
+        let payload =
+            parse_attachment_payload_from_raw(raw.as_bytes(), &body.attachments[0].filename, "")
+                .expect("the generated fallback name should locate a nameless attachment");
+        assert_eq!(payload.bytes, b"attachment bytes");
+    }
+
+    #[test]
     fn parses_inline_cid_image_without_filename_from_raw_message() {
         let body = parse_body_from_raw(
             concat!(
@@ -2729,6 +2908,36 @@ mod tests {
             }
             _ => panic!("expected FETCH response"),
         };
+    }
+
+    #[test]
+    fn finds_nameless_attachment_part_from_bodystructure() {
+        let response = b"* 1570 FETCH (BODYSTRUCTURE ((\"TEXT\" \"PLAIN\" (\"CHARSET\" \"UTF-8\") NIL NIL \"7BIT\" 4 1 NIL (\"INLINE\" NIL) NIL)(\"APPLICATION\" \"OCTET-STREAM\" NIL NIL NIL \"BASE64\" 12 NIL (\"ATTACHMENT\" NIL) NIL) \"MIXED\" NIL NIL NIL))\r\n";
+        let (_, parsed) = imap_proto::parser::parse_response(response).unwrap();
+        let imap_proto::types::Response::Fetch(_, attributes) = parsed else {
+            panic!("expected FETCH response");
+        };
+        let bodystructure = attributes
+            .iter()
+            .find_map(|attribute| match attribute {
+                imap_proto::types::AttributeValue::BodyStructure(bodystructure) => {
+                    Some(bodystructure)
+                }
+                _ => None,
+            })
+            .unwrap();
+        let metadata = message_structure_metadata(bodystructure);
+        assert_eq!(metadata.attachments.len(), 1);
+        assert_eq!(
+            metadata.attachments[0].mime_type,
+            "application/octet-stream"
+        );
+        assert_eq!(
+            attachment_part_metadata(bodystructure, &metadata.attachments[0].filename, "")
+                .expect("fallback filename should locate nameless attachment")
+                .path,
+            vec![2]
+        );
     }
 
     #[test]

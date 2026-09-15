@@ -123,10 +123,12 @@ function setupInvokeMocks(contacts: Contact[] = []) {
 function renderMetaLoader({
   onAccountListLoaded,
   mailboxRefreshRef = { current: 0 },
+  completedOnboardingAccountIdsRef = { current: new Set<number>() },
   accountScope = 1,
 }: {
   onAccountListLoaded?: () => void;
   mailboxRefreshRef?: { current: number };
+  completedOnboardingAccountIdsRef?: { current: Set<number> };
   accountScope?: number | 'all';
 } = {}) {
   const setters = {
@@ -155,6 +157,7 @@ function renderMetaLoader({
       folderId: 101,
       accountScope: activeAccountScope,
       mailboxRefreshRef,
+      completedOnboardingAccountIdsRef,
       ...setters,
       onAccountListLoaded,
     })
@@ -196,6 +199,29 @@ describe('useAppMetaLoader', () => {
     });
 
     expect(setters.setContacts).toHaveBeenCalledWith([contact]);
+  });
+
+  it('keeps a just-completed onboarding account completed when stale metadata resolves', async () => {
+    setupInvokeMocks();
+    const staleAccount = { ...account, onboarding_completed: false };
+    const defaultImplementation = mockInvoke.getMockImplementation();
+    mockInvoke.mockImplementation(((command: string, args?: InvokeArgs) => {
+      if (command === 'list_accounts') return Promise.resolve([staleAccount]);
+      if (command === 'get_account') return Promise.resolve(staleAccount);
+      return defaultImplementation?.(command, args);
+    }) as never);
+    const completedOnboardingAccountIdsRef = { current: new Set<number>([account.id]) };
+    const { result, setters } = renderMetaLoader({ completedOnboardingAccountIdsRef });
+
+    await act(async () => {
+      await result.current.loadMeta(101, 1, { mode: 'mailbox' });
+    });
+
+    expect(setters.setAccount).toHaveBeenCalledWith(expect.objectContaining({ onboarding_completed: true }));
+    expect(setters.setAccountForm).toHaveBeenCalledWith(expect.objectContaining({ onboarding_completed: true }));
+    expect(setters.setAccounts).toHaveBeenCalledWith([
+      expect.objectContaining({ id: account.id, onboarding_completed: true }),
+    ]);
   });
 
   it('uses mailbox metadata as the single startup owner for stats and tray state', async () => {

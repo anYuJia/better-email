@@ -621,6 +621,8 @@ fn sync_imap_headers_for_account(
     let mut completed_history_folders = 0;
     let mut fetched_bodies = 0;
     let mut body_failures = 0;
+    let mut attachment_metadata_synced = 0;
+    let mut attachment_metadata_failures = 0;
     let mut auto_downloaded_attachments = 0;
     let mut auto_download_failures = 0;
     for (folder_index, mailbox) in mailboxes.iter().enumerate() {
@@ -696,6 +698,8 @@ fn sync_imap_headers_for_account(
                             Ok(stats) => {
                                 fetched_bodies += stats.fetched;
                                 body_failures += stats.failures;
+                                attachment_metadata_synced += stats.attachment_metadata_synced;
+                                attachment_metadata_failures += stats.attachment_metadata_failures;
                                 auto_downloaded_attachments += stats.auto_downloaded;
                                 auto_download_failures += stats.auto_download_failures;
                             }
@@ -788,6 +792,8 @@ fn sync_imap_headers_for_account(
 
     let body_note = if fetched_bodies > 0
         || body_failures > 0
+        || attachment_metadata_synced > 0
+        || attachment_metadata_failures > 0
         || auto_downloaded_attachments > 0
         || auto_download_failures > 0
     {
@@ -796,6 +802,13 @@ fn sync_imap_headers_for_account(
             let mut part = format!("获取正文 {fetched_bodies} 封");
             if body_failures > 0 {
                 part.push_str(&format!("，{body_failures} 封失败"));
+            }
+            parts.push(part);
+        }
+        if attachment_metadata_synced > 0 || attachment_metadata_failures > 0 {
+            let mut part = format!("补齐附件信息 {attachment_metadata_synced} 封");
+            if attachment_metadata_failures > 0 {
+                part.push_str(&format!("，{attachment_metadata_failures} 封失败"));
             }
             parts.push(part);
         }
@@ -953,16 +966,21 @@ impl SyncTaskProgress {
 struct MailboxBodySyncStats {
     fetched: usize,
     failures: usize,
+    attachment_metadata_synced: usize,
+    attachment_metadata_failures: usize,
     auto_downloaded: usize,
     auto_download_failures: usize,
 }
 
 fn should_fetch_attachment_metadata(
-    remote_uid: i64,
-    previous_highest_uid: i64,
-    fetch_history_attachments: bool,
+    _remote_uid: i64,
+    _previous_highest_uid: i64,
+    _fetch_history_attachments: bool,
 ) -> bool {
-    fetch_history_attachments || (previous_highest_uid > 0 && remote_uid > previous_highest_uid)
+    // BODYSTRUCTURE is already fetched while hydrating a message body and is
+    // only metadata. Always retaining it makes historical and newly received
+    // messages behave identically; attachment bytes remain on-demand.
+    true
 }
 
 /// 同步单个邮箱的缺失正文（按 LIMIT 分批拉取）。入参较多是同步进度与
@@ -984,48 +1002,52 @@ fn sync_mailbox_bodies(
     let mut stats = MailboxBodySyncStats {
         fetched: 0,
         failures: 0,
+        attachment_metadata_synced: 0,
+        attachment_metadata_failures: 0,
         auto_downloaded: 0,
         auto_download_failures: 0,
     };
     let pending =
         store.list_messages_missing_body(account.id, remote_name, BODY_SYNC_LIMIT_PER_MAILBOX)?;
-    if pending.is_empty() {
-        return Ok(stats);
-    }
-    let attachment_metadata_uids = pending
-        .iter()
-        .filter_map(|(_, uid)| {
-            should_fetch_attachment_metadata(*uid, previous_highest_uid, fetch_history_attachments)
-                .then_some(*uid)
-        })
-        .collect::<BTreeSet<_>>();
-    let uid_to_message_id = pending
-        .into_iter()
-        .map(|(message_id, uid)| (uid, message_id))
-        .collect::<BTreeMap<i64, i64>>();
-    let uids = uid_to_message_id.keys().copied().collect::<Vec<_>>();
-    let total_messages = uids.len();
-    let total_batches = total_messages.div_ceil(BODY_SYNC_BATCH_SIZE);
-    for (batch_index, batch_uids) in uids.chunks(BODY_SYNC_BATCH_SIZE).enumerate() {
-        ensure_not_cancelled(store)?;
-        let batch_uid_to_message_id = batch_uids
+    if !pending.is_empty() {
+        let attachment_metadata_uids = pending
             .iter()
-            .filter_map(|uid| {
-                uid_to_message_id
-                    .get(uid)
-                    .map(|message_id| (*uid, *message_id))
+            .filter_map(|(_, uid)| {
+                should_fetch_attachment_metadata(
+                    *uid,
+                    previous_highest_uid,
+                    fetch_history_attachments,
+                )
+                .then_some(*uid)
             })
+            .collect::<BTreeSet<_>>();
+        let uid_to_message_id = pending
+            .into_iter()
+            .map(|(message_id, uid)| (uid, message_id))
             .collect::<BTreeMap<i64, i64>>();
-        let bodies = match imap_probe::fetch_message_bodies(
-            account,
-            secret,
-            remote_name,
-            batch_uids,
-            &attachment_metadata_uids,
-        ) {
-            Ok(bodies) => bodies,
-            Err(error) => {
-                crate::logging::log_line(format!(
+        let uids = uid_to_message_id.keys().copied().collect::<Vec<_>>();
+        let total_messages = uids.len();
+        let total_batches = total_messages.div_ceil(BODY_SYNC_BATCH_SIZE);
+        for (batch_index, batch_uids) in uids.chunks(BODY_SYNC_BATCH_SIZE).enumerate() {
+            ensure_not_cancelled(store)?;
+            let batch_uid_to_message_id = batch_uids
+                .iter()
+                .filter_map(|uid| {
+                    uid_to_message_id
+                        .get(uid)
+                        .map(|message_id| (*uid, *message_id))
+                })
+                .collect::<BTreeMap<i64, i64>>();
+            let bodies = match imap_probe::fetch_message_bodies(
+                account,
+                secret,
+                remote_name,
+                batch_uids,
+                &attachment_metadata_uids,
+            ) {
+                Ok(bodies) => bodies,
+                Err(error) => {
+                    crate::logging::log_line(format!(
                     "[better-email][sync] body batch fetch failed account_id={} mailbox={} batch={}/{} pending={} error={error}",
                     account.id,
                     remote_name,
@@ -1033,75 +1055,166 @@ fn sync_mailbox_bodies(
                     total_batches,
                     batch_uids.len()
                 ));
-                stats.failures += batch_uids.len();
-                update_body_sync_progress(
-                    store,
-                    task_progress,
-                    account,
-                    remote_name,
-                    folder_index,
-                    total_folders,
-                    stats.fetched + stats.failures,
-                    total_messages,
-                    batch_index + 1,
-                    total_batches,
-                )?;
-                continue;
-            }
-        };
-        let mut fetched_message_ids = Vec::new();
-        let mut received_uids = BTreeSet::new();
-        for (uid, body) in bodies {
-            ensure_not_cancelled(store)?;
-            received_uids.insert(uid);
-            let Some(&message_id) = batch_uid_to_message_id.get(&uid) else {
-                continue;
-            };
-            match store.update_message_body(message_id, &body) {
-                Ok(_) => {
-                    stats.fetched += 1;
-                    fetched_message_ids.push(message_id);
+                    stats.failures += batch_uids.len();
+                    update_body_sync_progress(
+                        store,
+                        task_progress,
+                        account,
+                        remote_name,
+                        folder_index,
+                        total_folders,
+                        stats.fetched + stats.failures,
+                        total_messages,
+                        batch_index + 1,
+                        total_batches,
+                    )?;
+                    continue;
                 }
-                Err(error) => {
-                    crate::logging::log_line(format!(
+            };
+            let mut fetched_message_ids = Vec::new();
+            let mut received_uids = BTreeSet::new();
+            for (uid, body) in bodies {
+                ensure_not_cancelled(store)?;
+                received_uids.insert(uid);
+                let Some(&message_id) = batch_uid_to_message_id.get(&uid) else {
+                    continue;
+                };
+                match store.update_message_body(message_id, &body) {
+                    Ok(_) => {
+                        stats.fetched += 1;
+                        fetched_message_ids.push(message_id);
+                    }
+                    Err(error) => {
+                        crate::logging::log_line(format!(
                         "[better-email][sync] body update failed account_id={} mailbox={} uid={} message_id={} error={error}",
                         account.id,
                         remote_name,
                         uid,
                         message_id
                     ));
-                    stats.failures += 1;
+                        stats.failures += 1;
+                    }
                 }
             }
+            stats.failures += batch_uids
+                .iter()
+                .filter(|uid| !received_uids.contains(uid))
+                .count();
+            ensure_not_cancelled(store)?;
+            if account.auto_download_attachments {
+                for (uid, message_id) in &batch_uid_to_message_id {
+                    ensure_not_cancelled(store)?;
+                    if !fetched_message_ids.contains(message_id) || pre_existing_uids.contains(uid)
+                    {
+                        continue;
+                    }
+                    let outcome = auto_download_attachments_for_message(store, *message_id);
+                    stats.auto_downloaded += outcome.downloaded;
+                    stats.auto_download_failures += outcome.failures;
+                }
+            }
+            update_body_sync_progress(
+                store,
+                task_progress,
+                account,
+                remote_name,
+                folder_index,
+                total_folders,
+                stats.fetched + stats.failures,
+                total_messages,
+                batch_index + 1,
+                total_batches,
+            )?;
         }
-        stats.failures += batch_uids
-            .iter()
-            .filter(|uid| !received_uids.contains(uid))
-            .count();
-        ensure_not_cancelled(store)?;
-        if account.auto_download_attachments {
-            for (uid, message_id) in &batch_uid_to_message_id {
-                ensure_not_cancelled(store)?;
-                if !fetched_message_ids.contains(message_id) || pre_existing_uids.contains(uid) {
+    }
+
+    // 升级旧版本时，正文可能已经缓存，但历史同步曾跳过 BODYSTRUCTURE。
+    // 只拉结构并更新附件表，避免再次下载或覆盖正文。
+    let attachment_metadata_pending = store.list_messages_missing_attachment_metadata(
+        account.id,
+        remote_name,
+        BODY_SYNC_LIMIT_PER_MAILBOX,
+    )?;
+    if !attachment_metadata_pending.is_empty() {
+        let uid_to_message_id = attachment_metadata_pending
+            .into_iter()
+            .map(|(message_id, uid)| (uid, message_id))
+            .collect::<BTreeMap<i64, i64>>();
+        let uids = uid_to_message_id.keys().copied().collect::<Vec<_>>();
+        let total_messages = uids.len();
+        let total_batches = total_messages.div_ceil(BODY_SYNC_BATCH_SIZE);
+        for (batch_index, batch_uids) in uids.chunks(BODY_SYNC_BATCH_SIZE).enumerate() {
+            ensure_not_cancelled(store)?;
+            let metadata = match imap_probe::fetch_attachment_metadata(
+                account,
+                secret,
+                remote_name,
+                batch_uids,
+            ) {
+                Ok(metadata) => metadata,
+                Err(error) => {
+                    crate::logging::log_line(format!(
+                        "[better-email][sync] attachment metadata batch fetch failed account_id={} mailbox={} batch={}/{} pending={} error={error}",
+                        account.id,
+                        remote_name,
+                        batch_index + 1,
+                        total_batches,
+                        batch_uids.len()
+                    ));
+                    stats.attachment_metadata_failures += batch_uids.len();
+                    update_attachment_metadata_progress(
+                        store,
+                        task_progress,
+                        account,
+                        remote_name,
+                        folder_index,
+                        total_folders,
+                        stats.attachment_metadata_synced + stats.attachment_metadata_failures,
+                        total_messages,
+                        batch_index + 1,
+                        total_batches,
+                    )?;
                     continue;
                 }
-                let outcome = auto_download_attachments_for_message(store, *message_id);
-                stats.auto_downloaded += outcome.downloaded;
-                stats.auto_download_failures += outcome.failures;
+            };
+            let mut received_uids = BTreeSet::new();
+            for (uid, attachments) in metadata {
+                ensure_not_cancelled(store)?;
+                received_uids.insert(uid);
+                let Some(&message_id) = uid_to_message_id.get(&uid) else {
+                    continue;
+                };
+                match store.update_message_attachments(message_id, &attachments) {
+                    Ok(_) => stats.attachment_metadata_synced += 1,
+                    Err(error) => {
+                        crate::logging::log_line(format!(
+                            "[better-email][sync] attachment metadata update failed account_id={} mailbox={} uid={} message_id={} error={error}",
+                            account.id,
+                            remote_name,
+                            uid,
+                            message_id
+                        ));
+                        stats.attachment_metadata_failures += 1;
+                    }
+                }
             }
+            stats.attachment_metadata_failures += batch_uids
+                .iter()
+                .filter(|uid| !received_uids.contains(uid))
+                .count();
+            update_attachment_metadata_progress(
+                store,
+                task_progress,
+                account,
+                remote_name,
+                folder_index,
+                total_folders,
+                stats.attachment_metadata_synced + stats.attachment_metadata_failures,
+                total_messages,
+                batch_index + 1,
+                total_batches,
+            )?;
         }
-        update_body_sync_progress(
-            store,
-            task_progress,
-            account,
-            remote_name,
-            folder_index,
-            total_folders,
-            stats.fetched + stats.failures,
-            total_messages,
-            batch_index + 1,
-            total_batches,
-        )?;
     }
     Ok(stats)
 }
@@ -1133,6 +1246,43 @@ fn update_body_sync_progress(
         ),
         &format!(
             "{}：正在获取 {} 正文，已处理 {}/{}（第 {}/{} 批）",
+            account.email,
+            remote_name,
+            processed_messages.min(total_messages),
+            total_messages,
+            batch_index,
+            total_batches
+        ),
+    )
+}
+
+/// 上报历史邮件附件元数据回填进度，不重复下载正文。
+#[allow(clippy::too_many_arguments)]
+fn update_attachment_metadata_progress(
+    store: &MailStore,
+    task_progress: Option<SyncTaskProgress>,
+    account: &Account,
+    remote_name: &str,
+    folder_index: usize,
+    total_folders: usize,
+    processed_messages: usize,
+    total_messages: usize,
+    batch_index: usize,
+    total_batches: usize,
+) -> MailResult<()> {
+    let Some(task_progress) = task_progress else {
+        return Ok(());
+    };
+    task_progress.update(
+        store,
+        folder_progress_percent(
+            folder_index,
+            total_folders,
+            processed_messages,
+            total_messages,
+        ),
+        &format!(
+            "{}：正在补齐 {} 附件信息，已处理 {}/{}（第 {}/{} 批）",
             account.email,
             remote_name,
             processed_messages.min(total_messages),
@@ -1377,9 +1527,9 @@ mod tests {
     }
 
     #[test]
-    fn history_attachment_metadata_requires_explicit_opt_in() {
-        assert!(!should_fetch_attachment_metadata(44, 0, false));
-        assert!(!should_fetch_attachment_metadata(44, 100, false));
+    fn attachment_metadata_is_available_for_historical_and_new_messages() {
+        assert!(should_fetch_attachment_metadata(44, 0, false));
+        assert!(should_fetch_attachment_metadata(44, 100, false));
         assert!(should_fetch_attachment_metadata(101, 100, false));
         assert!(should_fetch_attachment_metadata(44, 100, true));
     }

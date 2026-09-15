@@ -275,7 +275,7 @@ describe('mail UI utilities', () => {
     expect(newMailNotificationBody({ ...run, new_messages: 0 })).toBeNull();
   });
 
-  it('shows sender and subject when only one new message arrives', () => {
+  it('shows sender and content when only one new message arrives', () => {
     const run = {
       imported_messages: 5,
       new_messages: 1,
@@ -283,8 +283,31 @@ describe('mail UI utilities', () => {
       message: '同步完成',
     };
     const messages = [
-      { sender_name: 'Ada', sender_email: 'ada@example.com', subject: 'Review' },
+      {
+        sender_name: 'Ada',
+        sender_email: 'ada@example.com',
+        subject: 'Review',
+        snippet: '项目已经完成，详情见附件。',
+      },
     ];
+
+    expect(newMailNotificationDecision(run, defaultNotificationPolicy, messages))
+      .toMatchObject({ reason: 'send', body: 'Ada · 项目已经完成，详情见附件。' });
+  });
+
+  it('falls back to subject when a single message has no usable content preview', () => {
+    const run = {
+      imported_messages: 1,
+      new_messages: 1,
+      finished_at: 'not-a-date',
+      message: '同步完成',
+    };
+    const messages = [{
+      sender_name: 'Ada',
+      sender_email: 'ada@example.com',
+      subject: 'Review',
+      snippet: '远端邮件头已同步',
+    }];
 
     expect(newMailNotificationDecision(run, defaultNotificationPolicy, messages))
       .toMatchObject({ reason: 'send', body: 'Ada · Review' });

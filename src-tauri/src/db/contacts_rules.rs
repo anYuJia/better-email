@@ -72,7 +72,7 @@ impl MailStore {
         self.with_conn(|conn| {
             let completed = conn
                 .query_row(
-                    "SELECT initial_scan_completed FROM contact_sync_state WHERE id = 1",
+                    "SELECT all_mail_scan_completed FROM contact_sync_state WHERE id = 1",
                     [],
                     |row| row.get::<_, i64>(0),
                 )
@@ -96,7 +96,7 @@ impl MailStore {
             if initial_only {
                 let completed = transaction
                     .query_row(
-                        "SELECT initial_scan_completed FROM contact_sync_state WHERE id = 1",
+                        "SELECT all_mail_scan_completed FROM contact_sync_state WHERE id = 1",
                         [],
                         |row| row.get::<_, i64>(0),
                     )
@@ -114,19 +114,19 @@ impl MailStore {
             }
 
             let own_addresses = own_email_addresses_for_conn(&transaction)?;
-            let mut aggregates = BTreeMap::<(i64, String), SentContactAggregate>::new();
-            let mut scanned_messages = 0_i64;
-            {
+            // The initial pass is global even when the UI currently scopes the
+            // mailbox to one account. Later manual scans may stay account-scoped.
+            let scan_account_id = if initial_only { None } else { account_id };
+            let message_headers = {
                 let mut stmt = transaction.prepare(
-                    "SELECT m.id, m.account_id, m.recipients, m.cc, m.bcc, m.received_at
+                    "SELECT m.id, m.account_id, m.sender_name, m.sender_email,
+                            m.recipients, m.cc, m.bcc, m.received_at
                      FROM messages m
-                     JOIN folders f ON f.id = m.folder_id
-                     WHERE f.role = 'sent'
-                       AND (?1 IS NULL OR m.account_id = ?1)
+                     WHERE (?1 IS NULL OR m.account_id = ?1)
                      ORDER BY CASE WHEN julianday(m.received_at) IS NULL THEN 1 ELSE 0 END,
                               julianday(m.received_at) DESC, m.received_at DESC, m.id DESC",
                 )?;
-                let rows = stmt.query_map(params![account_id], |row| {
+                let rows = stmt.query_map(params![scan_account_id], |row| {
                     Ok((
                         row.get::<_, i64>(0)?,
                         row.get::<_, i64>(1)?,
@@ -134,96 +134,63 @@ impl MailStore {
                         row.get::<_, String>(3)?,
                         row.get::<_, String>(4)?,
                         row.get::<_, String>(5)?,
+                        row.get::<_, String>(6)?,
+                        row.get::<_, String>(7)?,
                     ))
                 })?;
-                for row in rows {
-                    let (message_id, message_account_id, to, cc, bcc, seen_at) = row?;
-                    scanned_messages += 1;
-                    let mut message_addresses = BTreeMap::<String, String>::new();
-                    for header in [to, cc, bcc] {
-                        for (name, email) in parse_contact_address_list(&header) {
-                            if !own_addresses.contains(&email) {
-                                message_addresses.entry(email).or_insert(name);
-                            }
-                        }
-                    }
-                    for (email, name) in message_addresses {
-                        let aggregate = aggregates
-                            .entry((message_account_id, email.clone()))
-                            .or_default();
-                        aggregate.message_count += 1;
-                        if aggregate.name.is_empty() && !name.is_empty() && name != email {
-                            aggregate.name = name;
-                        }
-                        if seen_at_is_newer(&seen_at, &aggregate.last_seen_at) {
-                            aggregate.last_seen_at = seen_at.clone();
-                        }
-                        transaction.execute(
-                            "INSERT OR IGNORE INTO contact_sent_messages(message_id, email, scanned_at)
-                             VALUES (?1, ?2, ?3)",
-                            params![message_id, email, Utc::now().to_rfc3339()],
-                        )?;
-                    }
-                }
-            }
+                rows.collect::<Result<Vec<_>, _>>()?
+            };
 
+            let mut discovered_addresses = BTreeSet::<(i64, String)>::new();
+            let mut scanned_messages = 0_i64;
             let mut created = 0_i64;
             let mut updated = 0_i64;
-            for ((message_account_id, email), aggregate) in &aggregates {
-                let existing: Option<(i64, String, i64, String)> = transaction
-                    .query_row(
-                        "SELECT id, name, message_count, last_seen_at
-                         FROM contacts WHERE account_id = ?1 AND lower(email) = lower(?2)",
-                        params![message_account_id, email],
-                        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-                    )
-                    .optional()?;
-                let display_name = if aggregate.name.trim().is_empty() {
-                    email.as_str()
-                } else {
-                    aggregate.name.as_str()
-                };
-                if let Some((id, current_name, current_count, current_seen_at)) = existing {
-                    let next_name = if current_name.trim().is_empty() || current_name.eq_ignore_ascii_case(email) {
-                        display_name
-                    } else {
-                        current_name.as_str()
-                    };
-                    let next_count = current_count.max(aggregate.message_count);
-                    let next_seen_at = if seen_at_is_newer(&aggregate.last_seen_at, &current_seen_at) {
-                        aggregate.last_seen_at.as_str()
-                    } else {
-                        current_seen_at.as_str()
-                    };
-                    transaction.execute(
-                        "UPDATE contacts SET name = ?2, message_count = ?3, last_seen_at = ?4
-                         WHERE id = ?1 AND account_id = ?5",
-                        params![id, next_name, next_count, next_seen_at, message_account_id],
-                    )?;
-                    updated += 1;
-                } else {
-                    transaction.execute(
-                        "INSERT INTO contacts(account_id, name, email, aliases, vip, message_count, last_seen_at)
-                         VALUES (?1, ?2, ?3, '', 0, ?4, ?5)",
-                        params![message_account_id, display_name, email, aggregate.message_count, aggregate.last_seen_at],
-                    )?;
-                    created += 1;
+            for (
+                message_id,
+                message_account_id,
+                sender_name,
+                sender_email,
+                recipients,
+                cc,
+                bcc,
+                seen_at,
+            ) in message_headers
+            {
+                scanned_messages += 1;
+                let stats = sync_contacts_from_message_headers_with_own_addresses(
+                    &transaction,
+                    message_id,
+                    message_account_id,
+                    &sender_name,
+                    &sender_email,
+                    &recipients,
+                    &cc,
+                    &bcc,
+                    &seen_at,
+                    &own_addresses,
+                )?;
+                for email in stats.discovered {
+                    discovered_addresses.insert((message_account_id, email));
                 }
+                created += stats.created;
+                updated += stats.updated;
             }
 
             let now = Utc::now().to_rfc3339();
+            let scan_completed = if initial_only { 1 } else { 0 };
             transaction.execute(
-                "INSERT INTO contact_sync_state(id, initial_scan_completed, last_scanned_at)
-                 VALUES (1, ?1, ?2)
+                "INSERT INTO contact_sync_state(id, initial_scan_completed, all_mail_scan_completed, last_scanned_at)
+                 VALUES (1, ?1, ?2, ?3)
                  ON CONFLICT(id) DO UPDATE SET
                    initial_scan_completed = CASE WHEN ?1 = 1 THEN 1 ELSE contact_sync_state.initial_scan_completed END,
+                   all_mail_scan_completed = CASE WHEN ?2 = 1 THEN 1 ELSE contact_sync_state.all_mail_scan_completed END,
                    last_scanned_at = excluded.last_scanned_at",
-                params![if initial_only { 1 } else { 0 }, now],
+                params![scan_completed, scan_completed, now],
             )?;
             transaction.commit()?;
             Ok(RecentContactSyncReport {
                 scanned_messages,
-                discovered_contacts: aggregates.len() as i64,
+                discovered_contacts: discovered_addresses.len() as i64,
                 created,
                 updated,
                 skipped: false,
@@ -234,49 +201,43 @@ impl MailStore {
     pub fn sync_contacts_from_sent_message(&self, message_id: i64) -> MailResult<()> {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
-            let (message_account_id, to, cc, bcc, seen_at): (i64, String, String, String, String) = transaction.query_row(
-                "SELECT account_id, recipients, cc, bcc, received_at FROM messages WHERE id = ?1",
+            let (message_account_id, sender_name, sender_email, to, cc, bcc, seen_at): (
+                i64,
+                String,
+                String,
+                String,
+                String,
+                String,
+                String,
+            ) = transaction.query_row(
+                "SELECT account_id, sender_name, sender_email, recipients, cc, bcc, received_at
+                 FROM messages WHERE id = ?1",
                 params![message_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                        row.get(6)?,
+                    ))
+                },
             )?;
             let own_addresses = own_email_addresses_for_conn(&transaction)?;
-            let mut addresses = BTreeMap::<String, String>::new();
-            for header in [to, cc, bcc] {
-                for (name, email) in parse_contact_address_list(&header) {
-                    if !own_addresses.contains(&email) {
-                        addresses.entry(email).or_insert(name);
-                    }
-                }
-            }
-            for (email, name) in addresses {
-                let inserted = transaction.execute(
-                    "INSERT OR IGNORE INTO contact_sent_messages(message_id, email, scanned_at)
-                     VALUES (?1, ?2, ?3)",
-                    params![message_id, email, Utc::now().to_rfc3339()],
-                )?;
-                if inserted == 0 {
-                    continue;
-                }
-                let display_name = if name.trim().is_empty() { email.as_str() } else { name.as_str() };
-                transaction.execute(
-                    "INSERT INTO contacts(account_id, name, email, aliases, vip, message_count, last_seen_at)
-                     VALUES (?1, ?2, ?3, '', 0, 1, ?4)
-                     ON CONFLICT(account_id, email) DO UPDATE SET
-                        name = CASE WHEN contacts.name = '' OR lower(contacts.name) = lower(contacts.email)
-                                    THEN excluded.name ELSE contacts.name END,
-                        message_count = contacts.message_count + 1,
-                        last_seen_at = CASE
-                            WHEN julianday(excluded.last_seen_at) IS NOT NULL
-                                 AND (julianday(contacts.last_seen_at) IS NULL
-                                      OR julianday(excluded.last_seen_at) > julianday(contacts.last_seen_at))
-                                THEN excluded.last_seen_at
-                            WHEN julianday(excluded.last_seen_at) IS NULL
-                                 AND excluded.last_seen_at > contacts.last_seen_at
-                                THEN excluded.last_seen_at
-                            ELSE contacts.last_seen_at END",
-                    params![message_account_id, display_name, email, seen_at],
-                )?;
-            }
+            sync_contacts_from_message_headers_with_own_addresses(
+                &transaction,
+                message_id,
+                message_account_id,
+                &sender_name,
+                &sender_email,
+                &to,
+                &cc,
+                &bcc,
+                &seen_at,
+                &own_addresses,
+            )?;
             transaction.commit()?;
             Ok(())
         })
@@ -1044,10 +1005,185 @@ pub(super) fn normalize_contact_aliases(aliases: Vec<String>, primary_email: &st
 }
 
 #[derive(Default)]
-struct SentContactAggregate {
-    name: String,
-    message_count: i64,
-    last_seen_at: String,
+pub(super) struct ContactHeaderSyncStats {
+    discovered: BTreeSet<String>,
+    created: i64,
+    updated: i64,
+}
+
+/// Collect participants from a complete message header. This is shared by
+/// IMAP imports and the outbox so contacts stay current without waiting for a
+/// manual scan.
+pub(super) fn sync_contacts_from_message_headers(
+    conn: &Connection,
+    message_id: i64,
+    account_id: i64,
+    sender_name: &str,
+    sender_email: &str,
+    recipients: &str,
+    cc: &str,
+    bcc: &str,
+    seen_at: &str,
+) -> MailResult<ContactHeaderSyncStats> {
+    let own_addresses = own_email_addresses_for_conn(conn)?;
+    sync_contacts_from_message_headers_with_own_addresses(
+        conn,
+        message_id,
+        account_id,
+        sender_name,
+        sender_email,
+        recipients,
+        cc,
+        bcc,
+        seen_at,
+        &own_addresses,
+    )
+}
+
+fn sync_contacts_from_message_headers_with_own_addresses(
+    conn: &Connection,
+    message_id: i64,
+    account_id: i64,
+    sender_name: &str,
+    sender_email: &str,
+    recipients: &str,
+    cc: &str,
+    bcc: &str,
+    seen_at: &str,
+    own_addresses: &BTreeSet<String>,
+) -> MailResult<ContactHeaderSyncStats> {
+    let mut stats = ContactHeaderSyncStats::default();
+    let mut addresses = BTreeMap::<String, String>::new();
+    let normalized_sender = normalize_email(sender_email);
+    if normalized_sender.contains('@') && !own_addresses.contains(&normalized_sender) {
+        addresses.insert(normalized_sender, sender_name.trim().to_string());
+    }
+    for header in [recipients, cc, bcc] {
+        for (name, email) in parse_contact_address_list(header) {
+            if !own_addresses.contains(&email) {
+                addresses.entry(email).or_insert(name);
+            }
+        }
+    }
+
+    let scanned_at = Utc::now().to_rfc3339();
+    for (email, name) in addresses {
+        stats.discovered.insert(email.clone());
+        let existing = contact_row_for_address_conn(conn, account_id, &email)?;
+        let message_already_counted = existing
+            .as_ref()
+            .map(|contact| contact_has_message_observation(conn, message_id, contact))
+            .transpose()?
+            .unwrap_or(false);
+        let inserted = conn.execute(
+            "INSERT OR IGNORE INTO contact_sent_messages(message_id, email, scanned_at)
+             VALUES (?1, ?2, ?3)",
+            params![message_id, email, scanned_at],
+        )?;
+        let is_new_observation = inserted > 0 && !message_already_counted;
+
+        let display_name = if name.trim().is_empty() {
+            email.as_str()
+        } else {
+            name.trim()
+        };
+        if let Some(existing) = existing {
+            let mut aliases = existing.aliases.clone();
+            if !existing.email.eq_ignore_ascii_case(&email) {
+                aliases.push(email.clone());
+            }
+            let aliases = normalize_contact_aliases(aliases, &existing.email);
+            let next_name = if existing.name.trim().is_empty()
+                || existing.name.eq_ignore_ascii_case(&existing.email)
+            {
+                display_name.to_string()
+            } else {
+                existing.name.clone()
+            };
+            let next_seen_at = if seen_at_is_newer(seen_at, &existing.last_seen_at) {
+                seen_at.to_string()
+            } else {
+                existing.last_seen_at.clone()
+            };
+            let next_message_count = existing.message_count + i64::from(is_new_observation);
+            conn.execute(
+                "UPDATE contacts
+                 SET name = ?2, aliases = ?3, message_count = ?4, last_seen_at = ?5
+                 WHERE id = ?1 AND account_id = ?6",
+                params![
+                    existing.id,
+                    next_name,
+                    contact_aliases_to_text(&aliases),
+                    next_message_count,
+                    next_seen_at,
+                    account_id,
+                ],
+            )?;
+            stats.updated += 1;
+        } else {
+            conn.execute(
+                "INSERT INTO contacts(account_id, name, email, aliases, vip, message_count, last_seen_at)
+                 VALUES (?1, ?2, ?3, '', 0, 1, ?4)",
+                params![account_id, display_name, email, seen_at],
+            )?;
+            stats.created += 1;
+        }
+    }
+    Ok(stats)
+}
+
+fn contact_has_message_observation(
+    conn: &Connection,
+    message_id: i64,
+    contact: &Contact,
+) -> MailResult<bool> {
+    let mut stmt = conn.prepare(
+        "SELECT 1 FROM contact_sent_messages
+         WHERE message_id = ?1 AND lower(email) = lower(?2)
+         LIMIT 1",
+    )?;
+    for email in std::iter::once(&contact.email).chain(contact.aliases.iter()) {
+        if stmt
+            .query_row(params![message_id, email], |row| row.get::<_, i64>(0))
+            .optional()?
+            .is_some()
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn contact_row_for_address_conn(
+    conn: &Connection,
+    account_id: i64,
+    email: &str,
+) -> MailResult<Option<Contact>> {
+    Ok(conn
+        .query_row(
+            "SELECT id, account_id, name, email, aliases, vip, message_count, last_seen_at
+         FROM contacts
+         WHERE account_id = ?1
+           AND (lower(email) = lower(?2)
+                OR instr(char(10) || lower(aliases) || char(10),
+                        char(10) || lower(?2) || char(10)) > 0)
+         ORDER BY id
+         LIMIT 1",
+            params![account_id, email],
+            |row| {
+                Ok(Contact {
+                    id: row.get(0)?,
+                    account_id: row.get(1)?,
+                    name: row.get(2)?,
+                    email: row.get(3)?,
+                    aliases: contact_aliases_from_text(row.get(4)?),
+                    vip: row.get::<_, i64>(5)? != 0,
+                    message_count: row.get(6)?,
+                    last_seen_at: row.get(7)?,
+                })
+            },
+        )
+        .optional()?)
 }
 
 fn seen_at_is_newer(candidate: &str, current: &str) -> bool {
@@ -1192,7 +1328,41 @@ pub(super) fn upsert_contact(
     email: &str,
     seen_at: &str,
 ) -> MailResult<()> {
-    if email.trim().is_empty() {
+    let email = normalize_email(email);
+    if email.is_empty() {
+        return Ok(());
+    }
+    if let Some(existing) = contact_row_for_address_conn(conn, account_id, &email)? {
+        let mut aliases = existing.aliases.clone();
+        if !existing.email.eq_ignore_ascii_case(&email) {
+            aliases.push(email.clone());
+        }
+        let aliases = normalize_contact_aliases(aliases, &existing.email);
+        let next_name = if existing.name.trim().is_empty()
+            || existing.name.eq_ignore_ascii_case(&existing.email)
+        {
+            name.trim().to_string()
+        } else {
+            existing.name.clone()
+        };
+        let next_seen_at = if seen_at_is_newer(seen_at, &existing.last_seen_at) {
+            seen_at.to_string()
+        } else {
+            existing.last_seen_at.clone()
+        };
+        conn.execute(
+            "UPDATE contacts
+             SET name = ?2, aliases = ?3, message_count = ?4, last_seen_at = ?5
+             WHERE id = ?1 AND account_id = ?6",
+            params![
+                existing.id,
+                next_name,
+                contact_aliases_to_text(&aliases),
+                existing.message_count + 1,
+                next_seen_at,
+                account_id,
+            ],
+        )?;
         return Ok(());
     }
     conn.execute(
@@ -1204,7 +1374,7 @@ pub(super) fn upsert_contact(
             message_count = contacts.message_count + 1,
             last_seen_at = excluded.last_seen_at
         ",
-        params![account_id, name.trim(), email.trim(), seen_at],
+        params![account_id, name.trim(), email, seen_at],
     )?;
     Ok(())
 }

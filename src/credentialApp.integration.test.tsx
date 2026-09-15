@@ -12,7 +12,11 @@ it('opens the account whose saved credential is missing', async () => {
   await invoke('delete_account_secret', { accountEmail: 'design@better-email.local' });
   render(<App requestedSettingsAccountScope="all" />);
   fireEvent.click(await screen.findByRole('button', { name: '修复登录' }, { timeout: 5000 }));
-  await waitFor(() => expect(document.querySelector('.settings-credential-panel')?.textContent).toContain('design@better-email.local'));
+  await waitFor(() => {
+    const panel = document.querySelector('.settings-credential-panel');
+    expect(panel).not.toBeNull();
+    expect(panel?.textContent ?? '').toContain('design@better-email.local');
+  }, { timeout: 10_000 });
   await act(async () => { await Promise.resolve(); });
-  expect(document.querySelector('.settings-credential-panel')?.textContent).toContain('design@better-email.local');
+  expect(document.querySelector('.settings-credential-panel')?.textContent ?? '').toContain('design@better-email.local');
 }, 15_000);

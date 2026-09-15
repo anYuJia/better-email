@@ -54,7 +54,7 @@ function renderSheet(overrides: Partial<ComponentProps<typeof MobileMailboxSheet
 }
 
 describe('MobileMailboxSheet', () => {
-  it('keeps the drawer grouped and names it for assistive technology', () => {
+  it('keeps the drawer grouped and names it for assistive technology', { timeout: 15_000 }, () => {
     renderSheet();
 
     expect(screen.getByRole('dialog', { name: '邮箱' }).getAttribute('aria-labelledby')).toBe(

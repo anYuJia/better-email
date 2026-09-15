@@ -1,6 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import MobileBottomNav from './MobileBottomNav';
+
+afterEach(() => {
+  cleanup();
+});
 
 function renderNav(filter: 'all' | 'starred' = 'all') {
   const handlers = {

@@ -252,6 +252,11 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # setup-android@v3 defaults to the removed legacy `tools` package.
+          # The runner already provides command-line tools; only install the
+          # maintained platform-tools package here.
+          packages: platform-tools
 
       - name: Install Android SDK components
         shell: bash

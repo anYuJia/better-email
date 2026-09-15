@@ -108,9 +108,9 @@
 }
 
 .settings-modal .settings-about-update-result {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--st-border);
@@ -122,6 +122,13 @@
   display: grid;
   gap: 2px;
   min-width: 0;
+}
+
+.settings-modal .settings-about-update-result > .settings-about-update-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .settings-modal .settings-about-update-result strong {
@@ -142,11 +149,64 @@
   white-space: nowrap;
 }
 
+.settings-modal .settings-about-update-notes,
+.settings-modal .settings-about-update-progress,
+.settings-modal .settings-about-update-error {
+  grid-column: 1 / -1;
+}
+
+.settings-modal .settings-about-update-notes {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.settings-modal .settings-about-update-progress {
+  display: grid;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.settings-modal .settings-about-update-progress-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-aux);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-modal .settings-about-update-progress progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  accent-color: var(--st-accent);
+}
+
+.settings-modal .settings-about-update-error {
+  margin: 0;
+  color: var(--st-danger);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
+}
+
 
 @media (max-width: 640px) {
   .settings-modal .settings-about-update-result {
     align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-modal .settings-about-update-actions {
+    justify-content: flex-start;
   }
 }
 

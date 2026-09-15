@@ -21,6 +21,7 @@ import MobileMailboxSheet from './components/mobile/MobileMailboxSheet';
 import MobileSettingsRoot from './components/mobile/MobileSettingsRoot';
 import GlobalTooltip from './components/GlobalTooltip';
 import ContactSyncLoadingDialog from './components/ContactSyncLoadingDialog';
+import AppUpdateSurface from './components/AppUpdateSurface';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import type { PendingSendUndo } from './components/UndoSnackbarStack';
@@ -39,6 +40,7 @@ import useUndoQueue from './hooks/useUndoQueue';
 import useReaderActions from './hooks/useReaderActions';
 import useAppGlobalEffects from './hooks/useAppGlobalEffects';
 import useAppMetaLoader from './hooks/useAppMetaLoader';
+import useNativePlatform from './hooks/useNativePlatform';
 import useUnreadFocusSync from './hooks/useUnreadFocusSync';
 import useComposerController, { type OpenComposerOptions } from './hooks/useComposerController';
 import useCredentialManagement from './hooks/useCredentialManagement';
@@ -217,9 +219,7 @@ function MailboxApp({
   const [isSettingsOpen, setSettingsOpen] = useState(standaloneSettingsWindow);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [narrowView, setNarrowView] = useState<'sidebar' | 'list' | 'reader'>('list');
-  const [nativePlatform, setNativePlatform] = useState<'android' | 'ios' | 'desktop' | 'web'>(
-    () => (mockMode ? 'web' : 'desktop'),
-  );
+  const { nativePlatform, nativePlatformResolved } = useNativePlatform();
   const [isViewportMobile, setIsViewportMobile] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 720px)').matches,
   );
@@ -275,25 +275,6 @@ function MailboxApp({
     void prewarmSettingsWindow().catch(() => undefined);
     return undefined;
   }, [accounts.length, initialAccountListLoaded, standaloneSettingsWindow, useNativeComposerWindow]);
-
-  useEffect(() => {
-    let active = true;
-    invoke<string>(IPC.GetPlatform)
-      .then((platform) => {
-        if (!active) return;
-        if (platform === 'android' || platform === 'ios') {
-          setNativePlatform(platform);
-        } else if (platform === 'macos' || platform === 'windows' || platform === 'linux') {
-          setNativePlatform('desktop');
-        }
-      })
-      .catch(() => {
-        // Browser preview and component tests do not expose the native command.
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -534,6 +515,7 @@ function MailboxApp({
     if (!/(?:^Error:|失败|错误|出错|无法|不能|被拒绝|超时|请先|尚未配置|不存在)/i.test(status)) return;
     showMessageToast(status.replace(/^Error:\s*/i, ''), 'error');
   }, [showMessageToast, status]);
+
   const {
     loadMeta,
     releaseDueSnoozedMessages,
@@ -2357,6 +2339,15 @@ function MailboxApp({
             onDismissSend={() => setPendingSendUndo(null)}
           />
         </Suspense>
+      )}
+      {!isAccountLoginActive && !standaloneSettingsWindow && (
+        <AppUpdateSurface
+          standaloneSettingsWindow={standaloneSettingsWindow}
+          nativePlatform={nativePlatform}
+          nativePlatformResolved={nativePlatformResolved}
+          isMobileApp={isMobileApp}
+          onNotify={showMessageToast}
+        />
       )}
       {!isAccountLoginActive && <GlobalTooltip />}
       <ContactSyncLoadingDialog open={contactScanBusy} />

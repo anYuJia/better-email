@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import type { Message } from '../../app/types';
 import ReaderToolbar from './ReaderToolbar';
@@ -80,10 +80,14 @@ function renderToolbar(
 }
 
 describe('ReaderToolbar common actions', () => {
-  it('keeps reply, star, archive, snooze, and more visible', () => {
+  it('keeps reply and forward side by side with the primary reader actions', () => {
     renderToolbar();
 
-    expect(screen.getByRole('button', { name: '回复' })).toBeDefined();
+    const responseGroup = screen.getByRole('group', { name: '回复与转发操作' });
+    expect(within(responseGroup).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual([
+      '回复',
+      '转发',
+    ]);
     expect(screen.getByRole('button', { name: '添加星标' })).toBeDefined();
     expect(screen.getByRole('button', { name: '归档' })).toBeDefined();
     expect(screen.getByRole('button', { name: '稍后处理' })).toBeDefined();
@@ -91,13 +95,19 @@ describe('ReaderToolbar common actions', () => {
     expect(screen.queryByRole('button', { name: '更多回复方式' })).toBeNull();
   });
 
-  it('moves reply-all and forward into the more menu', () => {
-    renderToolbar();
+  it('keeps reply-all in the more menu while removing forward from it', () => {
+    const onComposeFromMessage = vi.fn();
+    renderToolbar(message(), { onComposeFromMessage });
 
+    fireEvent.click(screen.getByRole('button', { name: '转发' }));
+    expect(onComposeFromMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: '设计评审' }),
+      'forward',
+    );
     fireEvent.click(screen.getByTitle('更多操作'));
 
     expect(screen.getByRole('menuitem', { name: '回复全部' })).toBeDefined();
-    expect(screen.getByRole('menuitem', { name: '转发' })).toBeDefined();
+    expect(screen.queryByRole('menuitem', { name: '转发' })).toBeNull();
   });
 
   it('does not repeat primary toolbar actions in the more menu', () => {

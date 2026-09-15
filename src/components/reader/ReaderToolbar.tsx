@@ -2,6 +2,7 @@ import {
   Archive,
   Clock,
   Download,
+  Forward,
   Languages,
   Loader2,
   MailOpen,
@@ -154,6 +155,7 @@ function ReaderToolbar({
   }).filter((item) => ![
     'open',
     'reply',
+    'forward',
     'star-state',
     'snooze',
     'unsnooze',
@@ -277,10 +279,20 @@ function ReaderToolbar({
             </button>
           </div>
         ) : canReply ? (
-          <div className="reader-action-group reader-response-actions" role="group" aria-label="回复操作">
-            <button className="primary-action" title="回复" onClick={() => onComposeFromMessage(selected, 'reply')}>
+          <div className="reader-action-group reader-response-actions" role="group" aria-label="回复与转发操作">
+            <button type="button" className="primary-action" title="回复" onClick={() => onComposeFromMessage(selected, 'reply')}>
               <Reply size={16} />
               <span>回复</span>
+            </button>
+            <button
+              type="button"
+              className="reader-forward-action"
+              title="转发"
+              aria-label="转发"
+              onClick={() => onComposeFromMessage(selected, 'forward')}
+            >
+              <Forward size={16} />
+              <span>转发</span>
             </button>
           </div>
         ) : null}

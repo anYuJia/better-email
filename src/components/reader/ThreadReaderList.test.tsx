@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FolderRole, MessageSummary, ThreadSummary } from '../../app/types';
 import ThreadReaderList from './ThreadReaderList';
@@ -66,6 +66,11 @@ function renderThread(threadMessages: MessageSummary[]) {
 describe('ThreadReaderList action consistency', () => {
   it('uses the same state-aware actions as the thread context menu', () => {
     renderThread([message(1, 'inbox')]);
+    const responseGroup = screen.getByRole('group', { name: '回复与转发操作' });
+    expect(within(responseGroup).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual([
+      '回复',
+      '转发',
+    ]);
     fireEvent.click(screen.getByTitle('更多会话操作'));
 
     expect(screen.getByRole('menuitem', { name: '标为已读' })).toBeDefined();
@@ -75,6 +80,7 @@ describe('ThreadReaderList action consistency', () => {
     expect(screen.getByRole('menuitem', { name: '移到废纸篓' })).toBeDefined();
     expect(screen.queryByRole('menuitem', { name: '添加星标' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: '归档' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: '转发最新邮件' })).toBeNull();
     expect(screen.queryByText(/批量/)).toBeNull();
   });
 

@@ -106,13 +106,6 @@ function ThreadReaderList({
       disabled: !activeThreadSelected,
       onSelect: () => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'replyAll'),
     },
-    {
-      id: 'thread-forward',
-      label: '转发最新邮件',
-      icon: <Forward size={15} />,
-      disabled: !activeThreadSelected,
-      onSelect: () => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'forward'),
-    },
   ];
   const threadMenuItems = [...responseItems, ...contextItems];
 
@@ -124,14 +117,25 @@ function ThreadReaderList({
           <p>{activeThread.participants} · {threadMessages.length} 封邮件 · 未读 {activeThread.unread_count}</p>
         </div>
         <div className="reader-actions">
-          <div className="reader-action-group reader-response-actions" role="group" aria-label="回复操作">
+          <div className="reader-action-group reader-response-actions" role="group" aria-label="回复与转发操作">
             <button
+              type="button"
               className="primary-action"
               title="回复最新邮件"
               onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'reply')}
             >
               <Reply size={16} />
               <span>回复</span>
+            </button>
+            <button
+              type="button"
+              className="reader-forward-action"
+              title="转发最新邮件"
+              aria-label="转发"
+              onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'forward')}
+            >
+              <Forward size={16} />
+              <span>转发</span>
             </button>
           </div>
           <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">

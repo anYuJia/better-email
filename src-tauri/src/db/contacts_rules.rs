@@ -1014,6 +1014,10 @@ pub(super) struct ContactHeaderSyncStats {
 /// Collect participants from a complete message header. This is shared by
 /// IMAP imports and the outbox so contacts stay current without waiting for a
 /// manual scan.
+// Header ingestion intentionally keeps the complete message identity and all
+// address fields together at this database boundary; grouping it into a
+// temporary struct would add ceremony to every IMAP and outbox call site.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn sync_contacts_from_message_headers(
     conn: &Connection,
     message_id: i64,
@@ -1040,6 +1044,7 @@ pub(super) fn sync_contacts_from_message_headers(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn sync_contacts_from_message_headers_with_own_addresses(
     conn: &Connection,
     message_id: i64,

@@ -112,7 +112,10 @@
   .app-shell.is-mobile-app .mobile-reader-surface > .reader-panel {
     overflow-x: hidden;
     overflow-y: auto;
-    touch-action: pan-x pan-y;
+    /* The panel owns vertical navigation. Horizontal overflow is delegated
+       to the inner HTML surface below so a swipe cannot move two surfaces at
+       once. */
+    touch-action: pan-y;
   }
 
   .app-shell.is-mobile-app .mobile-reader-surface .reader-actions {

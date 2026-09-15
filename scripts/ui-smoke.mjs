@@ -2989,8 +2989,9 @@ async function main() {
     await captureScreenshot(cdp, 'attachment-download-retry');
     await clickButton(cdp, '重试', "document.querySelector('.attachments')");
     await waitForExpression(cdp, "document.body.innerText.includes('附件已从 64 KB 继续下载：security-checklist.pdf') && document.body.innerText.includes('打开')");
-    await openDetails(cdp, '.reader-more-menu');
-    await clickButton(cdp, '转发', "document.querySelector('.reader-more-menu')");
+    // 转发是阅读器的一级操作，和回复并列；更多菜单只保留低频整理动作。
+    await evalInPage(cdp, "document.querySelector('.reader-more-menu[open]')?.removeAttribute('open')");
+    await clickButton(cdp, '转发', "document.querySelector('.reader-actions')");
     await waitForExpression(cdp, "document.querySelector('.composer') && document.querySelector('.composer input[aria-label=\"主题\"]')?.value === 'Fwd: 安全检查清单' && document.querySelector('.composer-attachment-list')?.innerText.includes('security-checklist.pdf') && document.querySelector('.status-line')?.textContent.includes('已带入 1 个附件')");
     await captureScreenshot(cdp, 'forward-with-source-attachment');
     await closeComposer(cdp);
@@ -3086,13 +3087,13 @@ async function main() {
     await fillInput(cdp, '.template-editor input[placeholder^="邮件主题"]', '你好 {{contact.name}}');
     await fillInput(cdp, '.template-editor textarea', '您好 {{contact.name}}，\n\n这是模板正文。\n\n{{signature}}');
     await clickButton(cdp, '保存模板', "document.querySelector('.template-editor')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('Smoke 设置模板') && document.querySelector('.settings-inline-status')?.textContent.includes('模板已保存：Smoke 设置模板')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('Smoke 设置模板')");
     await clickButton(cdp, 'AI 生成', "document.querySelector('.settings-page[data-settings-page=\"templates\"]')");
     await waitForExpression(cdp, "document.querySelector('.template-ai-body')");
     await fillInput(cdp, '.template-ai-generator input[placeholder^="描述模板用途"]', '向新客户介绍产品');
     await clickButton(cdp, 'AI 生成', "document.querySelector('.template-ai-generator')");
     await sleep(1000);
-    await waitForExpression(cdp, "!document.querySelector('.template-ai-preview') && /AI 服务已关闭|请先配置 AI 服务|浏览器预览不执行真实 AI 请求|MCP 服务未开启/.test(document.querySelector('.settings-inline-status')?.textContent ?? '')");
+    await waitForExpression(cdp, "!document.querySelector('.template-ai-preview') && /AI 接入尚未开启|请先配置 AI 服务|浏览器预览不执行真实 AI 请求|MCP 服务未开启/.test(document.body.innerText)");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
 

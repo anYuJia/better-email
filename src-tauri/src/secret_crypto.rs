@@ -36,6 +36,13 @@ fn read_existing_key(path: &Path) -> std::io::Result<[u8; 32]> {
 }
 
 pub(crate) fn load_or_create_key(data_dir: &Path) -> std::io::Result<[u8; 32]> {
+    load_or_create_key_with_publisher(data_dir, publish_key)
+}
+
+fn load_or_create_key_with_publisher(
+    data_dir: &Path,
+    publish: impl FnOnce(&Path, &Path) -> std::io::Result<()>,
+) -> std::io::Result<[u8; 32]> {
     let path = key_path(data_dir);
     match read_existing_key(&path) {
         Ok(key) => return Ok(key),
@@ -59,7 +66,7 @@ pub(crate) fn load_or_create_key(data_dir: &Path) -> std::io::Result<[u8; 32]> {
         file.write_all(&key)?;
         file.sync_all()?;
         drop(file);
-        match fs::hard_link(&temporary_path, &path) {
+        match publish(&temporary_path, &path) {
             Ok(()) => {
                 #[cfg(unix)]
                 fs::File::open(data_dir)?.sync_all()?;
@@ -71,6 +78,42 @@ pub(crate) fn load_or_create_key(data_dir: &Path) -> std::io::Result<[u8; 32]> {
     })();
     let _ = fs::remove_file(&temporary_path);
     result
+}
+
+fn publish_key(temporary_path: &Path, path: &Path) -> std::io::Result<()> {
+    #[cfg(target_os = "android")]
+    {
+        publish_key_by_rename(temporary_path, path)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        fs::hard_link(temporary_path, path)
+    }
+}
+
+/// Android SELinux forbids hard links even within an app's private directory.
+/// Serialize creators across threads/processes, then atomically rename the fully
+/// written key. Keep the lock file: unlinking it could let creators lock different
+/// inodes and overwrite each other's keys. Readers only see complete key files.
+#[cfg(any(target_os = "android", test))]
+fn publish_key_by_rename(temporary_path: &Path, path: &Path) -> std::io::Result<()> {
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(false);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let lock = options.open(path.with_extension("key.lock"))?;
+    lock.lock()?;
+    match fs::symlink_metadata(path) {
+        Ok(_) => Err(std::io::Error::new(
+            ErrorKind::AlreadyExists,
+            "凭据密钥已存在，未覆盖原文件。",
+        )),
+        Err(error) if error.kind() == ErrorKind::NotFound => fs::rename(temporary_path, path),
+        Err(error) => Err(error),
+    }
 }
 
 fn key_path(data_dir: &Path) -> PathBuf {
@@ -259,7 +302,10 @@ mod recovery_tests {
                 "concurrent secret"
             );
         }
-        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 1);
+        assert_eq!(
+            fs::read_dir(dir.path()).unwrap().count(),
+            if cfg!(target_os = "android") { 2 } else { 1 }
+        );
         assert_eq!(fs::read(key_path(dir.path())).unwrap().len(), 32);
     }
 
@@ -295,5 +341,88 @@ mod recovery_tests {
             .permissions()
             .mode();
         assert_eq!(mode & 0o777, 0o600);
+    }
+
+    #[test]
+    fn concurrent_initialization_without_hard_links_keeps_one_complete_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let barrier = Arc::new(Barrier::new(12));
+        let threads: Vec<_> = (0..12)
+            .map(|_| {
+                let path = dir.path().to_path_buf();
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    load_or_create_key_with_publisher(&path, |temporary_path, key_path| {
+                        // Every creator has written its own complete temporary
+                        // key before any creator can publish the final file.
+                        barrier.wait();
+                        publish_key_by_rename(temporary_path, key_path)
+                    })
+                    .unwrap()
+                })
+            })
+            .collect();
+        let key = read_keys_after_join(threads);
+        assert_eq!(fs::read(key_path(dir.path())).unwrap(), key);
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 2);
+        let ciphertext = encrypt_secret(dir.path(), "android secret").unwrap();
+        assert_eq!(
+            decrypt_secret(dir.path(), &ciphertext).unwrap(),
+            "android secret"
+        );
+    }
+
+    fn read_keys_after_join(threads: Vec<std::thread::JoinHandle<[u8; 32]>>) -> [u8; 32] {
+        let keys: Vec<_> = threads
+            .into_iter()
+            .map(|thread| thread.join().unwrap())
+            .collect();
+        assert!(keys.iter().all(|key| key == &keys[0]));
+        keys[0]
+    }
+
+    #[test]
+    fn rename_publication_never_overwrites_existing_or_damaged_keys() {
+        for length in [0, 1, 31, 32, 33, 64] {
+            let dir = tempfile::tempdir().unwrap();
+            let original = vec![42; length];
+            let path = key_path(dir.path());
+            fs::write(&path, &original).unwrap();
+            let temporary_path = dir.path().join("new-key.tmp");
+            fs::write(&temporary_path, [17; 32]).unwrap();
+            let error = publish_key_by_rename(&temporary_path, &path).unwrap_err();
+            assert_eq!(error.kind(), ErrorKind::AlreadyExists);
+            assert_eq!(fs::read(&path).unwrap(), original);
+            assert!(temporary_path.exists());
+        }
+    }
+
+    #[test]
+    fn failed_publication_cleans_temporary_key_without_creating_final_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let error = load_or_create_key_with_publisher(dir.path(), |_, _| {
+            Err(std::io::Error::from(ErrorKind::PermissionDenied))
+        })
+        .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+        assert!(!key_path(dir.path()).exists());
+        assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rename_publication_keeps_key_and_lock_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        load_or_create_key_with_publisher(dir.path(), publish_key_by_rename).unwrap();
+        for path in [
+            key_path(dir.path()),
+            dir.path().join("credentials.key.lock"),
+        ] {
+            assert_eq!(
+                fs::metadata(path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
     }
 }

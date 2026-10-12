@@ -30,14 +30,22 @@ function isAvailableFocusTarget(element: HTMLElement): boolean {
   return !element.hasAttribute('disabled')
     && !element.hidden
     && element.getAttribute('aria-hidden') !== 'true'
-    && !element.closest('[inert]')
+    && !element.closest('[inert], [hidden], [aria-hidden="true"]')
+    && !hasHiddenAncestor(element)
     && style.display !== 'none'
     && style.visibility !== 'hidden';
 }
 
+function hasHiddenAncestor(element: HTMLElement): boolean {
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    if (window.getComputedStyle(parent).display === 'none') return true;
+  }
+  return false;
+}
+
 function getFocusableElements(dialog: HTMLElement): HTMLElement[] {
   return Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    .filter(isAvailableFocusTarget);
+    .filter((element) => element.tabIndex >= 0 && isAvailableFocusTarget(element));
 }
 
 /**

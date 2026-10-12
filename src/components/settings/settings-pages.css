@@ -3660,8 +3660,8 @@
 }
 
 .settings-modal .settings-mcp-guide-close {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;

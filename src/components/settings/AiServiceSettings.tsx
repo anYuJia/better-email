@@ -1,10 +1,13 @@
 import {
   KeyRound,
+  LoaderCircle,
   PlugZap,
   Save,
   ShieldAlert,
 } from 'lucide-react';
 import useAiService from '../../hooks/useAiService';
+import { secretDraftLabel } from '../../app/aiServiceConfig';
+import AiSettingsLoadNotice from './AiSettingsLoadNotice';
 import type { MessageToast } from '../MessageToastStack';
 import {
   AnimatedDisclosure,
@@ -28,6 +31,11 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
     patchConfig,
     testing,
     saving,
+    secretsLoaded,
+    loadError,
+    reloadConfig,
+    saveError,
+    testResult,
     saveConfig,
     runTestConnection,
   } = useAiService({ onNotify, serviceType: 'http' });
@@ -35,6 +43,7 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
   const connectorEnabled = config.enabled;
   const providerEndpoint = config.endpoint;
   const providerHasApiKey = config.hasApiKey;
+  const busy = saving || !secretsLoaded;
 
   const handleEnabledChange = (enabled: boolean) => {
     const previousValue = config.enabled;
@@ -42,16 +51,17 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
     // The feature gate is shared with the mail reader, which may live in a
     // different native window. Persist this switch immediately so the reader
     // cannot observe the old disabled value while this page shows it enabled.
-    saveConfig({ enabled }).catch(() => {
+    saveConfig({ enabled }, { persistedOnly: true }).catch(() => {
       patchConfig({ enabled: previousValue });
     });
   };
 
   return (
     <div className="settings-ai-page-stack">
+      <AiSettingsLoadNotice loaded={secretsLoaded} error={loadError} onRetry={reloadConfig} />
       <SettingsSection
         title="AI 功能"
-        description={`用于${AVAILABLE_FEATURES.join('、')}。`}
+        description={`用于${AVAILABLE_FEATURES.join('、')}。${config.serviceType === 'mcp' ? '当前使用 MCP 服务。' : ''}`}
         badge={<SettingsBadge tone={connectorEnabled ? 'info' : 'neutral'}>
           {connectorEnabled ? '已启用' : '未启用'}
         </SettingsBadge>}
@@ -61,7 +71,7 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
           label="启用 AI 功能"
           description="使用时，邮件内容可能会发送到你配置的外部 AI 服务；开关会立即保存。"
           checked={connectorEnabled}
-          disabled={saving}
+          disabled={busy}
           onChange={handleEnabledChange}
         />
       </SettingsSection>
@@ -82,6 +92,7 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
               type="url"
               placeholder="https://api.example.com/v1"
               value={providerEndpoint}
+              disabled={busy}
               onChange={(event) => patchConfig({ endpoint: event.target.value })}
             />
           </SettingsField>
@@ -93,6 +104,7 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
                 type="password"
                 placeholder={providerHasApiKey ? '已保存，留空保持不变' : '输入访问密钥'}
                 value={config.apiKey}
+                disabled={busy}
                 onChange={(event) => patchConfig({ apiKey: event.target.value })}
                 autoComplete="off"
               />
@@ -100,6 +112,7 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
                 <button
                   type="button"
                   className="settings-text-button"
+                  disabled={busy}
                   onClick={() => patchConfig({ clearApiKey: true, hasApiKey: false })}
                 >
                   清除已保存密钥
@@ -107,7 +120,7 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
               ) : (
                 <span className="settings-ai-key-hint">
                   <KeyRound size={12} aria-hidden="true" />
-                  {providerHasApiKey ? '已保存' : '未保存'}
+                  {secretDraftLabel(providerHasApiKey === true, config.apiKey, config.clearApiKey === true)}
                 </span>
               )}
             </div>
@@ -119,6 +132,7 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
               type="text"
               placeholder="gpt-4o-mini"
               value={config.defaultModel}
+              disabled={busy}
               onChange={(event) => patchConfig({ defaultModel: event.target.value })}
             />
           </SettingsField>
@@ -130,6 +144,7 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
             label="允许向此服务发送邮件内容"
             description="确认后才能使用外部服务。"
             checked={config.privacyAcknowledged}
+            disabled={busy}
             onChange={(checked) => patchConfig({ privacyAcknowledged: checked })}
           />
 
@@ -153,6 +168,8 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
                   type="number"
                   min={5}
                   max={300}
+                  step={1}
+                  disabled={busy}
                   value={config.timeoutSeconds}
                   onChange={(event) => patchConfig({ timeoutSeconds: Number(event.target.value) || 30 })}
                 />
@@ -163,20 +180,22 @@ export default function AiServiceSettings({ onNotify = () => undefined }: AiServ
           <div className="st-actions settings-ai-actions">
             <SettingsButton
               onClick={runTestConnection}
-              disabled={testing || !connectorEnabled}
+              disabled={testing || busy || !providerEndpoint.trim()}
             >
-              <PlugZap size={14} />
+              {testing ? <LoaderCircle className="settings-action-spinner" size={14} /> : <PlugZap size={14} />}
               {testing ? '测试中…' : '测试连接'}
             </SettingsButton>
             <SettingsButton
               variant="primary"
               onClick={() => { saveConfig().catch(() => undefined); }}
-              disabled={saving}
+              disabled={busy}
             >
               <Save size={14} />
               {saving ? '保存中…' : '保存设置'}
             </SettingsButton>
           </div>
+          {saveError && <SettingsNotice tone="danger" title="保存失败"><p>{saveError}</p></SettingsNotice>}
+          {testResult && <SettingsNotice tone={testResult.ok ? 'success' : 'danger'} title={testResult.ok ? '连接正常' : '连接失败'}><p>{testResult.message}</p></SettingsNotice>}
 
         </SettingsSection>
       </div>

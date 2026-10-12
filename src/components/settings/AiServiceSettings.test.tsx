@@ -1,8 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AiServiceSettings from './AiServiceSettings';
 import { aiServiceStorageKey } from '../../app/aiServiceConfig';
 import { testAiConnection } from '../../app/aiService';
+import { IPC } from '../../ipc/commands';
+
+const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
+vi.mock('../../tauriBridge', () => ({ invoke: invokeMock }));
 
 vi.mock('../../app/aiService', () => ({
   testAiConnection: vi.fn(),
@@ -15,6 +19,14 @@ function seedConfig(config: Record<string, unknown>) {
 }
 
 describe('AiServiceSettings', () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === IPC.LoadAiSettings) return { configured: false };
+      if (command === IPC.SaveAiSettings) return 'AI 服务设置已保存。';
+      throw new Error(`Unexpected IPC: ${command}`);
+    });
+  });
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
@@ -70,7 +82,7 @@ describe('AiServiceSettings', () => {
     const onNotify = vi.fn();
     seedConfig({ enabled: false, serviceType: 'http' });
     render(<AiServiceSettings onNotify={onNotify} />);
-
+    await waitFor(() => expect((screen.getByRole('checkbox', { name: /启用 AI 功能/ }) as HTMLInputElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole('checkbox', { name: /启用 AI 功能/ }));
 
     await waitFor(() => expect(onNotify).toHaveBeenCalledWith('AI 服务设置已保存。', 'success'));
@@ -86,7 +98,7 @@ describe('AiServiceSettings', () => {
       latencyMs: 0,
     });
     const { rerender } = render(<AiServiceSettings onNotify={onNotify} />);
-
+    await waitFor(() => expect((screen.getByRole('button', { name: /测试连接/ }) as HTMLButtonElement).disabled).toBe(false));
     fireEvent.click(screen.getByRole('button', { name: /测试连接/ }));
     await waitFor(() => expect(onNotify).toHaveBeenCalledWith(
       '测试连接失败：测试连接不能复用已保存密钥到新端点，请先输入本次要测试的 API Key。',

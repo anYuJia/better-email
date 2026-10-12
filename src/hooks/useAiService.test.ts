@@ -37,6 +37,7 @@ describe('useAiService', () => {
     Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
     invokeMock.mockReset();
     vi.mocked(testAiConnection).mockReset();
+    vi.restoreAllMocks();
   });
 
   it.each(['http', 'mcp'] as const)('migrates an enabled local mirror without changing its route on the %s page', async (serviceType) => {
@@ -155,5 +156,98 @@ describe('useAiService', () => {
     const { result } = renderHook(() => useAiService({ serviceType: 'mcp' }));
     await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
     expect(result.current.config.mcpEndpoint).toBe('');
+  });
+
+  it('keeps failed loads locked and allows an explicit retry without writing settings', async () => {
+    invokeMock.mockRejectedValue(new Error('数据库暂时不可用'));
+    const { result } = renderHook(() => useAiService({ serviceType: 'mcp' }));
+    await waitFor(() => expect(result.current.loadError).toContain('数据库暂时不可用'), { timeout: 3000 });
+    expect(result.current.secretsLoaded).toBe(false);
+    await expect(result.current.saveConfig()).rejects.toThrow('尚未读取完成');
+    expect(invokeMock).not.toHaveBeenCalledWith(IPC.SaveAiSettings, expect.anything());
+    invokeMock.mockResolvedValue(report(true));
+    act(() => result.current.reloadConfig());
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+    expect(result.current.loadError).toBeNull();
+  });
+
+  it('clears a submitted token while retaining edits made during the save', async () => {
+    let stored = report(true);
+    let resolveSave!: (message: string) => void;
+    invokeMock.mockImplementation(async (command: string, args?: { input?: Record<string, unknown> }) => {
+      if (command === IPC.LoadAiSettings) return stored;
+      if (command === IPC.SaveAiSettings) {
+        stored = { ...stored, has_api_key: true, model: String(args?.input?.model) };
+        return new Promise((resolve) => { resolveSave = resolve; });
+      }
+    });
+    const { result } = renderHook(() => useAiService({ serviceType: 'http' }));
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+    act(() => result.current.patchConfig({ apiKey: 'submitted-token' }));
+    let pending!: Promise<string>;
+    act(() => { pending = result.current.saveConfig(); });
+    await waitFor(() => expect(resolveSave).toBeTypeOf('function'));
+    act(() => result.current.patchConfig({ defaultModel: 'later-model' }));
+    await act(async () => { resolveSave('已保存'); await pending; });
+    expect(result.current.config.apiKey).toBe('');
+    expect(result.current.config.hasApiKey).toBe(true);
+    expect(result.current.config.defaultModel).toBe('later-model');
+  });
+
+  it('preserves another window’s MCP settings when saving HTTP model edits', async () => {
+    let stored = { ...report(true), service_type: 'mcp', mcp_enabled: true, mcp_endpoint: 'https://old.example/mcp' };
+    invokeMock.mockImplementation(async (command: string) => command === IPC.LoadAiSettings ? stored : '已保存');
+    const { result } = renderHook(() => useAiService({ serviceType: 'http' }));
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+    act(() => result.current.patchConfig({ defaultModel: 'new-model' }));
+    stored = { ...stored, mcp_endpoint: 'https://another-window.example/mcp' };
+    await act(async () => { await result.current.saveConfig(); });
+    expect(invokeMock).toHaveBeenCalledWith(IPC.SaveAiSettings, {
+      input: expect.objectContaining({ model: 'new-model', service_type: 'mcp', mcp_endpoint: 'https://another-window.example/mcp' }),
+    });
+  });
+
+  it('saves the shared AI gate without changing its connector or submitting drafts', async () => {
+    let stored = { ...report(true), service_type: 'mcp', mcp_enabled: true, mcp_endpoint: 'https://example.com/mcp' };
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === IPC.LoadAiSettings) return stored;
+      stored = { ...stored, enabled: false };
+      return '已保存';
+    });
+    const { result } = renderHook(() => useAiService({ serviceType: 'http' }));
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+    act(() => result.current.patchConfig({ apiKey: 'unsaved-token', defaultModel: 'unsaved-model', enabled: false }));
+    await act(async () => { await result.current.saveConfig({ enabled: false }, { persistedOnly: true }); });
+    expect(invokeMock).toHaveBeenCalledWith(IPC.SaveAiSettings, {
+      input: expect.objectContaining({ enabled: false, service_type: 'mcp', api_key: '', model: 'deepseek-v4-flash' }),
+    });
+    expect(result.current.config.apiKey).toBe('unsaved-token');
+    expect(result.current.config.defaultModel).toBe('unsaved-model');
+    expect(result.current.config.enabled).toBe(false);
+  });
+
+  it('does not report a native save as failed when the local mirror is full', async () => {
+    invokeMock.mockImplementation(async (command: string) => command === IPC.LoadAiSettings ? report(true) : '已保存');
+    const onNotify = vi.fn();
+    const { result } = renderHook(() => useAiService({ serviceType: 'http', onNotify }));
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError'); });
+    await act(async () => { await result.current.saveConfig(); });
+    expect(result.current.saveError).toBeNull();
+    expect(onNotify).toHaveBeenCalledWith('已保存', 'success');
+  });
+
+  it('does not show notifications from a connection test after leaving the page', async () => {
+    invokeMock.mockResolvedValue(report(true));
+    let resolveTest!: (result: { ok: boolean; message: string }) => void;
+    vi.mocked(testAiConnection).mockImplementationOnce(() => new Promise((resolve) => { resolveTest = resolve; }));
+    const onNotify = vi.fn();
+    const { result, unmount } = renderHook(() => useAiService({ serviceType: 'http', onNotify }));
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.runTestConnection(); });
+    unmount();
+    await act(async () => { resolveTest({ ok: true, message: '旧页面连接成功' }); await pending; });
+    expect(onNotify).not.toHaveBeenCalled();
   });
 });

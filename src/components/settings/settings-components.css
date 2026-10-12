@@ -793,7 +793,9 @@
   color: var(--st-text);
   cursor: pointer;
   text-align: left;
-  transition: all var(--ui-motion-duration-fast, 150ms) ease;
+  transition: border-color var(--ui-motion-duration-fast, 150ms) ease,
+    background-color var(--ui-motion-duration-fast, 150ms) ease,
+    box-shadow var(--ui-motion-duration-fast, 150ms) ease;
 }
 
 .settings-modal .account-scope-picker-card:hover {

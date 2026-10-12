@@ -96,13 +96,19 @@ export function mergePersistedAiSettings(
 }
 
 /** 从后端读取 AI 设置（密钥只保存在应用本地数据库，不落 localStorage）。 */
-export async function loadAiSettingsFromBackend(): Promise<AiSettingsReport | null> {
+export async function loadAiSettingsFromBackend({ strict = false }: { strict?: boolean } = {}): Promise<AiSettingsReport | null> {
   try {
     const report = await invoke<AiSettingsReport>(IPC.LoadAiSettings);
+    if (!report && strict) throw new Error('暂时无法读取 AI 设置，请重试。');
     return report ?? null;
-  } catch {
+  } catch (error) {
+    if (strict) throw error;
     return null;
   }
+}
+
+export function normalizeAiTimeoutSeconds(value: number): number {
+  return Number.isFinite(value) ? Math.max(5, Math.min(300, Math.floor(value))) : 30;
 }
 
 /**
@@ -134,7 +140,7 @@ export async function saveAiSettingsToBackend(config: AiServiceConfig): Promise<
     // 空值表示「保持现有密钥」；只有用户显式点击清除才删除。
     api_key: config.apiKey,
     model: config.defaultModel.trim() || 'gpt-4o-mini',
-    timeout_seconds: config.timeoutSeconds,
+    timeout_seconds: normalizeAiTimeoutSeconds(config.timeoutSeconds),
     privacy_acknowledged: config.privacyAcknowledged,
     mcp_enabled: config.mcpEnabled === true,
     mcp_endpoint: (config.mcpEndpoint ?? '').trim(),
@@ -185,11 +191,22 @@ export function loadAiServiceConfig(): AiServiceConfig {
 
 /** localStorage 只保留非密钥字段；API Key 由后端应用本地数据库管理。 */
 export function saveAiServiceConfig(config: AiServiceConfig): void {
-  window.localStorage.setItem(aiServiceStorageKey, JSON.stringify(stripSecrets(config)));
+  try {
+    window.localStorage.setItem(aiServiceStorageKey, JSON.stringify(stripSecrets(config)));
+  } catch {
+    // SQLite is authoritative. A full/unavailable mirror must not turn a
+    // successful native save into a reported failure.
+  }
 }
 
 export function maskApiKey(key: string): string {
   if (!key) return '';
   if (key.length <= 8) return '••••';
   return `${key.slice(0, 4)}••••••••${key.slice(-4)}`;
+}
+
+export function secretDraftLabel(hasSaved: boolean, incoming: string, clear: boolean): string {
+  if (clear) return '待清除';
+  if (incoming.trim()) return '待保存';
+  return hasSaved ? '已保存' : '未配置';
 }

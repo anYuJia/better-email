@@ -155,4 +155,32 @@ describe('McpSettings', () => {
     await waitFor(() => expect(screen.getByText('端点已更改，请重新输入 Token')).not.toBeNull());
     expect(screen.getByRole('dialog', { name: '连接 MCP 服务' })).not.toBeNull();
   });
+
+  it('never exposes a newly entered token in the summary or copied connection details', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const { container } = render(<McpSettings />);
+    await waitUntilLoaded();
+    fireEvent.click(screen.getByRole('button', { name: '开始配置' }));
+    fireEvent.change(screen.getByLabelText('访问 Token'), { target: { value: 'private-new-token' } });
+    expect(screen.getByText('待保存')).not.toBeNull();
+    expect(container.querySelector('.settings-mcp-connection-preview')?.textContent).not.toContain('private-new-token');
+    fireEvent.click(screen.getByRole('button', { name: '复制信息' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalled());
+    expect(writeText.mock.calls[0][0]).not.toContain('private-new-token');
+  });
+
+  it('supports Home and End tab navigation and restores keyboard focus after cancellation', async () => {
+    render(<McpSettings />);
+    await waitUntilLoaded();
+    const start = screen.getByRole('button', { name: '开始配置' });
+    start.focus();
+    fireEvent.click(start);
+    fireEvent.keyDown(screen.getByRole('tab', { name: '连接信息' }), { key: 'End' });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('tab', { name: '初始化与提示词' })));
+    fireEvent.keyDown(screen.getByRole('tab', { name: '初始化与提示词' }), { key: 'Home' });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('tab', { name: '连接信息' })));
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    await waitFor(() => expect(document.activeElement).toBe(start));
+  });
 });

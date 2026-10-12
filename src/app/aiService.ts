@@ -5,7 +5,7 @@ import type {
   AiServiceConfig,
   AiTestConnectionResult,
 } from './types/ai';
-import { loadEffectiveAiServiceConfig } from './aiServiceConfig';
+import { loadEffectiveAiServiceConfig, normalizeAiTimeoutSeconds } from './aiServiceConfig';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
 
@@ -67,7 +67,7 @@ async function requestExternal(
     endpoint: (isMcp ? config.mcpEndpoint ?? '' : config.endpoint).trim(),
     api_key: isMcp ? config.mcpApiKey ?? '' : config.apiKey,
     model: config.defaultModel.trim() || 'gpt-4o-mini',
-    timeout_seconds: config.timeoutSeconds,
+    timeout_seconds: normalizeAiTimeoutSeconds(config.timeoutSeconds),
     service_type: config.serviceType,
   };
   const result = await invoke<AiRequestResult>(IPC.AiRequest, { input });
@@ -127,7 +127,7 @@ export async function testAiConnection(config: AiServiceConfig): Promise<AiTestC
         apiKey: isMcp ? config.mcpApiKey ?? '' : config.apiKey,
         clearApiKey: isMcp ? config.clearMcpApiKey === true : config.clearApiKey === true,
         model: config.defaultModel.trim() || 'gpt-4o-mini',
-        timeoutSeconds: config.timeoutSeconds,
+        timeoutSeconds: normalizeAiTimeoutSeconds(config.timeoutSeconds),
       },
     );
     if (report.service_type !== config.serviceType || isOfflineAiResult(report.message)) {

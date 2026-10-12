@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { WebSocket as UndiciWebSocket } from 'undici';
 import { testInitialHeaderLayout } from './ui-header-layout.mjs';
+import { testMcpGuideLayouts } from './ui-mcp-settings.mjs';
 
 function resolveCdpWebSocket() {
   if (typeof globalThis.WebSocket === 'function') {
@@ -3058,8 +3059,12 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide[role=\"dialog\"]') && document.querySelector('.settings-mcp-guide #settings-mcp-endpoint')");
     await fillInput(cdp, '#settings-mcp-endpoint', 'https://mcp.smoke.example/mcp');
     await fillInput(cdp, '#settings-mcp-token', 'smoke-token');
+    await withStep('MCP guide responsive, theme and text scaling matrix', () => testMcpGuideLayouts(cdp, {
+      evaluate: evalInPage, viewport: setUiViewport, fill: fillInput, wait: waitForExpression, screenshot: captureScreenshot,
+    }));
     await clickButton(cdp, '初始化与提示词', "document.querySelector('.settings-mcp-guide')");
     await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide [role=\"tabpanel\"] textarea[aria-label=\"初始化连接提示词\"]')?.value.includes('notifications/initialized')");
+    await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide').getAnimations({subtree:true}).every(animation => animation.playState === 'finished')");
     await captureScreenshot(cdp, 'settings-mcp-guide-prompts');
     await clickButton(cdp, '连接信息', "document.querySelector('.settings-mcp-guide')");
     await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide [role=\"tabpanel\"] #settings-mcp-endpoint')?.value === 'https://mcp.smoke.example/mcp'");

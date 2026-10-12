@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AiServiceConfig, AiServiceType, AiTestConnectionResult } from '../app/types/ai';
 import {
   defaultAiServiceConfig,
@@ -37,7 +37,6 @@ type UseAiServiceOptions = {
 
 async function migrateLocalAiSettingsToBackend(
   initialReport: Awaited<ReturnType<typeof loadAiSettingsFromBackend>>,
-  serviceType?: AiServiceType,
 ): Promise<Awaited<ReturnType<typeof loadAiSettingsFromBackend>>> {
   if (!isNativeAiRuntime()) return initialReport;
 
@@ -50,13 +49,15 @@ async function migrateLocalAiSettingsToBackend(
   for (const delayMs of AI_SETTINGS_MIGRATION_DELAYS_MS) {
     await waitForAiSettingsMigrationRetry(delayMs);
     try {
+      // A failed read is not an empty store. Confirm the backend has no row
+      // before migrating a possibly stale mirror after startup recovers.
+      const latest = await loadAiSettingsFromBackend();
+      if (!latest) continue;
+      if (hasPersistedAiSettings(latest)) return latest;
       // Older native builds only wrote the non-secret mirror to localStorage.
       // Persist that preference into the shared SQLite store so the Rust
       // request gate and a second native window see the same enabled value.
-      await saveAiSettingsToBackend({
-        ...localConfig,
-        ...(serviceType ? { serviceType } : {}),
-      });
+      await saveAiSettingsToBackend(localConfig);
       report = await loadAiSettingsFromBackend();
       if (report && hasPersistedAiSettings(report)) return report;
     } catch {
@@ -74,6 +75,9 @@ export default function useAiService({ setStatus, onNotify, serviceType }: UseAi
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [secretsLoaded, setSecretsLoaded] = useState(false);
+  const revisionRef = useRef(0);
+  const testingRef = useRef(false);
+  const savingRef = useRef(false);
 
   const requestConfig = useMemo(() => (
     serviceType && config.serviceType !== serviceType
@@ -89,23 +93,31 @@ export default function useAiService({ setStatus, onNotify, serviceType }: UseAi
     setStatus?.(message);
   }, [onNotify, setStatus]);
 
-  // 从后端本地数据库恢复设置，不回写 localStorage。
+  // 从后端本地数据库恢复设置，localStorage 只同步已保存的非密钥字段。
   // 后端刻意不把 AI 密钥放入系统凭据库，打开设置页不会触发任何 Keychain 访问。
   // 后端绝不回传完整密钥：只返回 has_api_key 标志，apiKey 输入框保持空值表示
   // 「保持现有密钥」，保存时后端会保留已存密钥。
   useEffect(() => {
     let cancelled = false;
+    const initialRevision = revisionRef.current;
+    const hydrate = (report: NonNullable<Awaited<ReturnType<typeof loadAiSettingsFromBackend>>>) => {
+      setConfig((current) => {
+        const persisted = mergePersistedAiSettings(current, report);
+        saveAiServiceConfig(persisted);
+        return revisionRef.current === initialRevision ? persisted : current;
+      });
+    };
     loadAiSettingsFromBackend()
       .then(async (report) => {
         if (cancelled) return;
         // A fresh/mock backend can legitimately have no settings row. Do not
         // replace a recoverable local configuration with its empty defaults.
         if (report && hasPersistedAiSettings(report)) {
-          setConfig((current) => mergePersistedAiSettings(current, report));
+          hydrate(report);
         } else {
-          const migratedReport = await migrateLocalAiSettingsToBackend(report, serviceType);
+          const migratedReport = await migrateLocalAiSettingsToBackend(report);
           if (!cancelled && migratedReport && hasPersistedAiSettings(migratedReport)) {
-            setConfig((current) => mergePersistedAiSettings(current, migratedReport));
+            hydrate(migratedReport);
           }
         }
         if (!cancelled) setSecretsLoaded(true);
@@ -118,26 +130,31 @@ export default function useAiService({ setStatus, onNotify, serviceType }: UseAi
     };
   }, [serviceType]);
 
-  // Hydrate first, then mirror non-secret fields to localStorage. Writing the
-  // initial state before the backend response arrived used to overwrite the
-  // last recoverable values in a second settings window.
-  useEffect(() => {
-    if (!secretsLoaded) return;
-    saveAiServiceConfig(config);
-  }, [config, secretsLoaded]);
+  // localStorage mirrors persisted settings only; cancelled guide drafts must
+  // never become the runtime configuration in another window.
 
   const maskedApiKey = useMemo(() => maskApiKey(config.apiKey), [config.apiKey]);
 
   const patchConfig = useCallback((patch: Partial<AiServiceConfig>) => {
-    setConfig((current) => ({ ...current, ...patch }));
+    revisionRef.current += 1;
+    setConfig((current) => ({
+      ...current,
+      ...patch,
+      ...(patch.apiKey?.trim() ? { clearApiKey: false } : {}),
+      ...(patch.mcpApiKey?.trim() ? { clearMcpApiKey: false } : {}),
+    }));
     setTestResult(null);
     setSaveError(null);
   }, []);
 
   const runTestConnection = useCallback(async () => {
+    if (testingRef.current) return;
+    testingRef.current = true;
+    const revision = revisionRef.current;
     setTesting(true);
     try {
       const result = await testAiConnection(requestConfig);
+      if (revisionRef.current !== revision) return;
       setTestResult(result);
       const message = result.ok || /^测试连接失败/.test(result.message)
         ? result.message
@@ -147,11 +164,14 @@ export default function useAiService({ setStatus, onNotify, serviceType }: UseAi
         result.ok ? 'success' : 'error',
       );
     } finally {
+      testingRef.current = false;
       setTesting(false);
     }
   }, [notify, requestConfig]);
 
   const saveConfig = useCallback(async (overrides: Partial<AiServiceConfig> = {}) => {
+    if (savingRef.current) throw new Error('设置正在保存，请稍候。');
+    savingRef.current = true;
     setSaving(true);
     setSaveError(null);
     const configToSave: AiServiceConfig = {
@@ -159,18 +179,28 @@ export default function useAiService({ setStatus, onNotify, serviceType }: UseAi
       ...overrides,
       ...(serviceType ? { serviceType } : {}),
     };
+    if (configToSave.serviceType === 'mcp' && configToSave.mcpEnabled !== true) {
+      configToSave.serviceType = 'http';
+    }
+    const revision = revisionRef.current;
     try {
       const message = await saveAiSettingsToBackend(configToSave);
       const persisted = await loadAiSettingsFromBackend();
       // 清除标记只发一次；保存成功后复位，避免 localStorage/下次保存误清。
-      setConfig((current) => ({
-        ...current,
-        ...overrides,
-        ...(persisted && hasPersistedAiSettings(persisted) ? mergePersistedAiSettings(current, persisted) : {}),
-        ...(serviceType ? { serviceType } : {}),
+      const saved = {
+        ...(persisted && hasPersistedAiSettings(persisted)
+          ? mergePersistedAiSettings(configToSave, persisted) : {
+            ...configToSave,
+            hasApiKey: !configToSave.clearApiKey && (Boolean(configToSave.apiKey.trim()) || configToSave.hasApiKey === true),
+            hasMcpApiKey: !configToSave.clearMcpApiKey && (Boolean(configToSave.mcpApiKey?.trim()) || configToSave.hasMcpApiKey === true),
+          }),
+        apiKey: '',
+        mcpApiKey: '',
         clearApiKey: false,
         clearMcpApiKey: false,
-      }));
+      };
+      saveAiServiceConfig(saved);
+      setConfig((current) => revisionRef.current === revision ? saved : current);
       notify(message, 'success');
       return message;
     } catch (error) {
@@ -180,6 +210,7 @@ export default function useAiService({ setStatus, onNotify, serviceType }: UseAi
       notify(message, 'error');
       throw error;
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }, [notify, requestConfig, serviceType]);

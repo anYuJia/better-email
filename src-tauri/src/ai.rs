@@ -5,7 +5,8 @@ use std::time::Duration;
 const MAX_AI_CONTENT_CHARS: usize = 60_000;
 /// AI/MCP HTTP 响应读取上限：防止恶意服务端返回超大响应把应用内存打满。
 const MAX_AI_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
-const MCP_PROTOCOL_VERSION: &str = "2025-03-26";
+const MCP_PROTOCOL_VERSION: &str = "2025-06-18";
+const MCP_SUPPORTED_VERSIONS: &[&str] = &["2025-03-26", MCP_PROTOCOL_VERSION];
 
 #[derive(Debug, Deserialize)]
 pub struct AiChatRequest {
@@ -324,13 +325,15 @@ struct McpClient {
     agent: ureq::Agent,
     next_id: u64,
     session_id: Option<String>,
+    protocol_version: Option<String>,
+    deadline: std::time::Instant,
 }
 
 impl McpClient {
     fn new(endpoint: &str, api_key: &str, timeout_seconds: u64) -> Result<Self, String> {
         let validated = validate_ai_endpoint(endpoint)?;
         Ok(Self {
-            endpoint: validated.trim_end_matches('/').to_string(),
+            endpoint: validated,
             api_key: api_key.trim().to_string(),
             agent: ureq::Agent::config_builder()
                 .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
@@ -340,6 +343,9 @@ impl McpClient {
                 .new_agent(),
             next_id: 1,
             session_id: None,
+            protocol_version: None,
+            deadline: std::time::Instant::now()
+                + Duration::from_secs(timeout_seconds.clamp(5, 300)),
         })
     }
 
@@ -363,13 +369,58 @@ impl McpClient {
             serde_json::json!({
                 "protocolVersion": MCP_PROTOCOL_VERSION,
                 "capabilities": {},
-                "clientInfo": { "name": "better-email", "version": "1.0.0" },
+                "clientInfo": { "name": "better-email", "version": env!("CARGO_PKG_VERSION") },
             }),
         )?;
-        if payload.get("result").is_none() {
-            return Err("MCP 初始化响应缺少 result。".to_string());
+        let result = &payload["result"];
+        let version = result["protocolVersion"]
+            .as_str()
+            .ok_or_else(|| "MCP 初始化响应缺少 protocolVersion。".to_string())?;
+        if !MCP_SUPPORTED_VERSIONS.contains(&version) {
+            return Err(format!("MCP 服务协议版本 {version} 不受支持；请使用 Streamable HTTP（2025-03-26 或 2025-06-18）。"));
         }
+        if !result["capabilities"]["tools"].is_object() {
+            return Err("MCP 服务未声明 tools 能力，无法提供邮件处理工具。".to_string());
+        }
+        self.protocol_version = Some(version.to_string());
         self.notify("notifications/initialized", serde_json::json!({}))
+    }
+
+    fn list_tools(&mut self) -> Result<Vec<serde_json::Value>, String> {
+        let mut tools = Vec::new();
+        let mut cursors = std::collections::HashSet::new();
+        let mut params = serde_json::json!({});
+        for _ in 0..32 {
+            let payload = self.call("tools/list", params)?;
+            let page = payload["result"]["tools"]
+                .as_array()
+                .ok_or_else(|| "MCP tools/list 响应缺少 tools 列表。".to_string())?;
+            for tool in page {
+                if tool["name"].as_str().is_none_or(str::is_empty)
+                    || !tool["inputSchema"].is_object()
+                {
+                    return Err("MCP tools/list 返回了无效的工具定义。".to_string());
+                }
+            }
+            tools.extend(page.iter().cloned());
+            if tools.len() > 1024 {
+                return Err("MCP 工具列表超过大小上限。".to_string());
+            }
+            match payload["result"].get("nextCursor") {
+                None => return Ok(tools),
+                Some(cursor) => {
+                    let cursor = cursor
+                        .as_str()
+                        .filter(|value| !value.is_empty())
+                        .ok_or_else(|| "MCP 工具分页游标无效。".to_string())?;
+                    if !cursors.insert(cursor.to_string()) {
+                        return Err("MCP 工具分页游标重复，已停止读取。".to_string());
+                    }
+                    params = serde_json::json!({ "cursor": cursor });
+                }
+            }
+        }
+        Err("MCP 工具分页超过上限，已停止读取。".to_string())
     }
 
     fn request(
@@ -386,13 +437,23 @@ impl McpClient {
         if let Some(id) = id {
             body["id"] = serde_json::json!(id);
         }
+        let remaining = self
+            .deadline
+            .checked_duration_since(std::time::Instant::now())
+            .filter(|remaining| !remaining.is_zero())
+            .ok_or_else(|| "MCP 请求已超时，请检查服务状态或增加超时时间。".to_string())?;
 
         let mut request = self
             .agent
             .post(&self.endpoint)
+            .config()
+            .timeout_global(Some(remaining))
+            .build()
             .header("Content-Type", "application/json")
-            .header("Accept", "application/json, text/event-stream")
-            .header("MCP-Protocol-Version", MCP_PROTOCOL_VERSION);
+            .header("Accept", "application/json, text/event-stream");
+        if let Some(version) = self.protocol_version.as_deref() {
+            request = request.header("MCP-Protocol-Version", version);
+        }
         if let Some(session_id) = self.session_id.as_deref() {
             request = request.header("Mcp-Session-Id", session_id);
         }
@@ -405,47 +466,56 @@ impl McpClient {
             .send(payload)
             .map_err(|error| format!("MCP 服务请求失败：{error}"))?;
         let status = response.status();
-        let response_session_id = response
-            .headers()
-            .get("Mcp-Session-Id")
-            .and_then(|value| value.to_str().ok())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(ToOwned::to_owned);
         let content_type = response
             .headers()
             .get("content-type")
             .and_then(|value| value.to_str().ok())
             .map(str::to_owned);
-        let raw_body = crate::http::read_response_capped(
-            response.body_mut().as_reader(),
-            MAX_AI_RESPONSE_BYTES,
-        )?;
-        if response_session_id.is_some() {
-            self.session_id = response_session_id;
-        }
-
         if !status.is_success() {
+            let raw_body = crate::http::read_response_capped(
+                response.body_mut().as_reader(),
+                MAX_AI_RESPONSE_BYTES,
+            )?;
             let detail = json_error_message(&raw_body)
                 .map(|message| format!("：{message}"))
                 .unwrap_or_default();
-            return Err(format!("MCP 服务返回 HTTP {status}{detail}"));
+            let hint = match status.as_u16() {
+                401 | 403 => "；请检查访问 Token 或服务端授权方式。",
+                404 | 405 => "；请填写 Streamable HTTP 端点；旧版 HTTP+SSE 和 stdio 暂不支持。",
+                _ => "",
+            };
+            return Err(format!("MCP 服务返回 HTTP {status}{detail}{hint}"));
+        }
+        if method == "initialize" {
+            if let Some(header) = response.headers().get("Mcp-Session-Id") {
+                let session_id = header
+                    .to_str()
+                    .map_err(|_| "MCP 服务返回了无效的会话 ID。".to_string())?;
+                if session_id.is_empty()
+                    || !session_id.bytes().all(|byte| (0x21..=0x7e).contains(&byte))
+                {
+                    return Err("MCP 服务返回了无效的会话 ID。".to_string());
+                }
+                self.session_id = Some(session_id.to_string());
+            }
         }
         // JSON-RPC notifications deliberately do not have a response body. A
         // compliant Streamable HTTP server may return 202 or 204 here.
         if id.is_none() {
             return Ok(serde_json::Value::Null);
         }
-        let payload = parse_json_rpc_body(&raw_body, content_type.as_deref())?;
         let expected_id = id.expect("response id is present for a request");
-        if payload.get("id").and_then(|value| value.as_u64()) != Some(expected_id) {
-            return Err(format!("MCP 服务响应 id 不匹配（期望 {expected_id}）。"));
-        }
-        if payload.get("error").is_some() {
-            let message = json_error_message(&raw_body).unwrap_or_else(|| "未知错误".to_string());
-            return Err(format!("MCP 服务错误：{message}"));
-        }
-        Ok(payload)
+        let payload = if is_sse_content_type(content_type.as_deref()) {
+            read_sse_rpc(response.body_mut().as_reader(), expected_id)?
+        } else {
+            let raw_body = crate::http::read_response_capped(
+                response.body_mut().as_reader(),
+                MAX_AI_RESPONSE_BYTES,
+            )?;
+            serde_json::from_str(&raw_body)
+                .map_err(|error| format!("MCP 服务响应解析失败：{error}"))?
+        };
+        validate_rpc_response(payload, expected_id)
     }
 }
 
@@ -466,91 +536,250 @@ fn json_error_message(raw_body: &str) -> Option<String> {
     })
 }
 
-fn parse_json_rpc_body(
-    raw_body: &str,
-    content_type: Option<&str>,
-) -> Result<serde_json::Value, String> {
-    let is_event_stream = content_type
+fn is_sse_content_type(content_type: Option<&str>) -> bool {
+    content_type
         .and_then(|value| value.split(';').next())
         .map(|value| value.trim().eq_ignore_ascii_case("text/event-stream"))
-        .unwrap_or(false);
-    if !is_event_stream {
-        return serde_json::from_str(raw_body)
-            .map_err(|error| format!("MCP 服务响应解析失败：{error}"));
-    }
+        .unwrap_or(false)
+}
 
-    let mut last_error = None;
-    for event in raw_body.split("\n\n") {
-        let data = event
-            .lines()
-            .filter_map(|line| line.strip_prefix("data:"))
-            .map(str::trim_start)
-            .collect::<Vec<_>>()
-            .join("\n");
-        if data.is_empty() || data == "[DONE]" {
+/// 逐行读取 SSE：收到对应请求的完整事件就返回，不能等持续流关闭。
+/// 大小限制覆盖整个流（包括注释、进度通知与不匹配的响应）。
+fn read_sse_rpc(reader: impl std::io::Read, expected_id: u64) -> Result<serde_json::Value, String> {
+    use std::io::{BufReader, Read};
+    let mut reader = BufReader::new(reader);
+    let mut line = Vec::new();
+    let mut data = String::new();
+    let mut byte = [0_u8; 1];
+    let mut skip_lf = false;
+    let mut first_line = true;
+    let mut mismatched = false;
+    let mut total = 0_u64;
+    while reader
+        .read(&mut byte)
+        .map_err(|error| format!("MCP SSE 响应读取失败：{error}"))?
+        != 0
+    {
+        total += 1;
+        if total > MAX_AI_RESPONSE_BYTES {
+            return Err("MCP 服务响应超过大小上限，已拒绝读取。".to_string());
+        }
+        if skip_lf && byte[0] == b'\n' {
+            skip_lf = false;
             continue;
         }
-        match serde_json::from_str(&data) {
-            Ok(payload) => return Ok(payload),
-            Err(error) => last_error = Some(error.to_string()),
+        skip_lf = byte[0] == b'\r';
+        if byte[0] != b'\n' && byte[0] != b'\r' {
+            line.push(byte[0]);
+            continue;
+        }
+        let text =
+            std::str::from_utf8(&line).map_err(|_| "MCP SSE 响应不是有效的 UTF-8。".to_string())?;
+        let text = if first_line {
+            text.trim_start_matches('\u{feff}')
+        } else {
+            text
+        };
+        first_line = false;
+        if text.is_empty() {
+            if !data.is_empty() {
+                let payload: serde_json::Value = serde_json::from_str(data.trim_end_matches('\n'))
+                    .map_err(|error| format!("MCP SSE 事件解析失败：{error}"))?;
+                // 进度通知和其他请求的响应可以先于本次响应到达。
+                if payload.get("id").and_then(|id| id.as_u64()) == Some(expected_id)
+                    && payload.get("method").is_none()
+                {
+                    return Ok(payload);
+                }
+                mismatched |= payload.get("id").is_some();
+                data.clear();
+            }
+        } else if let Some(value) = text.strip_prefix("data:") {
+            data.push_str(value.strip_prefix(' ').unwrap_or(value));
+            data.push('\n');
+        }
+        line.clear();
+    }
+    if mismatched {
+        Err(format!("MCP 服务响应 id 不匹配（期望 {expected_id}）。"))
+    } else {
+        Err(format!(
+            "MCP SSE 流结束前未收到请求 {expected_id} 的完整响应。"
+        ))
+    }
+}
+
+fn validate_rpc_response(
+    payload: serde_json::Value,
+    expected_id: u64,
+) -> Result<serde_json::Value, String> {
+    if payload["jsonrpc"] != "2.0" || payload.get("method").is_some() {
+        return Err("MCP 服务响应不是有效的 JSON-RPC 2.0 响应。".to_string());
+    }
+    if payload["id"].as_u64() != Some(expected_id) {
+        return Err(format!("MCP 服务响应 id 不匹配（期望 {expected_id}）。"));
+    }
+    if payload.get("result").is_some() == payload.get("error").is_some() {
+        return Err("MCP 服务响应必须包含 result 或 error 其中之一。".to_string());
+    }
+    if let Some(error) = payload.get("error") {
+        let message = error["message"].as_str().unwrap_or("未知错误");
+        let short: String = message.chars().take(500).collect();
+        return Err(format!("MCP 服务错误：{short}"));
+    }
+    if !payload["result"].is_object() {
+        return Err("MCP 服务响应 result 不是有效的对象。".to_string());
+    }
+    Ok(payload)
+}
+
+fn supported_tool_names(operation: &str) -> &[&str] {
+    match operation {
+        "translate" => &["translate_message", "translate"],
+        "generate_template" => &["generate_template"],
+        "summarize" => &["summarize_message", "summarize"],
+        _ => &[],
+    }
+}
+
+fn mcp_arguments(
+    operation: &str,
+    text: &str,
+    target_language: &str,
+    prompt: &str,
+) -> serde_json::Value {
+    match operation {
+        "translate" => serde_json::json!({
+            "text": text,
+            "target_language": if target_language.trim().is_empty() { "中文" } else { target_language.trim() },
+        }),
+        "generate_template" => serde_json::json!({
+            "prompt": if prompt.trim().is_empty() { "写一封通用商务邮件模板。" } else { prompt.trim() },
+        }),
+        _ => serde_json::json!({ "text": text }),
+    }
+}
+
+fn validate_tool_arguments(
+    tool: &serde_json::Value,
+    arguments: &serde_json::Value,
+) -> Result<(), String> {
+    let schema = &tool["inputSchema"];
+    if schema["type"] != "object" {
+        return Err("工具 inputSchema 必须为 object。".to_string());
+    }
+    if let Some(required) = schema.get("required") {
+        let required = required
+            .as_array()
+            .ok_or_else(|| "工具 required 定义无效。".to_string())?;
+        for field in required {
+            let field = field
+                .as_str()
+                .ok_or_else(|| "工具 required 字段无效。".to_string())?;
+            if arguments.get(field).is_none() {
+                return Err(format!("工具需要 Better Email 未提供的参数 {field}。"));
+            }
         }
     }
-    Err(format!(
-        "MCP 服务 SSE 响应解析失败：{}",
-        last_error.unwrap_or_else(|| "未找到 data 事件".to_string())
-    ))
+    for (name, value) in arguments.as_object().expect("tool arguments are objects") {
+        let property = schema["properties"].get(name);
+        if property.is_none() && schema["additionalProperties"] == false {
+            return Err(format!("工具不接受参数 {name}。"));
+        }
+        if let Some(property) = property {
+            if let Some(kind) = property.get("type") {
+                if kind != "string"
+                    && !kind
+                        .as_array()
+                        .is_some_and(|types| types.iter().any(|kind| kind == "string"))
+                {
+                    return Err(format!("工具参数 {name} 不接受文本。"));
+                }
+            }
+            if let Some(choices) = property.get("enum").and_then(|choices| choices.as_array()) {
+                if !choices.contains(value) {
+                    return Err(format!("工具参数 {name} 不接受当前值。"));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn mcp_result_content(result: &serde_json::Value) -> Option<String> {
-    if let Some(text) = result.get("text").and_then(|value| value.as_str()) {
+    if let Some(text) = result
+        .get("text")
+        .and_then(|value| value.as_str())
+        .filter(|text| !text.trim().is_empty())
+    {
         return Some(text.to_string());
     }
     if let Some(content) = result.get("content").and_then(|value| value.as_array()) {
         let mut parts = Vec::new();
         for item in content {
-            if let Some(text) = item.get("text").and_then(|value| value.as_str()) {
+            if let Some(text) = item
+                .get("text")
+                .and_then(|value| value.as_str())
+                .filter(|text| !text.trim().is_empty())
+            {
                 parts.push(text.to_string());
-            } else if let Ok(serialized) = serde_json::to_string(item) {
-                parts.push(serialized);
+            } else if item["type"] == "resource" {
+                if let Some(text) = item["resource"]["text"]
+                    .as_str()
+                    .filter(|text| !text.trim().is_empty())
+                {
+                    parts.push(text.to_string());
+                }
             }
         }
         if !parts.is_empty() {
             return Some(parts.join("\n"));
         }
     }
-    if let Some(string) = result.as_str() {
-        return Some(string.to_string());
+    if let Some(structured) = result.get("structuredContent") {
+        for field in ["text", "content", "translation", "summary", "template"] {
+            if let Some(text) = structured[field]
+                .as_str()
+                .filter(|text| !text.trim().is_empty())
+            {
+                return Some(text.to_string());
+            }
+        }
     }
     None
 }
 
 pub fn run_mcp_tool_call(input: &AiRequestInput) -> Result<AiRequestResult, String> {
     let started_at = std::time::Instant::now();
+    let tool_names = supported_tool_names(&input.operation);
+    if tool_names.is_empty() {
+        return Err(format!("不支持的 MCP 邮件操作：{}。", input.operation));
+    }
     let endpoint = input.endpoint.trim();
     if endpoint.is_empty() {
         return Err("MCP 服务地址为空，请先在设置中配置。".to_string());
     }
     let mut client = McpClient::new(endpoint, &input.api_key, input.timeout_seconds.max(5))?;
     client.initialize()?;
-    let tool_names: Vec<&str> = match input.operation.as_str() {
-        "translate" => vec!["translate_message", "translate"],
-        "generate_template" => vec!["generate_template"],
-        "summarize" => vec!["summarize_message", "summarize"],
-        _ => vec!["chat"],
-    };
-    let arguments = match input.operation.as_str() {
-        "translate" => serde_json::json!({
-            "text": input.text,
-            "target_language": if input.target_language.trim().is_empty() { "中文" } else { input.target_language.trim() },
-        }),
-        "generate_template" => serde_json::json!({
-            "prompt": if input.prompt.trim().is_empty() { "写一封通用商务邮件模板。" } else { input.prompt.trim() },
-        }),
-        "summarize" => serde_json::json!({ "text": input.text }),
-        _ => serde_json::json!({ "text": input.text, "prompt": input.prompt }),
-    };
+    let tools = client.list_tools()?;
+    let arguments = mcp_arguments(
+        &input.operation,
+        &input.text,
+        &input.target_language,
+        &input.prompt,
+    );
     let mut last_error = String::new();
     for tool_name in tool_names {
+        let Some(tool) = tools
+            .iter()
+            .find(|tool| tool["name"].as_str() == Some(tool_name))
+        else {
+            continue;
+        };
+        if let Err(error) = validate_tool_arguments(tool, &arguments) {
+            last_error = format!("MCP 工具 {tool_name} 参数不兼容：{error}");
+            continue;
+        }
         match client.call(
             "tools/call",
             serde_json::json!({ "name": tool_name, "arguments": arguments }),
@@ -559,14 +788,20 @@ pub fn run_mcp_tool_call(input: &AiRequestInput) -> Result<AiRequestResult, Stri
                 let result = payload.get("result");
                 if result
                     .and_then(|value| value.get("isError"))
+                    .is_some_and(|value| !value.is_boolean())
+                {
+                    return Err(format!("MCP 工具 {tool_name} 返回的 isError 标记无效。"));
+                }
+                if result
+                    .and_then(|value| value.get("isError"))
                     .and_then(|value| value.as_bool())
                     == Some(true)
                 {
                     let detail = result
                         .and_then(mcp_result_content)
+                        .map(|detail| detail.chars().take(500).collect::<String>())
                         .unwrap_or_else(|| "工具返回错误".to_string());
-                    last_error = format!("MCP 工具 {tool_name} 调用失败：{detail}");
-                    continue;
+                    return Err(format!("MCP 工具 {tool_name} 调用失败：{detail}"));
                 }
                 if let Some(content) = result.and_then(mcp_result_content) {
                     let truncated = content.chars().count() > MAX_AI_CONTENT_CHARS;
@@ -582,15 +817,20 @@ pub fn run_mcp_tool_call(input: &AiRequestInput) -> Result<AiRequestResult, Stri
                         latency_ms: started_at.elapsed().as_millis().min(u64::MAX as u128) as u64,
                     });
                 }
-                last_error = format!("MCP 工具 {tool_name} 未返回可用文本内容。");
+                return Err(format!("MCP 工具 {tool_name} 未返回可用文本内容。"));
             }
             Err(error) => {
-                last_error = format!("MCP 工具 {tool_name} 调用失败：{error}");
+                // 网络异常可能发生在服务端已执行后，不自动重试其他别名。
+                return Err(format!("MCP 工具 {tool_name} 调用失败：{error}"));
             }
         }
     }
     Err(if last_error.is_empty() {
-        "MCP 服务没有可用的翻译/模板工具。".to_string()
+        format!(
+            "MCP 服务未提供 {} 所需的工具（{}）。",
+            input.operation,
+            tool_names.join(" / ")
+        )
     } else {
         last_error
     })
@@ -608,10 +848,33 @@ pub fn test_ai_connection(
         "mcp" => {
             let mut client = McpClient::new(endpoint, api_key, timeout_seconds.max(5))?;
             client.initialize()?;
+            let tools = client.list_tools()?;
+            let operations = [
+                ("translate", "翻译"),
+                ("summarize", "摘要"),
+                ("generate_template", "模板"),
+            ]
+            .into_iter()
+            .filter_map(|(operation, label)| {
+                let arguments = mcp_arguments(operation, "", "中文", "");
+                tools
+                    .iter()
+                    .any(|tool| {
+                        supported_tool_names(operation)
+                            .iter()
+                            .any(|name| tool["name"].as_str() == Some(name))
+                            && validate_tool_arguments(tool, &arguments).is_ok()
+                    })
+                    .then_some(label)
+            })
+            .collect::<Vec<_>>();
+            if operations.is_empty() {
+                return Err("MCP 连接已建立，但服务没有提供名称与参数兼容的邮件工具（translate_message / translate、summarize_message / summarize、generate_template）。".to_string());
+            }
             Ok(AiConnectionReport {
                 ok: true,
                 service_type: "mcp".to_string(),
-                message: "MCP 服务连接正常。".to_string(),
+                message: format!("MCP 服务连接正常，可用功能：{}。", operations.join("、")),
                 latency_ms: started_at.elapsed().as_millis().min(u64::MAX as u128) as u64,
             })
         }
@@ -654,10 +917,10 @@ mod tests {
     use std::thread::JoinHandle;
     use std::time::Duration;
 
-    type TestResponse = (u16, Vec<(&'static str, &'static str)>, String);
-    type CapturedRequest = (String, Value);
+    pub(super) type TestResponse = (u16, Vec<(&'static str, &'static str)>, String);
+    pub(super) type CapturedRequest = (String, Value);
 
-    fn read_request(stream: &mut TcpStream) -> CapturedRequest {
+    pub(super) fn read_request(stream: &mut TcpStream) -> CapturedRequest {
         stream
             .set_read_timeout(Some(Duration::from_secs(2)))
             .expect("set request read timeout");
@@ -693,7 +956,7 @@ mod tests {
         (headers, body)
     }
 
-    fn spawn_mcp_test_server(
+    pub(super) fn spawn_mcp_test_server(
         responses: Vec<TestResponse>,
     ) -> (String, JoinHandle<Vec<CapturedRequest>>) {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind MCP test server");
@@ -731,7 +994,7 @@ mod tests {
         (endpoint, handle)
     }
 
-    fn mcp_input(endpoint: &str, operation: &str) -> AiRequestInput {
+    pub(super) fn mcp_input(endpoint: &str, operation: &str) -> AiRequestInput {
         AiRequestInput {
             operation: operation.to_string(),
             text: "hello".to_string(),
@@ -822,31 +1085,50 @@ mod tests {
         assert!(ftp.unwrap_err().contains("https:// 或 http://"));
     }
 
+    pub(super) fn tool_list_response(id: u64, names: &[&str]) -> TestResponse {
+        (
+            200,
+            vec![("Content-Type", "application/json")],
+            serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "result": { "tools": names.iter().map(|name| serde_json::json!({
+                    "name": name,
+                    "inputSchema": { "type": "object", "properties": {
+                        "text": { "type": "string" }, "target_language": { "type": "string" },
+                        "prompt": { "type": "string" }
+                    } }
+                })).collect::<Vec<_>>() }
+            })
+            .to_string(),
+        )
+    }
+
+    pub(super) fn initialize_response(version: &str) -> TestResponse {
+        (
+            200,
+            vec![
+                ("Content-Type", "application/json"),
+                ("Mcp-Session-Id", "session-123"),
+            ],
+            serde_json::json!({ "jsonrpc": "2.0", "id": 1,
+                "result": { "protocolVersion": version, "capabilities": { "tools": {} } }
+            })
+            .to_string(),
+        )
+    }
+
     #[test]
     fn mcp_follows_initialize_notification_session_and_sse_response() {
         let (endpoint, server) = spawn_mcp_test_server(vec![
-            (
-                200,
-                vec![
-                    ("Content-Type", "application/json"),
-                    ("Mcp-Session-Id", "session-123"),
-                ],
-                serde_json::json!({
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "result": { "protocolVersion": "2025-03-26" }
-                })
-                .to_string(),
-            ),
+            initialize_response("2025-03-26"),
             (202, vec![], String::new()),
+            tool_list_response(2, &["translate_message"]),
             (
                 200,
                 vec![("Content-Type", "text/event-stream")],
                 format!(
-                    "event: message\ndata: {}\n\n",
-                    serde_json::json!({
-                        "jsonrpc": "2.0",
-                        "id": 2,
+                    "event: message\r\ndata: {}\r\n\r\n",
+                    serde_json::json!({ "jsonrpc": "2.0", "id": 3,
                         "result": { "content": [{ "type": "text", "text": "translated" }] }
                     })
                 ),
@@ -855,13 +1137,20 @@ mod tests {
         let result =
             run_mcp_tool_call(&mcp_input(&endpoint, "translate")).expect("MCP tool call succeeds");
         let requests = server.join().expect("MCP test server completes");
-
         assert_eq!(result.content, "translated");
         assert_eq!(result.service_type, "mcp");
-        assert_eq!(requests.len(), 3);
+        assert_eq!(requests.len(), 4);
         assert_eq!(requests[0].1["method"], "initialize");
-        assert!(requests[0].1.get("id").is_some());
+        assert_eq!(
+            requests[0].1["params"]["protocolVersion"],
+            super::MCP_PROTOCOL_VERSION
+        );
+        assert_eq!(
+            requests[0].1["params"]["clientInfo"]["version"],
+            env!("CARGO_PKG_VERSION")
+        );
         assert!(!requests[0].0.contains("mcp-session-id:"));
+        assert!(!requests[0].0.contains("mcp-protocol-version:"));
         assert!(requests[0]
             .0
             .contains("authorization: bearer mcp-test-token"));
@@ -870,57 +1159,36 @@ mod tests {
             .contains("accept: application/json, text/event-stream"));
         assert_eq!(requests[1].1["method"], "notifications/initialized");
         assert!(requests[1].1.get("id").is_none());
-        assert!(requests[1].0.contains("mcp-session-id: session-123"));
-        assert_eq!(requests[2].1["method"], "tools/call");
-        assert_eq!(requests[2].1["params"]["name"], "translate_message");
-        assert!(requests[2].0.contains("mcp-session-id: session-123"));
+        for request in &requests[1..] {
+            assert!(request.0.contains("mcp-session-id: session-123"));
+            assert!(request.0.contains("mcp-protocol-version: 2025-03-26"));
+        }
+        assert_eq!(requests[2].1["method"], "tools/list");
+        assert_eq!(requests[3].1["method"], "tools/call");
+        assert_eq!(requests[3].1["params"]["name"], "translate_message");
     }
 
     #[test]
-    fn mcp_tool_errors_fall_back_to_the_next_supported_tool() {
+    fn mcp_only_calls_an_alias_advertised_by_the_server() {
         let (endpoint, server) = spawn_mcp_test_server(vec![
-            (
-                200,
-                vec![("Content-Type", "application/json")],
-                serde_json::json!({
-                    "jsonrpc": "2.0",
-                    "id": 1,
-                    "result": { "protocolVersion": "2025-03-26" }
-                })
-                .to_string(),
-            ),
+            initialize_response("2025-06-18"),
             (204, vec![], String::new()),
+            tool_list_response(2, &["translate"]),
             (
                 200,
                 vec![("Content-Type", "application/json")],
                 serde_json::json!({
-                    "jsonrpc": "2.0",
-                    "id": 2,
-                    "result": {
-                        "isError": true,
-                        "content": [{ "type": "text", "text": "unknown tool" }]
-                    }
-                })
-                .to_string(),
-            ),
-            (
-                200,
-                vec![("Content-Type", "application/json")],
-                serde_json::json!({
-                    "jsonrpc": "2.0",
-                    "id": 3,
-                    "result": { "content": [{ "type": "text", "text": "fallback works" }] }
+                    "jsonrpc": "2.0", "id": 3,
+                    "result": { "content": [{ "type": "text", "text": "alias works" }] }
                 })
                 .to_string(),
             ),
         ]);
-        let result = run_mcp_tool_call(&mcp_input(&endpoint, "translate"))
-            .expect("fallback MCP tool call succeeds");
+        let result =
+            run_mcp_tool_call(&mcp_input(&endpoint, "translate")).expect("advertised alias works");
         let requests = server.join().expect("MCP test server completes");
-
-        assert_eq!(result.content, "fallback works");
+        assert_eq!(result.content, "alias works");
         assert_eq!(requests.len(), 4);
-        assert_eq!(requests[2].1["params"]["name"], "translate_message");
         assert_eq!(requests[3].1["params"]["name"], "translate");
     }
 
@@ -932,7 +1200,7 @@ mod tests {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 1,
-                "result": { "protocolVersion": "2025-03-26" }
+                "result": { "protocolVersion": "2025-03-26", "capabilities": { "tools": {} } }
             })
             .to_string(),
         )]);
@@ -1007,3 +1275,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod mcp_tests;

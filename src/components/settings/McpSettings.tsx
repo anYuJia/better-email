@@ -45,6 +45,8 @@ type McpConnectionGuideProps = {
   openedFromEnable: boolean;
   testing: boolean;
   saving: boolean;
+  saveError: string | null;
+  testResult: { ok: boolean; message: string } | null;
   patchConfig: (patch: Partial<AiServiceConfig>) => void;
   onTestConnection: () => void;
   onSave: () => void;
@@ -58,6 +60,8 @@ function McpConnectionGuide({
   openedFromEnable,
   testing,
   saving,
+  saveError,
+  testResult,
   patchConfig,
   onTestConnection,
   onSave,
@@ -78,7 +82,7 @@ function McpConnectionGuide({
     'MCP 连接信息',
     `服务端点：${endpoint || '待填写'}`,
     `访问 Token：${token || (providerHasApiKey ? '（已保存，未回显）' : '（待填写）')}`,
-    '连接方式：MCP Streamable HTTP / SSE',
+    '连接方式：MCP Streamable HTTP（支持 SSE 响应）',
   ].join('\n'), [endpoint, providerHasApiKey, token]);
   const initializationPrompt = useMemo(() => (
     endpoint
@@ -148,7 +152,7 @@ function McpConnectionGuide({
           <span className="settings-mcp-guide-mark" aria-hidden="true"><PlugZap size={18} /></span>
           <span className="settings-mcp-guide-heading">
             <strong id="settings-mcp-guide-title">连接 MCP 服务</strong>
-            <small>填入服务信息，复制初始化提示词，完成一次配置。</small>
+            <small>填入服务信息，测试连接后保存。</small>
           </span>
           <button
             ref={closeButtonRef}
@@ -156,6 +160,7 @@ function McpConnectionGuide({
             className="settings-mcp-guide-close"
             aria-label="关闭 MCP 连接向导"
             title="关闭"
+            disabled={saving}
             onClick={onClose}
           >
             <X size={17} aria-hidden="true" />
@@ -194,6 +199,7 @@ function McpConnectionGuide({
         </div>
 
         <div className="settings-mcp-guide-content">
+          {saveError && <SettingsNotice tone="danger" title="保存失败"><p>{saveError}</p></SettingsNotice>}
           {activeTab === 'connection' ? (
             <div
               className="settings-mcp-guide-panel"
@@ -214,7 +220,7 @@ function McpConnectionGuide({
               <SettingsField
                 label="MCP 服务端点"
                 htmlFor="settings-mcp-endpoint"
-                hint="支持服务商提供的 Streamable HTTP 或 SSE 地址。"
+                hint="填写 Streamable HTTP 端点；暂不支持旧版 HTTP+SSE 或 stdio。"
               >
                 <input
                   id="settings-mcp-endpoint"
@@ -223,6 +229,7 @@ function McpConnectionGuide({
                   value={config.mcpEndpoint ?? ''}
                   placeholder="https://example.com/mcp"
                   autoComplete="url"
+                  disabled={saving}
                   onChange={(event) => patchConfig({ mcpEndpoint: event.target.value })}
                 />
               </SettingsField>
@@ -230,7 +237,7 @@ function McpConnectionGuide({
               <SettingsField
                 label="访问 Token"
                 htmlFor="settings-mcp-token"
-                hint="Token 只保存在 Better Email 的本地设置中，不会写入复制的提示词。"
+                hint="按需填写；无认证的本地服务可留空。Token 保存在本地，不会写入提示词。"
               >
                 <div className="settings-mcp-token-row">
                   <input
@@ -240,12 +247,14 @@ function McpConnectionGuide({
                     value={config.mcpApiKey ?? ''}
                     placeholder={providerHasApiKey ? '已保存，留空保持不变' : '粘贴服务商提供的 Token'}
                     autoComplete="off"
+                    disabled={saving}
                     onChange={(event) => patchConfig({ mcpApiKey: event.target.value })}
                   />
                   {providerHasApiKey && !token ? (
                     <SettingsButton
                       size="sm"
                       variant="ghost"
+                      disabled={saving}
                       onClick={() => patchConfig({ clearMcpApiKey: true, hasMcpApiKey: false })}
                     >
                       清除 Token
@@ -267,6 +276,7 @@ function McpConnectionGuide({
                 label="允许向此服务发送邮件内容"
                 description="连接测试只验证服务，不代表邮件内容已经发送。"
                 checked={config.privacyAcknowledged}
+                disabled={saving}
                 onChange={(checked) => patchConfig({ privacyAcknowledged: checked })}
               />
 
@@ -292,15 +302,17 @@ function McpConnectionGuide({
               <div className="st-actions settings-mcp-guide-actions">
                 <SettingsButton
                   onClick={onTestConnection}
-                  disabled={testing || !endpoint || !config.enabled}
+                  disabled={testing || saving || !endpoint}
                   icon={testing ? <LoaderCircle className="settings-action-spinner" size={14} /> : <PlugZap size={14} />}
                 >
                   {testing ? '测试中…' : '测试连接'}
                 </SettingsButton>
-                {!config.enabled && (
-                  <span className="settings-mcp-action-hint">请先在“AI 接入”中启用 AI 功能。</span>
-                )}
               </div>
+              {testResult && (
+                <SettingsNotice tone={testResult.ok ? 'success' : 'danger'} title={testResult.ok ? '连接正常' : '连接失败'}>
+                  <p>{testResult.message}</p>
+                </SettingsNotice>
+              )}
 
             </div>
           ) : (
@@ -364,7 +376,7 @@ function McpConnectionGuide({
         <footer className="settings-mcp-guide-footer">
           <span>{openedFromEnable ? '保存后 MCP 才会正式启用。' : '修改只在保存后生效。'}</span>
           <div>
-            <SettingsButton onClick={onClose}>取消</SettingsButton>
+            <SettingsButton onClick={onClose} disabled={saving}>取消</SettingsButton>
             <SettingsButton
               variant="primary"
               aria-label={openedFromEnable ? '保存并启用' : '保存设置'}
@@ -389,6 +401,7 @@ function getMcpStatus(
   if (!enabled) return { tone: 'neutral', label: '未启用' };
   if (!endpoint) return { tone: 'warning', label: '待配置' };
   if (testResult?.ok) return { tone: 'success', label: '连接正常' };
+  if (testResult) return { tone: 'warning', label: '连接失败' };
   return { tone: 'info', label: '待测试' };
 }
 
@@ -403,6 +416,8 @@ export default function McpSettings({ onNotify }: McpSettingsProps = {}) {
     testing,
     saving,
     testResult,
+    saveError,
+    secretsLoaded,
     saveConfig,
     runTestConnection,
   } = useAiService({ onNotify, serviceType: 'mcp' });
@@ -426,6 +441,7 @@ export default function McpSettings({ onNotify }: McpSettingsProps = {}) {
       setOpenedFromEnable(false);
       setGuideOpen(false);
       patchConfig({ mcpEnabled: false });
+      saveConfig({ mcpEnabled: false }).catch(() => patchConfig({ mcpEnabled: connectorEnabled }));
       return;
     }
 
@@ -434,6 +450,7 @@ export default function McpSettings({ onNotify }: McpSettingsProps = {}) {
   };
 
   const closeGuide = () => {
+    if (saving) return;
     if (guideSnapshotRef.current) patchConfig(guideSnapshotRef.current);
     guideSnapshotRef.current = null;
     setOpenedFromEnable(false);
@@ -463,6 +480,7 @@ export default function McpSettings({ onNotify }: McpSettingsProps = {}) {
           description="开启后立即打开连接向导，填入服务商提供的地址和 Token。"
           ariaLabel="启用 MCP"
           checked={connectorEnabled}
+          disabled={saving || !secretsLoaded}
           onChange={handleMcpEnabledChange}
         />
         {connectorEnabled && !config.enabled && (
@@ -484,7 +502,7 @@ export default function McpSettings({ onNotify }: McpSettingsProps = {}) {
               <strong>{endpoint || '尚未配置 MCP 服务端点'}</strong>
               <small>{endpoint ? '外部 MCP 服务端点' : '开启连接向导后填写服务商提供的地址'}</small>
             </span>
-            <SettingsButton size="sm" variant="ghost" onClick={() => openGuide(false)}>
+            <SettingsButton size="sm" variant="ghost" disabled={saving || !secretsLoaded} onClick={() => openGuide(false)}>
               查看连接信息
             </SettingsButton>
           </div>
@@ -495,7 +513,7 @@ export default function McpSettings({ onNotify }: McpSettingsProps = {}) {
               <strong>配置 MCP 服务端点</strong>
               <small>开启 MCP 后会直接弹出连接信息、Token 输入和初始化提示词。</small>
             </span>
-            <SettingsButton size="sm" variant="ghost" onClick={() => handleMcpEnabledChange(true)}>
+            <SettingsButton size="sm" variant="ghost" disabled={saving || !secretsLoaded} onClick={() => handleMcpEnabledChange(true)}>
               开始配置
             </SettingsButton>
           </div>
@@ -509,6 +527,8 @@ export default function McpSettings({ onNotify }: McpSettingsProps = {}) {
           openedFromEnable={openedFromEnable}
           testing={testing}
           saving={saving}
+          saveError={saveError}
+          testResult={testResult}
           patchConfig={patchConfig}
           onTestConnection={runTestConnection}
           onSave={saveAndCloseGuide}

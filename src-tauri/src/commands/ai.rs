@@ -76,13 +76,17 @@ pub async fn ai_chat_request(
     // 保存的密钥绝不会被发送到调用方构造的任意端点。
     let (endpoint, api_key) =
         enforce_saved_http_request(&store, "http", &input.endpoint, &input.api_key)?;
-    crate::ai::call_chat_completion(
-        &endpoint,
-        &api_key,
-        &input.model,
-        &input.messages,
-        input.timeout_seconds,
-    )
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::ai::call_chat_completion(
+            &endpoint,
+            &api_key,
+            &input.model,
+            &input.messages,
+            input.timeout_seconds,
+        )
+    })
+    .await
+    .map_err(|error| format!("AI 请求任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -97,10 +101,12 @@ pub async fn ai_request(
     };
     input.endpoint = endpoint;
     input.api_key = api_key;
-    match input.service_type.as_str() {
+    tauri::async_runtime::spawn_blocking(move || match input.service_type.as_str() {
         "mcp" => run_mcp_tool_call(&input),
         _ => run_ai_request(&input),
-    }
+    })
+    .await
+    .map_err(|error| format!("AI 请求任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -111,6 +117,7 @@ pub async fn test_ai_connection(
     api_key: String,
     model: String,
     timeout_seconds: u64,
+    clear_api_key: Option<bool>,
 ) -> Result<AiConnectionReport, String> {
     // 「测试连接」测试的是用户本次输入的新配置：只使用本次传入的 key。
     // 仅当 endpoint 与已保存配置完全一致时，才允许复用已保存 key（目标不变）。
@@ -119,8 +126,16 @@ pub async fn test_ai_connection(
     } else {
         "http"
     };
-    let api_key = test_connection_key(&store, service_kind, &endpoint, &api_key)?;
-    test_connection_inner(&service_type, &endpoint, &api_key, &model, timeout_seconds)
+    let api_key = if clear_api_key == Some(true) {
+        String::new()
+    } else {
+        test_connection_key(&store, service_kind, &endpoint, &api_key)?
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        test_connection_inner(&service_type, &endpoint, &api_key, &model, timeout_seconds)
+    })
+    .await
+    .map_err(|error| format!("连接测试任务失败：{error}"))?
 }
 
 #[tauri::command]
@@ -130,7 +145,11 @@ pub fn save_ai_settings(
 ) -> Result<String, String> {
     // 两类密钥分别绑定到各自的 endpoint：AI 接入页和 MCP 页可以独立保存，
     // 但密钥仍不能跟随 endpoint 变化而被静默沿用，否则旧 key 可能被发到新的端点。
-    let existing = store.load_ai_settings().ok();
+    let existing = Some(
+        store
+            .load_ai_settings()
+            .map_err(|error| format!("读取 AI 设置失败：{error}"))?,
+    );
     let (api_key, mcp_api_key) = resolve_ai_secrets_for_save(existing.as_ref(), &input)?;
     let service_type = if input.service_type == "mcp" {
         "mcp".to_string()
@@ -185,9 +204,8 @@ fn resolve_ai_secrets_for_save(
     let http_endpoint_changed = existing.is_some_and(|record| {
         normalized_endpoint(&record.endpoint) != normalized_endpoint(&input.endpoint)
     });
-    let mcp_endpoint_changed = existing.is_some_and(|record| {
-        normalized_endpoint(&record.mcp_endpoint) != normalized_endpoint(&input.mcp_endpoint)
-    });
+    let mcp_endpoint_changed =
+        existing.is_some_and(|record| record.mcp_endpoint.trim() != input.mcp_endpoint.trim());
     let api_key = resolve_bound_secret_key(
         input.api_key.trim(),
         input.clear_api_key,
@@ -205,7 +223,7 @@ fn resolve_ai_secrets_for_save(
 
 /// 单条密钥的绑定解析：
 /// - 显式清除标记：删除；
-/// - endpoint 变化：空 key 拒绝保存并要求重新输入；
+/// - endpoint 变化且已有密钥：空 key 拒绝保存并要求重新输入；
 /// - endpoint 未变：空值表示保持现有密钥。
 fn resolve_bound_secret_key(
     incoming: &str,
@@ -217,7 +235,7 @@ fn resolve_bound_secret_key(
         return Ok(String::new());
     }
     if incoming.is_empty() {
-        if endpoint_changed {
+        if endpoint_changed && existing.is_some_and(|key| !key.trim().is_empty()) {
             return Err("服务端点已更改，请重新输入 API Key 后再保存。".to_string());
         }
         return Ok(existing.unwrap_or_default().to_string());
@@ -272,7 +290,7 @@ fn enforce_saved_http_request(
         if !saved.mcp_enabled {
             return Err("MCP 服务未开启，请先在设置中启用 MCP 服务。".to_string());
         }
-        if normalized_endpoint(endpoint) != normalized_endpoint(&saved.mcp_endpoint) {
+        if endpoint.trim() != saved.mcp_endpoint.trim() {
             return Err("MCP 服务地址与已保存配置不一致，已拒绝发送密钥。".to_string());
         }
         let key = if api_key.trim().is_empty() {
@@ -295,9 +313,8 @@ fn enforce_saved_http_request(
 
 /// 「测试连接」的密钥解析：只使用本次传入的 key。
 ///
-/// 仅当测试的 endpoint 与已保存配置（service_type + endpoint）完全一致（规范化
-/// 后）时，才允许复用已保存的 key（目标与保存时完全相同）；测试任何未保存的
-/// 新端点都必须显式传入本次要测试的 key，绝不回退到已保存 key。
+/// 仅当 endpoint 与该连接器保存的地址一致时，才允许复用已保存的 key。
+/// 新端点可以匿名测试或使用本次输入的 key，绝不回退到已保存 key。
 fn test_connection_key(
     store: &MailStore,
     service_type: &str,
@@ -307,20 +324,21 @@ fn test_connection_key(
     if !api_key.trim().is_empty() {
         return Ok(api_key.trim().to_string());
     }
-    let saved = store.load_ai_settings().ok();
+    let saved = Some(
+        store
+            .load_ai_settings()
+            .map_err(|error| format!("读取 AI 设置失败：{error}"))?,
+    );
     let matches_saved = saved.as_ref().is_some_and(|record| {
-        saved_service_type_matches(record, service_type)
-            && normalized_endpoint(endpoint)
-                == if service_type == "mcp" {
-                    normalized_endpoint(&record.mcp_endpoint)
-                } else {
-                    normalized_endpoint(&record.endpoint)
-                }
+        if service_type == "mcp" {
+            endpoint.trim() == record.mcp_endpoint.trim()
+        } else {
+            normalized_endpoint(endpoint) == normalized_endpoint(&record.endpoint)
+        }
     });
     if !matches_saved {
-        return Err(
-            "测试连接不能复用已保存密钥到新端点，请先输入本次要测试的 API Key。".to_string(),
-        );
+        // 无 Token 的 MCP 服务同样可测试；新目标绝不携带已保存密钥。
+        return Ok(String::new());
     }
     let key = saved
         .map(|record| {
@@ -624,10 +642,10 @@ mod tests {
     #[test]
     fn test_connection_never_reuses_saved_key_for_new_endpoint() {
         let store = store_with(stored_http_record());
-        // 新端点（即使同为 HTTPS）：空 key 必须拒绝，不能回退到保存密钥。
-        let err =
-            test_connection_key(&store, "http", "https://attacker.example.com/v1", "").unwrap_err();
-        assert!(err.contains("不能复用"), "新端点测试应要求显式 key：{err}");
+        // 新端点（即使同为 HTTPS）：只能匿名测试，不能回退到保存密钥。
+        let key =
+            test_connection_key(&store, "http", "https://attacker.example.com/v1", "").unwrap();
+        assert!(key.is_empty(), "新端点测试不得携带已保存密钥");
 
         // 新端点 + 显式传入 key：允许使用传入 key。
         let key = test_connection_key(&store, "http", "https://attacker.example.com/v1", "sk-temp")
@@ -652,10 +670,51 @@ mod tests {
             .expect("saved mcp key reused for identical endpoint");
         assert_eq!(key, "mcp-saved-secret");
 
-        // 未保存任何配置时，任何端点都必须显式传入 key。
+        // 未保存任何配置时，可以测试无需 Token 的本地服务。
         let empty = MailStore::open_at(unique_test_database_path()).expect("store opens");
-        let err =
-            test_connection_key(&empty, "http", "https://api.example.com/v1", "").unwrap_err();
-        assert!(err.contains("不能复用"), "无保存配置时应要求 key：{err}");
+        let key = test_connection_key(&empty, "mcp", "http://127.0.0.1:8080/mcp", "").unwrap();
+        assert!(key.is_empty(), "无 Token 的本地服务可直接测试");
+    }
+
+    #[test]
+    fn uncredentialed_endpoints_can_change_without_a_token() {
+        let existing = AiSettingsRecord {
+            api_key: String::new(),
+            mcp_api_key: String::new(),
+            ..stored_http_record()
+        };
+        let mut input = save_input(&existing);
+        input.mcp_endpoint = "http://127.0.0.1:8080/mcp".to_string();
+        assert_eq!(
+            resolve_ai_secrets_for_save(Some(&existing), &input).unwrap(),
+            (String::new(), String::new())
+        );
+    }
+
+    #[test]
+    fn mcp_slash_changes_do_not_reuse_a_saved_token() {
+        let existing = stored_http_record();
+        let mut input = save_input(&existing);
+        input.mcp_endpoint.push('/');
+        assert!(resolve_ai_secrets_for_save(Some(&existing), &input).is_err());
+        let store = store_with(existing);
+        assert!(
+            test_connection_key(&store, "mcp", "https://mcp.example.com/", "")
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn inactive_connectors_can_test_their_own_saved_token() {
+        let store = store_with(AiSettingsRecord {
+            service_type: "mcp".to_string(),
+            mcp_enabled: true,
+            ..stored_http_record()
+        });
+        assert_eq!(
+            test_connection_key(&store, "http", "https://api.example.com/v1", "").unwrap(),
+            "sk-saved-secret"
+        );
     }
 }

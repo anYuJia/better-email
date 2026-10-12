@@ -112,7 +112,8 @@ export function summarizeMessage(text: string, config?: AiServiceConfig): Promis
 }
 
 export async function testAiConnection(config: AiServiceConfig): Promise<AiTestConnectionResult> {
-  const gateError = checkAiConfig(config, false);
+  // 握手/工具发现不发送邮件内容，可在启用功能之前验证连接。
+  const gateError = checkAiConfig({ ...config, enabled: true, mcpEnabled: true }, false);
   if (gateError) {
     return { ok: false, message: aiErrorMessage(gateError), latencyMs: 0 };
   }
@@ -124,6 +125,7 @@ export async function testAiConnection(config: AiServiceConfig): Promise<AiTestC
         serviceType: config.serviceType,
         endpoint: (isMcp ? config.mcpEndpoint ?? '' : config.endpoint).trim(),
         apiKey: isMcp ? config.mcpApiKey ?? '' : config.apiKey,
+        clearApiKey: isMcp ? config.clearMcpApiKey === true : config.clearApiKey === true,
         model: config.defaultModel.trim() || 'gpt-4o-mini',
         timeoutSeconds: config.timeoutSeconds,
       },

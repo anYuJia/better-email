@@ -129,6 +129,19 @@ describe('aiService', () => {
     expect(checkAiConfig(config, false)).toBeNull();
   });
 
+  it('can test an anonymous MCP connection before AI is enabled and honors token removal', async () => {
+    invokeMock.mockResolvedValueOnce({ ok: true, service_type: 'mcp', message: '连接正常', latency_ms: 1 });
+    await expect(testAiConnection({
+      ...defaultAiServiceConfig,
+      serviceType: 'mcp',
+      mcpEndpoint: 'http://127.0.0.1:8080/mcp',
+      clearMcpApiKey: true,
+    })).resolves.toMatchObject({ ok: true });
+    expect(invokeMock).toHaveBeenCalledWith(IPC.TestAiConnection, expect.objectContaining({
+      apiKey: '', clearApiKey: true,
+    }));
+  });
+
   it('hydrates runtime requests from the saved backend provider', async () => {
     invokeMock.mockReset();
     invokeMock

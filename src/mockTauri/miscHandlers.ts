@@ -83,8 +83,7 @@ export const handlers: Record<string, MockCommandHandler> = {
     const mcp_endpoint = String(input.mcp_endpoint ?? '').trim();
     const endpointChanged = normalizedEndpoint(endpoint)
       !== normalizedEndpoint(mockAiSettingsState.endpoint);
-    const mcpEndpointChanged = normalizedEndpoint(mcp_endpoint)
-      !== normalizedEndpoint(mockAiSettingsState.mcp_endpoint);
+    const mcpEndpointChanged = mcp_endpoint !== mockAiSettingsState.mcp_endpoint.trim();
     const api_key = resolveMockBoundSecretKey(
       String(input.api_key ?? ''),
       input.clear_api_key === true,

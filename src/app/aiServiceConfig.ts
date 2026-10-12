@@ -89,7 +89,7 @@ export function mergePersistedAiSettings(
     timeoutSeconds: report.timeout_seconds || current.timeoutSeconds,
     privacyAcknowledged: report.privacy_acknowledged,
     mcpEnabled: report.mcp_enabled,
-    mcpEndpoint: report.mcp_endpoint || current.mcpEndpoint,
+    mcpEndpoint: report.mcp_endpoint,
     mcpApiKey: '',
     hasMcpApiKey: report.has_mcp_api_key,
   };

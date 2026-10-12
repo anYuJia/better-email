@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import useAiService from './useAiService';
 import { aiServiceStorageKey } from '../app/aiServiceConfig';
 import { IPC } from '../ipc/commands';
+import { testAiConnection } from '../app/aiService';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 
@@ -35,9 +36,10 @@ describe('useAiService', () => {
     window.localStorage.clear();
     Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
     invokeMock.mockReset();
+    vi.mocked(testAiConnection).mockReset();
   });
 
-  it('migrates an enabled local mirror when the native backend has no saved row', async () => {
+  it.each(['http', 'mcp'] as const)('migrates an enabled local mirror without changing its route on the %s page', async (serviceType) => {
     Object.defineProperty(window, '__TAURI_INTERNALS__', {
       configurable: true,
       value: {},
@@ -61,13 +63,14 @@ describe('useAiService', () => {
       throw new Error(`Unexpected IPC command: ${command}`);
     });
 
-    const { result } = renderHook(() => useAiService({ serviceType: 'http' }));
+    const { result } = renderHook(() => useAiService({ serviceType }));
 
     await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
     expect(persisted).toBe(true);
     expect(invokeMock).toHaveBeenCalledWith(IPC.SaveAiSettings, {
       input: expect.objectContaining({
         enabled: true,
+        service_type: 'http',
         endpoint: 'https://api.example.com/v1',
         model: 'deepseek-v4-flash',
       }),
@@ -75,7 +78,7 @@ describe('useAiService', () => {
     expect(result.current.config.enabled).toBe(true);
   });
 
-  it('retries migration when the native backend is not ready on the first read', async () => {
+  it('recovers a failed initial read without migrating over existing native settings', async () => {
     Object.defineProperty(window, '__TAURI_INTERNALS__', {
       configurable: true,
       value: {},
@@ -101,7 +104,56 @@ describe('useAiService', () => {
     const { result } = renderHook(() => useAiService({ serviceType: 'http' }));
 
     await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
-    expect(invokeMock).toHaveBeenCalledWith(IPC.SaveAiSettings, expect.anything());
+    expect(invokeMock).not.toHaveBeenCalledWith(IPC.SaveAiSettings, expect.anything());
     expect(loadCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it('keeps unsaved drafts out of the runtime mirror and resets clear markers on new tokens', async () => {
+    invokeMock.mockResolvedValue(report(true));
+    const { result } = renderHook(() => useAiService({ serviceType: 'mcp' }));
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+    act(() => result.current.patchConfig({ mcpEndpoint: 'https://draft.example/mcp', clearMcpApiKey: true }));
+    act(() => result.current.patchConfig({ mcpApiKey: 'replacement-token' }));
+    expect(result.current.config.clearMcpApiKey).toBe(false);
+    const mirror = JSON.parse(window.localStorage.getItem(aiServiceStorageKey)!);
+    expect(mirror.mcpEndpoint).toBe('');
+    expect(JSON.stringify(mirror)).not.toContain('replacement-token');
+  });
+
+  it('discards a connection result after the configuration changes', async () => {
+    invokeMock.mockResolvedValue(report(true));
+    let resolveTest!: (value: { ok: boolean; message: string; latencyMs: number }) => void;
+    vi.mocked(testAiConnection).mockImplementationOnce(() => new Promise((resolve) => { resolveTest = resolve; }));
+    const onNotify = vi.fn();
+    const { result } = renderHook(() => useAiService({ serviceType: 'mcp', onNotify }));
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.runTestConnection(); });
+    act(() => result.current.patchConfig({ mcpEndpoint: 'https://new.example/mcp' }));
+    await act(async () => {
+      resolveTest({ ok: true, message: 'old endpoint connected', latencyMs: 1 });
+      await pending;
+    });
+    expect(result.current.testResult).toBeNull();
+    expect(result.current.testing).toBe(false);
+    expect(onNotify).not.toHaveBeenCalled();
+  });
+
+  it('does not overwrite edits made while initial settings are loading', async () => {
+    let resolveLoad!: (value: ReturnType<typeof report>) => void;
+    invokeMock.mockImplementationOnce(() => new Promise((resolve) => { resolveLoad = resolve; }));
+    const { result } = renderHook(() => useAiService({ serviceType: 'mcp' }));
+    act(() => result.current.patchConfig({ mcpEndpoint: 'https://draft.example/mcp' }));
+    await act(async () => { resolveLoad(report(true)); });
+    expect(result.current.config.mcpEndpoint).toBe('https://draft.example/mcp');
+    expect(JSON.parse(window.localStorage.getItem(aiServiceStorageKey)!).mcpEndpoint).toBe('');
+  });
+
+  it('uses a saved empty MCP endpoint instead of reviving a stale mirror', async () => {
+    window.localStorage.setItem(aiServiceStorageKey, JSON.stringify({ mcpEndpoint: 'https://stale.example/mcp' }));
+    invokeMock.mockResolvedValue(report(true));
+    const { result } = renderHook(() => useAiService({ serviceType: 'mcp' }));
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+    expect(result.current.config.mcpEndpoint).toBe('');
   });
 });

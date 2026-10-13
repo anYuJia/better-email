@@ -233,9 +233,7 @@ fn resolve_bound_secret_key(
     endpoint_changed: bool,
 ) -> Result<String, String> {
     if clear && !incoming.is_empty() {
-        return Err(
-            "密钥保存状态冲突：同时收到清除标记和新的 API Key，请重试保存。".to_string(),
-        );
+        return Err("密钥保存状态冲突：同时收到清除标记和新的 API Key，请重试保存。".to_string());
     }
     if clear {
         return Ok(String::new());

@@ -109,7 +109,6 @@ describe('useAiService', () => {
     expect(loadCount).toBeGreaterThanOrEqual(2);
   });
 
-<<<<<<< HEAD
   it('keeps unsaved drafts out of the runtime mirror and resets clear markers on new tokens', async () => {
     invokeMock.mockResolvedValue(report(true));
     const { result } = renderHook(() => useAiService({ serviceType: 'mcp' }));
@@ -272,6 +271,5 @@ describe('useAiService', () => {
     expect(result.current.config.clearApiKey).toBe(false);
     expect(result.current.config.mcpApiKey).toBe('mcp-replacement');
     expect(result.current.config.clearMcpApiKey).toBe(false);
-  });
   });
 });

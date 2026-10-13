@@ -57,6 +57,7 @@ static ACTIVE_VERIFICATION_WORKERS: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
 struct VerificationWorkerGuard;
 impl VerificationWorkerGuard {
+    #[allow(deprecated)]
     fn acquire() -> MailResult<Self> {
         use std::sync::atomic::Ordering;
         ACTIVE_VERIFICATION_WORKERS

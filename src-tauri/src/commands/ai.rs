@@ -222,6 +222,7 @@ fn resolve_ai_secrets_for_save(
 }
 
 /// 单条密钥的绑定解析：
+/// - clear 与非空新 key 同时出现属于冲突状态，拒绝保存，绝不静默丢弃新 key；
 /// - 显式清除标记：删除；
 /// - endpoint 变化且已有密钥：空 key 拒绝保存并要求重新输入；
 /// - endpoint 未变：空值表示保持现有密钥。
@@ -231,6 +232,11 @@ fn resolve_bound_secret_key(
     existing: Option<&str>,
     endpoint_changed: bool,
 ) -> Result<String, String> {
+    if clear && !incoming.is_empty() {
+        return Err(
+            "密钥保存状态冲突：同时收到清除标记和新的 API Key，请重试保存。".to_string(),
+        );
+    }
     if clear {
         return Ok(String::new());
     }
@@ -445,6 +451,12 @@ mod tests {
                 .expect("replace"),
             "new-key",
             "新输入应覆盖旧密钥"
+        );
+        let conflict = resolve_bound_secret_key("new-key", true, Some("existing-key"), false)
+            .expect_err("clear + replacement key must be rejected");
+        assert!(
+            conflict.contains("状态冲突"),
+            "后端不能静默丢弃 clear=true 时传入的新 key：{conflict}"
         );
         assert_eq!(
             resolve_bound_secret_key("", false, None, false).expect("none"),

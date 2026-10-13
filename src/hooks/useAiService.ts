@@ -168,10 +168,11 @@ export default function useAiService({ setStatus, onNotify, serviceType }: UseAi
 
   const patchConfig = useCallback((patch: Partial<AiServiceConfig>) => {
     revisionRef.current += 1;
+    // A newly typed secret always cancels a previous one-shot clear intent.
     const normalizedPatch = {
       ...patch,
-      ...(patch.apiKey?.trim() ? { clearApiKey: false } : {}),
-      ...(patch.mcpApiKey?.trim() ? { clearMcpApiKey: false } : {}),
+      ...(typeof patch.apiKey === 'string' && patch.apiKey.trim() ? { clearApiKey: false } : {}),
+      ...(typeof patch.mcpApiKey === 'string' && patch.mcpApiKey.trim() ? { clearMcpApiKey: false } : {}),
     };
     for (const field of Object.keys(normalizedPatch) as ConfigField[]) {
       if (Object.is(normalizedPatch[field], persistedConfigRef.current[field])) changedFieldsRef.current.delete(field);

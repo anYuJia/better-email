@@ -1,8 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import useMessageTranslation from './useMessageTranslation';
+import useMessageTranslation, {
+  cacheTranslation,
+  clearTranslationCache,
+  getCachedTranslation,
+} from './useMessageTranslation';
 import { aiServiceStorageKey } from '../app/aiServiceConfig';
-import { clearTranslationCache } from './useMessageTranslation';
 import { IPC } from '../ipc/commands';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
@@ -163,5 +166,58 @@ describe('useMessageTranslation', () => {
     rerender({ message: chineseMessage(2) });
     expect(result.current.needsTranslation).toBe(false);
     expect(result.current.translationState.status).toBe('idle');
+  });
+
+  it('does not reuse a cached translation after the configured model changes', async () => {
+    let model = 'model-a';
+    let requestCount = 0;
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === IPC.LoadAiSettings) {
+        return {
+          configured: true,
+          enabled: true,
+          service_type: 'http',
+          endpoint: 'https://api.example.com/v1',
+          has_api_key: true,
+          model,
+          timeout_seconds: 30,
+          privacy_acknowledged: true,
+          mcp_enabled: false,
+          mcp_endpoint: '',
+          has_mcp_api_key: false,
+        };
+      }
+      if (command === IPC.AiRequest) {
+        requestCount += 1;
+        return {
+          operation: 'translate',
+          content: model === 'model-a' ? '模型 A 译文' : '模型 B 译文',
+          service_type: 'http',
+          truncated: false,
+        };
+      }
+      throw new Error(`Unexpected IPC command: ${command}`);
+    });
+    const { result } = renderHook(() => useMessageTranslation(englishMessage(9), {}));
+
+    await act(async () => {
+      await result.current.translate();
+    });
+    expect(result.current.translationState.translation).toBe('模型 A 译文');
+
+    model = 'model-b';
+    await act(async () => {
+      await result.current.translate();
+    });
+    expect(result.current.translationState.translation).toBe('模型 B 译文');
+    expect(requestCount).toBe(2);
+  });
+
+  it('keeps the in-memory translation cache bounded with LRU eviction', () => {
+    for (let index = 0; index < 70; index += 1) {
+      cacheTranslation(`key-${index}`, `value-${index}`);
+    }
+    expect(getCachedTranslation('key-0')).toBeUndefined();
+    expect(getCachedTranslation('key-69')).toBe('value-69');
   });
 });

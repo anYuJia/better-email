@@ -109,6 +109,7 @@ describe('useAiService', () => {
     expect(loadCount).toBeGreaterThanOrEqual(2);
   });
 
+<<<<<<< HEAD
   it('keeps unsaved drafts out of the runtime mirror and resets clear markers on new tokens', async () => {
     invokeMock.mockResolvedValue(report(true));
     const { result } = renderHook(() => useAiService({ serviceType: 'mcp' }));
@@ -249,5 +250,28 @@ describe('useAiService', () => {
     unmount();
     await act(async () => { resolveTest({ ok: true, message: '旧页面连接成功' }); await pending; });
     expect(onNotify).not.toHaveBeenCalled();
+  });
+
+  it('cancels one-shot clear flags when a replacement HTTP or MCP key is typed', async () => {
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === IPC.LoadAiSettings) return report(true);
+      throw new Error(`Unexpected IPC command: ${command}`);
+    });
+
+    const { result } = renderHook(() => useAiService({ serviceType: 'http' }));
+    await waitFor(() => expect(result.current.secretsLoaded).toBe(true));
+
+    act(() => {
+      result.current.patchConfig({ clearApiKey: true, hasApiKey: false });
+      result.current.patchConfig({ apiKey: 'sk-replacement' });
+      result.current.patchConfig({ clearMcpApiKey: true, hasMcpApiKey: false });
+      result.current.patchConfig({ mcpApiKey: 'mcp-replacement' });
+    });
+
+    expect(result.current.config.apiKey).toBe('sk-replacement');
+    expect(result.current.config.clearApiKey).toBe(false);
+    expect(result.current.config.mcpApiKey).toBe('mcp-replacement');
+    expect(result.current.config.clearMcpApiKey).toBe(false);
+  });
   });
 });

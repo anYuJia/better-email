@@ -18,6 +18,7 @@ import {
 } from './app/settingsWindow';
 import type { AccountScope } from './app/types';
 import { IPC } from './ipc/commands';
+import { nativeComposerPlacement, rememberNativeComposerGeometry } from './app/nativeComposerGeometry';
 
 type InvokeArgs = Record<string, unknown> | undefined;
 type TauriCore = typeof import('@tauri-apps/api/core');
@@ -185,13 +186,14 @@ async function ensureComposerWindow(): Promise<void> {
     const composeUrl = new URL(window.location.href);
     composeUrl.search = '?window=compose&prewarm=1';
     composeUrl.hash = '';
+    const { availableMonitors, primaryMonitor } = await loadWindow();
+    const placement = await Promise.all([availableMonitors(), primaryMonitor()])
+      .then(([monitors, primary]) => nativeComposerPlacement(monitors, primary))
+      .catch(() => ({ width: 960, height: 700, minWidth: 760, minHeight: 560 }));
     const child = new WebviewWindow(COMPOSER_WINDOW_LABEL, {
       url: composeUrl.toString(),
       title: '写邮件',
-      width: 960,
-      height: 700,
-      minWidth: 760,
-      minHeight: 560,
+      ...placement,
       resizable: true,
       decorations: true,
       titleBarStyle: 'overlay',
@@ -205,6 +207,7 @@ async function ensureComposerWindow(): Promise<void> {
       void child.once('tauri://created', () => resolve());
       void child.once('tauri://error', (event) => reject(new Error(`无法创建独立写信窗口：${String(event.payload)}`)));
     });
+    await rememberNativeComposerGeometry(child);
   })();
   composerWindowCreation = creation;
   try {

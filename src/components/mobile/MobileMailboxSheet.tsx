@@ -1,6 +1,7 @@
 import {
   ChevronRight,
-  Edit3,
+  Check,
+  PenLine,
   FolderOpen,
   Settings,
   UserRound,
@@ -8,8 +9,11 @@ import {
 } from 'lucide-react';
 import type { Account, AccountScope, Folder } from '../../app/types';
 import { folderIconForRole } from '../../app/appConfig';
+import { useRef } from 'react';
+import useModalAccessibility from '../../hooks/useModalAccessibility';
 
 type MobileMailboxSheetProps = {
+  active?: boolean;
   accountScope: AccountScope;
   accounts: Account[];
   folders: Folder[];
@@ -35,6 +39,7 @@ function folderLabel(folder: Folder): string {
 }
 
 export default function MobileMailboxSheet({
+  active = true,
   accountScope,
   accounts,
   folders,
@@ -45,12 +50,18 @@ export default function MobileMailboxSheet({
   onCompose,
   onOpenSettings,
 }: MobileMailboxSheetProps) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  useModalAccessibility({ open: active, dialogRef, backdropRef, initialFocusRef: closeButtonRef, onEscape: onClose });
   return (
-    <div className="mobile-sheet-backdrop" role="presentation" onClick={onClose}>
+    <div ref={backdropRef} className="mobile-sheet-backdrop" role="presentation" onClick={onClose}>
       <aside
+        ref={dialogRef}
+        tabIndex={-1}
         className="mobile-mailbox-sheet"
         role="dialog"
-        aria-modal="true"
+        aria-modal={active ? true : undefined}
         aria-labelledby="mobile-mailbox-title"
         onClick={(event) => event.stopPropagation()}
       >
@@ -59,8 +70,8 @@ export default function MobileMailboxSheet({
             <span>Better Email</span>
             <h1 id="mobile-mailbox-title">邮箱</h1>
           </div>
-          <button type="button" className="mobile-header-icon" aria-label="关闭邮箱导航" onClick={onClose}>
-            <X size={22} aria-hidden="true" />
+          <button ref={closeButtonRef} type="button" className="mobile-header-icon" aria-label="关闭邮箱导航" onClick={onClose}>
+            <X size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </header>
 
@@ -71,22 +82,24 @@ export default function MobileMailboxSheet({
               <button
                 type="button"
                 className={accountScope === 'all' ? 'mobile-mailbox-row active' : 'mobile-mailbox-row'}
+                aria-current={accountScope === 'all' ? 'true' : undefined}
                 onClick={() => {
                   onAccountScopeChange('all');
                   onClose();
                 }}
               >
-                <span className="mobile-mailbox-row-icon"><UserRound size={18} aria-hidden="true" /></span>
+                <span className="mobile-mailbox-row-icon"><UserRound size={20} strokeWidth={1.75} aria-hidden="true" /></span>
                 <span className="mobile-mailbox-row-copy">
                   <strong>所有账号</strong>
                   <small>{accounts.length ? `${accounts.length} 个账号` : '尚未添加账号'}</small>
                 </span>
-                {accountScope === 'all' && <span className="mobile-mailbox-check">当前</span>}
+                {accountScope === 'all' && <span className="mobile-mailbox-check" aria-label="当前"><Check size={16} strokeWidth={1.75} aria-hidden="true" /></span>}
               </button>
               {accounts.map((account) => (
                 <button
                   type="button"
                   className={accountScope === account.id ? 'mobile-mailbox-row active' : 'mobile-mailbox-row'}
+                  aria-current={accountScope === account.id ? 'true' : undefined}
                   key={account.id}
                   onClick={() => {
                     onAccountScopeChange(String(account.id));
@@ -100,7 +113,7 @@ export default function MobileMailboxSheet({
                     <strong>{account.display_name || account.email}</strong>
                     <small>{account.email}</small>
                   </span>
-                  {accountScope === account.id && <span className="mobile-mailbox-check">当前</span>}
+                  {accountScope === account.id && <span className="mobile-mailbox-check" aria-label="当前"><Check size={16} strokeWidth={1.75} aria-hidden="true" /></span>}
                 </button>
               ))}
             </div>
@@ -113,6 +126,7 @@ export default function MobileMailboxSheet({
                 <button
                   type="button"
                   className={folder.id === folderId ? 'mobile-mailbox-row active' : 'mobile-mailbox-row'}
+                  aria-current={folder.id === folderId ? 'page' : undefined}
                   key={folder.id}
                   onClick={() => {
                     onSelectFolder(folder.id);
@@ -125,12 +139,12 @@ export default function MobileMailboxSheet({
                     {folder.name !== folderLabel(folder) && <small>{folder.name}</small>}
                   </span>
                   {folder.unread_count > 0 && <span className="mobile-mailbox-count">{folder.unread_count}</span>}
-                  <ChevronRight size={16} aria-hidden="true" />
+                  <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               ))}
               {folders.length === 0 && (
                 <div className="mobile-mailbox-empty">
-                  <FolderOpen size={18} aria-hidden="true" />
+                  <FolderOpen size={20} strokeWidth={1.75} aria-hidden="true" />
                   <span>暂无邮箱文件夹</span>
                 </div>
               )}
@@ -146,11 +160,11 @@ export default function MobileMailboxSheet({
               onCompose();
             }}
           >
-            <Edit3 size={19} aria-hidden="true" />
+            <PenLine size={20} strokeWidth={1.75} aria-hidden="true" />
             写邮件
           </button>
           <button type="button" onClick={onOpenSettings}>
-            <Settings size={19} aria-hidden="true" />
+            <Settings size={20} strokeWidth={1.75} aria-hidden="true" />
             设置
           </button>
         </footer>

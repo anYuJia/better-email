@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type RefObject } from 'react';
 import {
+  ArrowLeft,
   Check,
   Plus,
   RefreshCw,
@@ -20,6 +21,8 @@ export type AddContactsResult = {
 };
 
 type ComposerContactsPanelProps = {
+  panelRef?: RefObject<HTMLElement>;
+  modal?: boolean;
   contacts: Contact[];
   draft: DraftInput;
   activeRecipientField: ComposerRecipientField;
@@ -98,6 +101,8 @@ function compareByFrequency(left: Contact, right: Contact) {
 }
 
 export default function ComposerContactsPanel({
+  panelRef,
+  modal = false,
   contacts,
   draft,
   activeRecipientField,
@@ -139,7 +144,7 @@ export default function ComposerContactsPanel({
   const emptyDescription = query ? '试试搜索其他姓名或邮箱' : '可以先到联系人设置中添加';
 
   return (
-    <aside id="composer-contacts-panel" className="composer-contacts-panel" aria-label="联系人">
+    <aside ref={panelRef} id="composer-contacts-panel" className="composer-contacts-panel" aria-label="联系人" role={modal ? 'dialog' : undefined} aria-modal={modal || undefined}>
       <div className="composer-contacts-header">
         <div className="composer-contacts-heading">
           <strong>联系人</strong>
@@ -160,7 +165,7 @@ export default function ComposerContactsPanel({
               }
             }}
           >
-            <RefreshCw size={13} aria-hidden="true" className={scanBusy ? 'is-spinning' : ''} />
+            <RefreshCw size={16} aria-hidden="true" className={scanBusy ? 'is-spinning' : ''} />
             <span>{scanBusy ? '正在扫描…' : '同步'}</span>
           </button>
         ) : null}
@@ -174,11 +179,11 @@ export default function ComposerContactsPanel({
             <button
               type="button"
               className="composer-contacts-close"
-              aria-label="关闭联系人面板"
-              title="关闭联系人面板"
+              aria-label={modal ? '返回写信' : '关闭联系人面板'}
+              title={modal ? '返回写信' : '关闭联系人面板'}
               onClick={onClose}
             >
-              <X size={17} aria-hidden="true" />
+              {modal ? <ArrowLeft size={18} aria-hidden="true" /> : <X size={18} aria-hidden="true" />}
             </button>
           )}
         </div>
@@ -196,7 +201,7 @@ export default function ComposerContactsPanel({
           />
           {query && (
             <button type="button" aria-label="清除联系人搜索" onClick={() => setQuery('')}>
-              <X size={13} aria-hidden="true" />
+              <X size={16} aria-hidden="true" />
             </button>
           )}
         </label>
@@ -246,7 +251,7 @@ export default function ComposerContactsPanel({
               }}
             >
               <span className={`composer-contact-avatar tone-${avatarTone(contact)}`} aria-hidden="true">
-                {avatarLabel ?? <UserRound size={17} />}
+                {avatarLabel ?? <UserRound size={18} />}
               </span>
               <span className={`composer-contact-copy${hasName ? '' : ' is-email-only'}`}>
                 <strong title={name}>{name}</strong>
@@ -254,7 +259,7 @@ export default function ComposerContactsPanel({
               </span>
               {addedTo ? (
                 <span className="composer-contact-add is-added">
-                  <Check size={13} aria-hidden="true" />已添加
+                  <Check size={16} aria-hidden="true" />已添加
                 </span>
               ) : (
                 <button
@@ -267,7 +272,7 @@ export default function ComposerContactsPanel({
                     addContact(contact);
                   }}
                 >
-                  <Plus size={13} aria-hidden="true" />添加
+                  <Plus size={16} aria-hidden="true" />添加
                 </button>
               )}
             </article>
@@ -276,7 +281,7 @@ export default function ComposerContactsPanel({
         {visibleContacts.length === 0 && (
           <div className="composer-contacts-empty">
             <span className="composer-contacts-empty-icon" aria-hidden="true">
-              <UserRound size={19} />
+              <UserRound size={18} />
             </span>
             <strong>{emptyTitle}</strong>
             <small>{emptyDescription}</small>

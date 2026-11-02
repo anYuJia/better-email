@@ -63,17 +63,21 @@ pub async fn ai_chat_request(
     store: State<'_, MailStore>,
     input: AiChatRequest,
 ) -> Result<AiChatOutcome, String> {
-    // 聊天补全只允许 HTTP 型服务，且 endpoint 必须与已保存配置一致，
-    // 保存的密钥绝不会被发送到调用方构造的任意端点。
-    let (endpoint, api_key) =
-        enforce_saved_http_request(&store, "http", &input.endpoint, &input.api_key)?;
-    crate::ai::call_chat_completion(
-        &endpoint,
-        &api_key,
-        &input.model,
-        &input.messages,
-        input.timeout_seconds,
-    )
+    let store = store.inner().clone();
+    super::executor::network_string(-1, move || {
+        // 聊天补全只允许 HTTP 型服务，且 endpoint 必须与已保存配置一致，
+        // 保存的密钥绝不会被发送到调用方构造的任意端点。
+        let (endpoint, api_key) =
+            enforce_saved_http_request(&store, "http", &input.endpoint, &input.api_key)?;
+        crate::ai::call_chat_completion(
+            &endpoint,
+            &api_key,
+            &input.model,
+            &input.messages,
+            input.timeout_seconds,
+        )
+    })
+    .await
 }
 
 #[tauri::command]
@@ -81,17 +85,21 @@ pub async fn ai_request(
     store: State<'_, MailStore>,
     input: AiRequestInput,
 ) -> Result<AiRequestResult, String> {
-    let mut input = input;
-    let (endpoint, api_key) = match input.service_type.as_str() {
-        "mcp" => enforce_saved_http_request(&store, "mcp", &input.endpoint, &input.api_key)?,
-        _ => enforce_saved_http_request(&store, "http", &input.endpoint, &input.api_key)?,
-    };
-    input.endpoint = endpoint;
-    input.api_key = api_key;
-    match input.service_type.as_str() {
-        "mcp" => run_mcp_tool_call(&input),
-        _ => run_ai_request(&input),
-    }
+    let store = store.inner().clone();
+    super::executor::network_string(-1, move || {
+        let mut input = input;
+        let (endpoint, api_key) = match input.service_type.as_str() {
+            "mcp" => enforce_saved_http_request(&store, "mcp", &input.endpoint, &input.api_key)?,
+            _ => enforce_saved_http_request(&store, "http", &input.endpoint, &input.api_key)?,
+        };
+        input.endpoint = endpoint;
+        input.api_key = api_key;
+        match input.service_type.as_str() {
+            "mcp" => run_mcp_tool_call(&input),
+            _ => run_ai_request(&input),
+        }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -103,44 +111,52 @@ pub async fn test_ai_connection(
     model: String,
     timeout_seconds: u64,
 ) -> Result<AiConnectionReport, String> {
-    // 「测试连接」测试的是用户本次输入的新配置：只使用本次传入的 key。
-    // 仅当 endpoint 与已保存配置完全一致时，才允许复用已保存 key（目标不变）。
-    let service_kind = if service_type.as_str() == "mcp" {
-        "mcp"
-    } else {
-        "http"
-    };
-    let api_key = test_connection_key(&store, service_kind, &endpoint, &api_key)?;
-    test_connection_inner(&service_type, &endpoint, &api_key, &model, timeout_seconds)
+    let store = store.inner().clone();
+    super::executor::network_string(-1, move || {
+        // 「测试连接」测试的是用户本次输入的新配置：只使用本次传入的 key。
+        // 仅当 endpoint 与已保存配置完全一致时，才允许复用已保存 key（目标不变）。
+        let service_kind = if service_type.as_str() == "mcp" {
+            "mcp"
+        } else {
+            "http"
+        };
+        let api_key = test_connection_key(&store, service_kind, &endpoint, &api_key)?;
+        test_connection_inner(&service_type, &endpoint, &api_key, &model, timeout_seconds)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn save_ai_settings(
+pub async fn save_ai_settings(
     store: State<'_, MailStore>,
     input: AiSettingsSaveInput,
 ) -> Result<String, String> {
-    // 两类密钥分别绑定到各自的 endpoint：AI 接入页和 MCP 页可以独立保存，
-    // 但密钥仍不能跟随 endpoint 变化而被静默沿用，否则旧 key 可能被发到新的端点。
-    let existing = store.load_ai_settings().ok();
-    let (api_key, mcp_api_key) = resolve_ai_secrets_for_save(existing.as_ref(), &input)?;
-    let record = AiSettingsRecord {
-        enabled: input.enabled,
-        service_type: input.service_type,
-        endpoint: input.endpoint,
-        api_key,
-        model: input.model,
-        timeout_seconds: input.timeout_seconds,
-        privacy_acknowledged: input.privacy_acknowledged,
-        mcp_enabled: input.mcp_enabled,
-        mcp_endpoint: input.mcp_endpoint,
-        mcp_api_key,
-    };
-    // AI 密钥只写入应用自己的本地数据库，不触碰系统凭据库，
-    // 保证打开设置页时不会触发任何 Keychain 访问或授权提示。
-    store
-        .save_ai_settings(&record)
-        .map_err(|error| error.to_string())?;
-    Ok("AI 服务设置已保存。".to_string())
+    let store = store.inner().clone();
+    super::executor::database_string(move || {
+        // 两类密钥分别绑定到各自的 endpoint：AI 接入页和 MCP 页可以独立保存，
+        // 但密钥仍不能跟随 endpoint 变化而被静默沿用，否则旧 key 可能被发到新的端点。
+        let existing = store.load_ai_settings().ok();
+        let (api_key, mcp_api_key) = resolve_ai_secrets_for_save(existing.as_ref(), &input)?;
+        let record = AiSettingsRecord {
+            enabled: input.enabled,
+            service_type: input.service_type,
+            endpoint: input.endpoint,
+            api_key,
+            model: input.model,
+            timeout_seconds: input.timeout_seconds,
+            privacy_acknowledged: input.privacy_acknowledged,
+            mcp_enabled: input.mcp_enabled,
+            mcp_endpoint: input.mcp_endpoint,
+            mcp_api_key,
+        };
+        // AI 密钥只写入应用自己的本地数据库，不触碰系统凭据库，
+        // 保证打开设置页时不会触发任何 Keychain 访问或授权提示。
+        store
+            .save_ai_settings(&record)
+            .map_err(|error| error.to_string())?;
+        Ok("AI 服务设置已保存。".to_string())
+    })
+    .await
 }
 
 /// 端点规范化：去首尾空白、去掉末尾斜杠。用于判断端点是否变化、是否与已保存
@@ -199,11 +215,15 @@ fn resolve_bound_secret_key(
 }
 
 #[tauri::command]
-pub fn load_ai_settings(store: State<'_, MailStore>) -> Result<AiSettingsReport, String> {
-    store
-        .load_ai_settings()
-        .map(AiSettingsReport::from)
-        .map_err(|error| error.to_string())
+pub async fn load_ai_settings(store: State<'_, MailStore>) -> Result<AiSettingsReport, String> {
+    let store = store.inner().clone();
+    super::executor::database_string(move || {
+        store
+            .load_ai_settings()
+            .map(AiSettingsReport::from)
+            .map_err(|error| error.to_string())
+    })
+    .await
 }
 
 /// 后端安全边界：校验一次外部 AI/MCP 请求是否可以使用保存的密钥。

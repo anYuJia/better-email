@@ -1,6 +1,7 @@
 import useOnboardingAccount from './hooks/useOnboardingAccount';
 import useMobileVisualViewport from './hooks/useMobileVisualViewport';
 import useMailFeedback from './hooks/useMailFeedback';
+import useStatusFeedback from './hooks/useStatusFeedback';
 import React, {
   lazy,
   Suspense,
@@ -17,6 +18,9 @@ import ReaderPane from './components/ReaderPane';
 import MobileInboxHeader from './components/mobile/MobileInboxHeader';
 import MobileBottomNav from './components/mobile/MobileBottomNav';
 import MobileMailboxSheet from './components/mobile/MobileMailboxSheet';
+import MobileScreenSurface from './components/mobile/MobileScreenSurface';
+import useMobileNavigation from './hooks/useMobileNavigation';
+import useExitPresence from './hooks/useExitPresence';
 import MobileSettingsRoot from './components/mobile/MobileSettingsRoot';
 import GlobalTooltip from './components/GlobalTooltip';
 import ContactSyncLoadingDialog from './components/ContactSyncLoadingDialog';
@@ -122,7 +126,9 @@ import { buildTitlebarViewSummary } from './app/titlebarSummary';
 import { openUnreadInbox } from './app/trayActions';
 import './ui-2026.css';
 
-const ComposerWindow = lazy(() => import('./components/ComposerWindow'));
+const loadComposerWindow = () => import('./components/ComposerWindow');
+const ComposerWindow = lazy(loadComposerWindow);
+const preloadComposerWindow = () => { void loadComposerWindow().catch(() => undefined); };
 const SnoozePicker = lazy(() => import('./components/SnoozePicker'));
 import DeferredSurface from './components/DeferredSurface';
 import useSettingsAccountSelection from './hooks/useSettingsAccountSelection';
@@ -182,7 +188,19 @@ function MailboxApp({
   onStandaloneSettingsReady,
 }: AppProps & { standaloneSettingsWindow: boolean; requestedSettingsSection: SettingsSectionId }) {
   const [account, setAccount] = useState<Account | null>(null);
+  const readerScrollPositions = useRef(new Map<string, number>());
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const accountSourceLabels = useMemo(() => {
+    const names = new Map<string, number>();
+    for (const entry of accounts) {
+      const name = entry.display_name.trim().toLocaleLowerCase();
+      if (name) names.set(name, (names.get(name) ?? 0) + 1);
+    }
+    return new Map(accounts.map((entry) => {
+      const name = entry.display_name.trim();
+      return [entry.id, name && names.get(name.toLocaleLowerCase()) === 1 ? name : entry.email];
+    }));
+  }, [accounts]);
   const [accountScope, setAccountScope] = useState<AccountScope>(
     () => requestedSettingsAccountScope ?? loadAccountScope(),
   );
@@ -222,8 +240,6 @@ function MailboxApp({
   const [isViewportMobile, setIsViewportMobile] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 720px)').matches,
   );
-  const [mobileScreen, setMobileScreen] = useState<'mail' | 'reader' | 'mailbox' | 'settings'>('mail');
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const themeMode = useThemeMode();
   useAutoHideScrollbars();
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>(requestedSettingsSection);
@@ -302,83 +318,9 @@ function MailboxApp({
     return () => media.removeEventListener?.('change', update);
   }, []);
 
-  useEffect(() => {
-    if (!isMobileApp) return undefined;
-    const current = window.history.state?.betterEmailScreen;
-    if (!current) {
-      window.history.replaceState(
-        { ...(window.history.state ?? {}), betterEmailScreen: 'mail' },
-        '',
-      );
-    }
-
-    const handlePopState = (event: PopStateEvent) => {
-      const next = event.state?.betterEmailScreen;
-      const nextScreen = next === 'reader' || next === 'mailbox' || next === 'settings'
-        ? next
-        : 'mail';
-      setMobileScreen(nextScreen);
-      setMobileSearchOpen(Boolean(event.state?.betterEmailSearch));
-      if (nextScreen === 'settings' && typeof event.state?.betterEmailSettingsSection === 'string') {
-        setActiveSettingsSection(event.state.betterEmailSettingsSection as SettingsSectionId);
-        setSettingsOpen(true);
-      } else {
-        setSettingsOpen(false);
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [isMobileApp]);
-
-  const navigateMobileScreen = useCallback((nextScreen: 'mail' | 'reader' | 'mailbox' | 'settings') => {
-    setMobileScreen(nextScreen);
-    setMobileSearchOpen(false);
-    if (!isMobileApp) return;
-    const currentState = window.history.state ?? {};
-    const {
-      betterEmailSettingsSection: _settingsSection,
-      betterEmailSettingsDirection: _settingsDirection,
-      betterEmailSearch: _search,
-      ...baseState
-    } = currentState;
-    if (currentState.betterEmailScreen === nextScreen) {
-      if (currentState.betterEmailSearch) {
-        window.history.replaceState({ ...baseState, betterEmailScreen: nextScreen }, '');
-      }
-      return;
-    }
-    window.history.pushState({ ...baseState, betterEmailScreen: nextScreen }, '');
-  }, [isMobileApp]);
-
-  const backMobileScreen = useCallback(() => {
-    setMobileSearchOpen(false);
-    if (isMobileApp && window.history.state?.betterEmailSearch) {
-      window.history.back();
-      return;
-    }
-    if (isMobileApp && window.history.state?.betterEmailScreen !== 'mail') {
-      window.history.back();
-      return;
-    }
-    setMobileScreen('mail');
-  }, [isMobileApp]);
-
-  const openMobileSearch = useCallback(() => {
-    setMobileSearchOpen(true);
-    if (!isMobileApp || window.history.state?.betterEmailSearch) return;
-    window.history.pushState(
-      { ...(window.history.state ?? {}), betterEmailSearch: true },
-      '',
-    );
-  }, [isMobileApp]);
-
-  const closeMobileSearch = useCallback(() => {
-    if (isMobileApp && window.history.state?.betterEmailSearch) {
-      window.history.back();
-      return;
-    }
-    setMobileSearchOpen(false);
-  }, [isMobileApp]);
+  const { mobileScreen, setMobileScreen, mobileSearchOpen, navigateMobileScreen, backMobileScreen, openMobileSearch, closeMobileSearch } = useMobileNavigation({
+    isMobileApp, isSettingsOpen, activeSettingsSection, setActiveSettingsSection, setSettingsOpen,
+  });
 
   useEffect(() => {
     if (isMobileApp && isSettingsOpen && mobileScreen !== 'settings') {
@@ -418,8 +360,8 @@ function MailboxApp({
     handleClearSearchAndFilter,
     handleClearSearchForFilter,
     handleApplySearchShortcut,
-    handleShowMessages,
-    handleShowThreads,
+    handleShowMessages: showMessagesMode,
+    handleShowThreads: showThreadsMode,
   } = useMailboxSearchController({
     account,
     accountScope,
@@ -525,13 +467,6 @@ function MailboxApp({
     queueUndoAction,
   } = useUndoQueue();
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
-  const lastVisualStatusRef = useRef(status);
-  useEffect(() => {
-    if (lastVisualStatusRef.current === status) return;
-    lastVisualStatusRef.current = status;
-    if (!/(?:^Error:|失败|错误|出错|无法|不能|被拒绝|超时|请先|尚未配置|不存在)/i.test(status)) return;
-    showMessageToast(status.replace(/^Error:\s*/i, ''), 'error');
-  }, [showMessageToast, status]);
   const {
     loadMeta,
     releaseDueSnoozedMessages,
@@ -571,6 +506,8 @@ function MailboxApp({
     readerSelectedDetail,
     readerDisplayedId,
     readerSelectionRevision,
+    detailLoadState,
+    retrySelectedDetail,
     selected,
     selectedDetail,
     setSelectedDetail,
@@ -757,6 +694,7 @@ function MailboxApp({
     currentFolderAccountId,
     visibleFolderIdForRole,
     openThread,
+    invalidateThreadRequest,
     changeAccountScope,
     selectFolder,
   } = useMailboxNavigation({
@@ -783,6 +721,16 @@ function MailboxApp({
     setThreadMessages,
     navigationScopeClaimRef,
   });
+
+  const handleShowMessages = useCallback(() => {
+    invalidateThreadRequest();
+    showMessagesMode();
+  }, [invalidateThreadRequest, showMessagesMode]);
+  const handleShowThreads = useCallback(() => {
+    invalidateThreadRequest();
+    showThreadsMode();
+  }, [invalidateThreadRequest, showThreadsMode]);
+  useEffect(() => invalidateThreadRequest(), [listMode, invalidateThreadRequest]);
 
   const openDesktopSettingsWindow = useCallback((section: SettingsSectionId = 'general') => {
     setStatus('正在打开设置窗口…');
@@ -953,6 +901,7 @@ function MailboxApp({
     blockSelectedSender,
     downloadAttachment,
     openAttachment,
+    refreshMessageAttachments,
     saveAttachmentAs,
     exportSelectedMessage,
   } = useReaderActions({
@@ -1024,8 +973,15 @@ function MailboxApp({
   const {
     draft,
     setDraft,
+    editorFlushRef,
+    getDraftSnapshot,
     quickReplyBody,
+    readerReplyRef,
+    quickReplyComposerActive,
     setQuickReplyBody,
+    quickReplySaveError,
+    retryQuickReplySave,
+    isSubmitting,
     isRichComposer,
     setRichComposer,
     composeTemplates,
@@ -1037,6 +993,11 @@ function MailboxApp({
     setComposerMinimized,
     composerFocusRequest,
     isComposerDropActive,
+    attachmentImports,
+    isImportingAttachments,
+    retryAttachmentImport,
+    dismissAttachmentImport,
+    sendIssue,
     composerCloseConfirmOpen,
     setComposerCloseConfirmOpen,
     openComposer,
@@ -1075,6 +1036,7 @@ function MailboxApp({
     accounts,
     identities,
     selectedId,
+    quickReplyAccountId: selected?.account_id ?? null,
     pendingSendUndo,
     sendUndoDelaySeconds,
     setOutbox,
@@ -1090,6 +1052,10 @@ function MailboxApp({
     setSendProgress: setComposerSendProgress,
     setSendProgressMessage: setComposerSendProgressMessage,
     setAttachmentProgress: setComposerAttachmentProgress,
+  });
+  const composerPresent = useExitPresence(isComposerOpen);
+  useStatusFeedback(status, showMessageToast, {
+    visible: isComposerOpen && !isComposerMinimized, sendIssue, imports: attachmentImports,
   });
 
   useEffect(() => {
@@ -1582,15 +1548,15 @@ function MailboxApp({
 
   const openComposerContactsSettings = useCallback(() => {
     const openContactsSettings = () => openMobileSettingsSection('contacts');
-    if (isDraftEmpty(draft)) {
+    if (isDraftEmpty(getDraftSnapshot().draft) && !attachmentImports.some(item => item.status !== 'ready')) {
       forceCloseComposer();
       openContactsSettings();
       return;
     }
     saveDraft()
-      .then(openContactsSettings)
+      .then((result) => { if (result.status === 'saved') openContactsSettings(); })
       .catch((error) => setStatus(String(error)));
-  }, [draft, forceCloseComposer, openMobileSettingsSection, saveDraft, setStatus]);
+  }, [attachmentImports, getDraftSnapshot, forceCloseComposer, openMobileSettingsSection, saveDraft, setStatus]);
 
   const handleRunActiveThreadAction = useCallback((action: BulkMessageAction) => {
     if (!activeThread) return;
@@ -1716,6 +1682,7 @@ function MailboxApp({
       <MessageListPane
         mobile={isMobileApp}
         showAccountSource={accountScope === 'all'}
+        accountSourceLabels={accountSourceLabels}
         appliedQuery={appliedQuery}
         onOpenNavigation={isMobileApp ? undefined : showNarrowSidebar}
         filter={filter}
@@ -1773,6 +1740,7 @@ function MailboxApp({
   const readerContent = (
     <AppErrorBoundary>
       <ReaderPane
+        scrollPositions={readerScrollPositions.current}
         deliveryStatus={outbox.find((item) => item.message_id === selected?.id)}
         onResolveDelivery={resolveDelivery}
         activeThread={activeThread}
@@ -1781,6 +1749,8 @@ function MailboxApp({
         selected={readerSelectedDetail}
         selectedId={readerDisplayedId}
         activeSelectedId={selectedId}
+        detailLoadState={detailLoadState}
+        onRetryDetail={retrySelectedDetail}
         attachmentsLoaded={attachmentsLoaded}
         readTriggerKey={readerSelectionRevision}
         accountScope={accountScope}
@@ -1796,6 +1766,11 @@ function MailboxApp({
         selectedInterceptsHttps={selectedInterceptsHttps}
         onOpenHttpsLink={handleOpenHttpsLink}
         quickReplyBody={quickReplyBody}
+        readerReplyRef={readerReplyRef}
+        quickReplyComposerActive={quickReplyComposerActive}
+        quickReplySaveError={quickReplySaveError}
+        onRetryQuickReplySave={retryQuickReplySave}
+        submissionPending={isSubmitting}
         onSelectMessage={selectMessageForReading}
         onComposeNew={handleComposeNew}
         onComposeFromMessage={composeFromMessage}
@@ -1829,6 +1804,7 @@ function MailboxApp({
         onUpdateLabel={handleUpdateLabel}
         onDeleteLabel={handleDeleteLabel}
         onOpenAttachment={openAttachment}
+        onRefreshAttachments={refreshMessageAttachments}
         onDownloadAttachment={downloadAttachment}
         onSaveAttachmentAs={saveAttachmentAs}
         onQuickReplyChange={setQuickReplyBody}
@@ -1854,8 +1830,7 @@ function MailboxApp({
     >
       {standaloneSettingsWindow ? null : isMobileApp ? (
         <div className={`mobile-app-surface mobile-screen-${mobileScreen}`}>
-          {mobileScreen === 'mail' && (
-            <>
+          <MobileScreenSurface kind="mail" active={mobileScreen === 'mail' || mobileScreen === 'mailbox'} persistent>
               <MobileInboxHeader
                 accountScopeLabel={accountScope === 'all' ? '统一邮箱' : (account?.display_name || account?.email)}
                 currentViewLabel={currentViewLabel}
@@ -1879,6 +1854,7 @@ function MailboxApp({
               />
               {messageListContent}
               <MobileBottomNav
+                onComposeIntent={useNativeComposerWindow ? undefined : preloadComposerWindow}
                 filter={filter}
                 onOpenMail={() => {
                   handleClearSearchForFilter('all', false);
@@ -1893,15 +1869,15 @@ function MailboxApp({
                 onCompose={() => handleComposeNew(undefined)}
                 onOpenSettings={openMobileSettings}
               />
-            </>
-          )}
-          {mobileScreen === 'reader' && (
+          </MobileScreenSurface>
+          <MobileScreenSurface kind="reader" active={mobileScreen === 'reader'}>
             <div className="mobile-reader-surface">
               {readerContent}
             </div>
-          )}
-          {mobileScreen === 'mailbox' && (
+          </MobileScreenSurface>
+          <MobileScreenSurface kind="mailbox" active={mobileScreen === 'mailbox'}>
             <MobileMailboxSheet
+              active={mobileScreen === 'mailbox'}
               accountScope={accountScope}
               accounts={accounts}
               folders={folders}
@@ -1912,15 +1888,15 @@ function MailboxApp({
               onCompose={() => handleComposeNew(undefined)}
               onOpenSettings={openMobileSettings}
             />
-          )}
-          {mobileScreen === 'settings' && (
+          </MobileScreenSurface>
+          <MobileScreenSurface kind="settings" active={mobileScreen === 'settings'}>
             <MobileSettingsRoot
               account={account}
               accounts={accounts}
               onBack={backMobileScreen}
               onOpenSection={openMobileSettingsSection}
             />
-          )}
+          </MobileScreenSurface>
         </div>
       ) : (
         <>
@@ -1943,6 +1919,7 @@ function MailboxApp({
         onRefresh={handleRefreshAction}
       />
       <Sidebar
+        onComposeIntent={useNativeComposerWindow ? undefined : preloadComposerWindow}
         accountScope={accountScope}
         accounts={accounts}
         folders={folders}
@@ -2044,10 +2021,13 @@ function MailboxApp({
         </>
       )}
 
-      {!isAccountLoginActive && !useNativeComposerWindow && isComposerOpen && (
+      {!isAccountLoginActive && !useNativeComposerWindow && composerPresent && (
         <Suspense fallback={<DeferredSurface label="正在打开写信窗口" />}>
           <AppErrorBoundary>
             <ComposerWindow
+              editorFlushRef={editorFlushRef}
+              open={isComposerOpen}
+              submissionPending={isSubmitting}
               mobile={isMobileApp}
               minimized={isComposerMinimized}
               focusRequest={composerFocusRequest}
@@ -2076,7 +2056,6 @@ function MailboxApp({
               onSaveTemplate={saveDraftAsTemplate}
               onInsertSignature={insertSignatureIntoDraft}
               onPickAttachments={() => {
-                setComposerAttachmentProgress(null);
                 pickDraftAttachments().catch((error) => setStatus(String(error)));
               }}
               onRemoveAttachment={removeDraftAttachment}
@@ -2096,6 +2075,11 @@ function MailboxApp({
               sendProgress={composerSendProgress}
               sendProgressMessage={composerSendProgressMessage}
               attachmentProgress={composerAttachmentProgress}
+              attachmentImports={attachmentImports}
+              isImportingAttachments={isImportingAttachments}
+              onRetryAttachmentImport={(id) => { void retryAttachmentImport(id); }}
+              onDismissAttachmentImport={dismissAttachmentImport}
+              sendIssue={sendIssue}
               crossAccountRisks={crossAccountRisks}
             />
           </AppErrorBoundary>

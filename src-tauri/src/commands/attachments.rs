@@ -104,6 +104,29 @@ pub(crate) fn read_verified_outbound_attachment(
     store: &MailStore,
     attachment: &Attachment,
 ) -> MailResult<Vec<u8>> {
+    read_verified_outbound_attachment_with_progress(store, attachment, |_| Ok(()))
+}
+
+pub(crate) fn read_verified_outbound_attachment_with_progress(
+    store: &MailStore,
+    attachment: &Attachment,
+    on_progress: impl FnMut(u64) -> MailResult<()>,
+) -> MailResult<Vec<u8>> {
+    verify_outbound_attachment(store, attachment, true, on_progress)
+}
+
+fn verify_outbound_attachment(
+    store: &MailStore,
+    attachment: &Attachment,
+    collect_bytes: bool,
+    mut on_progress: impl FnMut(u64) -> MailResult<()>,
+) -> MailResult<Vec<u8>> {
+    on_progress(0)?;
+    if attachment.filename.trim().is_empty() {
+        return Err(crate::db::MailError::SmtpPermanent(
+            "附件缺少文件名，已停止发送；请移除该附件并重新添加。".to_string(),
+        ));
+    }
     if attachment.local_path.trim().is_empty() {
         return Err(crate::db::MailError::Smtp(
             "附件没有本地路径，无法读取。".to_string(),
@@ -139,7 +162,12 @@ pub(crate) fn read_verified_outbound_attachment(
             "附件超过大小上限，已拒绝发送。".to_string(),
         ));
     }
-    let mut bytes = Vec::with_capacity(current_size.max(0) as usize);
+    // 保存/排队前只做流式摘要校验；只有真正构建 MIME 时才保留完整字节。
+    let mut bytes = if collect_bytes {
+        Vec::with_capacity(current_size.max(0) as usize)
+    } else {
+        Vec::new()
+    };
     let mut digest = Sha256::new();
     let mut read_total = 0_i64;
     let mut buffer = [0_u8; 64 * 1024];
@@ -155,7 +183,10 @@ pub(crate) fn read_verified_outbound_attachment(
             ));
         }
         digest.update(&buffer[..read]);
-        bytes.extend_from_slice(&buffer[..read]);
+        if collect_bytes {
+            bytes.extend_from_slice(&buffer[..read]);
+        }
+        on_progress(read_total as u64)?;
     }
     if read_total != current_size {
         return Err(crate::db::MailError::Smtp(
@@ -186,7 +217,7 @@ pub(crate) fn read_verified_outbound_attachment(
 /// 发送前对单个附件做最终校验。实际 SMTP/MIME 发送必须使用
 /// `read_verified_outbound_attachment` 返回的同一批字节。
 pub fn validate_outbound_attachment(store: &MailStore, attachment: &Attachment) -> MailResult<()> {
-    read_verified_outbound_attachment(store, attachment).map(|_| ())
+    verify_outbound_attachment(store, attachment, false, |_| Ok(())).map(|_| ())
 }
 
 fn file_sha256(path: &Path, expected_size: i64) -> MailResult<String> {
@@ -318,14 +349,17 @@ fn enforce_outbound_total_size(attachments: impl Iterator<Item = i64>) -> MailRe
 
 /// 保存/发送前对 IPC 传入的发件附件执行与「正常发送」一致的全部校验：
 /// canonical 常规文件、大小与声明一致、单附件/总大小上限、授权表匹配。
-/// 仅校验带文件名的条目（与 DB 持久化逻辑一致，空文件名条目不会落库）。
+/// 任何无效条目都会阻止保存/发送，绝不能静默丢弃附件后继续发送。
 pub(crate) fn validate_outbound_attachment_inputs(
     store: &MailStore,
     attachments: &[OutboundAttachmentInput],
 ) -> MailResult<()> {
+    enforce_outbound_total_size(attachments.iter().map(|attachment| attachment.size_bytes))?;
     for attachment in attachments {
         if attachment.filename.trim().is_empty() {
-            continue;
+            return Err(crate::db::MailError::SmtpPermanent(
+                "附件缺少文件名，已停止保存或发送；请移除该附件并重新添加。".to_string(),
+            ));
         }
         let db_attachment = Attachment {
             id: 0,
@@ -340,12 +374,7 @@ pub(crate) fn validate_outbound_attachment_inputs(
         };
         validate_outbound_attachment(store, &db_attachment)?;
     }
-    enforce_outbound_total_size(
-        attachments
-            .iter()
-            .filter(|attachment| !attachment.filename.trim().is_empty())
-            .map(|attachment| attachment.size_bytes),
-    )
+    Ok(())
 }
 
 /// 发送前校验持久化的发件邮件附件声明总大小（每条已由 validate_outbound_attachment 校验）。
@@ -453,11 +482,12 @@ fn create_private_file(path: &Path) -> MailResult<File> {
 }
 
 #[tauri::command]
-pub fn list_attachments(
+pub async fn list_attachments(
     store: State<'_, MailStore>,
     message_id: i64,
 ) -> MailResult<Vec<Attachment>> {
-    store.list_attachments(message_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_attachments(message_id)).await
 }
 
 /// 附件读取路径安全校验：canonicalize 解析符号链接后，必须位于应用受管理
@@ -473,12 +503,22 @@ pub(crate) fn validated_attachment_read_path(
             "附件尚未下载到本地。",
         )));
     }
-    let canonical = fs::canonicalize(&attachment.local_path).map_err(|error| {
-        crate::db::MailError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("附件文件不可用：{error}"),
-        ))
-    })?;
+    let canonical = match fs::canonicalize(&attachment.local_path) {
+        Ok(path) => path,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            // 历史版本可能在远端留档后删除临时副本却保留“已下载”。CAS 清理
+            // 旧状态，使刷新后的下载按钮可重试，不能让记录永久指向不存在文件。
+            store.mark_attachment_missing_if_path(attachment.id, &attachment.local_path)?;
+            return Err(crate::db::MailError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "附件文件不可用：本地副本已丢失，已标记为未下载；请重新下载。若远端副本也不存在，请重新添加原文件。",
+            )));
+        }
+        Err(error) => return Err(error.into()),
+    };
+    if let Some(path) = recover_legacy_sent_attachment(store, attachment, &canonical)? {
+        return Ok(path);
+    }
     // 受管目录与用户下载目录也做 canonicalize：macOS 的 /var→/private/var 等
     // 符号链接若不归一化，会误伤合法路径。
     let managed_root = store.attachment_root();
@@ -496,27 +536,85 @@ pub(crate) fn validated_attachment_read_path(
     Ok(canonical)
 }
 
+/// 只修复旧版本已发送记录绑定、且摘要授权仍有效的临时/外发副本。
+/// 两个旧目录不加入普通读取白名单；未知记录、替换内容和 symlink 均不放行。
+fn recover_legacy_sent_attachment(
+    store: &MailStore,
+    attachment: &Attachment,
+    canonical: &Path,
+) -> MailResult<Option<PathBuf>> {
+    let is_legacy_path = [store.temp_attachment_dir(), store.outbound_attachment_dir()]
+        .iter()
+        .filter_map(|root| root.canonicalize().ok())
+        .any(|root| canonical.starts_with(root));
+    if !is_legacy_path || !store.is_sent_attachment(attachment.id, &attachment.local_path)? {
+        return Ok(None);
+    }
+    let bytes = match read_verified_outbound_attachment(store, attachment) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            store.mark_attachment_missing_if_path(attachment.id, &attachment.local_path)?;
+            return Err(crate::db::MailError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("旧附件副本无法通过内容校验，已标记为未下载；请重新下载：{error}"),
+            )));
+        }
+    };
+    let mut message = store.get_outbound_message(attachment.message_id)?;
+    message.attachments = vec![attachment.clone()];
+    store.persist_sent_attachment_bytes(&message, &[bytes])?;
+    let recovered = store.get_attachment(attachment.id)?;
+    let path = fs::canonicalize(&recovered.local_path)?;
+    if !path.starts_with(fs::canonicalize(store.attachment_root())?) {
+        return Err(crate::db::MailError::Io(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "附件恢复后的路径不在受管目录内。",
+        )));
+    }
+    Ok(Some(path))
+}
+
 #[tauri::command]
-pub fn read_attachment_data_url(
+pub async fn prepare_attachment_preview(
+    store: State<'_, MailStore>,
+    attachment_id: i64,
+) -> MailResult<Attachment> {
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let attachment = store.get_attachment(attachment_id)?;
+        let path = validated_attachment_read_path(&store, &attachment)?;
+        let mut current = store.get_attachment(attachment_id)?;
+        current.local_path = path.to_string_lossy().into_owned();
+        Ok(current)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn read_attachment_data_url(
     store: State<'_, MailStore>,
     attachment_id: i64,
 ) -> MailResult<String> {
-    let attachment = store.get_attachment(attachment_id)?;
-    let path = validated_attachment_read_path(&store, &attachment)?;
-    let metadata = fs::metadata(&path)?;
-    validate_attachment_download_size(metadata.len().min(i64::MAX as u64) as i64)?;
-    let bytes = fs::read(&path)?;
-    let mime_type = if attachment.mime_type.trim().is_empty()
-        || attachment
-            .mime_type
-            .eq_ignore_ascii_case("application/octet-stream")
-    {
-        mime_type_for_path(&path).to_string()
-    } else {
-        attachment.mime_type.trim().to_string()
-    };
-    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
-    Ok(format!("data:{mime_type};base64,{encoded}"))
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let attachment = store.get_attachment(attachment_id)?;
+        let path = validated_attachment_read_path(&store, &attachment)?;
+        let metadata = fs::metadata(&path)?;
+        validate_attachment_download_size(metadata.len().min(i64::MAX as u64) as i64)?;
+        let bytes = fs::read(&path)?;
+        let mime_type = if attachment.mime_type.trim().is_empty()
+            || attachment
+                .mime_type
+                .eq_ignore_ascii_case("application/octet-stream")
+        {
+            mime_type_for_path(&path).to_string()
+        } else {
+            attachment.mime_type.trim().to_string()
+        };
+        let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+        Ok(format!("data:{mime_type};base64,{encoded}"))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -525,49 +623,52 @@ pub async fn save_image_data_url_as(
     data_url: String,
     filename: String,
 ) -> MailResult<String> {
-    let Some((metadata, encoded)) = data_url.split_once(',') else {
-        return Err(crate::db::MailError::Imap(
-            "图片数据无效，无法另存为。".to_string(),
-        ));
-    };
-    let Some(mime_type) = metadata
-        .strip_prefix("data:")
-        .and_then(|value| value.split(';').next())
-    else {
-        return Err(crate::db::MailError::Imap(
-            "图片类型无效，无法另存为。".to_string(),
-        ));
-    };
-    if !mime_type.starts_with("image/") || !metadata.contains(";base64") {
-        return Err(crate::db::MailError::Imap(
-            "仅支持另存为邮件中的图片。".to_string(),
-        ));
-    }
-    // 解码前先按编码长度限制，避免恶意超长 payload 先被整体解码到内存。
-    let encoded_len = encoded.len();
-    let max_encoded_len = max_base64_encoded_len(MAX_ATTACHMENT_DOWNLOAD_BYTES as usize);
-    if encoded_len > max_encoded_len {
-        return Err(crate::db::MailError::Imap(format!(
-            "图片数据超过大小上限（编码长度 {encoded_len} 字节 > {max_encoded_len} 字节）。"
-        )));
-    }
+    super::executor::dialog(move || {
+        let Some((metadata, encoded)) = data_url.split_once(',') else {
+            return Err(crate::db::MailError::Imap(
+                "图片数据无效，无法另存为。".to_string(),
+            ));
+        };
+        let Some(mime_type) = metadata
+            .strip_prefix("data:")
+            .and_then(|value| value.split(';').next())
+        else {
+            return Err(crate::db::MailError::Imap(
+                "图片类型无效，无法另存为。".to_string(),
+            ));
+        };
+        if !mime_type.starts_with("image/") || !metadata.contains(";base64") {
+            return Err(crate::db::MailError::Imap(
+                "仅支持另存为邮件中的图片。".to_string(),
+            ));
+        }
+        // 解码前先按编码长度限制，避免恶意超长 payload 先被整体解码到内存。
+        let encoded_len = encoded.len();
+        let max_encoded_len = max_base64_encoded_len(MAX_ATTACHMENT_DOWNLOAD_BYTES as usize);
+        if encoded_len > max_encoded_len {
+            return Err(crate::db::MailError::Imap(format!(
+                "图片数据超过大小上限（编码长度 {encoded_len} 字节 > {max_encoded_len} 字节）。"
+            )));
+        }
 
-    let payload = base64::engine::general_purpose::STANDARD
-        .decode(encoded)
-        .map_err(|error| crate::db::MailError::Imap(format!("图片数据解析失败：{error}")))?;
-    validate_attachment_download_size(payload.len().min(i64::MAX as usize) as i64)?;
+        let payload = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .map_err(|error| crate::db::MailError::Imap(format!("图片数据解析失败：{error}")))?;
+        validate_attachment_download_size(payload.len().min(i64::MAX as usize) as i64)?;
 
-    let Some(target_path) =
-        prompt_save_file_path(&app, "另存图片", sanitize_filename(&filename), None)?
-    else {
-        return Err(crate::db::MailError::Cancelled);
-    };
+        let Some(target_path) =
+            prompt_save_file_path(&app, "另存图片", sanitize_filename(&filename), None)?
+        else {
+            return Err(crate::db::MailError::Cancelled);
+        };
 
-    if let Some(parent) = target_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&target_path, payload)?;
-    Ok(format!("图片已另存为 {}", target_path.to_string_lossy()))
+        if let Some(parent) = target_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&target_path, payload)?;
+        Ok(format!("图片已另存为 {}", target_path.to_string_lossy()))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -575,31 +676,35 @@ pub async fn pick_outbound_attachments(
     app: AppHandle,
     store: State<'_, MailStore>,
 ) -> MailResult<Vec<OutboundAttachmentInput>> {
-    // 顺手清理过期的发件附件授权记录，避免无界增长。
-    let _ = store.cleanup_outbound_attachment_auths(30);
-    let Some(paths) = app
-        .dialog()
-        .file()
-        .set_title("选择附件")
-        .blocking_pick_files()
-    else {
-        return Ok(Vec::new());
-    };
+    let store = store.inner().clone();
+    super::executor::dialog(move || {
+        // 顺手清理过期的发件附件授权记录，避免无界增长。
+        let _ = store.cleanup_outbound_attachment_auths(30);
+        let Some(paths) = app
+            .dialog()
+            .file()
+            .set_title("选择附件")
+            .blocking_pick_files()
+        else {
+            return Ok(Vec::new());
+        };
 
-    let mut running_total = 0_i64;
-    let mut inputs = Vec::new();
-    for path in paths {
-        let path = path.into_path().map_err(|error| {
-            crate::db::MailError::Io(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                format!("无法解析附件路径：{error}"),
-            ))
-        })?;
-        let input = authorize_outbound_path(&store, &path, running_total)?;
-        running_total = running_total.saturating_add(input.size_bytes);
-        inputs.push(input);
-    }
-    Ok(inputs)
+        let mut running_total = 0_i64;
+        let mut inputs = Vec::new();
+        for path in paths {
+            let path = path.into_path().map_err(|error| {
+                crate::db::MailError::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("无法解析附件路径：{error}"),
+                ))
+            })?;
+            let input = authorize_outbound_path(&store, &path, running_total)?;
+            running_total = running_total.saturating_add(input.size_bytes);
+            inputs.push(input);
+        }
+        Ok(inputs)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -607,16 +712,49 @@ pub async fn download_attachment(
     store: State<'_, MailStore>,
     attachment_id: i64,
 ) -> MailResult<AttachmentDownload> {
-    let attachment = store.get_attachment(attachment_id)?;
-    download_attachment_file(&store, &attachment)
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let (attachment, account_id) = super::executor::database(move || {
+        let attachment = lookup.get_attachment(attachment_id)?;
+        let account_id = lookup.get_message_account(attachment.message_id)?.id;
+        Ok((attachment, account_id))
+    })
+    .await?;
+    super::executor::network(account_id, move || {
+        download_attachment_file(&store, &attachment)
+    })
+    .await
 }
 
 pub fn download_attachment_file(
     store: &MailStore,
     attachment: &Attachment,
 ) -> MailResult<AttachmentDownload> {
-    let account = store.get_message_account(attachment.message_id)?;
-    let secret = store.get_account_secret(&account)?;
+    // 已发送旧副本仍在本地时优先安全迁移，避免为了修复旧路径再次依赖网络。
+    if attachment.is_downloaded && !attachment.local_path.is_empty() {
+        match fs::canonicalize(&attachment.local_path) {
+            Ok(canonical) => match recover_legacy_sent_attachment(store, attachment, &canonical) {
+                Ok(Some(path)) => {
+                    return Ok(AttachmentDownload {
+                        attachment: store.get_attachment(attachment.id)?,
+                        local_path: path.to_string_lossy().into_owned(),
+                        message: "已恢复本地已发送附件副本。".into(),
+                    });
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    if store.get_attachment(attachment.id)?.is_downloaded {
+                        return Err(error);
+                    }
+                    // 校验失败已清为未下载；本次显式“下载”继续取远端可信副本。
+                }
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                store.mark_attachment_missing_if_path(attachment.id, &attachment.local_path)?;
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
     let (remote_mailbox, remote_uid) = store.get_message_remote_ref(attachment.message_id)?;
     if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
         return Err(crate::db::MailError::Imap(
@@ -624,6 +762,8 @@ pub fn download_attachment_file(
         ));
     }
     validate_attachment_download_size(attachment.size_bytes)?;
+    let account = store.get_message_account(attachment.message_id)?;
+    let secret = store.get_account_secret(&account)?;
 
     // 用户配置的下载目录只存放最终完成的附件文件；断点续传与解码临时文件
     // 放回应用受管理的缓存目录，避免在用户目录中写 .download/.decoded。
@@ -763,121 +903,133 @@ pub fn auto_download_attachments_for_message(
 
 #[allow(deprecated)]
 #[tauri::command]
-pub fn open_attachment(
+pub async fn open_attachment(
     app: AppHandle,
     store: State<'_, MailStore>,
     attachment_id: i64,
 ) -> MailResult<String> {
-    let attachment = store.get_attachment(attachment_id)?;
-    let path = validated_attachment_read_path(&store, &attachment)?;
-    app.shell()
-        .open(path.to_string_lossy().into_owned(), None)
-        .map_err(|error| crate::db::MailError::Imap(format!("无法打开附件：{error}")))?;
-    Ok(format!("已打开附件：{}", attachment.filename))
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let attachment = store.get_attachment(attachment_id)?;
+        let path = validated_attachment_read_path(&store, &attachment)?;
+        app.shell()
+            .open(path.to_string_lossy().into_owned(), None)
+            .map_err(|error| crate::db::MailError::Imap(format!("无法打开附件：{error}")))?;
+        Ok(format!("已打开附件：{}", attachment.filename))
+    })
+    .await
 }
 
 #[allow(deprecated)]
 #[tauri::command]
-pub fn reveal_attachment_in_finder(
+pub async fn reveal_attachment_in_finder(
     _app: AppHandle,
     store: State<'_, MailStore>,
     attachment_id: i64,
 ) -> MailResult<String> {
-    let attachment = store.get_attachment(attachment_id)?;
-    let path = validated_attachment_read_path(&store, &attachment)?;
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let attachment = store.get_attachment(attachment_id)?;
+        let path = validated_attachment_read_path(&store, &attachment)?;
 
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg("-R")
-            .arg(&path)
-            .spawn()
-            .map_err(crate::db::MailError::Io)?;
-    }
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("explorer")
-            .arg(format!("/select,{}", path.to_string_lossy()))
-            .spawn()
-            .map_err(crate::db::MailError::Io)?;
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    {
-        let target = path
-            .parent()
-            .map(|parent| parent.to_string_lossy().into_owned())
-            .unwrap_or_else(|| path.to_string_lossy().into_owned());
-        _app.shell()
-            .open(target, None)
-            .map_err(|error| crate::db::MailError::Imap(format!("无法定位附件：{error}")))?;
-    }
+        #[cfg(target_os = "macos")]
+        {
+            std::process::Command::new("open")
+                .arg("-R")
+                .arg(&path)
+                .spawn()
+                .map_err(crate::db::MailError::Io)?;
+        }
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("explorer")
+                .arg(format!("/select,{}", path.to_string_lossy()))
+                .spawn()
+                .map_err(crate::db::MailError::Io)?;
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            let target = path
+                .parent()
+                .map(|parent| parent.to_string_lossy().into_owned())
+                .unwrap_or_else(|| path.to_string_lossy().into_owned());
+            _app.shell()
+                .open(target, None)
+                .map_err(|error| crate::db::MailError::Imap(format!("无法定位附件：{error}")))?;
+        }
 
-    Ok(format!("已在 Finder 中显示：{}", attachment.filename))
+        Ok(format!("已在 Finder 中显示：{}", attachment.filename))
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn copy_attachment_file_to_clipboard(
+pub async fn copy_attachment_file_to_clipboard(
     store: State<'_, MailStore>,
     attachment_id: i64,
 ) -> MailResult<String> {
-    let attachment = store.get_attachment(attachment_id)?;
-    let path = validated_attachment_read_path(&store, &attachment)?;
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let attachment = store.get_attachment(attachment_id)?;
+        let path = validated_attachment_read_path(&store, &attachment)?;
 
-    #[cfg(target_os = "macos")]
-    {
-        let output = std::process::Command::new("osascript")
-            .arg("-e")
-            .arg("on run argv")
-            .arg("-e")
-            .arg("set the clipboard to (POSIX file (item 1 of argv))")
-            .arg("-e")
-            .arg("end run")
-            .arg(path.to_string_lossy().into_owned())
-            .output()
-            .map_err(crate::db::MailError::Io)?;
-        if !output.status.success() {
-            let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
-            return Err(crate::db::MailError::Imap(if message.is_empty() {
-                "无法复制附件文件到剪切板。".to_string()
-            } else {
-                format!("无法复制附件文件到剪切板：{message}")
-            }));
+        #[cfg(target_os = "macos")]
+        {
+            let output = std::process::Command::new("osascript")
+                .arg("-e")
+                .arg("on run argv")
+                .arg("-e")
+                .arg("set the clipboard to (POSIX file (item 1 of argv))")
+                .arg("-e")
+                .arg("end run")
+                .arg(path.to_string_lossy().into_owned())
+                .output()
+                .map_err(crate::db::MailError::Io)?;
+            if !output.status.success() {
+                let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                return Err(crate::db::MailError::Imap(if message.is_empty() {
+                    "无法复制附件文件到剪切板。".to_string()
+                } else {
+                    format!("无法复制附件文件到剪切板：{message}")
+                }));
+            }
         }
-    }
 
-    #[cfg(target_os = "windows")]
-    {
-        let script = format!(
-            "Set-Clipboard -LiteralPath {}",
-            powershell_single_quote(&path.to_string_lossy())
-        );
-        let output = std::process::Command::new("powershell")
-            .arg("-NoProfile")
-            .arg("-NonInteractive")
-            .arg("-Command")
-            .arg(script)
-            .output()
-            .map_err(crate::db::MailError::Io)?;
-        if !output.status.success() {
-            let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
-            return Err(crate::db::MailError::Imap(if message.is_empty() {
-                "无法复制附件文件到剪切板。".to_string()
-            } else {
-                format!("无法复制附件文件到剪切板：{message}")
-            }));
+        #[cfg(target_os = "windows")]
+        {
+            let script = format!(
+                "Set-Clipboard -LiteralPath {}",
+                powershell_single_quote(&path.to_string_lossy())
+            );
+            let output = std::process::Command::new("powershell")
+                .arg("-NoProfile")
+                .arg("-NonInteractive")
+                .arg("-Command")
+                .arg(script)
+                .output()
+                .map_err(crate::db::MailError::Io)?;
+            if !output.status.success() {
+                let message = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                return Err(crate::db::MailError::Imap(if message.is_empty() {
+                    "无法复制附件文件到剪切板。".to_string()
+                } else {
+                    format!("无法复制附件文件到剪切板：{message}")
+                }));
+            }
         }
-    }
 
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    {
-        let _ = &path;
-        Err(crate::db::MailError::Imap(
-            "当前系统暂不支持复制附件文件对象。".to_string(),
-        ))
-    }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            let _ = &path;
+            Err(crate::db::MailError::Imap(
+                "当前系统暂不支持复制附件文件对象。".to_string(),
+            ))
+        }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
-    Ok(format!("已复制附件文件：{}", attachment.filename))
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        Ok(format!("已复制附件文件：{}", attachment.filename))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -886,33 +1038,37 @@ pub async fn save_attachment_as(
     store: State<'_, MailStore>,
     attachment_id: i64,
 ) -> MailResult<String> {
-    let attachment = store.get_attachment(attachment_id)?;
-    if !attachment.is_downloaded || attachment.local_path.trim().is_empty() {
-        return Err(crate::db::MailError::Imap(
-            "附件尚未下载，请先下载后再另存为。".to_string(),
-        ));
-    }
+    let store = store.inner().clone();
+    super::executor::dialog(move || {
+        let attachment = store.get_attachment(attachment_id)?;
+        if !attachment.is_downloaded || attachment.local_path.trim().is_empty() {
+            return Err(crate::db::MailError::Imap(
+                "附件尚未下载，请先下载后再另存为。".to_string(),
+            ));
+        }
 
-    let source_path = validated_attachment_read_path(&store, &attachment)?;
+        let source_path = validated_attachment_read_path(&store, &attachment)?;
 
-    // 另存为对话框初始目录为配置的默认附件下载位置；用户显式更改则以用户选择为准。
-    let initial_dir = store.resolve_download_dir().ok();
-    let Some(target_path) = prompt_save_file_path(
-        &app,
-        "另存附件",
-        sanitize_filename(&attachment.filename),
-        initial_dir.as_deref(),
-    )?
-    else {
-        return Err(crate::db::MailError::Cancelled);
-    };
+        // 另存为对话框初始目录为配置的默认附件下载位置；用户显式更改则以用户选择为准。
+        let initial_dir = store.resolve_download_dir().ok();
+        let Some(target_path) = prompt_save_file_path(
+            &app,
+            "另存附件",
+            sanitize_filename(&attachment.filename),
+            initial_dir.as_deref(),
+        )?
+        else {
+            return Err(crate::db::MailError::Cancelled);
+        };
 
-    if let Some(parent) = target_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::copy(&source_path, &target_path)?;
-    let target = target_path.to_string_lossy().into_owned();
-    Ok(format!("附件已另存为 {target}"))
+        if let Some(parent) = target_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(&source_path, &target_path)?;
+        let target = target_path.to_string_lossy().into_owned();
+        Ok(format!("附件已另存为 {target}"))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -921,38 +1077,44 @@ pub async fn export_message_as_eml(
     store: State<'_, MailStore>,
     message_id: i64,
 ) -> MailResult<String> {
-    let message = store.get_message(message_id)?;
-    let attachments = store.list_attachments(message_id)?;
-    let (payload, skipped_attachments) = render_eml_message(&store, &message, &attachments)?;
-    let filename = sanitize_filename(&format!(
-        "{}.eml",
-        if message.subject.trim().is_empty() {
-            "better-email-message"
-        } else {
-            message.subject.trim()
-        }
-    ));
-    let target_path = app
-        .dialog()
-        .file()
-        .set_title("导出邮件为 EML")
-        .set_file_name(filename)
-        .blocking_save_file()
-        .ok_or_else(|| crate::db::MailError::Imap("已取消邮件导出。".to_string()))?
-        .into_path()
-        .map_err(|error| crate::db::MailError::Imap(format!("无法解析邮件导出路径：{error}")))?;
-
-    if let Some(parent) = target_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&target_path, payload)?;
-    let mut message = format!("邮件已导出为 {}", target_path.to_string_lossy());
-    if skipped_attachments > 0 {
-        message.push_str(&format!(
-            "（{skipped_attachments} 个附件尚未下载，未包含在导出中）"
+    let store = store.inner().clone();
+    super::executor::dialog(move || {
+        let message = store.get_message(message_id)?;
+        let attachments = store.list_attachments(message_id)?;
+        let (payload, skipped_attachments) = render_eml_message(&store, &message, &attachments)?;
+        let filename = sanitize_filename(&format!(
+            "{}.eml",
+            if message.subject.trim().is_empty() {
+                "better-email-message"
+            } else {
+                message.subject.trim()
+            }
         ));
-    }
-    Ok(message)
+        let target_path = app
+            .dialog()
+            .file()
+            .set_title("导出邮件为 EML")
+            .set_file_name(filename)
+            .blocking_save_file()
+            .ok_or_else(|| crate::db::MailError::Imap("已取消邮件导出。".to_string()))?
+            .into_path()
+            .map_err(|error| {
+                crate::db::MailError::Imap(format!("无法解析邮件导出路径：{error}"))
+            })?;
+
+        if let Some(parent) = target_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&target_path, payload)?;
+        let mut message = format!("邮件已导出为 {}", target_path.to_string_lossy());
+        if skipped_attachments > 0 {
+            message.push_str(&format!(
+                "（{skipped_attachments} 个附件尚未下载，未包含在导出中）"
+            ));
+        }
+        Ok(message)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -961,25 +1123,29 @@ pub async fn import_eml_file(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<Option<Message>> {
-    let Some(path) = app
-        .dialog()
-        .file()
-        .set_title("导入 EML 邮件")
-        .blocking_pick_file()
-    else {
-        return Ok(None);
-    };
-    let path = path
-        .into_path()
-        .map_err(|error| crate::db::MailError::Imap(format!("无法解析 EML 路径：{error}")))?;
-    // 先 metadata 预检，再按上限流式读取，避免超大 EML 被整体读入内存。
-    let payload = read_file_with_limit(&path, MAX_EML_IMPORT_BYTES)?;
-    if payload.is_empty() {
-        return Err(crate::db::MailError::Imap(
-            "EML 文件为空，无法导入。".to_string(),
-        ));
-    }
-    store.import_eml_message(account_id, &payload).map(Some)
+    let store = store.inner().clone();
+    super::executor::dialog(move || {
+        let Some(path) = app
+            .dialog()
+            .file()
+            .set_title("导入 EML 邮件")
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        let path = path
+            .into_path()
+            .map_err(|error| crate::db::MailError::Imap(format!("无法解析 EML 路径：{error}")))?;
+        // 先 metadata 预检，再按上限流式读取，避免超大 EML 被整体读入内存。
+        let payload = read_file_with_limit(&path, MAX_EML_IMPORT_BYTES)?;
+        if payload.is_empty() {
+            return Err(crate::db::MailError::Imap(
+                "EML 文件为空，无法导入。".to_string(),
+            ));
+        }
+        store.import_eml_message(account_id, &payload).map(Some)
+    })
+    .await
 }
 
 /// 清洗将要写入 RFC 822 header 的动态字段：移除 `\r` 与 `\n`。
@@ -1185,12 +1351,14 @@ fn optional_header(name: &str, value: &str) -> String {
 }
 
 #[tauri::command]
-pub fn save_temp_attachment(
+pub async fn save_temp_attachment(
     app: AppHandle,
     store: State<'_, MailStore>,
     filename: String,
     base64_data: String,
 ) -> MailResult<String> {
+    let store = store.inner().clone();
+    super::executor::database(move || {
     use base64::prelude::*;
     // 解码前先按编码长度限制：base64 长度 ≤ 4*ceil(N/3)，超过即解码结果必然超限，
     // 避免恶意输入先被整体解码到内存再被截断。
@@ -1240,6 +1408,8 @@ pub fn save_temp_attachment(
     )?;
 
     Ok(canonical.to_string_lossy().into_owned())
+
+    }).await
 }
 
 /// 创建粘贴/拖入附件的私有临时目录；Unix 下收紧为 0700（即使已存在也重新收紧）。
@@ -1304,8 +1474,12 @@ fn write_private_temp_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 /// IPC 不接受任何路径参数：只删除后端确认位于 temp_attachment_dir 且未被数据库
 /// 引用的文件，绝不允许按任意路径删除。
 #[tauri::command]
-pub fn cleanup_temp_attachments(store: State<'_, MailStore>) -> MailResult<usize> {
-    store.prune_temp_attachments(std::time::Duration::from_secs(0))
+pub async fn cleanup_temp_attachments(store: State<'_, MailStore>) -> MailResult<usize> {
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        store.prune_temp_attachments(std::time::Duration::from_secs(0))
+    })
+    .await
 }
 
 /// 按「文件名、文件名 (1).ext、文件名 (2).ext…」返回第 index 个候选文件名。
@@ -2038,7 +2212,7 @@ mod tests {
             references_header: String::new(),
             attachments: vec![attachment],
         };
-        let rendered = crate::smtp::render_outbound_with_attachment_bytes(&message, &[verified])
+        let rendered = crate::smtp::render_outbound_with_attachment_bytes(&message, vec![verified])
             .expect("rendered from verified bytes");
         let rendered = String::from_utf8_lossy(&rendered);
         assert!(rendered.contains("safe"));
@@ -2232,12 +2406,237 @@ mod tests {
     }
 
     #[test]
-    fn empty_filename_attachment_rows_are_skipped_in_validation() {
+    fn empty_filename_attachment_rows_block_saving_instead_of_being_dropped() {
         let store =
             crate::db::MailStore::open_at(unique_test_database_path()).expect("store opens");
-        // 与 DB 持久化逻辑一致：空文件名条目不落库，也不参与校验。
         let input = outbound_input("", "", 0);
-        validate_outbound_attachment_inputs(&store, &[input]).expect("empty rows skipped");
+        let error = validate_outbound_attachment_inputs(&store, &[input]).unwrap_err();
+        assert!(error.to_string().contains("缺少文件名"));
+    }
+
+    fn legacy_sent_attachment_fixture(sent: bool, temp: bool) -> (MailStore, Attachment) {
+        let store = MailStore::open_at(unique_test_database_path()).unwrap();
+        store
+            .create_account(crate::models::AccountCreateInput {
+                email: "legacy@example.com".into(),
+                display_name: "Local fixture".into(),
+                provider: "Local".into(),
+                imap_host: "imap.example.com:993".into(),
+                smtp_host: "smtp.example.com:465".into(),
+                incoming_protocol: "imap".into(),
+                auth_type: "password".into(),
+                sync_mode: "manual".into(),
+                remote_images_allowed: false,
+                signature: String::new(),
+                cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
+                auto_download_attachments: false,
+                fetch_history_attachments: false,
+                warn_external_senders: false,
+            })
+            .unwrap();
+        let directory = if temp {
+            store.temp_attachment_dir()
+        } else {
+            store.outbound_attachment_dir()
+        };
+        fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("legacy.bin");
+        fs::write(&path, b"legacy attachment").unwrap();
+        let path = path.canonicalize().unwrap();
+        let size = fs::metadata(&path).unwrap().len() as i64;
+        store
+            .register_outbound_attachment_auth(
+                &path.to_string_lossy(),
+                size,
+                &super::file_sha256(&path, size).unwrap(),
+            )
+            .unwrap();
+        let item = store
+            .queue_outbox_message(crate::models::DraftInput {
+                draft_id: 0,
+                account_id: 0,
+                identity_id: 0,
+                to: "recipient@example.com".into(),
+                cc: String::new(),
+                bcc: String::new(),
+                subject: "Legacy sent".into(),
+                body: "body".into(),
+                html_body: String::new(),
+                send_at: String::new(),
+                attachments: vec![outbound_input("legacy.bin", &path.to_string_lossy(), size)],
+            })
+            .unwrap();
+        if sent {
+            store
+                .mark_outbox_smtp_sent_pending_archive(item.message_id, "<legacy@test>")
+                .unwrap();
+            store
+                .mark_outbox_remote_archived(item.message_id, "Sent", 0)
+                .unwrap();
+        }
+        let attachment = store.list_attachments(item.message_id).unwrap().remove(0);
+        (store, attachment)
+    }
+
+    #[test]
+    fn legacy_sent_temp_and_outbound_copies_are_promoted_before_reading() {
+        for temp in [false, true] {
+            let (store, attachment) = legacy_sent_attachment_fixture(true, temp);
+            let path = super::validated_attachment_read_path(&store, &attachment).unwrap();
+            assert!(path.starts_with(store.attachment_root().canonicalize().unwrap()));
+            assert_ne!(path.to_string_lossy(), attachment.local_path);
+            assert_eq!(fs::read(&path).unwrap(), b"legacy attachment");
+            let current = store.get_attachment(attachment.id).unwrap();
+            assert!(current.is_downloaded);
+            assert_eq!(current.local_path, path.to_string_lossy());
+            store
+                .prune_temp_attachments(std::time::Duration::ZERO)
+                .unwrap();
+            assert!(path.is_file());
+        }
+    }
+
+    #[test]
+    fn legacy_sent_download_can_recover_without_credentials_or_remote_uid() {
+        let (store, attachment) = legacy_sent_attachment_fixture(true, false);
+        let result = super::download_attachment_file(&store, &attachment).unwrap();
+        assert!(result.attachment.is_downloaded);
+        assert!(std::path::Path::new(&result.local_path)
+            .starts_with(store.attachment_root().canonicalize().unwrap()));
+        assert_eq!(fs::read(result.local_path).unwrap(), b"legacy attachment");
+    }
+
+    #[test]
+    fn missing_legacy_copy_becomes_downloadable_and_corrupt_copy_is_not_trusted() {
+        for corrupt in [false, true] {
+            let (store, attachment) = legacy_sent_attachment_fixture(true, true);
+            if corrupt {
+                fs::write(&attachment.local_path, b"replaced content!").unwrap();
+            } else {
+                fs::remove_file(&attachment.local_path).unwrap();
+            }
+            let error = super::validated_attachment_read_path(&store, &attachment).unwrap_err();
+            assert!(error.to_string().contains("请重新下载"));
+            let current = store.get_attachment(attachment.id).unwrap();
+            assert!(!current.is_downloaded);
+            assert!(current.local_path.is_empty());
+            assert!(super::download_attachment_file(&store, &current)
+                .unwrap_err()
+                .to_string()
+                .contains("没有远端 UID"));
+        }
+    }
+
+    #[test]
+    fn legacy_directory_alone_never_authorizes_a_reader_path() {
+        let (store, attachment) = legacy_sent_attachment_fixture(false, false);
+        let error = super::validated_attachment_read_path(&store, &attachment).unwrap_err();
+        assert!(error.to_string().contains("不在受管目录"));
+        let mut unbound = attachment.clone();
+        unbound.id += 1000;
+        assert!(super::validated_attachment_read_path(&store, &unbound).is_err());
+        assert_eq!(
+            store.get_attachment(attachment.id).unwrap().local_path,
+            attachment.local_path
+        );
+    }
+
+    #[test]
+    fn verified_attachment_reports_bytes_and_can_cancel_before_the_file_finishes() {
+        let store = MailStore::open_at(unique_test_database_path()).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("large.bin");
+        let payload = vec![0x91; 3 * 64 * 1024 + 7];
+        fs::write(&source, &payload).unwrap();
+        let input = authorize_outbound_path(&store, &source, 0).unwrap();
+        let attachment = sample_attachment("large.bin", &input.local_path, input.size_bytes);
+        let mut reported = Vec::new();
+        let verified =
+            super::read_verified_outbound_attachment_with_progress(&store, &attachment, |bytes| {
+                reported.push(bytes);
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(verified, payload);
+        assert_eq!(reported.first(), Some(&0));
+        assert_eq!(reported.last(), Some(&(payload.len() as u64)));
+        assert!(reported.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(reported.len() > 2, "读取期间而非仅完成后发布进度");
+
+        let mut cancelled_at = 0;
+        let result =
+            super::read_verified_outbound_attachment_with_progress(&store, &attachment, |bytes| {
+                cancelled_at = bytes;
+                if bytes >= 64 * 1024 {
+                    Err(crate::db::MailError::Cancelled)
+                } else {
+                    Ok(())
+                }
+            });
+        assert!(matches!(result, Err(crate::db::MailError::Cancelled)));
+        assert_eq!(cancelled_at, 64 * 1024);
+        assert!(
+            fs::exists(&input.local_path).unwrap(),
+            "取消不破坏可重试的源附件"
+        );
+    }
+
+    #[test]
+    fn exact_25_mib_attachment_is_complete_and_one_extra_byte_is_rejected_before_reading() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = MailStore::open_at(directory.path().join("db.sqlite3")).unwrap();
+        let source = directory.path().join("boundary.bin");
+        let file = fs::File::create(&source).unwrap();
+        file.set_len(super::MAX_OUTBOUND_ATTACHMENT_BYTES as u64)
+            .unwrap();
+        let input = authorize_outbound_path(&store, &source, 0).unwrap();
+        let attachment = sample_attachment("boundary.bin", &input.local_path, input.size_bytes);
+        let bytes = read_verified_outbound_attachment(&store, &attachment).unwrap();
+        assert_eq!(bytes.len(), 25 * 1024 * 1024);
+        assert!(bytes.iter().all(|byte| *byte == 0));
+        drop(bytes);
+
+        file.set_len(super::MAX_OUTBOUND_ATTACHMENT_BYTES as u64 + 1)
+            .unwrap();
+        assert!(authorize_outbound_path(&store, &source, 0)
+            .unwrap_err()
+            .to_string()
+            .contains("超过大小上限"));
+        let oversized = sample_attachment(
+            "boundary.bin",
+            &source.to_string_lossy(),
+            super::MAX_OUTBOUND_ATTACHMENT_BYTES + 1,
+        );
+        let mut read_progress = Vec::new();
+        let error =
+            super::read_verified_outbound_attachment_with_progress(&store, &oversized, |bytes| {
+                read_progress.push(bytes);
+                Ok(())
+            })
+            .unwrap_err();
+        assert!(error.to_string().contains("超过大小上限"));
+        assert_eq!(
+            read_progress,
+            [0],
+            "超限文件在分配/读取附件或构建 SMTP MIME 前拒绝"
+        );
+    }
+
+    #[test]
+    fn validation_streams_digest_without_retaining_attachment_bytes() {
+        let store = MailStore::open_at(unique_test_database_path()).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("validate.bin");
+        fs::write(&source, vec![0x91; 256 * 1024]).unwrap();
+        let input = authorize_outbound_path(&store, &source, 0).unwrap();
+        let attachment = sample_attachment("validate.bin", &input.local_path, input.size_bytes);
+        let bytes =
+            super::verify_outbound_attachment(&store, &attachment, false, |_| Ok(())).unwrap();
+        assert_eq!(bytes.capacity(), 0);
+        fs::write(&input.local_path, vec![0x92; 256 * 1024]).unwrap();
+        assert!(super::verify_outbound_attachment(&store, &attachment, false, |_| Ok(())).is_err());
     }
 
     #[cfg(unix)]

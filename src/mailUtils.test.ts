@@ -3,6 +3,7 @@ import {
   defaultNotificationPolicy,
   formatBytes,
   formatDate,
+  formatListDate,
   messageDateGroup,
   localDateKey,
   messageMatchesLocalDateRange,
@@ -30,6 +31,14 @@ import {
 import { providerCompatibilityMatrix, providerPresets } from './providerCatalog';
 
 describe('mail UI utilities', () => {
+  it('uses calendar boundaries for compact list dates and preserves cross-year context', () => {
+    const now = new Date(2026, 0, 1, 10, 30);
+    expect(formatListDate(new Date(2026, 0, 1, 9, 5).toISOString(), now)).toBe('09:05');
+    expect(formatListDate(new Date(2025, 11, 31, 0, 1).toISOString(), now)).toBe('昨天');
+    expect(formatListDate(new Date(2025, 11, 30, 23, 59).toISOString(), now)).toBe('2025/12/30');
+    expect(formatListDate(new Date(2026, 0, 2, 0, 1).toISOString(), now)).toBe('1/2');
+    expect(formatListDate('unknown', now)).toBe('unknown');
+  });
   it('formats invalid dates without destroying the source value', () => {
     expect(formatDate('not-a-date')).toBe('not-a-date');
   });

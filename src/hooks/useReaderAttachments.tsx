@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Copy, Download, ExternalLink, FolderOpen, ImageIcon } from 'lucide-react';
 import type { Attachment } from '../app/types';
 import { attachmentKind } from '../components/reader/attachmentUtils';
@@ -14,16 +14,21 @@ type ReaderAttachmentsOptions = {
   onDownloadAttachment: (attachment: Attachment) => void | Promise<Attachment | null | undefined>;
   onOpenAttachment: (attachment: Attachment) => void;
   onSaveAttachmentAs: (attachment: Attachment) => void;
+  onRefreshAttachments?: (messageId: number) => Promise<void>;
   openImagePreview: (image: PreviewImage, trigger?: Element | null) => void;
 };
 
 export default function useReaderAttachments({
   attachments,
+  selectedId,
   onDownloadAttachment,
   onOpenAttachment,
   onSaveAttachmentAs,
+  onRefreshAttachments,
   openImagePreview,
 }: ReaderAttachmentsOptions) {
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
   const [downloadingAttachmentIds, setDownloadingAttachmentIds] = useState<Set<number>>(
     () => new Set(),
   );
@@ -95,6 +100,7 @@ export default function useReaderAttachments({
     attachment: Attachment,
     trigger?: HTMLElement | null,
   ) => {
+    const ownerId = selectedIdRef.current;
     // 未下载的图片附件：先下载，再用下载接口返回的新附件生成资源地址，
     // 绝不使用下载前为空（或过期）的 local_path。
     let current = attachment;
@@ -105,10 +111,14 @@ export default function useReaderAttachments({
     }
     if (attachmentKind(current) === 'image') {
       try {
+        // Validate on the native side before converting the path. This repairs
+        // legacy sent copies and detects missing files without base64 copies.
+        current = await invoke<Attachment>(IPC.PrepareAttachmentPreview, { attachmentId: current.id });
         const assetUrl = await localFileAssetUrl(current.local_path);
         if (!assetUrl.trim()) {
           throw new Error('附件本地文件不可用，请重新下载后再试。');
         }
+        if (selectedIdRef.current !== ownerId) return;
         openImagePreview({
           src: assetUrl,
           alt: current.filename,
@@ -120,11 +130,12 @@ export default function useReaderAttachments({
           ...currentErrors,
           [current.id]: attachmentErrorMessage(error) || '无法生成附件预览地址，请重新下载后再试。',
         }));
+        await onRefreshAttachments?.(attachment.message_id);
       }
       return;
     }
     onOpenAttachment(current);
-  }, [handleAttachmentDownload, onOpenAttachment, openImagePreview]);
+  }, [handleAttachmentDownload, onOpenAttachment, openImagePreview, onRefreshAttachments]);
 
   const revealAttachmentInFinder = useCallback(async (attachment: Attachment) => {
     if (!attachment.is_downloaded) {

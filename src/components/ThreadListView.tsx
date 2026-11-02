@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { VolumeX } from 'lucide-react';
 import type { ThreadSummary } from '../app/types';
-import { formatDate } from '../mailUtils';
+import { formatDate, formatListDate } from '../mailUtils';
 import { calculateVisibleRange } from './messageListLayout';
 
 /**
@@ -192,7 +192,7 @@ export default function ThreadListView({
                     <span className={hasUnread ? 'thread-sender is-unread' : 'thread-sender'} title={sender}>
                       {sender}
                     </span>
-                    <time>{formatDate(thread.latest_at)}</time>
+                    <time dateTime={thread.latest_at} title={formatDate(thread.latest_at)}>{formatListDate(thread.latest_at)}</time>
                   </div>
                   <div className="thread-subject-line">
                     <strong className={hasUnread ? 'thread-subject is-unread' : 'thread-subject'} title={subject}>

@@ -8,6 +8,18 @@
  * the menu then sits in viewport space, can flip at an edge, and cannot be
  * clipped by a pane or toolbar.
  */
+
+/* Exit visuals carry no interaction or semantics. Native popovers keep them
+ * above a modal, but even their backdrop must let the next click through. */
+[data-transient-exit],
+[data-transient-exit] *,
+[data-transient-exit]::backdrop {
+  pointer-events: none !important;
+}
+
+[data-transient-exit]::backdrop {
+  background: transparent;
+}
 .app-shell > :is(.sidebar, .message-list-panel, .reader-panel):has(
   details[data-floating-menu="true"][open]
 ) {
@@ -27,7 +39,7 @@ details[data-floating-menu="true"] > :is([data-floating-menu-panel="true"], div)
   bottom: auto;
   margin: 0;
   z-index: 2500;
-  width: max-content;
+  width: var(--floating-menu-width, max-content);
   min-width: 140px;
   height: max-content;
   max-width: calc(100vw - 16px);

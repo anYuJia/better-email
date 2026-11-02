@@ -366,14 +366,17 @@ describe('message list de-AI contract — selection states are distinguishable',
     expect(blocks[0]).toMatch(/background:\s*transparent/);
   });
 
-  it('unread emphasis is font-weight only (sender + subject)', () => {
+  it('unread hierarchy keeps the sender stronger than the subject', () => {
     const senderUnread = extractBlock(messageListCss, '.sender.unread');
     expect(senderUnread.length).toBeGreaterThan(0);
     expect(senderUnread[0]).toMatch(/font-weight:\s*600/);
 
     const subjectUnread = extractBlock(messageListCss, '.subject.unread');
     expect(subjectUnread.length).toBeGreaterThan(0);
-    expect(subjectUnread[0]).toMatch(/font-weight:\s*600/);
+    expect(subjectUnread[0]).toMatch(/font-weight:\s*500/);
+    expect(extractDecl(senderUnread[0], 'font-weight')).toBeGreaterThan(
+      extractDecl(subjectUnread[0], 'font-weight'),
+    );
   });
 });
 
@@ -397,7 +400,7 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
     expect(r).toBeLessThanOrEqual(8);
   });
 
-  it('list controls have breathing room and keep the shared tab indicator animated', () => {
+  it('list controls keep a neutral segmented selection with an animated shared indicator', () => {
     const strip = extractBlock(messageListCss, '.list-control-strip');
     expect(strip.length).toBeGreaterThan(0);
     expect(extractDecl(strip[0], 'min-height')).toBeGreaterThanOrEqual(52);
@@ -408,14 +411,32 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
     const activeRule = messageListCss.slice(activeStart, activeEnd);
     expect(activeRule).toMatch(/background:\s*var\(--quiet-row-selected\)/);
     expect(activeRule).toMatch(/box-shadow:\s*var\(--ui-box-shadow-none\)/);
+
+    const segment = extractBlock(messageListCss, '.app-shell .list-control-tabs');
+    expect(segment[0]).toMatch(/background:\s*var\(--ui-surface-muted\)/);
+    expect(segment[0]).toMatch(/border-radius:\s*var\(--ui-radius-control\)/);
     const tabs = extractBlock(messageListCss, '.app-shell .list-control-tab-indicator');
     expect(tabs.length).toBeGreaterThan(0);
     const indicator = tabs.find((block) => block.includes('width:'));
     expect(indicator).toBeDefined();
     expect(indicator).toMatch(/width:\s*var\(--list-tab-indicator-width\)/);
-    expect(indicator).toMatch(/height:\s*3px/);
+    expect(indicator).toMatch(/top:\s*2px/);
+    expect(indicator).toMatch(/bottom:\s*2px/);
+    expect(indicator).toMatch(/background:\s*var\(--ui-surface\)/);
+    expect(indicator).toMatch(/z-index:\s*0/);
+    expect(indicator).toMatch(/pointer-events:\s*none/);
     expect(indicator).toMatch(/transform:\s*translateX\(0\)/);
-    expect(indicator).toMatch(/transition:\s*transform/);
+    expect(indicator).toMatch(/transition:\s*transform var\(--ui-motion-normal\) var\(--ui-ease-emphasized\)/);
+
+    const tabButton = extractBlock(messageListCss, '.app-shell .list-control-tabs > button');
+    expect(tabButton[0]).toMatch(/z-index:\s*1/);
+    const activeTab = extractBlock(messageListCss, '.app-shell .list-control-tabs > button.active');
+    expect(activeTab[0]).toMatch(/color:\s*var\(--ui-text\)/);
+    expect(activeTab[0]).toMatch(/background:\s*transparent/);
+    expect(activeTab[0]).toMatch(/font-weight:\s*600/);
+    expect(messageListCss).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\.app-shell \.list-control-tab-indicator\s*\{\s*transition:\s*var\(--ui-transition-none\)/,
+    );
 
     const threadsIndicator = extractBlock(
       messageListCss,

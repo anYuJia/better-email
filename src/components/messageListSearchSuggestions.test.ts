@@ -110,4 +110,23 @@ describe('message list search suggestions', () => {
     expect(entries[0].body).toContain('invoice');
     expect(entries[0].body).not.toContain('undefined');
   });
+
+  it('counts overlapping fields once for all/quick filters and independently for each field', () => {
+    const messages = Array.from({ length: 64 }, (_, index) => {
+      const fieldMask = index >> 3;
+      const flags = index & 7;
+      return message({
+        id: index, sender_name: fieldMask & 1 ? '合同比对' : '未命中',
+        recipients: fieldMask & 2 ? '合同收件人' : '其他收件人',
+        snippet: fieldMask & 4 ? '合同正文摘要' : '其他摘要',
+        has_attachments: Boolean(flags & 1), is_read: Boolean(flags & 2), is_starred: Boolean(flags & 4),
+      });
+    });
+    const entries = buildMessageSearchEntries(messages);
+    for (const query of ['合同', 'from:合同', 'to:合同', 'BODY:合同', 'has:attachment 合同', 'is:unread 合同', 'is:starred 合同']) {
+      expect(buildMessageSearchSuggestions(entries, query).map((item) => item.count)).toEqual([56, 32, 32, 32, 28, 28, 28]);
+    }
+    expect(buildMessageSearchSuggestions(entries, '未出现的词').every((item) => item.count === 0)).toBe(true);
+    expect(buildMessageSearchSuggestions(entries, 'is:unread').map((item) => item.count)).toEqual([64, 64, 64, 64, 32, 32, 32]);
+  });
 });

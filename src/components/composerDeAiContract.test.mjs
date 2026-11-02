@@ -16,6 +16,8 @@ function rulesOnly(css) {
 }
 
 const composerCss = rulesOnly(readCss('src/components/composer/composer.css'));
+const composerMotionCss = rulesOnly(readCss('src/components/composer/composer-motion.css'));
+const designTokensCss = rulesOnly(readCss('src/design-tokens.css'));
 const sharedDialogsCss = rulesOnly(readCss('src/styles/shared-dialogs.css'));
 const darkModeCss = rulesOnly(readCss('src/styles/dark-mode.css'));
 const globalCss = rulesOnly(readCss('src/styles/global.css'));
@@ -53,6 +55,19 @@ function extractDecl(block, prop) {
   return m ? parseInt(m[1], 10) : null;
 }
 
+function extractBlock(css, prelude) {
+  const start = css.indexOf(prelude);
+  if (start < 0) throw new Error(`Missing CSS block: ${prelude}`);
+  const open = css.indexOf('{', start + prelude.length);
+  let depth = 1;
+  for (let index = open + 1; index < css.length; index += 1) {
+    if (css[index] === '{') depth += 1;
+    if (css[index] === '}') depth -= 1;
+    if (depth === 0) return css.slice(open + 1, index);
+  }
+  throw new Error(`Unclosed CSS block: ${prelude}`);
+}
+
 /* ----------------------------------------------------------------------- *
  * Contract: the composer is a desktop email editor, not an AI writing app.
  *
@@ -65,7 +80,7 @@ function extractDecl(block, prop) {
  *  5. Recipient chips use small radius (≤ 8px), not 999px pill.
  *  6. Send button is accent, not gradient/glow/shadow/999px pill.
  *  7. Formatting toolbar buttons are 28-30px icon buttons, not pill containers.
- *  8. No scale(0.97) press animation in shared-motion for composer scope.
+ *  8. Only named action groups receive shared press feedback; rows stay stable.
  *  9. Context-menu has no backdrop-filter blur.
  * 10. Snooze-picker light mode uses semantic tokens, not hardcoded hex.
  * 11. Dropdowns (CustomSelect) use semantic tokens without hardcoded fallbacks.
@@ -167,15 +182,15 @@ describe('composer de-AI contract — send button is accent, not flashy', () => 
   it('split send button keeps rounded outer corners on both segments', () => {
     const split = findRules(composerCss, '.composer-send-split')
       .find((rule) => rule.selector === '.composer-send-split');
-    expect(split?.body).toMatch(/border-radius:\s*var\(--ui-radius-panel\)/);
+    expect(split?.body).toMatch(/border-radius:\s*var\(--ui-radius-control\)/);
 
     const primary = findRules(composerCss, '.composer-send-split > .composer-send-primary')
       .find((rule) => rule.selector === '.composer-send-split > .composer-send-primary');
-    expect(primary?.body).toMatch(/border-radius:\s*var\(--ui-radius-panel\)\s+0\s+0\s+var\(--ui-radius-panel\)/);
+    expect(primary?.body).toMatch(/border-radius:\s*var\(--ui-radius-control\)\s+0\s+0\s+var\(--ui-radius-control\)/);
 
     const menu = findRules(composerCss, '.composer-send-split > .composer-send-menu-trigger')
       .find((rule) => rule.selector === '.composer-send-split > .composer-send-menu-trigger');
-    expect(menu?.body).toMatch(/border-radius:\s*0\s+var\(--ui-radius-panel\)\s+var\(--ui-radius-panel\)\s+0/);
+    expect(menu?.body).toMatch(/border-radius:\s*0\s+var\(--ui-radius-control\)\s+var\(--ui-radius-control\)\s+0/);
   });
 
   it('send button has no gradient', () => {
@@ -194,7 +209,7 @@ describe('composer de-AI contract — send button is accent, not flashy', () => 
     }
   });
 
-  it('send button has no scale animation', () => {
+  it('send button does not define its own transform outside shared action feedback', () => {
     const rules = findRules(sharedDialogsCss, '.dialog-button-primary');
     for (const r of rules) {
       expect(r.body).not.toMatch(/transform:\s*scale/);
@@ -250,32 +265,128 @@ describe('composer close confirmation — clear action hierarchy', () => {
   });
 });
 
-describe('composer de-AI contract — no press scale animation in motion system', () => {
-  it('shared-motion.css has no scale(0.97) transform', () => {
-    expect(sharedMotionCss).not.toContain('scale(0.97)');
+describe('composer motion contract — named actions share tactile feedback', () => {
+  it('opts only named composer actions into geometric feedback', () => {
+    const allowed = [
+      '.composer-schedule-picker-popover .composer-schedule-picker-confirm',
+    ];
+    const motionEnabled = extractBlock(sharedMotionCss, '@media (prefers-reduced-motion: no-preference)');
+    const composerGeometry = parseRules(motionEnabled).filter((rule) => (
+      rule.selector.includes('.composer')
+      && rule.selector !== '.composer .composer-send-split > button'
+      && /(?:^|;)\s*(?:transform|translate|scale)\s*:/.test(rule.body)
+    ));
+    expect(composerGeometry.map((rule) => rule.selector).sort()).toEqual([...allowed].sort());
+    for (const rule of composerGeometry) {
+      expect(rule.body).toMatch(/--ui-control-feedback:\s*tactile/);
+      expect(rule.body).not.toMatch(/(?:^|;)\s*translate\s*:/);
+      expect(rule.body).toMatch(/scale:\s*var\(--ui-control-scale\)/);
+      expect(rule.body).toMatch(/transition:\s*var\(--ui-transition-control\)/);
+    }
+
+    // Geometry must not leak into reduced motion through an unguarded rule.
+    expect(sharedMotionCss.replace(motionEnabled, ''))
+      .not.toMatch(/(?:^|;)\s*(?:translate|scale)\s*:/m);
+    expect(sharedMotionCss.replace(motionEnabled, '')).not.toMatch(/--ui-control-feedback:\s*tactile/);
+    const base = parseRules(sharedMotionCss).find((rule) => rule.selector === 'button');
+    expect(base.body).toMatch(/--ui-control-feedback:\s*none/);
+    expect(sharedMotionCss).not.toContain('.composer *');
+    expect(sharedMotionCss).not.toMatch(/transition:\s*all\b|will-change:/);
   });
 
-  it('shared-motion.css excludes composer from active transforms', () => {
-    // Composer elements should have transform: none enforced
-    const hasComposerExclusion = sharedMotionCss.includes('composer') &&
-      sharedMotionCss.includes('transform: none');
-    expect(hasComposerExclusion).toBe(true);
+  it('moves the send halves together around their seam while leaving the nested menu stationary', () => {
+    const halves = extractBlock(sharedMotionCss, '.composer .composer-send-split > button');
+    expect(halves).toMatch(/--ui-control-feedback:\s*tactile/);
+    expect(halves).not.toMatch(/(?:^|;)\s*translate\s*:/);
+    expect(halves).toMatch(/scale:\s*var\(--ui-send-scale\)/);
+    expect(halves).toMatch(/transition:\s*var\(--ui-send-transition\)/);
+    expect(halves).toMatch(/transform-origin:\s*right center/);
+    expect(extractBlock(sharedMotionCss, '.composer .composer-send-split > .composer-send-menu-trigger'))
+      .toMatch(/transform-origin:\s*left center/);
+    const containers = parseRules(sharedMotionCss).filter((rule) => rule.selector === '.composer .composer-send-split');
+    for (const rule of containers) {
+      expect(rule.body).not.toMatch(/(?:^|;)\s*(?:transform|translate|scale)\s*:/);
+    }
   });
-});
 
-describe('composer motion contract — hover feedback is immediate', () => {
-  it('disables transitions for composer controls and the portalled sender menu', () => {
+  it('shares hover, press and release timing without turning every control into a moving target', () => {
+    expect(designTokensCss).toMatch(/--ui-motion-hover:\s*160ms/);
+    expect(designTokensCss).toMatch(/--ui-motion-press:\s*80ms/);
+    expect(designTokensCss).toMatch(/--ui-motion-settle:\s*220ms/);
+    const base = parseRules(sharedMotionCss).find((rule) => rule.selector === 'button');
+    expect(base).toBeDefined();
+    expect(base.body).toMatch(/--ui-control-duration:\s*var\(--ui-motion-settle\)/);
+    expect(base.body).toMatch(/--ui-control-scale-duration:\s*var\(--ui-motion-settle\)/);
+    expect(base.body).toMatch(/--ui-control-easing:\s*var\(--ui-ease-control\)/);
+    expect(base.body).toMatch(/transition:\s*var\(--ui-transition-control\)/);
+    expect(base.body).not.toMatch(/(?:^|;)\s*(?:transform|translate|scale)\s*:/);
+
+    const hover = extractBlock(sharedMotionCss, '@media (hover: hover) and (pointer: fine)');
+    expect(hover).toContain(':is(button, summary):hover');
+    expect(hover).toMatch(/--ui-control-duration:\s*var\(--ui-motion-hover\)/);
+    expect(hover).not.toContain('--ui-control-scale-duration:');
+    expect(hover).not.toMatch(/--ui-control-offset-y:\s*-/);
+
+    const pressed = extractBlock(sharedMotionCss, ':is(button, summary):active');
+    expect(pressed).toMatch(/--ui-control-duration:\s*var\(--ui-motion-press\)/);
+    expect(pressed).toMatch(/--ui-control-scale-duration:\s*var\(--ui-motion-press\)/);
+    expect(pressed).toMatch(/--ui-control-easing:\s*var\(--ui-ease-press\)/);
+    expect(pressed).toMatch(/--ui-control-scale:\s*var\(--ui-control-press-scale,\s*0\.98\)/);
+    expect(pressed).not.toMatch(/(?:^|;)\s*(?:transform|translate|scale)\s*:/);
+    expect(extractBlock(sharedMotionCss, ':is(button, summary)[data-ui-pressed="true"]')).toBe(pressed);
+    expect(sharedMotionCss).toContain(':active:where(:not([data-ui-pressed]))');
+  });
+
+  it('keeps toolbar, navigation and secondary actions free of geometric feedback', () => {
+    const stable = [
+      '.reader-actions .icon-only-action', '.titlebar-refresh', '.mobile-header-icon',
+      '.composer-mini-actions > button', '.composer .composer-header-actions > button',
+      '.composer .composer-rich-toolbar button', '.composer .composer-footer-tool-group button',
+      '.settings-modal .st-btn', '.dialog-button',
+    ];
+    for (const selector of stable) {
+      const rules = parseRules(sharedMotionCss).filter((rule) => rule.selector === selector);
+      expect(rules.length).toBeGreaterThan(0);
+      for (const rule of rules) {
+        expect(rule.body).not.toMatch(/(?:^|;)\s*(?:transform|translate|scale)\s*:/);
+      }
+    }
+  });
+
+  it('settles disabled, busy and cancelled actions without accepting a new press', () => {
+    const disabled = extractBlock(sharedMotionCss, ':is(button, summary):is(:disabled, [aria-disabled="true"], [aria-busy="true"], [data-ui-pressed="false"])');
+    expect(disabled).not.toMatch(/(?:^|;)\s*(?:translate|transform)\s*:/);
+    expect(disabled).toMatch(/--ui-control-scale:\s*1\s*;/);
+    expect(disabled).toMatch(/--ui-control-duration:\s*var\(--ui-motion-settle\)/);
+    expect(disabled).toMatch(/--ui-control-scale-duration:\s*var\(--ui-motion-settle\)/);
+  });
+
+  it('keeps ordinary composer controls and the sender menu stationary while sharing colour feedback', () => {
     const selectors = [
       '.composer button',
       '.composer summary',
+      '.custom-select-dropdown[data-portal-owner="composer-sender"] button',
+    ];
+    for (const selector of selectors) {
+      const rule = parseRules(composerCss).filter((candidate) => candidate.selector === selector).at(-1);
+      expect(rule, `missing stable control base for ${selector}`).toBeDefined();
+      expect(rule.body).toMatch(/transition:\s*var\(--ui-transition-control\)/);
+      expect(rule.body).toMatch(/transform:\s*none/);
+      expect(rule.body).toMatch(/translate:\s*none/);
+      expect(rule.body).toMatch(/scale:\s*1\s*;/);
+    }
+  });
+
+  it('keeps fields, attachment rows and the toolbar container free of layout transitions', () => {
+    const selectors = [
       '.composer input',
       '.composer select',
       '.composer textarea',
+      '.composer [contenteditable="true"]',
       '.composer .composer-field-row',
       '.composer .composer-body-field',
       '.composer .composer-attachments',
       '.composer .composer-rich-toolbar',
-      '.custom-select-dropdown[data-portal-owner="composer-sender"] button',
     ];
 
     for (const selector of selectors) {
@@ -287,7 +398,7 @@ describe('composer motion contract — hover feedback is immediate', () => {
     }
   });
 
-  it('keeps the progress fill as the only functional composer transition', () => {
+  it('allows only shared action timing and functional progress transitions in the editor', () => {
     const transitionRules = parseRules(composerCss).filter((rule) => (
       /\btransition\s*:/.test(rule.body)
     ));
@@ -298,8 +409,28 @@ describe('composer motion contract — hover feedback is immediate', () => {
       .filter((rule) => !rule.selector.includes('progress-fill'))
       .forEach((rule) => {
         expect(rule.body, `unexpected animated composer rule: ${rule.selector}`)
-          .toMatch(/transition:\s*none/);
+          .toMatch(/transition:\s*(?:none|var\(--ui-transition-control\))\s*;/);
       });
+
+    const movingRules = parseRules(composerCss).filter((rule) => (
+      [...rule.body.matchAll(/(?:^|;)\s*(transform|translate|scale)\s*:\s*([^;]+);/g)]
+        .some(([, property, value]) => value.trim() !== 'none' && !(property === 'scale' && value.trim() === '1'))
+    ));
+    expect(movingRules.map((rule) => rule.selector).sort()).toEqual([
+      '.composer-attachment-progress-fill',
+      '.composer-send-progress-fill',
+    ]);
+  });
+
+  it('removes both control transitions and surface animations for reduced motion', () => {
+    const reducedControls = extractBlock(sharedMotionCss, '@media (prefers-reduced-motion: reduce)');
+    expect(reducedControls).toMatch(/transition-duration:\s*var\(--ui-motion-none\) !important/);
+    expect(reducedControls).toMatch(/animation-duration:\s*var\(--ui-motion-none\) !important/);
+    expect(composerCss).toContain("@import './composer-motion.css'");
+    // Surface interpolation now has a reversible lifecycle; reduced-motion
+    // endpoints/cancellation are exercised in useSurfaceMotion.test.tsx.
+    expect(composerMotionCss).not.toContain('@keyframes composer-surface');
+    expect(composerMotionCss).toContain('.composer-backdrop[hidden]');
   });
 
   it('keeps recipient input geometry stable while hovering or focusing', () => {

@@ -1,8 +1,9 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
+  LoaderCircle,
   Mail,
   Maximize2,
   PanelBottomClose,
@@ -14,6 +15,7 @@ import { isDraftEmpty } from '../app/appConfig';
 import type {
   Account,
   ComposerAutosave,
+  ComposerSaveResult,
   ComposeTemplate,
   Contact,
   DraftInput,
@@ -27,30 +29,22 @@ import ComposerContactsPanel, { type AddContactsResult, type ComposerRecipientFi
 import ComposerPrimaryFields from './composer/ComposerPrimaryFields';
 import ComposerQuickTools, { ComposerRichToolbar } from './composer/ComposerQuickTools';
 import ComposerSchedulePicker from './composer/ComposerSchedulePicker';
+import ComposerTransferStatus from './composer/ComposerTransferStatus';
+import { attachmentImportBlockReason, type AttachmentImportItem } from '../app/attachmentImports';
+import type { ComposerSendIssue } from '../hooks/useComposerSend';
 import useModalAccessibility from '../hooks/useModalAccessibility';
+import useExitPresence from '../hooks/useExitPresence';
+import useComposerEditingSession from '../hooks/useComposerEditingSession';
+import useSurfaceMotion from '../hooks/useSurfaceMotion';
+import useComposerGeometry from '../hooks/useComposerGeometry';
 import { useWheelContainment } from '../hooks/useWheelContainment';
 import { startDraggingCurrentWindow } from '../tauriBridge';
 import './composer/composer.css';
+import './composer/composer-geometry.css';
 import './composer/composer-recovery.css';
 import './composer/composer-polish.css';
 
-type ComposerPosition = {
-  x: number;
-  y: number;
-};
-
-type ComposerDragState = {
-  startX: number;
-  startY: number;
-  originX: number;
-  originY: number;
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-};
-
-const COMPOSER_VIEWPORT_MARGIN = 10;
+const COMPOSER_CONTACTS_SPLIT_MIN_WIDTH = 900;
 
 function formatClock(value: string) {
   const date = new Date(value);
@@ -67,25 +61,10 @@ function formatScheduleLabel(value: string) {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-function clampComposerPosition(
-  panel: HTMLElement | null,
-  current: ComposerPosition,
-): ComposerPosition {
-  if (!panel) return current;
-  const rect = panel.getBoundingClientRect();
-  const naturalLeft = rect.left - current.x;
-  const naturalTop = rect.top - current.y;
-  const minX = COMPOSER_VIEWPORT_MARGIN - naturalLeft;
-  const maxX = window.innerWidth - COMPOSER_VIEWPORT_MARGIN - naturalLeft - rect.width;
-  const minY = COMPOSER_VIEWPORT_MARGIN - naturalTop;
-  const maxY = window.innerHeight - COMPOSER_VIEWPORT_MARGIN - naturalTop - rect.height;
-  return {
-    x: Math.min(Math.max(current.x, Math.min(minX, maxX)), Math.max(minX, maxX)),
-    y: Math.min(Math.max(current.y, Math.min(minY, maxY)), Math.max(minY, maxY)),
-  };
-}
-
 export type ComposerWindowProps = {
+  /** Parent retains the presentation via useExitPresence after business close. */
+  open?: boolean;
+  editorFlushRef?: React.MutableRefObject<(() => void) | null>;
   minimized: boolean;
   standaloneWindow?: boolean;
   mobile?: boolean;
@@ -114,7 +93,7 @@ export type ComposerWindowProps = {
   onApplyTemplate: (template: ComposeTemplate) => void;
   onDeleteTemplate: (template: ComposeTemplate) => void;
   onTemplateNameChange: (value: string) => void;
-  onSaveTemplate: () => void;
+  onSaveTemplate: () => ComposerSaveResult | void;
   onInsertSignature: () => void;
   onPickAttachments: () => void;
   onRemoveAttachment: (index: number) => void;
@@ -125,26 +104,34 @@ export type ComposerWindowProps = {
   onAttachmentPaste: React.ClipboardEventHandler<HTMLTextAreaElement>;
   buildInlineImageAttachments: (files: File[]) => Promise<OutboundAttachmentInput[]>;
   onInlineImagesAdded: (attachments: OutboundAttachmentInput[]) => void;
-  onSaveDraft: () => Promise<void> | void;
+  onSaveDraft: () => Promise<ComposerSaveResult | void> | ComposerSaveResult | void;
   onQueueDraft: () => void;
   onSendDraft: () => void;
   onSendRiskConfirm: () => void;
   onSendRiskCancel: () => void;
   sendRiskConfirm: CrossAccountRiskItem[] | null;
   crossAccountRisks: CrossAccountRiskItem[];
+  submissionPending?: boolean;
   sendProgress: number | null;
   sendProgressMessage: string | null;
   attachmentProgress: number | null;
+  attachmentImports?: AttachmentImportItem[];
+  isImportingAttachments?: boolean;
+  onRetryAttachmentImport?: (id: string) => void;
+  onDismissAttachmentImport?: (id: string) => void;
+  sendIssue?: ComposerSendIssue | null;
 };
 
 export default function ComposerWindow({
+  editorFlushRef,
+  open = true,
   minimized,
   standaloneWindow = false,
   mobile = false,
   defaultContactsOpen,
   platform = 'web',
   focusRequest = 0,
-  draft,
+  draft: incomingDraft,
   accounts,
   identities,
   fallbackAccountId,
@@ -184,27 +171,52 @@ export default function ComposerWindow({
   onSendRiskCancel,
   sendRiskConfirm,
   crossAccountRisks,
+  submissionPending = false,
   sendProgress,
   sendProgressMessage,
   attachmentProgress,
+  attachmentImports = [],
+  isImportingAttachments = false,
+  onRetryAttachmentImport,
+  onDismissAttachmentImport,
+  sendIssue,
 }: ComposerWindowProps) {
-  const [position, setPosition] = useState<ComposerPosition>({ x: 0, y: 0 });
-  const dragRef = useRef<ComposerDragState | null>(null);
+  const surfaceActive = open && !minimized;
+  const localEditorFlushRef = useRef<(() => void) | null>(null);
+  const flushPendingRef = editorFlushRef ?? localEditorFlushRef;
+  const editorPresent = useExitPresence(open && !minimized, standaloneWindow ? 0 : 180);
+  const minimizedPresent = useExitPresence(open && minimized, standaloneWindow ? 0 : 180);
+  const lastVisibleDraftRef = useRef(incomingDraft);
+  useLayoutEffect(() => {
+    if (open) lastVisibleDraftRef.current = incomingDraft;
+  }, [incomingDraft, open]);
+  // Closing may immediately clear the controller draft. Keep the last committed
+  // text for the outgoing presentation without delaying that business action.
+  const draft = open ? incomingDraft : lastVisibleDraftRef.current;
   const panelRef = useRef<HTMLElement | null>(null);
+  const contactsPanelRef = useRef<HTMLElement | null>(null);
+  const contactsBackdropRef = useRef<HTMLDivElement | null>(null);
+  const [compactContacts, setCompactContacts] = useState(() =>
+    !standaloneWindow || window.innerWidth < COMPOSER_CONTACTS_SPLIT_MIN_WIDTH);
+  const [compactRecipients, setCompactRecipients] = useState(() => window.innerWidth <= 720);
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const scheduleAnchorRef = useRef<HTMLButtonElement | null>(null);
   const templateButtonRef = useRef<HTMLButtonElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
+  const popoverAnchorRef = useRef<HTMLButtonElement | null>(null);
   const sendMenuRef = useRef<HTMLDivElement | null>(null);
   const sendMenuItemRefs = useRef<HTMLButtonElement[]>([]);
   const minimizedRestoreRef = useRef<HTMLButtonElement | null>(null);
-  const composerOpenerRef = useRef<HTMLElement | null>(null);
+  const minimizedLayerRef = useRef<HTMLElement | null>(null);
+  const editingSession = useComposerEditingSession(panelRef, surfaceActive);
+  const composerOpenerRef = useRef<HTMLElement | null | undefined>(undefined);
+  const focusSessionRef = useRef({ mounted: false, closeHandled: false, generation: 0 });
   const [contactsOpen, setContactsOpen] = useState(() => {
     if (defaultContactsOpen !== undefined) return defaultContactsOpen;
     if (typeof window === 'undefined') return false;
     try {
       const stored = localStorage.getItem('better-email-composer-contacts-open');
-      if (stored !== null) return stored === 'true';
+      if (stored !== null) return stored === 'true' && window.innerWidth > 720;
     } catch {}
     return false;
   });
@@ -212,6 +224,23 @@ export default function ComposerWindow({
     () => typeof window !== 'undefined' && window.innerWidth <= 720,
   );
   const isMobileComposerViewport = mobile || isNarrowComposerViewport;
+  const floating = !standaloneWindow && !isMobileComposerViewport;
+  const geometry = useComposerGeometry(panelRef, floating, surfaceActive);
+  const previousMinimized = useRef(minimized);
+  const minimizeOffset = useCallback(() => {
+    if (!floating || (!minimized && !previousMinimized.current)) return { x: 0, y: 4 };
+    const panel = panelRef.current;
+    if (!panel) return { x: 0, y: 24 };
+    const bounds = panel.getBoundingClientRect();
+    const target = minimizedLayerRef.current?.getBoundingClientRect();
+    const dx = (target?.width ? target.left + target.width / 2 : window.innerWidth - 242) - (bounds.left + bounds.width / 2);
+    const dy = (target?.height ? target.top + target.height / 2 : window.innerHeight - 54) - (bounds.top + bounds.height / 2);
+    const length = Math.max(1, Math.hypot(dx, dy));
+    return { x: Math.round(dx / length * 32), y: Math.round(dy / length * 32) };
+  }, [floating, minimized]);
+  useSurfaceMotion(panelRef, surfaceActive, { enabled: !standaloneWindow, getOffset: minimizeOffset });
+  useSurfaceMotion(minimizedLayerRef, open && minimized, { distance: -8 });
+  useLayoutEffect(() => { previousMinimized.current = minimized; }, [minimized]);
   const [ccOpen, setCcOpen] = useState(() => Boolean(draft.cc.trim()));
   const [bccOpen, setBccOpen] = useState(() => Boolean(draft.bcc.trim()));
   const [activeRecipientField, setActiveRecipientField] = useState<ComposerRecipientField>('to');
@@ -222,63 +251,98 @@ export default function ComposerWindow({
   const [scheduleOpenRequest, setScheduleOpenRequest] = useState(0);
   const [scheduleClearConfirmOpen, setScheduleClearConfirmOpen] = useState(false);
   const [saveDraftPending, setSaveDraftPending] = useState(false);
+  const [saveDraftFeedback, setSaveDraftFeedback] = useState<{ message: string; error: boolean } | null>(null);
+  const saveDraftBlockedReason = attachmentImportBlockReason(attachmentImports)
+    || (isImportingAttachments ? '附件仍在准备中，请等待完成后再保存草稿。' : null);
+  useEffect(() => { setSaveDraftFeedback(null); }, [saveDraftBlockedReason]);
   const contactsPanelVisible = contactsOpen;
+  const contactsOverlayOpen = contactsOpen && compactContacts && !minimized && open;
   const title = draft.subject.trim() || '新邮件';
   const windowHeading = draft.in_reply_to ? '回复邮件' : '新邮件';
   const accountId = draft.account_id || fallbackAccountId || accounts[0]?.id || 0;
   const draftAccount = accounts.find((entry) => entry.id === accountId) ?? null;
-  const draftContacts = contacts.filter((contact) => contact.account_id === accountId);
-  const draftIdentities = identities.filter((identity) => identity.account_id === accountId);
+  const draftContacts = useMemo(() => contacts.filter((contact) => contact.account_id === accountId), [contacts, accountId]);
+  const draftIdentities = useMemo(() => identities.filter((identity) => identity.account_id === accountId), [identities, accountId]);
   const draftIdentity =
     draftIdentities.find((identity) => identity.id === draft.identity_id)
     ?? draftIdentities.find((identity) => identity.is_default)
     ?? draftIdentities[0]
     ?? null;
   const explicitSaveStatus = /^正在保存|保存失败|网络异常/.test(status);
+  const saveFailed = explicitSaveStatus ? /保存失败|网络异常/.test(status) : autosave?.save_state === 'error';
   const autosaveLabel = explicitSaveStatus
-    ? status
-    : autosave?.save_state === 'error'
-      ? '自动保存失败，内容仍在编辑器'
-      : autosave?.save_state === 'saving'
-        ? '正在保存到本机…'
-        : autosave && !isDraftEmpty(draft)
-      ? `已自动保存 · ${formatClock(autosave.saved_at)}`
-      : isDraftEmpty(draft)
-        ? ''
-        : '正在保存…';
+    ? saveFailed ? '草稿保存失败' : status
+    : saveFailed
+      ? '本机保存失败'
+      : autosave?.save_state === 'saving' || (!autosave && !isDraftEmpty(draft))
+        ? '正在保存…'
+        : autosave && !isDraftEmpty(draft) ? '已存本机' : '';
+  const autosaveDetail = explicitSaveStatus ? status : saveFailed
+    ? `本机恢复点保存失败，内容仍在编辑器。${autosave?.save_error || ''}`
+    : autosaveLabel === '已存本机' && autosave
+      ? `本机恢复点已保存 · ${formatClock(autosave.saved_at)}。保存到草稿箱请使用“保存草稿”。`
+      : autosaveLabel;
 
   useLayoutEffect(() => {
     const panel = panelRef.current;
     if (!panel) return undefined;
-    if (saveDraftPending) panel.setAttribute('inert', '');
+    const focused = document.activeElement instanceof HTMLElement && panel.contains(document.activeElement)
+      ? document.activeElement : null;
+    if (saveDraftPending || submissionPending || !open || minimized) panel.setAttribute('inert', '');
     else panel.removeAttribute('inert');
-    return () => panel.removeAttribute('inert');
-  }, [saveDraftPending]);
+    return () => {
+      panel.removeAttribute('inert');
+      if (focused) queueMicrotask(() => {
+        const active = document.activeElement;
+        if (focused.isConnected && !focused.closest('[inert]')
+          && (active === document.body || (active instanceof Node && panel.contains(active)))) {
+          focused.focus({ preventScroll: true });
+        }
+      });
+    };
+  }, [editorPresent, minimized, open, saveDraftPending, submissionPending]);
 
   function patchDraft(patch: Partial<DraftInput>) {
+    if (!open || minimized || saveDraftPending || submissionPending) return;
     onDraftChange((current) => ({ ...current, ...patch }));
   }
 
+  function requestClose() {
+    flushPendingRef.current?.();
+    onClose();
+  }
+
   function closePopover() {
-    const opener = popoverMode === 'templates' ? templateButtonRef : moreButtonRef;
+    const opener = popoverAnchorRef.current;
     setPopoverMode(null);
-    queueMicrotask(() => opener.current?.focus({ preventScroll: true }));
+    queueMicrotask(() => {
+      const target = opener;
+      if (target?.isConnected && !target.closest('[inert]')) target.focus({ preventScroll: true });
+    });
   }
 
   function toggleComposerPopover(mode: Exclude<ComposerPopoverMode, null>) {
+    setSaveDraftFeedback(null);
+    popoverAnchorRef.current = mode === 'templates' ? templateButtonRef.current : moreButtonRef.current;
     setSendMenuOpen(false);
     setPopoverMode((current) => current === mode ? null : mode);
   }
 
   async function handleSaveDraft() {
     if (saveDraftPending) return;
+    flushPendingRef.current?.();
+    setSaveDraftFeedback(null);
     setSaveDraftPending(true);
     let saved = false;
     try {
-      await onSaveDraft();
-      saved = true;
-    } catch {
-      // The controller keeps the draft open and exposes the failure in status.
+      const result = await onSaveDraft();
+      // Legacy callbacks complete with void; the controller explicitly reports
+      // blocked/empty attempts so they cannot be mistaken for a saved draft.
+      saved = !result || result.status === 'saved';
+      if (result && result.status !== 'saved') setSaveDraftFeedback({ message: result.message, error: false });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error).replace(/^Error:\s*/i, '');
+      setSaveDraftFeedback({ message: `保存失败，内容已保留：${message}`, error: true });
     } finally {
       setSaveDraftPending(false);
     }
@@ -287,61 +351,127 @@ export default function ComposerWindow({
 
   function closeSendMenu() {
     setSendMenuOpen(false);
-    queueMicrotask(() => scheduleAnchorRef.current?.focus({ preventScroll: true }));
+    queueMicrotask(() => {
+      const target = scheduleAnchorRef.current;
+      if (target?.isConnected && !target.closest('[inert]')) target.focus({ preventScroll: true });
+    });
   }
 
   useEffect(() => {
-    composerOpenerRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
+    if (surfaceActive) return;
+    setPopoverMode(null);
+    setSendMenuOpen(false);
+    setScheduleClearConfirmOpen(false);
+  }, [surfaceActive]);
+
+  function restoreComposerFocus() {
+    const active = document.activeElement;
+    const stillOwned = !active || active === document.body || active === document.documentElement
+      || backdropRef.current?.contains(active) || minimizedLayerRef.current?.contains(active);
+    const opener = composerOpenerRef.current;
+    if (stillOwned && opener?.isConnected && !opener.closest('[inert]') && !opener.hasAttribute('disabled')) {
+      opener.focus({ preventScroll: true });
+    }
+  }
+
+  useLayoutEffect(() => {
+    const session = focusSessionRef.current;
+    session.mounted = true;
+    session.generation += 1;
+    // Capture once, before passive autofocus. StrictMode's second setup must
+    // never replace the external opener with a field from this same composer.
+    if (composerOpenerRef.current === undefined) {
+      const active = document.activeElement;
+      composerOpenerRef.current = active instanceof HTMLElement && active !== document.body
+        && !backdropRef.current?.contains(active) && !minimizedLayerRef.current?.contains(active)
+        ? active : null;
+    }
     return () => {
-      const opener = composerOpenerRef.current;
-      // The background inert cleanup runs later in the same React commit.
-      // Restore in a microtask so the original compose trigger can receive
-      // focus after every modal attribute has been removed.
+      session.mounted = false;
+      if (session.closeHandled) return;
+      const generation = ++session.generation;
+      // Also support callers that unmount directly, after modal inert cleanup.
+      // A StrictMode replay or a newer opening invalidates this queued request.
       queueMicrotask(() => {
-        if (opener?.isConnected) opener.focus({ preventScroll: true });
+        if (!session.mounted && session.generation === generation && !session.closeHandled) restoreComposerFocus();
       });
     };
   }, []);
 
+  useEffect(() => {
+    const session = focusSessionRef.current;
+    const generation = ++session.generation;
+    session.closeHandled = !open;
+    if (open) return;
+    // Restore once at business close. The visual-tail unmount must not steal
+    // focus again after the user starts another task.
+    queueMicrotask(() => {
+      if (session.generation === generation && session.closeHandled) restoreComposerFocus();
+    });
+  }, [open]);
+
   useModalAccessibility({
-    open: !standaloneWindow && !minimized && isMobileComposerViewport,
+    open: open && !standaloneWindow && !minimized && isMobileComposerViewport,
     dialogRef: panelRef,
     backdropRef,
-    focusTrapDisabled: sendRiskConfirm !== null,
+    focusTrapDisabled: sendRiskConfirm !== null || contactsOverlayOpen,
   });
 
+  function closeContacts() {
+    setContactsOpen(false);
+    try { localStorage.setItem('better-email-composer-contacts-open', 'false'); } catch {}
+  }
+
+  useModalAccessibility({
+    open: contactsOverlayOpen,
+    dialogRef: contactsPanelRef,
+    backdropRef: contactsBackdropRef,
+    onEscape: closeContacts,
+  });
+
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel || minimized) return undefined;
+    const measure = () => {
+      setCompactRecipients(window.innerWidth <= 720);
+      const width = panel.clientWidth || panel.getBoundingClientRect().width
+        || (standaloneWindow ? window.innerWidth : Math.min(760, window.innerWidth - 32));
+      setCompactContacts(width < COMPOSER_CONTACTS_SPLIT_MIN_WIDTH);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(panel);
+    window.addEventListener('resize', measure);
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+  }, [minimized, standaloneWindow]);
+
   useEffect(() => {
+    if (!open) return;
     if (minimized) {
+      editingSession.capture();
       minimizedRestoreRef.current?.focus({ preventScroll: true });
       return;
     }
+    if (contactsOverlayOpen) return;
+    if (editingSession.restore()) return;
     const panel = panelRef.current;
     const firstField = panel?.querySelector<HTMLElement>('input[type="text"], input:not([type]), textarea');
     (firstField ?? panel)?.focus({ preventScroll: true });
-  }, [focusRequest, minimized]);
+  }, [focusRequest, minimized, open]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined;
-    const contactsMedia = window.matchMedia('(max-width: 899px)');
     const mobileMedia = window.matchMedia('(max-width: 720px)');
     const updateViewportMode = () => {
       setIsNarrowComposerViewport(mobileMedia.matches);
-      if (contactsMedia.matches) setContactsOpen(false);
     };
     updateViewportMode();
-    contactsMedia.addEventListener?.('change', updateViewportMode);
     mobileMedia.addEventListener?.('change', updateViewportMode);
     return () => {
-      contactsMedia.removeEventListener?.('change', updateViewportMode);
       mobileMedia.removeEventListener?.('change', updateViewportMode);
     };
   }, []);
 
-  useEffect(() => {
-    setPosition((current) => clampComposerPosition(panelRef.current, current));
-  }, [contactsPanelVisible]);
 
   useEffect(() => {
     if (draft.cc.trim()) setCcOpen(true);
@@ -350,7 +480,7 @@ export default function ComposerWindow({
   }, [draft.bcc, draft.cc, draft.send_at]);
 
   useEffect(() => {
-    if (!sendMenuOpen) return undefined;
+    if (!sendMenuOpen || !surfaceActive) return undefined;
     sendMenuItemRefs.current[0]?.focus({ preventScroll: true });
     function closeOnPointerDown(event: PointerEvent) {
       const target = event.target;
@@ -382,73 +512,19 @@ export default function ComposerWindow({
       document.removeEventListener('pointerdown', closeOnPointerDown, true);
       document.removeEventListener('keydown', closeOnEscape, true);
     };
-  }, [sendMenuOpen]);
+  }, [sendMenuOpen, surfaceActive]);
 
-  useEffect(() => {
-    if (minimized) return undefined;
-    const handleResize = () => {
-      setPosition((current) => clampComposerPosition(panelRef.current, current));
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [minimized]);
-
-  function beginDrag(event: React.PointerEvent<HTMLElement>) {
-    if (event.button !== 0) return;
-    if ((event.target as HTMLElement).closest('button, input, textarea, select, label, a')) return;
-    const panel = panelRef.current;
-    const rect = panel?.getBoundingClientRect();
-    const naturalLeft = rect ? rect.left - position.x : 0;
-    const naturalTop = rect ? rect.top - position.y : 0;
-    const minX = COMPOSER_VIEWPORT_MARGIN - naturalLeft;
-    const maxX = rect
-      ? window.innerWidth - COMPOSER_VIEWPORT_MARGIN - naturalLeft - rect.width
-      : 0;
-    const minY = COMPOSER_VIEWPORT_MARGIN - naturalTop;
-    const maxY = rect
-      ? window.innerHeight - COMPOSER_VIEWPORT_MARGIN - naturalTop - rect.height
-      : 0;
-    dragRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: position.x,
-      originY: position.y,
-      minX: Math.min(minX, maxX),
-      maxX: Math.max(minX, maxX),
-      minY: Math.min(minY, maxY),
-      maxY: Math.max(minY, maxY),
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function moveDrag(event: React.PointerEvent<HTMLElement>) {
-    const drag = dragRef.current;
-    if (!drag) return;
-    const nextX = Math.min(
-      Math.max(drag.originX + event.clientX - drag.startX, drag.minX),
-      drag.maxX,
-    );
-    const nextY = Math.min(
-      Math.max(drag.originY + event.clientY - drag.startY, drag.minY),
-      drag.maxY,
-    );
-    setPosition({ x: nextX, y: nextY });
-  }
-
-  function endDrag(event: React.PointerEvent<HTMLElement>) {
-    if (!dragRef.current) return;
-    dragRef.current = null;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }
-
-  if (minimized) {
-    return (
-      <aside className="composer-minimized-layer" aria-label="已最小化的新邮件">
+  const minimizedPanel = minimizedPresent ? (
+      <aside
+        ref={minimizedLayerRef}
+        className={`composer-minimized-layer${open && minimized ? '' : ' is-exiting'}`}
+        aria-label="已最小化的新邮件"
+        aria-hidden={!open || !minimized || undefined}
+        {...(!open || !minimized ? { inert: '' } : {})}
+      >
         <section className="composer-minimized" aria-label="已最小化的新邮件">
           <button ref={minimizedRestoreRef} className="composer-mini-main" type="button" onClick={onRestore}>
-            <Mail size={17} />
+            <Mail size={18} />
             <span>
               <strong>{title}</strong>
               <small>{draft.to.trim() || '未填写收件人'}</small>
@@ -456,18 +532,17 @@ export default function ComposerWindow({
           </button>
           <div className="composer-mini-actions">
             <button type="button" onClick={onRestore} aria-label="展开写信窗口">
-              <Maximize2 size={15} />
+              <Maximize2 size={16} />
               展开
             </button>
-            <button type="button" onClick={onClose} aria-label="关闭写信窗口">
-              <X size={15} />
+            <button type="button" onClick={requestClose} aria-label="关闭写信窗口">
+              <X size={16} />
               关闭
             </button>
           </div>
         </section>
       </aside>
-    );
-  }
+  ) : null;
 
   const normalizedSendProgress = sendProgress == null ? null : Math.max(0, Math.min(100, Math.round(sendProgress)));
   const normalizedAttachmentProgress = attachmentProgress == null ? null : Math.max(0, Math.min(100, Math.round(attachmentProgress)));
@@ -476,7 +551,14 @@ export default function ComposerWindow({
     : normalizedAttachmentProgress == null
       ? ''
       : `附件处理中（${normalizedAttachmentProgress}%）`;
-  const composerBusy = normalizedSendProgress !== null || normalizedAttachmentProgress !== null;
+  const composerBusy = submissionPending || isImportingAttachments || attachmentImports.some((item) => item.status === 'failed')
+    || sendIssue?.kind === 'uncertain' || normalizedSendProgress !== null || normalizedAttachmentProgress !== null;
+  const uploadingToServer = normalizedSendProgress !== null && normalizedSendProgress >= 60 && normalizedSendProgress < 88;
+  const sendWorking = submissionPending || normalizedSendProgress !== null;
+  const sendStateLabel = sendWorking ? (normalizedSendProgress !== null ? '发送中…' : '提交中…')
+    : isImportingAttachments ? '准备附件…'
+      : sendIssue?.kind === 'uncertain' ? '待核对'
+        : attachmentImports.some(item => item.status === 'failed') ? '检查附件' : null;
 
   function beginNativeDrag(event: React.PointerEvent<HTMLElement>) {
     if (event.button !== 0) return;
@@ -486,6 +568,7 @@ export default function ComposerWindow({
 
   function handlePrimarySend() {
     if (composerBusy) return;
+    flushPendingRef.current?.();
     if (draft.send_at.trim()) onQueueDraft();
     else onSendDraft();
   }
@@ -501,32 +584,41 @@ export default function ComposerWindow({
   );
 
   return (
+    <>
+    {minimizedPanel}
+    {(open || editorPresent) && (
     <div
       ref={backdropRef}
-      className={`composer-backdrop ${standaloneWindow ? 'is-native-window' : isMobileComposerViewport ? 'is-modal' : 'is-floating'}`}
+      className={`composer-backdrop ${standaloneWindow ? 'is-native-window' : isMobileComposerViewport ? 'is-modal' : 'is-floating'}${open && !minimized ? '' : ' is-exiting'}`}
       data-composer-platform={standaloneWindow ? resolvedPlatform : undefined}
       role="dialog"
       aria-modal={!standaloneWindow && isMobileComposerViewport ? 'true' : undefined}
       aria-label="写信窗口"
+      aria-hidden={!open || minimized || undefined}
+      hidden={!editorPresent}
+      {...(!surfaceActive ? { inert: '' } : {})}
       onClick={(event) => {
         if (!standaloneWindow && isMobileComposerViewport && event.target === event.currentTarget) {
-          onClose();
+          requestClose();
         }
       }}
     >
       <section
         ref={panelRef}
         className={`composer${contactsPanelVisible ? ' has-contacts-panel' : ''}`}
-        aria-busy={saveDraftPending || undefined}
-        style={standaloneWindow ? undefined : { transform: `translate(${position.x}px, ${position.y}px)` }}
+        aria-busy={saveDraftPending || submissionPending || undefined}
+        style={geometry.style}
         onMouseDown={standaloneWindow ? undefined : (event) => event.stopPropagation()}
-        onPointerMove={moveDrag}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        onPointerMove={geometry.move}
+        onPointerUp={geometry.end}
+        onPointerCancel={geometry.end}
+        onLostPointerCapture={geometry.end}
+        onFocusCapture={(event) => editingSession.capture(event.target)}
+        onBlurCapture={(event) => editingSession.capture(event.target)}
       >
         <div className={`composer-workspace${contactsPanelVisible ? ' has-contacts' : ''}`}>
           <div className="composer-editor-pane">
-            <header className="composer-editor-header" onPointerDown={standaloneWindow ? beginNativeDrag : beginDrag}>
+            <header className="composer-editor-header" onPointerDown={standaloneWindow ? beginNativeDrag : geometry.beginDrag}>
               {standaloneWindow && (
                 <div
                   className="composer-titlebar-drag-region"
@@ -540,16 +632,14 @@ export default function ComposerWindow({
                 <span
                   className="composer-autosave-status"
                   aria-live="polite"
-                  role={autosave?.save_state === 'error' ? 'alert' : 'status'}
-                  data-save-state={autosave?.save_state ?? 'saved'}
-                  title={autosave?.save_error || (explicitSaveStatus ? autosaveLabel : autosave ? `恢复点：${autosave.saved_at}` : autosaveLabel)}
+                  role={saveFailed ? 'alert' : 'status'}
+                  data-save-state={saveFailed ? 'error' : autosave?.save_state ?? 'saved'}
+                  title={autosaveDetail}
                 >
-                  {autosave && autosave.save_state !== 'error' && autosave.save_state !== 'saving' && !isDraftEmpty(draft) && !explicitSaveStatus
-                    ? <CheckCircle2 size={16} aria-hidden="true" />
-                    : null}
+                  <CheckCircle2 size={16} aria-hidden="true" style={{ visibility: autosaveLabel === '已存本机' ? 'visible' : 'hidden' }} />
                   {autosaveLabel}
-                  {autosave?.save_state === 'error' && onRetryAutosave && (
-                    <button type="button" onClick={onRetryAutosave}>重试自动保存</button>
+                  {saveFailed && (explicitSaveStatus || onRetryAutosave) && (
+                    <button type="button" disabled={saveDraftPending} onClick={explicitSaveStatus ? handleSaveDraft : onRetryAutosave}>重试</button>
                   )}
                 </span>
               </span>
@@ -572,16 +662,16 @@ export default function ComposerWindow({
                     });
                   }}
                 >
-                  <UsersRound size={17} aria-hidden="true" />
+                  <UsersRound size={18} aria-hidden="true" />
                   <span>联系人</span>
                 </button>
                 {!standaloneWindow && (
                   <>
-                    <button type="button" onClick={onMinimize} aria-label="收起写信" title="收起写信">
-                      <PanelBottomClose size={17} aria-hidden="true" />
+                    <button type="button" onClick={() => { flushPendingRef.current?.(); editingSession.capture(); onMinimize(); }} aria-label="收起写信" title="收起写信">
+                      <PanelBottomClose size={18} aria-hidden="true" />
                     </button>
-                    <button type="button" onClick={onClose} aria-label="关闭写信窗口" title="关闭写信窗口">
-                      <X size={17} aria-hidden="true" />
+                    <button type="button" onClick={requestClose} aria-label="关闭写信窗口" title="关闭写信窗口">
+                      <X size={18} aria-hidden="true" />
                     </button>
                   </>
                 )}
@@ -589,6 +679,7 @@ export default function ComposerWindow({
             </header>
 
             <ComposerSenderContext
+              active={surfaceActive}
               accounts={accounts}
               identities={draftIdentities}
               accountId={accountId}
@@ -598,7 +689,7 @@ export default function ComposerWindow({
 
             {crossAccountRisks.length > 0 && (
               <div className="composer-risk-banner" role="alert">
-                <AlertTriangle size={15} />
+                <AlertTriangle size={16} />
                 <div>
                   {crossAccountRisks.map((risk) => (
                     <p key={risk.id}>
@@ -610,6 +701,9 @@ export default function ComposerWindow({
             )}
 
             <ComposerPrimaryFields
+              mobile={mobile || compactRecipients}
+              active={surfaceActive}
+              flushPendingRef={flushPendingRef}
               draft={draft}
               contacts={draftContacts}
               richComposer={richComposer}
@@ -619,7 +713,7 @@ export default function ComposerWindow({
               onToggleCc={() => setCcOpen((current) => !current)}
               onToggleBcc={() => setBccOpen((current) => !current)}
               onRecipientFieldFocus={setActiveRecipientField}
-              formattingToolbar={formattingOpen ? (editorRef) => <ComposerRichToolbar editorRef={editorRef} /> : undefined}
+              formattingToolbar={formattingOpen ? (editorRef) => <ComposerRichToolbar editorRef={editorRef} active={surfaceActive} /> : undefined}
               onPatchDraft={patchDraft}
               onPickAttachments={onPickAttachments}
               onRemoveAttachment={onRemoveAttachment}
@@ -633,8 +727,8 @@ export default function ComposerWindow({
             />
 
             <ComposerAdvancedTools
-              mode={popoverMode}
-              anchorRef={popoverMode === 'templates' ? templateButtonRef : moreButtonRef}
+              mode={surfaceActive ? popoverMode : null}
+              anchorRef={popoverAnchorRef}
               templates={templates}
               templateName={templateName}
               onClose={closePopover}
@@ -643,7 +737,21 @@ export default function ComposerWindow({
               onTemplateNameChange={onTemplateNameChange}
               onSaveTemplate={onSaveTemplate}
               onSaveDraft={handleSaveDraft}
+              signature={draftIdentity?.signature.trim() || draftAccount?.signature.trim() || ''}
+              onInsertSignature={onInsertSignature}
+              onOpenTemplates={() => { popoverAnchorRef.current = moreButtonRef.current; setPopoverMode('templates'); }}
               saveDraftPending={saveDraftPending}
+              saveDraftBlockedReason={saveDraftBlockedReason}
+              saveDraftFeedback={saveDraftFeedback}
+            />
+
+            <ComposerTransferStatus
+              imports={attachmentImports}
+              sendIssue={sendIssue}
+              disabled={submissionPending}
+              onRetry={onRetryAttachmentImport}
+              onDismiss={onDismissAttachmentImport}
+              onRetrySend={handlePrimarySend}
             />
 
             <footer>
@@ -671,19 +779,20 @@ export default function ComposerWindow({
                 {normalizedSendProgress !== null && (
                   <div className="composer-send-progress-wrapper">
                     <div
-                      className="composer-send-progress"
+                      className={`composer-send-progress${uploadingToServer ? ' is-indeterminate' : ''}`}
                       role="progressbar"
                       aria-label="发送进度"
                       aria-valuemin={0}
                       aria-valuemax={100}
-                      aria-valuenow={normalizedSendProgress}
+                      aria-valuenow={uploadingToServer ? undefined : normalizedSendProgress}
+                      aria-valuetext={sendProgressMessage || '正在准备发送'}
                     >
                       <div
                         className="composer-send-progress-fill"
                         style={{ transform: `scaleX(${normalizedSendProgress / 100})` }}
                       />
                     </div>
-                    {sendProgressMessage ? <span>{sendProgressMessage}</span> : null}
+                    {sendProgressMessage ? <span className="composer-send-progress-message">{sendProgressMessage}</span> : null}
                   </div>
                 )}
               </div>
@@ -709,6 +818,7 @@ export default function ComposerWindow({
                 {draft.send_at.trim() ? (
                   <div className="composer-schedule-status">
                     <ComposerSchedulePicker
+                      active={surfaceActive}
                       value={draft.send_at}
                       onChange={(value) => patchDraft({ send_at: value })}
                       openRequest={scheduleOpenRequest}
@@ -721,7 +831,7 @@ export default function ComposerWindow({
                       aria-label="取消定时发送"
                       onClick={() => setScheduleClearConfirmOpen(true)}
                     >
-                      <X size={15} aria-hidden="true" />
+                      <X size={16} aria-hidden="true" />
                     </button>
                     {scheduleClearConfirmOpen && (
                       <div className="composer-schedule-clear-confirm" role="alertdialog" aria-label="取消定时发送确认">
@@ -742,6 +852,7 @@ export default function ComposerWindow({
                   </div>
                 ) : (
                   <ComposerSchedulePicker
+                    active={surfaceActive}
                     value={draft.send_at}
                     onChange={(value) => patchDraft({ send_at: value })}
                     openRequest={scheduleOpenRequest}
@@ -754,15 +865,17 @@ export default function ComposerWindow({
                     type="button"
                     className="composer-send-primary"
                     disabled={composerBusy}
+                    aria-busy={sendWorking || isImportingAttachments}
+                    title={sendStateLabel ? sendProgressMessage || (sendIssue?.kind === 'uncertain' ? '请先在发件箱核对发送结果' : sendStateLabel) : undefined}
                     onClick={handlePrimarySend}
                   >
-                    <Send size={17} aria-hidden="true" />
-                    {draft.send_at.trim() ? (
+                    {sendWorking || isImportingAttachments ? <LoaderCircle size={18} className="ui-spinner" aria-hidden="true" /> : <Send size={18} aria-hidden="true" />}
+                    {sendStateLabel || (draft.send_at.trim() ? (
                       <>
                         <span className="composer-send-label-full">定时发送 · {formatScheduleLabel(draft.send_at)}</span>
                         <span className="composer-send-label-compact">定时发送</span>
                       </>
-                    ) : '发送'}
+                    ) : '发送')}
                   </button>
                   <button
                     type="button"
@@ -774,9 +887,9 @@ export default function ComposerWindow({
                     disabled={composerBusy}
                     onClick={() => setSendMenuOpen((current) => !current)}
                   >
-                    <ChevronDown size={17} aria-hidden="true" />
+                    <ChevronDown size={18} aria-hidden="true" />
                   </button>
-                  {sendMenuOpen && (
+                  {surfaceActive && sendMenuOpen && (
                     <div
                       ref={sendMenuRef}
                       className="composer-send-menu"
@@ -800,27 +913,41 @@ export default function ComposerWindow({
           </div>
 
           {contactsPanelVisible && (
-            <ComposerContactsPanel
-              contacts={draftContacts}
-              draft={draft}
-              activeRecipientField={activeRecipientField}
-              onAddContacts={onAddContacts}
-              onClose={() => {
-                setContactsOpen(false);
-                try {
-                  localStorage.setItem('better-email-composer-contacts-open', 'false');
-                } catch {}
-              }}
-              showClose={true}
-              onOpenContactsSettings={onOpenContactsSettings}
-              onScanRecentContacts={onScanRecentContacts}
-            />
+            <div
+              ref={contactsBackdropRef}
+              className="composer-contacts-layer"
+              onClick={(event) => { if (event.target === event.currentTarget && compactContacts) closeContacts(); }}
+            >
+              <ComposerContactsPanel
+                panelRef={contactsPanelRef}
+                modal={contactsOverlayOpen}
+                contacts={draftContacts}
+                draft={draft}
+                activeRecipientField={activeRecipientField}
+                onAddContacts={onAddContacts}
+                onClose={closeContacts}
+                showClose
+                onOpenContactsSettings={onOpenContactsSettings}
+                onScanRecentContacts={onScanRecentContacts}
+              />
+            </div>
           )}
         </div>
+        {floating && (
+          <button type="button" className="composer-resize-handle" aria-label="调整写信窗口大小"
+            title="拖动调整大小；方向键微调，Home 恢复默认"
+            onPointerDown={geometry.beginResize} onKeyDown={geometry.resizeWithKeyboard} />
+        )}
       </section>
 
+      {submissionPending && (
+        <span className="sr-only" role="status" aria-live="polite">
+          {sendProgressMessage || '正在提交邮件，请等待完成。'}
+        </span>
+      )}
+
       <ConfirmDialog
-        open={sendRiskConfirm !== null}
+        open={open && !minimized && sendRiskConfirm !== null}
         title="跨邮箱发送风险"
         description="发送前请确认以下风险。你可以返回修改发件账号或收件人。"
         summaryText={sendRiskConfirm?.map((risk) => `• ${risk.message}：${risk.detail}`).join('\n') ?? ''}
@@ -831,5 +958,7 @@ export default function ComposerWindow({
         onCancel={onSendRiskCancel}
       />
     </div>
+    )}
+    </>
   );
 }

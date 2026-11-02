@@ -39,6 +39,36 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  .mobile-screen-layer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--ui-bg);
+  }
+
+  .mobile-screen-layer[hidden] { display: none; }
+  .mobile-screen-layer--mail { z-index: 0; }
+  .mobile-screen-layer--reader,
+  .mobile-screen-layer--settings { z-index: 1; }
+  .mobile-screen-layer.is-exiting {
+    pointer-events: none;
+  }
+  .mobile-screen-layer--mailbox {
+    z-index: 2;
+    background: transparent;
+    animation: none;
+  }
+  .mobile-screen-layer--mailbox.is-exiting .mobile-sheet-backdrop {
+    animation: mobile-sheet-fade-in var(--ui-motion-normal) var(--ui-ease-standard) reverse both;
+  }
+  .mobile-screen-layer--mailbox.is-exiting .mobile-mailbox-sheet {
+    animation: mobile-sheet-slide-in var(--ui-motion-normal) var(--ui-ease-standard) reverse both;
+  }
+
   /* Inbox destination --------------------------------------------------- */
 
   .mobile-inbox-header {
@@ -365,7 +395,7 @@
   }
 
   .mobile-bottom-compose {
-    color: var(--ui-accent) !important;
+    color: var(--ui-accent);
   }
 
   /* Mailbox navigation drawer ----------------------------------------- */
@@ -631,6 +661,8 @@
 
   .mobile-reader-surface > .reader-panel {
     overflow: auto;
+    scroll-padding-top: 64px;
+    scroll-padding-bottom: calc(76px + env(safe-area-inset-bottom));
     background: var(--workspace-reader);
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
@@ -754,6 +786,18 @@
     margin-bottom: env(safe-area-inset-bottom);
   }
 
+  .quick-reply-entry {
+    min-height: 48px;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .mobile-app-surface .attachment-section-header > button,
+  .mobile-app-surface .attachment-section .attachment-actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   /* Full-screen compose ------------------------------------------------ */
 
   .app-shell.is-mobile-app > .composer-backdrop {
@@ -797,12 +841,6 @@
     display: none;
   }
 
-  .app-shell.is-mobile-app .composer-field-row {
-    min-height: 52px;
-    grid-template-columns: 58px minmax(0, 1fr);
-    padding-inline: 14px;
-    font-size: 13px;
-  }
 
   .app-shell.is-mobile-app .composer .composer-field-row input,
   .app-shell.is-mobile-app .composer .composer-body-field textarea,
@@ -810,11 +848,6 @@
     font-size: 16px;
   }
 
-  .app-shell.is-mobile-app .composer .composer-recipient-actions {
-    right: 14px;
-    gap: 0;
-    padding-left: 8px;
-  }
 
   .app-shell.is-mobile-app .composer .composer-recipient-actions button {
     min-width: 44px;
@@ -1148,6 +1181,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mobile-screen-layer,
+  .mobile-screen-layer.is-exiting,
+  .mobile-screen-layer--mailbox.is-exiting .mobile-sheet-backdrop,
+  .mobile-screen-layer--mailbox.is-exiting .mobile-mailbox-sheet,
   .mobile-sheet-backdrop,
   .mobile-mailbox-sheet {
     animation: none;

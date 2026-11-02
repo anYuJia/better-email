@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, type MutableRefObject } from 'react';
+import { useRef, type Dispatch, type SetStateAction, type MutableRefObject } from 'react';
 import type {
   Message,
   MessageSummary,
@@ -53,7 +53,6 @@ type UseReaderActionsOptions = {
 
 export default function useReaderActions({
   selected,
-  selectedDetail,
   setSelectedDetail,
   onUpdateCache,
   activeThread,
@@ -74,19 +73,32 @@ export default function useReaderActions({
   onBodyFetchSuccess,
   onBodyFetchError,
 }: UseReaderActionsOptions) {
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
 
-  async function renderSelectedWithRemoteImagePolicy(messageId = selected?.id) {
-    if (!messageId) return null;
-    const updated = await invoke<Message>(IPC.RenderMessageWithRemoteImagePolicy, { messageId });
+  function isCurrentMessage(message: Pick<Message, 'id' | 'account_id'>) {
+    return selectedRef.current?.id === message.id
+      && selectedRef.current.account_id === message.account_id;
+  }
+
+  function applyLoadedMessage(updated: Message) {
     const summary = toSummary(updated);
     setMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
     if (activeThread) {
       setThreadMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
     }
-    if (selectedDetail && selectedDetail.id === updated.id) {
-      setSelectedDetail(updated);
+    if (isCurrentMessage(updated)) {
+      setSelectedDetail((current) => current?.id === updated.id && current.account_id === updated.account_id ? updated : current);
     }
+    // Background completion still warms its own cache. It must never replace
+    // the currently displayed message or that message's attachment list.
     onUpdateCache(updated);
+  }
+
+  async function renderSelectedWithRemoteImagePolicy(messageId = selected?.id) {
+    if (!messageId) return null;
+    const updated = await invoke<Message>(IPC.RenderMessageWithRemoteImagePolicy, { messageId });
+    applyLoadedMessage(updated);
     return updated;
   }
 
@@ -103,25 +115,17 @@ export default function useReaderActions({
     });
     try {
       const updated = await invoke<Message>(IPC.FetchMessageBody, { messageId: selected.id });
-      const summary = toSummary(updated);
-      setMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
-      if (activeThread) {
-        setThreadMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
-      }
-      if (selectedDetail && selectedDetail.id === updated.id) {
-        setSelectedDetail(updated);
-      }
-      onUpdateCache(updated);
+      applyLoadedMessage(updated);
       onBodyFetchSuccess(updated.id);
       let refreshedAttachments: Attachment[] = [];
       let attachmentRefreshFailed = false;
       try {
         refreshedAttachments = await invoke<Attachment[]>(IPC.ListAttachments, { messageId: updated.id });
-        setAttachments(refreshedAttachments);
+        if (isCurrentMessage(updated)) setAttachments(refreshedAttachments);
       } catch (attachmentError) {
         attachmentRefreshFailed = true;
         const attachmentMessage = String(attachmentError).replace(/^Error:\s*/i, '');
-        setStatus(`正文已加载，但附件列表刷新失败：${attachmentMessage}`);
+        if (isCurrentMessage(updated)) setStatus(`正文已加载，但附件列表刷新失败：${attachmentMessage}`);
       }
       appFlowLog('manualFetchBody done', {
         messageId: updated.id,
@@ -129,7 +133,7 @@ export default function useReaderActions({
         htmlLength: updated.sanitized_html.length,
         attachments: refreshedAttachments.length,
       });
-      if (!isSilent && !attachmentRefreshFailed) {
+      if (!isSilent && !attachmentRefreshFailed && isCurrentMessage(updated)) {
         setStatus('远端正文已拉取并缓存到本地');
       }
     } catch (error) {
@@ -143,7 +147,7 @@ export default function useReaderActions({
         uid: selected.remote_uid,
         error: message,
       });
-      if (!isSilent) {
+      if (!isSilent && isCurrentMessage(selected)) {
         setStatus(`正文拉取失败：${message}`);
       }
       throw error;
@@ -155,16 +159,8 @@ export default function useReaderActions({
   async function allowRemoteImagesForSelectedOnce() {
     if (!selected) return;
     const updated = await invoke<Message>(IPC.RenderMessageWithRemoteImagesOnce, { messageId: selected.id });
-    const summary = toSummary(updated);
-    setMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
-    if (activeThread) {
-      setThreadMessages((current) => current.map((message) => (message.id === summary.id ? summary : message)));
-    }
-    if (selectedDetail && selectedDetail.id === updated.id) {
-      setSelectedDetail(updated);
-    }
-    onUpdateCache(updated);
-    setStatus('已允许查看当前邮件的远程图片');
+    applyLoadedMessage(updated);
+    if (isCurrentMessage(updated)) setStatus('已允许查看当前邮件的远程图片');
   }
 
   async function trustRemoteImagesForSelected(scope: 'sender' | 'domain') {
@@ -188,7 +184,7 @@ export default function useReaderActions({
       await fetchSelectedBody();
       await renderSelectedWithRemoteImagePolicy(selected.id);
     }
-    setStatus(scope === 'sender' ? `已信任发件人远程图片：${trust.value}` : `已信任发件人域名远程图片：${trust.value}`);
+    if (isCurrentMessage(selected)) setStatus(scope === 'sender' ? `已信任发件人远程图片：${trust.value}` : `已信任发件人域名远程图片：${trust.value}`);
   }
 
   async function blockSelectedSender() {
@@ -241,8 +237,24 @@ export default function useReaderActions({
       setStatus('请先下载附件');
       return;
     }
-    const message = await invoke<string>(IPC.OpenAttachment, { attachmentId: attachment.id });
-    setStatus(message);
+    try {
+      const message = await invoke<string>(IPC.OpenAttachment, { attachmentId: attachment.id });
+      setStatus(message);
+    } catch (error) {
+      setStatus(`附件打开失败：${String(error).replace(/^Error:\s*/i, '')}`);
+      await refreshMessageAttachments(attachment.message_id);
+    }
+  }
+
+  async function refreshMessageAttachments(messageId: number) {
+    const owner = selectedRef.current;
+    if (!owner || owner.id !== messageId) return;
+    try {
+      const refreshed = await invoke<Attachment[]>(IPC.ListAttachments, { messageId });
+      if (isCurrentMessage(owner)) setAttachments(refreshed);
+    } catch {
+      // Preserve the original file-access error if refreshing also fails.
+    }
   }
 
   async function saveAttachmentAs(attachment: Attachment) {
@@ -250,8 +262,13 @@ export default function useReaderActions({
       setStatus('请先下载附件');
       return;
     }
-    const message = await invoke<string>(IPC.SaveAttachmentAs, { attachmentId: attachment.id });
-    setStatus(message);
+    try {
+      const message = await invoke<string>(IPC.SaveAttachmentAs, { attachmentId: attachment.id });
+      setStatus(message);
+    } catch (error) {
+      setStatus(`附件另存失败：${String(error).replace(/^Error:\s*/i, '')}`);
+      await refreshMessageAttachments(attachment.message_id);
+    }
   }
 
   async function exportSelectedMessage() {
@@ -269,6 +286,7 @@ export default function useReaderActions({
     downloadAttachment,
     openAttachment,
     saveAttachmentAs,
+    refreshMessageAttachments,
     exportSelectedMessage,
   };
 }

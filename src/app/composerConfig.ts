@@ -1,5 +1,6 @@
 import type { ComposerAutosave, ComposeTemplate, DraftInput, MailIdentityInput } from './types';
 import { composeTemplatesStorageKey, composerAutosaveStorageKey, readAppStorage } from './storageConfig';
+import { normalizePendingAttachments } from './attachmentImports';
 
 export { composeTemplatesStorageKey, composerAutosaveStorageKey };
 
@@ -87,7 +88,13 @@ export function normalizeDraftInput(value: unknown): DraftInput | null {
         typeof attachment.local_path === 'string',
     )
     : [];
+  const source = item.quick_reply_source;
+  const quickReplySource = source && typeof source === 'object'
+    && typeof source.key === 'string' && /^\d+:\d+$/.test(source.key)
+    && typeof source.body === 'string' && typeof source.revision === 'string'
+    && (source.mode === 'reply' || source.mode === 'replyAll') ? source : undefined;
   return {
+    ...(quickReplySource ? { quick_reply_source: quickReplySource } : {}),
     draft_id: Number(item.draft_id) || 0,
     account_id: Number(item.account_id) || 0,
     identity_id: Number(item.identity_id) || 0,
@@ -118,11 +125,13 @@ export function parseComposerAutosave(value: unknown): ComposerAutosave | null {
   try {
     const parsed = value as Partial<ComposerAutosave> | null;
     const draft = normalizeDraftInput(parsed?.draft);
-    if (!draft || isDraftEmpty(draft)) return null;
+    const pending = normalizePendingAttachments(parsed?.pending_attachments);
+    if (!draft || (isDraftEmpty(draft) && !pending.length)) return null;
     return {
       draft,
       isRichComposer: true,
       saved_at: typeof parsed?.saved_at === 'string' ? parsed.saved_at : new Date().toISOString(),
+      ...(pending.length ? { pending_attachments: pending } : {}),
     };
   } catch {
     return null;

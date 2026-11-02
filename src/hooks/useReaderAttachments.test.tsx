@@ -29,6 +29,7 @@ function renderHookManager() {
   const onOpenAttachment = vi.fn();
   const onSaveAttachmentAs = vi.fn();
   const openImagePreview = vi.fn();
+  const onRefreshAttachments = vi.fn().mockResolvedValue(undefined);
   const utils = renderHook(() => useReaderAttachments({
     attachments: [],
     selectedId: null,
@@ -36,8 +37,9 @@ function renderHookManager() {
     onOpenAttachment,
     onSaveAttachmentAs,
     openImagePreview,
+    onRefreshAttachments,
   }));
-  return { utils, onDownloadAttachment, onOpenAttachment, openImagePreview };
+  return { utils, onDownloadAttachment, onOpenAttachment, openImagePreview, onRefreshAttachments };
 }
 
 describe('useReaderAttachments preview-after-download', () => {
@@ -52,6 +54,7 @@ describe('useReaderAttachments preview-after-download', () => {
   it('previews an already-downloaded image attachment with its asset url', async () => {
     const { utils, openImagePreview } = renderHookManager();
     const attachment = imageAttachment({ is_downloaded: true, local_path: '/appdata/attachments/photo.png' });
+    vi.mocked(invoke).mockResolvedValueOnce(attachment);
 
     await act(async () => {
       await utils.result.current.previewAttachment(attachment);
@@ -74,6 +77,7 @@ describe('useReaderAttachments preview-after-download', () => {
     const stale = imageAttachment({ id: 7, local_path: '' });
     const fresh = imageAttachment({ id: 7, is_downloaded: true, local_path: '/appdata/attachments/7-photo.png' });
     onDownloadAttachment.mockResolvedValue(fresh);
+    vi.mocked(invoke).mockResolvedValueOnce(fresh);
 
     await act(async () => {
       await utils.result.current.previewAttachment(stale);
@@ -112,6 +116,7 @@ describe('useReaderAttachments preview-after-download', () => {
       local_path: '/appdata/attachments/missing.png',
     });
     vi.mocked(localFileAssetUrl).mockRejectedValueOnce(new Error('附件文件不存在或已被删除。'));
+    vi.mocked(invoke).mockResolvedValueOnce(attachment);
 
     await act(async () => {
       await utils.result.current.previewAttachment(attachment);
@@ -129,6 +134,7 @@ describe('useReaderAttachments preview-after-download', () => {
       local_path: '/appdata/attachments/empty.png',
     });
     vi.mocked(localFileAssetUrl).mockResolvedValueOnce('');
+    vi.mocked(invoke).mockResolvedValueOnce(attachment);
 
     await act(async () => {
       await utils.result.current.previewAttachment(attachment);
@@ -136,5 +142,26 @@ describe('useReaderAttachments preview-after-download', () => {
 
     expect(openImagePreview).not.toHaveBeenCalled();
     expect(utils.result.current.attachmentErrors[10]).toContain('附件本地文件不可用');
+  });
+
+  it('previews the repaired managed copy instead of a legacy sent attachment path', async () => {
+    const { utils, openImagePreview } = renderHookManager();
+    const legacy = imageAttachment({ is_downloaded: true, local_path: '/appdata/temp_attachments/photo.png' });
+    const repaired = { ...legacy, local_path: '/appdata/attachments/1/repaired-photo.png' };
+    vi.mocked(invoke).mockResolvedValueOnce(repaired);
+    await act(async () => { await utils.result.current.previewAttachment(legacy); });
+    expect(invoke).toHaveBeenCalledWith('prepare_attachment_preview', { attachmentId: 1 });
+    expect(localFileAssetUrl).toHaveBeenCalledWith(repaired.local_path);
+    expect(openImagePreview).toHaveBeenCalledOnce();
+  });
+
+  it('refreshes download state when native validation discovers a missing file', async () => {
+    const { utils, openImagePreview, onRefreshAttachments } = renderHookManager();
+    const missing = imageAttachment({ is_downloaded: true, local_path: '/appdata/temp_attachments/photo.png' });
+    vi.mocked(invoke).mockRejectedValueOnce(new Error('本地副本已丢失，请重新下载'));
+    await act(async () => { await utils.result.current.previewAttachment(missing); });
+    expect(openImagePreview).not.toHaveBeenCalled();
+    expect(onRefreshAttachments).toHaveBeenCalledWith(1);
+    expect(utils.result.current.attachmentErrors[1]).toContain('重新下载');
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import {
   ChevronLeft,
@@ -13,7 +13,9 @@ import type { Account, AccountScope } from '../../app/types';
 import useModalAccessibility from '../../hooks/useModalAccessibility';
 import { startDraggingCurrentWindow } from '../../tauriBridge';
 import { SettingsSearch, SettingsSidebar } from './SettingsNavigationControls';
+import useSettingsSurfaceMotion from './useSettingsSurfaceMotion';
 import {
+  accountScopedSections,
   connectionSettingsSections,
   getSettingsNavigationContext,
   getSettingsSectionPresentation,
@@ -135,6 +137,8 @@ export default function SettingsFrame({
   const showSaveAction = canSave ?? (isAccountEditingSection && canSaveAndVerify);
   const accountSectionsEnabled = accounts.length > 0 || canSaveAndVerify;
   const isMobileViewport = useSettingsMobileViewport();
+  const isAccountScoped = accountScopedSections.has(activeSection);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [pendingAccountScope, setPendingAccountScope] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
@@ -142,6 +146,7 @@ export default function SettingsFrame({
   const shellRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
   const closeTimerRef = useRef<number | null>(null);
+  const onCloseRef = useRef(onClose);
   const closingRef = useRef(false);
   const handledNativeCloseRequestRef = useRef(0);
 
@@ -155,6 +160,8 @@ export default function SettingsFrame({
     onReady?.();
   }, [onReady]);
 
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
   useEffect(() => {
     if (!isDirty) setShowDiscardConfirm(false);
   }, [isDirty]);
@@ -165,6 +172,26 @@ export default function SettingsFrame({
     }
   }, []);
 
+  const completeClose = useCallback(() => {
+    if (closeTimerRef.current === null) return;
+    window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+    onCloseRef.current();
+  }, []);
+
+  useSettingsSurfaceMotion(shellRef, !isClosing, {
+    enabled: isMobileViewport && !standalone,
+    onExited: completeClose,
+  });
+
+  useEffect(() => {
+    if (!isClosing || typeof window.matchMedia !== 'function') return undefined;
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => { if (media.matches) completeClose(); };
+    media.addEventListener?.('change', update);
+    return () => media.removeEventListener?.('change', update);
+  }, [isClosing]);
+
   const finishClose = () => {
     if (closingRef.current) return;
     if (standalone || !canAnimateSettingsExit()) {
@@ -173,10 +200,7 @@ export default function SettingsFrame({
     }
     closingRef.current = true;
     setIsClosing(true);
-    closeTimerRef.current = window.setTimeout(() => {
-      closeTimerRef.current = null;
-      onClose();
-    }, SETTINGS_EXIT_MS);
+    closeTimerRef.current = window.setTimeout(completeClose, SETTINGS_EXIT_MS);
   };
 
   const performClose = (discardChanges = false) => {
@@ -191,6 +215,10 @@ export default function SettingsFrame({
 
   const requestClose = () => {
     if (closingRef.current) return;
+    if (isSearchExpanded) {
+      setIsSearchExpanded(false);
+      return;
+    }
     if (isDirty) {
       setPendingAccountScope(null);
       setShowDiscardConfirm(true);
@@ -239,7 +267,7 @@ export default function SettingsFrame({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented || event.key !== 'Escape') return;
+      if (event.defaultPrevented || event.key !== 'Escape' || event.isComposing || event.keyCode === 229) return;
       const settingsShell = shellRef.current;
       const startedInNestedDialog = settingsShell !== null
         && event.composedPath().some((target) => (
@@ -259,7 +287,7 @@ export default function SettingsFrame({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isClosing, isDirty, isMobileViewport, isNestedSection, onClose, showDiscardConfirm]);
+  }, [isClosing, isDirty, isMobileViewport, isNestedSection, isSearchExpanded, onClose, showDiscardConfirm]);
 
   return (
     <div
@@ -286,10 +314,17 @@ export default function SettingsFrame({
         data-ui="settings-app"
         data-standalone={standalone ? 'true' : 'false'}
         data-page-layout="standard"
+        data-settings-section={activeSection}
+        data-account-scoped={isAccountScoped ? 'true' : 'false'}
         role="region"
         aria-label={title}
         ref={shellRef}
         tabIndex={-1}
+        {...(isClosing ? { inert: '' } : {})}
+        onAnimationEnd={(event) => {
+          if (event.target === event.currentTarget
+            && /settings-(?:mobile-)?shell-exit/.test(event.animationName)) completeClose();
+        }}
       >
         <header className="settings-main-header">
           {standalone && (
@@ -304,7 +339,7 @@ export default function SettingsFrame({
               aria-hidden="true"
             />
           )}
-          <div className="settings-header-leading">
+          <div className="settings-header-leading" {...(isMobileViewport && isSearchExpanded ? { inert: '', 'aria-hidden': true } : {})}>
             <div className="settings-title">
               <button
                 type="button"
@@ -322,7 +357,7 @@ export default function SettingsFrame({
                 <strong className="settings-mobile-page-title">{activePresentation.label}</strong>
               </span>
             </div>
-            <AccountSwitcher
+            {isAccountScoped && <AccountSwitcher
               className="settings-header-account-switcher"
               accountScope={accountScope}
               accounts={accounts}
@@ -330,13 +365,16 @@ export default function SettingsFrame({
               onChange={requestAccountScopeChange}
               onSetDefault={onSetDefaultAccount}
               onAddAccount={onAddAccount}
-            />
+            />}
           </div>
           <SettingsSearch
+            mobile={isMobileViewport}
+            expanded={isSearchExpanded}
+            onExpandedChange={setIsSearchExpanded}
             accountSectionsEnabled={accountSectionsEnabled}
             onNavigate={onNavigate}
           />
-          <div className="settings-header-actions">
+          <div className="settings-header-actions" {...(isMobileViewport && isSearchExpanded ? { inert: '', 'aria-hidden': true } : {})}>
             {canActOnConnection && (
               <button
                 type="button"
@@ -347,7 +385,7 @@ export default function SettingsFrame({
                 disabled={isBusy || isTestingConnection}
                 onClick={onTestConnection}
               >
-                {isTestingConnection ? <LoaderCircle className="settings-action-spinner" size={15} /> : <FlaskConical size={15} />}
+                {isTestingConnection ? <LoaderCircle className="settings-action-spinner" size={16} /> : <FlaskConical size={16} />}
                 <span>{isTestingConnection ? '测试中…' : '测试连接'}</span>
               </button>
             )}
@@ -360,7 +398,7 @@ export default function SettingsFrame({
                 disabled={isBusy || !isDirty}
                 onClick={onSave}
               >
-                {isBusy ? <LoaderCircle className="settings-action-spinner" size={15} /> : <Save size={15} />}
+                {isBusy ? <LoaderCircle className="settings-action-spinner" size={16} /> : <Save size={16} />}
                 <span>{isBusy ? '保存中' : '保存修改'}</span>
               </button>
             )}
@@ -373,7 +411,7 @@ export default function SettingsFrame({
                 data-no-tooltip
                 onClick={requestClose}
               >
-                <X size={16} aria-hidden="true" />
+                <X size={18} aria-hidden="true" />
               </button>
             )}
           </div>

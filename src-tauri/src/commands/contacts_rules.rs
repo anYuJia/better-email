@@ -88,168 +88,193 @@ pub async fn preview_contact_import(
 }
 
 #[tauri::command]
-pub fn commit_contact_import(
+pub async fn commit_contact_import(
     path: String,
     selections: Vec<ContactImportSelection>,
     scope: Option<String>,
     account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportCommitSummary> {
-    let (file_name, payload, _size_bytes) = read_contact_file_by_path(&path)?;
-    let parsed = vcard::parse_contact_import_bytes(&payload, &file_name)
-        .map_err(crate::db::MailError::Imap)?;
-    let action_by_email: std::collections::HashMap<String, String> = selections
-        .into_iter()
-        .map(|selection| {
-            (
-                selection.email.trim().to_ascii_lowercase(),
-                selection.action,
-            )
-        })
-        .collect();
-    let inputs: Vec<(ContactCreateInput, String)> = parsed
-        .contacts
-        .into_iter()
-        .map(|contact| {
-            let action = action_by_email
-                .get(&contact.email.trim().to_ascii_lowercase())
-                .cloned()
-                .unwrap_or_else(|| "create".to_string());
-            (contact, action)
-        })
-        .collect();
-    let scope = scope.unwrap_or_else(|| "global".to_string());
-    match account_id {
-        Some(account_id) => {
-            store.commit_contact_import_for_account(account_id, inputs, &file_name, &scope)
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let (file_name, payload, _size_bytes) = read_contact_file_by_path(&path)?;
+        let parsed = vcard::parse_contact_import_bytes(&payload, &file_name)
+            .map_err(crate::db::MailError::Imap)?;
+        let action_by_email: std::collections::HashMap<String, String> = selections
+            .into_iter()
+            .map(|selection| {
+                (
+                    selection.email.trim().to_ascii_lowercase(),
+                    selection.action,
+                )
+            })
+            .collect();
+        let inputs: Vec<(ContactCreateInput, String)> = parsed
+            .contacts
+            .into_iter()
+            .map(|contact| {
+                let action = action_by_email
+                    .get(&contact.email.trim().to_ascii_lowercase())
+                    .cloned()
+                    .unwrap_or_else(|| "create".to_string());
+                (contact, action)
+            })
+            .collect();
+        let scope = scope.unwrap_or_else(|| "global".to_string());
+        match account_id {
+            Some(account_id) => {
+                store.commit_contact_import_for_account(account_id, inputs, &file_name, &scope)
+            }
+            None => store.commit_contact_import(inputs, &file_name, &scope),
         }
-        None => store.commit_contact_import(inputs, &file_name, &scope),
-    }
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn commit_contact_import_entries(
+pub async fn commit_contact_import_entries(
     file_name: String,
     entries: Vec<ContactImportEntryInput>,
     scope: Option<String>,
     account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportCommitSummary> {
-    let inputs: Vec<(ContactCreateInput, String)> = entries
-        .into_iter()
-        .map(|entry| {
-            (
-                ContactCreateInput {
-                    name: entry.name,
-                    email: entry.email,
-                    aliases: entry.aliases,
-                    vip: entry.vip,
-                },
-                entry.action,
-            )
-        })
-        .collect();
-    let scope = scope.unwrap_or_else(|| "global".to_string());
-    match account_id {
-        Some(account_id) => {
-            store.commit_contact_import_entries_for_account(account_id, inputs, &file_name, &scope)
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let inputs: Vec<(ContactCreateInput, String)> = entries
+            .into_iter()
+            .map(|entry| {
+                (
+                    ContactCreateInput {
+                        name: entry.name,
+                        email: entry.email,
+                        aliases: entry.aliases,
+                        vip: entry.vip,
+                    },
+                    entry.action,
+                )
+            })
+            .collect();
+        let scope = scope.unwrap_or_else(|| "global".to_string());
+        match account_id {
+            Some(account_id) => store
+                .commit_contact_import_entries_for_account(account_id, inputs, &file_name, &scope),
+            None => store.commit_contact_import_entries(inputs, &file_name, &scope),
         }
-        None => store.commit_contact_import_entries(inputs, &file_name, &scope),
-    }
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn list_contact_import_batches(
+pub async fn list_contact_import_batches(
     account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<Vec<ContactImportBatch>> {
-    store.list_contact_import_batches_for_account(account_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_contact_import_batches_for_account(account_id))
+        .await
 }
 
 #[tauri::command]
-pub fn undo_contact_import_batch(
+pub async fn undo_contact_import_batch(
     batch_id: i64,
     account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<ContactImportUndoReport> {
-    match account_id {
+    let store = store.inner().clone();
+    super::executor::database(move || match account_id {
         Some(account_id) => store.undo_contact_import_batch_for_account(account_id, batch_id),
         None => store.undo_contact_import_batch(batch_id),
-    }
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn list_contacts(
+pub async fn list_contacts(
     account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<Vec<Contact>> {
-    store.list_contacts_for_account(account_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_contacts_for_account(account_id)).await
 }
 
 #[tauri::command]
-pub fn should_auto_scan_recent_contacts(store: State<'_, MailStore>) -> MailResult<bool> {
-    store.should_auto_scan_recent_contacts()
+pub async fn should_auto_scan_recent_contacts(store: State<'_, MailStore>) -> MailResult<bool> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.should_auto_scan_recent_contacts()).await
 }
 
 #[tauri::command]
-pub fn scan_recent_contacts(
+pub async fn scan_recent_contacts(
     initial_only: Option<bool>,
     account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<RecentContactSyncReport> {
-    store.scan_recent_contacts_for_account(initial_only.unwrap_or(false), account_id)
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        store.scan_recent_contacts_for_account(initial_only.unwrap_or(false), account_id)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn create_contact(
+pub async fn create_contact(
     store: State<'_, MailStore>,
     input: ContactCreateInput,
     account_id: Option<i64>,
 ) -> MailResult<Contact> {
-    match account_id {
+    let store = store.inner().clone();
+    super::executor::database(move || match account_id {
         Some(account_id) => store.create_contact_for_account(account_id, input),
         None => store.create_contact(input),
-    }
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn update_contact(
+pub async fn update_contact(
     store: State<'_, MailStore>,
     contact_id: i64,
     input: ContactInput,
     account_id: Option<i64>,
 ) -> MailResult<Contact> {
-    match account_id {
+    let store = store.inner().clone();
+    super::executor::database(move || match account_id {
         Some(account_id) => store.update_contact_for_account(account_id, contact_id, input),
         None => store.update_contact(contact_id, input),
-    }
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn delete_contact(
+pub async fn delete_contact(
     store: State<'_, MailStore>,
     contact_id: i64,
     account_id: Option<i64>,
 ) -> MailResult<()> {
-    match account_id {
+    let store = store.inner().clone();
+    super::executor::database(move || match account_id {
         Some(account_id) => store.delete_contact_for_account(account_id, contact_id),
         None => store.delete_contact(contact_id),
-    }
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn merge_contacts(
+pub async fn merge_contacts(
     store: State<'_, MailStore>,
     target_contact_id: i64,
     source_contact_id: i64,
     account_id: Option<i64>,
 ) -> MailResult<Contact> {
-    match account_id {
+    let store = store.inner().clone();
+    super::executor::database(move || match account_id {
         Some(account_id) => {
             store.merge_contacts_for_account(account_id, target_contact_id, source_contact_id)
         }
         None => store.merge_contacts(target_contact_id, source_contact_id),
-    }
+    })
+    .await
 }
 
 #[tauri::command]
@@ -344,47 +369,54 @@ pub async fn import_contacts_vcard(
 }
 
 #[tauri::command]
-pub fn list_rules(
+pub async fn list_rules(
     account_id: Option<i64>,
     store: State<'_, MailStore>,
 ) -> MailResult<Vec<MailRule>> {
-    store.list_rules_for_account(account_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_rules_for_account(account_id)).await
 }
 
 #[tauri::command]
-pub fn upsert_rule(
+pub async fn upsert_rule(
     store: State<'_, MailStore>,
     rule_id: Option<i64>,
     input: MailRuleInput,
     account_id: Option<i64>,
 ) -> MailResult<MailRule> {
-    match account_id {
+    let store = store.inner().clone();
+    super::executor::database(move || match account_id {
         Some(account_id) => store.upsert_rule_for_account(account_id, rule_id, input),
         None => store.upsert_rule(rule_id, input),
-    }
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn set_rule_enabled(
+pub async fn set_rule_enabled(
     store: State<'_, MailStore>,
     rule_id: i64,
     enabled: bool,
     account_id: Option<i64>,
 ) -> MailResult<MailRule> {
-    match account_id {
+    let store = store.inner().clone();
+    super::executor::database(move || match account_id {
         Some(account_id) => store.set_rule_enabled_for_account(account_id, rule_id, enabled),
         None => store.set_rule_enabled(rule_id, enabled),
-    }
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn delete_rule(
+pub async fn delete_rule(
     store: State<'_, MailStore>,
     rule_id: i64,
     account_id: Option<i64>,
 ) -> MailResult<()> {
-    match account_id {
+    let store = store.inner().clone();
+    super::executor::database(move || match account_id {
         Some(account_id) => store.delete_rule_for_account(account_id, rule_id),
         None => store.delete_rule(rule_id),
-    }
+    })
+    .await
 }

@@ -47,6 +47,22 @@ export function formatDate(value: string): string {
   }).format(date);
 }
 
+const listTimeFormatter = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+const listDateFormatter = new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' });
+const listYearDateFormatter = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric' });
+
+/** Short calendar labels for scanning; reader/tooltips keep the full timestamp. */
+export function formatListDate(value: string, now = new Date()): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  if (localDateKey(date) === localDateKey(now)) {
+    return listTimeFormatter.format(date);
+  }
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (localDateKey(date) === localDateKey(yesterday)) return '昨天';
+  return (date.getFullYear() !== now.getFullYear() ? listYearDateFormatter : listDateFormatter).format(date);
+}
+
 export type MessageDateGroup = {
   id: 'today' | 'yesterday' | 'this-week' | 'earlier' | 'unknown';
   label: string;

@@ -99,7 +99,7 @@ export default function MessageBulkToolbar({
           aria-label={`更多批量操作，已选 ${selectedMessageIds.length} 封`}
         >
           <MoreHorizontal size={15} aria-hidden="true" />
-          更多
+          <span aria-live="polite">已选 {selectedMessageIds.length} 封</span>
         </summary>
         <div
           className="context-menu-surface context-menu--anchored"

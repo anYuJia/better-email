@@ -1,0 +1,24 @@
+/* useSurfaceMotion owns interpolation so rapid minimize/restore reverses from
+ * the painted frame. Individual translate leaves the drag transform intact. */
+.composer-backdrop[hidden] { display: none; }
+
+.composer-backdrop.is-exiting,
+.composer-minimized-layer.is-exiting {
+  pointer-events: none;
+}
+
+.composer-backdrop.is-exiting > .composer {
+  pointer-events: none;
+}
+
+/* The input policy owns touch/pen press state until the gesture ends. Native
+ * :active remains the keyboard/mouse fallback, never a cancelled-touch retry. */
+.composer-schedule-picker-confirm:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]) {
+  border-color: var(--ui-accent-pressed);
+  background: var(--ui-accent-pressed);
+}
+
+.composer-send-primary:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled),
+.composer-send-menu-trigger:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
+  background: var(--ui-accent-pressed);
+}

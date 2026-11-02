@@ -366,6 +366,9 @@
   right: 0;
   z-index: 80;
   display: grid;
+  max-height: min(360px, calc(100dvh - 80px));
+  overflow-x: hidden;
+  overflow-y: auto;
   gap: 0;
   padding: 3px;
   border: 1px solid var(--ui-border-strong);
@@ -376,7 +379,7 @@
 
 .search-suggestion-panel button {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   min-height: 35px;
@@ -407,13 +410,6 @@
 .search-suggestion-panel strong {
   font-size: var(--ui-font-size-secondary);
   font-weight: 600;
-}
-
-.search-suggestion-panel em {
-  color: var(--ui-text-tertiary);
-  font-size: var(--ui-font-size-meta);
-  font-style: normal;
-  white-space: nowrap;
 }
 
 .search-suggestion-title {
@@ -639,7 +635,7 @@
   box-shadow: var(--ui-shadow-popover);
 }
 
-.compact-menu > div button {
+.compact-menu > div > button {
   width: 100%;
   min-height: 32px;
   height: 32px;
@@ -660,26 +656,26 @@
   transition: var(--ui-transition-fast-color-background);
 }
 
-.compact-menu > div button:hover,
-.compact-menu > div button:focus-visible {
+.compact-menu > div > button:hover,
+.compact-menu > div > button:focus-visible {
   background: var(--quiet-row-hover);
   outline: none;
 }
 
-.compact-menu > div button:focus-visible {
+.compact-menu > div > button:focus-visible {
   box-shadow: none;
 }
 
-.compact-menu > div button.active {
+.compact-menu > div > button.active {
   background: transparent;
 }
 
-.compact-menu > div button.active:hover,
-.compact-menu > div button.active:focus-visible {
+.compact-menu > div > button.active:hover,
+.compact-menu > div > button.active:focus-visible {
   background: var(--quiet-row-hover);
 }
 
-.compact-menu > div button:disabled {
+.compact-menu > div > button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -855,6 +851,20 @@
   pointer-events: none;
 }
 
+.message-selection-controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.message-selection-controls .message-selection-all {
+  position: static;
+  width: 26px;
+  height: 32px;
+  justify-content: center;
+}
+
 .message-date-range-trigger {
   position: absolute;
   right: 12px;
@@ -862,13 +872,23 @@
   min-height: 26px;
   height: 26px;
   padding: 0 9px;
-  border: 1px solid color-mix(in srgb, var(--ui-accent) 42%, transparent);
+  border: 1px solid transparent;
   border-radius: var(--ui-radius-control);
-  color: var(--ui-accent);
-  background: color-mix(in srgb, var(--ui-accent-soft) 72%, transparent);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, white 28%, transparent);
-  backdrop-filter: blur(6px);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  box-shadow: none;
   line-height: 1;
+}
+
+.message-date-range-trigger.is-icon-only {
+  position: relative;
+  inset: auto;
+  width: 30px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
 }
 
 .message-date-range-trigger::after {
@@ -879,9 +899,8 @@
 
 .message-date-range-trigger:hover,
 .message-date-range-trigger[aria-expanded="true"] {
-  color: var(--color-text-on-accent);
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
 }
 
 .message-date-range-trigger:active {
@@ -1024,8 +1043,8 @@
 /* ---------------------------------------------------------------------------
  * 8 · Virtual list viewport
  *
- * The row height here is the single source of truth shared with
- * messageListLayout.ts. Changing it requires syncing the TS constant.
+ * The base row estimate is shared with messageListLayout.ts. The card can
+ * grow with its content; measured heights determine virtual row placement.
  * ------------------------------------------------------------------------- */
 
 .message-list-item {
@@ -1046,11 +1065,11 @@
 .message-card {
   box-sizing: border-box;
   position: relative;
-  height: 100%;
-  min-height: 0;
+  height: auto;
+  min-height: 68px;
   overflow: hidden;
   margin: 0;
-  padding: 9px 16px 9px 84px;
+  padding: 6px 16px 6px 64px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   border: 0;
@@ -1108,10 +1127,10 @@
 /* Selection controls share the leading slot so the left edge never shifts. */
 .message-leading {
   position: absolute;
-  left: 24px;
+  left: 20px;
   top: 50%;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   transform: translateY(-50%);
   pointer-events: none;
 }
@@ -1143,14 +1162,14 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  min-height: 36px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
-  flex: 0 0 36px;
+  flex: 0 0 32px;
   overflow: hidden;
   border-radius: 50%;
   color: var(--ui-text-secondary);
@@ -1302,7 +1321,7 @@
 /* Unread dot owns the leading slot until a selection control appears. */
 .message-unread-dot {
   position: absolute;
-  left: 20px;
+  left: 8px;
   top: 16px;
   z-index: 4;
   width: 6px;
@@ -1350,7 +1369,7 @@
 
 .sender {
   min-width: 0;
-  color: var(--ui-text-secondary);
+  color: var(--ui-text);
   font-size: var(--ui-font-size-body);
   line-height: 1.25;
   font-weight: 500;
@@ -1365,7 +1384,7 @@
 }
 
 .app-shell .sender:not(.unread) {
-  color: var(--ui-text-secondary);
+  color: var(--ui-text);
 }
 
 .subject {
@@ -1374,7 +1393,7 @@
   color: var(--ui-text-secondary);
   font-size: var(--ui-font-size-secondary);
   font-weight: 400;
-  line-height: var(--ui-line-height-tight);
+  line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1382,17 +1401,17 @@
 
 .subject.unread {
   color: var(--ui-text);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .message-card p {
   display: block;
-  margin: 2px 0 0;
+  margin: 0;
   width: 100%;
   max-width: 100%;
   color: var(--ui-text-tertiary);
-  font-size: var(--ui-font-size-meta);
-  line-height: 1.4;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .message-card time {
@@ -1427,14 +1446,13 @@
   min-width: 0;
   max-width: 96px;
   margin: 1px 0 0 auto;
-  padding: 0 4px;
-  border-radius: var(--ui-radius-control, 4px);
-  background: var(--ui-surface-muted);
+  padding: 0;
   color: var(--ui-text-tertiary);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.4;
-  text-align: center;
+  text-align: end;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1474,6 +1492,14 @@
   flex: 1 1 auto;
   min-width: 0;
   margin-top: 0;
+}
+
+.message-star-glyph {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-end: var(--ui-space-1);
+  color: var(--ui-warning);
+  vertical-align: -2px;
 }
 
 .message-attachment {
@@ -1565,7 +1591,7 @@
 .message-card.is-unread.selected:hover,
 .message-card.is-current {
   border-color: transparent;
-  background: color-mix(in srgb, var(--quiet-row-selected) 68%, var(--ui-list));
+  background: color-mix(in srgb, var(--ui-accent) 5%, var(--ui-list));
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1575,7 +1601,7 @@
 .app-shell .message-card.is-unread.selected:hover,
 .app-shell .message-card.is-current {
   border-color: transparent;
-  background: color-mix(in srgb, var(--quiet-row-selected) 68%, var(--ui-list));
+  background: color-mix(in srgb, var(--ui-accent) 5%, var(--ui-list));
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1598,7 +1624,7 @@
 .app-shell .message-card.is-selected:not(.is-current),
 .app-shell .message-card.is-selected:not(.is-current):hover,
 .app-shell .message-card:has(.message-select input:checked):not(.is-current) {
-  background: color-mix(in srgb, var(--quiet-row-selected) 42%, var(--ui-list));
+  background: var(--quiet-row-hover);
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -2002,19 +2028,19 @@
   position: relative;
   z-index: 20;
   box-sizing: border-box;
-  flex: 0 0 52px;
+  flex: 0 0 auto;
   width: 100%;
-  height: 52px;
-  min-height: 52px;
-  max-height: 52px;
+  min-height: 84px;
   padding: 6px 14px;
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
   overflow: visible;
   border-bottom: 1px solid var(--ui-border);
   background: var(--workspace-toolbar);
+  container-type: inline-size;
+  container-name: mail-list-toolbar;
 }
 
 .list-summary-row,
@@ -2025,14 +2051,16 @@
 }
 
 .app-shell .list-summary-row {
-  display: none;
+  display: flex;
   min-height: 30px;
   justify-content: space-between;
+  gap: 6px;
 }
 
 .app-shell .list-summary {
   width: 100%;
   min-width: 0;
+  display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 10px;
@@ -2040,7 +2068,11 @@
 
 .app-shell .list-summary strong {
   max-width: 100%;
-  font-size: 14px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -2051,6 +2083,12 @@
   white-space: nowrap;
 }
 
+.app-shell .list-summary .list-active-filter {
+  flex-shrink: 0;
+  margin-left: 0;
+  color: var(--ui-text-accent);
+}
+
 .list-control-row {
   flex: 1 1 auto;
   width: 100%;
@@ -2058,7 +2096,7 @@
   gap: 6px;
 }
 
-.list-control-row > .narrow-navigation-button {
+.list-summary-row > .narrow-navigation-button {
   flex: 0 0 32px;
   width: 32px;
   min-width: 32px;
@@ -2090,25 +2128,29 @@
 
 .app-shell .list-control-tabs {
   flex: 0 0 auto;
-  --list-tab-gap: 6px;
-  --list-tab-indicator-width: 64px;
+  --list-tab-gap: 2px;
+  --list-tab-indicator-width: max(44px, calc(2em + 16px));
   position: relative;
   gap: var(--list-tab-gap);
-  padding-bottom: 3px;
+  padding: 2px;
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-muted);
+  font-size: 13px;
 }
 
 .app-shell .list-control-tab-indicator {
   position: absolute;
-  left: 0;
-  bottom: 0;
+  left: 2px;
+  top: 2px;
+  bottom: 2px;
+  z-index: 0;
   width: var(--list-tab-indicator-width);
-  height: 3px;
-  border-radius: 2px;
-  background: var(--ui-accent);
+  border-radius: calc(var(--ui-radius-control) - 2px);
+  background: var(--ui-surface);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
   pointer-events: none;
   transform: translateX(0);
   transition: transform var(--ui-motion-normal) var(--ui-ease-emphasized);
-  will-change: transform;
 }
 
 .app-shell .list-control-tabs[data-active-mode="threads"] .list-control-tab-indicator {
@@ -2120,6 +2162,8 @@
 }
 
 .app-shell .list-control-tabs > button {
+  position: relative;
+  z-index: 1;
   flex: 0 0 var(--list-tab-indicator-width);
   width: var(--list-tab-indicator-width);
   min-width: var(--list-tab-indicator-width);
@@ -2133,6 +2177,7 @@
   box-shadow: var(--ui-box-shadow-none);
   font-size: 13px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .app-shell .list-control-tabs > button:hover,
@@ -2141,8 +2186,13 @@
   background: var(--quiet-row-hover);
 }
 
+.app-shell .list-control-tabs > button:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: -2px;
+}
+
 .app-shell .list-control-tabs > button.active {
-  color: var(--ui-accent);
+  color: var(--ui-text);
   background: transparent;
   border-bottom: 0;
   font-weight: 600;
@@ -2206,6 +2256,41 @@
 .compact-dropdown-label {
   color: var(--ui-text-secondary);
   font-weight: 400;
+}
+
+.compact-dropdown-trigger-icon {
+  display: none;
+}
+
+@container mail-list-toolbar (max-width: 460px) {
+  .compact-dropdown-label {
+    display: none;
+  }
+}
+
+@container mail-list-toolbar (max-width: 420px) {
+  .list-control-menus .compact-dropdown:has(.compact-dropdown-trigger-icon) > summary {
+    width: 32px;
+    min-width: 32px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .list-control-menus .compact-dropdown-trigger-icon {
+    display: inline-flex;
+  }
+
+  .list-control-menus .compact-dropdown:has(.compact-dropdown-trigger-icon) > summary > :is(.compact-dropdown-label, strong, svg) {
+    display: none;
+  }
+
+  .list-control-menus .compact-dropdown.is-filtered > summary {
+    color: var(--ui-text-accent);
+  }
+
+  .list-control-menus .compact-dropdown.is-filtered .compact-dropdown-trigger-icon svg {
+    color: inherit;
+  }
 }
 
 .compact-dropdown > summary strong {
@@ -2358,7 +2443,7 @@
   }
 
   .app-shell .list-control-tabs {
-    --list-tab-gap: 4px;
+    --list-tab-gap: 2px;
   }
 
   .app-shell .list-control-tabs > button {
@@ -2372,12 +2457,20 @@
 }
 
 @media (max-width: 1040px) {
-  .list-control-row > .narrow-navigation-button {
+  .list-summary-row > .narrow-navigation-button {
     display: grid;
   }
 }
 
 @media (max-width: 720px) {
+  .message-date-header {
+    height: 44px;
+  }
+
+  .message-date-header-selection {
+    min-height: 44px;
+  }
+
   .app-shell .list-control-strip {
     flex: 0 0 96px;
     height: 96px;
@@ -2406,11 +2499,10 @@
     margin-left: 0;
   }
 
-  /* Keep the approved touch rhythm unchanged while desktop rows use the
-   * denser 82px contract. MessageListView supplies the matching inline row
-   * height to the virtual layout. */
+  /* Touch rows start at 80px and grow with their content. MessageListView
+   * supplies each measured height to the virtual wrapper. */
   .message-list-item {
-    height: 88px;
+    height: 80px;
   }
 
   .message-card {

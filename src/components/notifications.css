@@ -177,19 +177,38 @@
 
 .message-toast-stack {
   position: fixed;
-  top: 16px;
+  top: calc(var(--app-titlebar-height, 54px) + 12px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 10001;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 6px;
   width: min(340px, calc(100vw - 32px));
+  max-height: min(360px, 50dvh);
   pointer-events: none;
+}
+
+.message-toast-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  padding: 1px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  border-radius: var(--ui-radius-panel);
+}
+
+.message-toast-list:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: -2px;
 }
 
 .message-toast {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-start;
   gap: 8px;
   padding: 9px 12px;
@@ -202,6 +221,7 @@
     0 0 0 1px color-mix(in srgb, var(--ui-border) 64%, transparent),
     var(--notification-toast-shadow);
   animation: var(--ui-animation-message-toast-in);
+  flex-shrink: 0;
 }
 
 .message-toast.leaving {
@@ -247,6 +267,20 @@
   white-space: nowrap;
 }
 
+.message-toast .message-toast-text {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+}
+
+.message-toast .message-toast-repeat {
+  flex-shrink: 0;
+  align-self: flex-start;
+  color: var(--ui-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 .message-toast-undo {
   position: relative;
   display: grid;
@@ -260,6 +294,12 @@
 
 .message-toast-undo-main {
   min-width: 0;
+}
+
+.message-toast-undo-main strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 
 .message-toast-undo .message-toast-count {
@@ -305,6 +345,11 @@
 }
 
 @media (max-width: 720px) {
+  .message-toast-stack {
+    /* Leave navigation, close and contact-sync actions reachable. */
+    top: calc(64px + env(safe-area-inset-top));
+  }
+
   .snackbar-stack,
   .message-toast-stack {
     --notification-inline-action-height: var(--ui-control-height-touch);

@@ -21,7 +21,7 @@ describe('composer attachment strip', () => {
   it('keeps regular attachments visible and removable', () => {
     expect(fieldsSource).toContain('composer-body-attachments composer-attachment-list');
     expect(fieldsSource).toContain('aria-label={`移除 ${attachment.filename}`}');
-    expect(fieldsSource).toContain('onClick={() => onRemoveAttachment(attachmentIndex)}');
+    expect(fieldsSource).toContain('onRemoveAttachment(attachmentIndex)');
   });
 
   it('pins attachments above the footer as a horizontal strip', () => {
@@ -31,18 +31,21 @@ describe('composer attachment strip', () => {
     expect(polishCss).toMatch(/\.composer \.composer-body-attachments\s*\{[\s\S]*?max-width:\s*100%;/);
     expect(polishCss).toMatch(/\.composer \.composer-body-attachments\s*\{[\s\S]*?flex-wrap:\s*nowrap;/);
     expect(polishCss).toMatch(/\.composer \.composer-body-attachments\s*\{[\s\S]*?overflow-x:\s*auto;/);
-    expect(polishCss).toMatch(/\.composer \.composer-body-attachments\s*\{[\s\S]*?touch-action:\s*pan-x;/);
-    expect(polishCss).toMatch(/\.composer \.composer-attachment-tile\s*\{[\s\S]*?min-width:\s*190px;/);
-    expect(polishCss).toMatch(/\.composer \.composer-attachment-tile\s*\{[\s\S]*?flex:\s*0 0 190px;/);
+    expect(polishCss).toMatch(/\.composer \.composer-body-attachments\s*\{[\s\S]*?overflow-y:\s*auto;/);
+    expect(polishCss).toMatch(/\.composer \.composer-body-attachments\s*\{[\s\S]*?touch-action:\s*auto;/);
   });
 
-  it('places the remove action in the attachment card top-right corner', () => {
-    expect(polishCss).toMatch(/\.composer \.composer-attachment-tile > button\s*\{[\s\S]*?position:\s*absolute;/);
-    expect(polishCss).toMatch(/\.composer \.composer-attachment-tile > button\s*\{[\s\S]*?top:\s*5px;/);
-    expect(polishCss).toMatch(/\.composer \.composer-attachment-tile > button\s*\{[\s\S]*?right:\s*5px;/);
+  it('keeps removal in its own layout column with a touch-sized target', () => {
+    expect(polishCss).toMatch(/\.composer \.composer-attachment-tile > button\s*\{[\s\S]*?position:\s*static;/);
+    const touch = polishCss.slice(polishCss.indexOf('@media (max-width: 767px), (pointer: coarse)'));
+    expect(touch).toMatch(/grid-template-columns:[^;]*44px;/);
+    expect(touch).toMatch(/\.composer \.composer-attachment-tile > button\s*\{\s*width:\s*44px;\s*min-height:\s*44px;/);
   });
 
-  it('fits supplied artwork inside the compact filemark instead of clipping it', () => {
-    expect(composerCss).toMatch(/\.composer \.composer-attachment-filemark-has-asset img\s*\{[\s\S]*?max-width:\s*38px;[\s\S]*?max-height:\s*42px;/);
+  it('uses the same line icon family as compose controls without decorative file artwork', () => {
+    expect(fieldsSource).not.toContain('attachmentIconAsset');
+    expect(fieldsSource).toContain('<FileText size={20}');
+    expect(composerCss).not.toContain('composer-attachment-filemark-fold');
+    expect(polishCss).toMatch(/\.composer \.composer-attachment-filemark svg\s*\{[\s\S]*?width:\s*20px;[\s\S]*?height:\s*20px;/);
   });
 });

@@ -1,10 +1,16 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import { containWheelWithin } from '../app/wheelContainment';
+import { focusMenuItem, focusPastMenu, getMenuFocusTargets } from '../app/menuFocus';
+import { enterMenu, exitMenu, finishMenuEnter, pauseMenuExit } from '../app/transientMenuMotion';
 
 type UseDetailsMenuOptions = {
   floating?: boolean;
   align?: 'start' | 'end';
+  /** Combobox-like owners can keep their own selected-option keyboard policy. */
+  manageFocus?: boolean;
+  /** Selected-option owners choose the first target after floating placement. */
+  initialFocus?: () => HTMLElement | null;
 };
 
 const VIEWPORT_GAP = 8;
@@ -89,12 +95,19 @@ function clearPanelFloatingStyles(panel: HTMLElement | null) {
 
 export function useDetailsMenu(
   ref: RefObject<HTMLElement>,
-  { floating = false, align = 'end' }: UseDetailsMenuOptions = {},
+  { floating = false, align = 'end', manageFocus = true, initialFocus }: UseDetailsMenuOptions = {},
 ) {
-  const closeMenu = useCallback(() => {
+  const openingFocusRef = useRef<'first' | 'last' | null>(null);
+  const needsInitialFocusRef = useRef(false);
+  const motionOpenRef = useRef(false);
+  const lastPanelRef = useRef<HTMLElement | null>(null);
+  useEffect(() => () => finishMenuEnter(lastPanelRef.current), []);
+  const closeMenu = useCallback(({ restoreFocus = true }: { restoreFocus?: boolean } = {}) => {
     const details = ref.current;
     if (!details) return;
     const panel = getFloatingPanel(details);
+    if (details.hasAttribute('open')) exitMenu(panel, details);
+    motionOpenRef.current = false;
     hideFromTopLayer(panel);
     clearPanelFloatingStyles(panel);
     if (details.hasAttribute('open')) {
@@ -103,7 +116,9 @@ export function useDetailsMenu(
     syncSummaryDisclosureState(details);
     details.removeAttribute('data-menu-positioned');
     const summary = details.querySelector('summary');
-    if (summary && document.activeElement !== summary) {
+    openingFocusRef.current = null;
+    needsInitialFocusRef.current = false;
+    if (restoreFocus && summary && document.activeElement !== summary) {
       (summary as HTMLElement).focus({ preventScroll: true });
     }
   }, [ref]);
@@ -112,7 +127,30 @@ export function useDetailsMenu(
     const details = ref.current;
     if (!details) return undefined;
     const menu: HTMLElement = details;
+    menu.setAttribute('data-menu-managed', 'true');
     let positionFrame: number | null = null;
+
+    function preparePanel(panel: HTMLElement) {
+      if (lastPanelRef.current !== panel) {
+        finishMenuEnter(lastPanelRef.current);
+        motionOpenRef.current = false;
+      }
+      lastPanelRef.current = panel;
+      if (!motionOpenRef.current) pauseMenuExit(menu);
+      panel.removeAttribute('inert');
+      panel.removeAttribute('aria-hidden');
+      panel.style.removeProperty('pointer-events');
+    }
+
+    function startMenuMotion(panel: HTMLElement, summary: HTMLElement, below = true) {
+      if (motionOpenRef.current) return;
+      motionOpenRef.current = true;
+      const panelBounds = panel.getBoundingClientRect();
+      const triggerBounds = summary.getBoundingClientRect();
+      enterMenu(panel, menu,
+        Math.max(0, Math.min((triggerBounds.left + triggerBounds.right) / 2 - panelBounds.left, panelBounds.width)),
+        below ? 0 : panelBounds.height, below);
+    }
 
     function clearPositionFrame() {
       if (positionFrame === null) return;
@@ -125,6 +163,7 @@ export function useDetailsMenu(
       const summary = menu.querySelector<HTMLElement>('summary');
       const panel = getFloatingPanel(menu);
       if (!summary || !panel) return;
+      preparePanel(panel);
 
       // A native popover participates in the browser top layer, so pane
       // containment, overflow clipping and local stacking contexts cannot
@@ -142,7 +181,7 @@ export function useDetailsMenu(
       const panelRect = panel.getBoundingClientRect();
       const maximumViewportWidth = Math.max(0, window.innerWidth - VIEWPORT_GAP * 2);
       const maximumViewportHeight = Math.max(0, window.innerHeight - VIEWPORT_GAP * 2);
-      const panelWidth = Math.min(panelRect.width, maximumViewportWidth);
+      const panelWidth = Math.min(panel.offsetWidth || panelRect.width, maximumViewportWidth);
       const measuredHeight = Math.min(panel.scrollHeight, maximumViewportHeight);
       const roomBelow = Math.max(
         0,
@@ -171,40 +210,85 @@ export function useDetailsMenu(
       menu.style.setProperty('--floating-menu-top', `${Math.round(top)}px`);
       menu.style.setProperty('--floating-menu-max-height', `${Math.floor(availableHeight)}px`);
       menu.setAttribute('data-menu-positioned', 'true');
+      startMenuMotion(panel, summary, placeBelow);
+    }
+
+    function focusOpenedMenu() {
+      needsInitialFocusRef.current = false;
+      if (!manageFocus) return;
+      const panel = getFloatingPanel(menu);
+      const targets = panel ? getMenuFocusTargets(panel) : [];
+      // Pointer-opened form popovers keep the keyboard closed on touch.
+      const isForm = Boolean(panel?.querySelector('input, textarea, select, [contenteditable="true"]'));
+      if (!isForm || openingFocusRef.current) {
+        focusMenuItem(openingFocusRef.current === 'last' ? targets[targets.length - 1]
+          : openingFocusRef.current === 'first' ? targets[0] : initialFocus?.() ?? targets[0]);
+      }
+      openingFocusRef.current = null;
     }
 
     function scheduleFloatingPosition() {
       if (!floating) return;
       clearPositionFrame();
-      menu.removeAttribute('data-menu-positioned');
+      // Keep an already positioned form visible while its contents rerender.
+      // Hiding it for the next measurement blurs WebKit's active input on
+      // every keystroke. Opening/closing still owns the initial hidden state.
       positionFrame = window.requestAnimationFrame(() => {
         positionFrame = null;
         positionFloatingMenu();
+        if (needsInitialFocusRef.current && menu.hasAttribute('open')) focusOpenedMenu();
       });
     }
 
     function handleToggle() {
       syncSummaryDisclosureState(menu);
       if (!menu.hasAttribute('open')) {
+        motionOpenRef.current = false;
+        needsInitialFocusRef.current = false;
         clearPositionFrame();
         menu.removeAttribute('data-menu-positioned');
         const panel = getFloatingPanel(menu);
+        finishMenuEnter(panel);
         hideFromTopLayer(panel);
         clearPanelFloatingStyles(panel);
         return;
       }
-      scheduleFloatingPosition();
+      needsInitialFocusRef.current = true;
+      const panel = getFloatingPanel(menu);
+      const summary = menu.querySelector<HTMLElement>(':scope > summary');
+      if (panel) preparePanel(panel);
+      if (floating) scheduleFloatingPosition();
+      else {
+        if (panel && summary) startMenuMotion(panel, summary);
+        focusOpenedMenu();
+      }
+    }
+
+    function handleSummaryClick(event: MouseEvent) {
+      const summary = menu.querySelector(':scope > summary');
+      if (!(event.target instanceof Node) || !summary?.contains(event.target)) return;
+      if (!menu.hasAttribute('open')) {
+        const panel = getFloatingPanel(menu);
+        if (panel) preparePanel(panel);
+        return;
+      }
+      // Capture the visible panel before native <details> removes it from
+      // layout. Disclosure semantics still close in this same event turn.
+      event.preventDefault();
+      closeMenu();
     }
 
     function handlePointerDown(event: PointerEvent) {
       if (!menu.hasAttribute('open')) return;
       const target = event.target as Node;
       if (menu.contains(target)) return;
-      closeMenu();
+      const focusableTarget = target instanceof Element
+        && target.closest('button, a[href], input, select, textarea, summary, [tabindex]');
+      closeMenu({ restoreFocus: !focusableTarget });
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || event.isComposing || event.keyCode === 229) return;
       const target = event.target as Node;
       // 只关闭自己菜单内的 Escape；stopPropagation 让嵌套 modal/其它菜单拥有
       // 各自的第一个 Escape。
@@ -213,6 +297,45 @@ export function useDetailsMenu(
         event.stopPropagation();
         event.stopImmediatePropagation();
         closeMenu();
+      }
+    }
+
+    function handleMenuNavigation(event: KeyboardEvent) {
+      if (event.defaultPrevented || !manageFocus || !(event.target instanceof Node) || !menu.contains(event.target)) return;
+      const summary = menu.querySelector<HTMLElement>(':scope > summary');
+      const panel = getFloatingPanel(menu);
+      if (!summary || !panel) return;
+      if (summary.contains(event.target) && ['Enter', ' '].includes(event.key) && !menu.hasAttribute('open')) {
+        openingFocusRef.current = 'first';
+      } else if (summary.contains(event.target) && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
+        event.preventDefault();
+        openingFocusRef.current = event.key === 'ArrowUp' ? 'last' : 'first';
+        menu.setAttribute('open', '');
+        syncSummaryDisclosureState(menu);
+        positionFloatingMenu();
+        const targets = getMenuFocusTargets(panel);
+        focusMenuItem(event.key === 'ArrowUp' ? targets[targets.length - 1] : targets[0]);
+      } else if (menu.hasAttribute('open') && panel.contains(event.target)
+        && event.target instanceof HTMLElement
+        && !event.target.matches('input, textarea, select, [contenteditable="true"]')
+        && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        const targets = getMenuFocusTargets(panel);
+        if (!targets.length) return;
+        event.preventDefault();
+        const current = targets.indexOf(document.activeElement as HTMLElement);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? targets.length - 1
+          : (current + (event.key === 'ArrowUp' ? -1 : 1) + targets.length) % targets.length;
+        focusMenuItem(targets[next]);
+      } else if (menu.hasAttribute('open') && event.key === 'Tab' && !panel.querySelector('input, textarea, select, [contenteditable="true"]')) {
+        closeMenu({ restoreFocus: false });
+        if (focusPastMenu(summary, panel, event.shiftKey)) event.preventDefault();
+        else summary.focus({ preventScroll: true });
+      }
+    }
+
+    function handleFocusOut(event: FocusEvent) {
+      if (event.relatedTarget instanceof Node && !menu.contains(event.relatedTarget) && menu.hasAttribute('open')) {
+        closeMenu({ restoreFocus: false });
       }
     }
 
@@ -230,10 +353,15 @@ export function useDetailsMenu(
     }
 
     menu.addEventListener('toggle', handleToggle);
+    menu.addEventListener('click', handleSummaryClick, true);
     document.addEventListener('pointerdown', handlePointerDown, true);
     // Capture phase prevents the same Escape from reaching application-level
     // selection/modal handlers after this menu has already consumed it.
     document.addEventListener('keydown', handleKeyDown, true);
+    // Bubble after React handlers so CompactDropdown and nested menus can
+    // implement their own navigation before this shared trigger fallback.
+    document.addEventListener('keydown', handleMenuNavigation);
+    menu.addEventListener('focusout', handleFocusOut);
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
     menu.addEventListener('wheel', handleWheel, { passive: false });
@@ -242,8 +370,11 @@ export function useDetailsMenu(
     return () => {
       clearPositionFrame();
       menu.removeEventListener('toggle', handleToggle);
+      menu.removeEventListener('click', handleSummaryClick, true);
       document.removeEventListener('pointerdown', handlePointerDown, true);
       document.removeEventListener('keydown', handleKeyDown, true);
+      document.removeEventListener('keydown', handleMenuNavigation);
+      menu.removeEventListener('focusout', handleFocusOut);
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
       menu.removeEventListener('wheel', handleWheel);

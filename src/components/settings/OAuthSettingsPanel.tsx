@@ -57,6 +57,12 @@ export default function OAuthSettingsPanel({
   onExchange,
 }: OAuthSettingsPanelProps) {
   const latestSession = sessions[0] ?? null;
+  const authorizationStatus = latestSession ? ({
+    authorization_pending: '等待浏览器授权',
+    code_received: '已收到授权，等待完成连接',
+    token_stored: '授权已保存',
+    token_exchange_failed: '授权未完成，请重试',
+  }[latestSession.status] ?? '请检查授权状态') : '尚未授权';
 
   return (
     <>
@@ -65,11 +71,11 @@ export default function OAuthSettingsPanel({
           {authType === 'oauth2' ? <ShieldCheck size={17} /> : <KeyRound size={17} />}
         </span>
         <div>
-          <strong>{authType === 'oauth2' ? 'OAuth2 向导' : '授权码模式'}</strong>
+          <strong>{authType === 'oauth2' ? '邮箱登录' : '授权码登录'}</strong>
           <p>
             {authType === 'oauth2'
-              ? '用于 Gmail/Outlook PKCE 授权、回调授权码、Token 本地凭据存储、刷新和 XOAUTH2 登录。'
-              : '适用于 QQ、网易和自建邮箱的应用专用密码或授权码，凭据只写入本地凭据记录中。'}
+              ? '通过 Gmail 或 Outlook 的官方登录页面，授权 Better Email 访问邮箱。'
+              : '使用邮箱提供的授权码或应用专用密码登录。'}
           </p>
         </div>
       </section>
@@ -78,11 +84,11 @@ export default function OAuthSettingsPanel({
         <>
           <section className="settings-oauth-primary" data-settings-section="auth">
             <span>
-              <strong>OAuth2 授权</strong>
+              <strong>浏览器授权</strong>
               <small>
                 {latestSession
-                  ? `最近状态：${latestSession.status} · ${formatDate(latestSession.created_at)}`
-                  : '尚未建立授权会话'}
+                  ? `${authorizationStatus} · 发起于 ${formatDate(latestSession.created_at)}`
+                  : authorizationStatus}
               </small>
             </span>
             <SettingsButton

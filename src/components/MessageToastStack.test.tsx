@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MessageToastStack from './MessageToastStack';
 import type { PendingSendUndo } from './UndoSnackbarStack';
@@ -22,6 +22,7 @@ describe('MessageToastStack announcements and exit state', () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -135,11 +136,67 @@ describe('MessageToastStack announcements and exit state', () => {
 
     expect(document.querySelector('.message-toast-undo.leaving')).not.toBeNull();
     expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('button', { name: '撤回发送' })).toBeNull();
+    expect(document.querySelector<HTMLButtonElement>('.message-toast-undo-btn')?.disabled).toBe(true);
 
     act(() => {
       vi.advanceTimersByTime(260);
     });
 
     expect(document.querySelector('.message-toast-undo')).toBeNull();
+  });
+
+  it('merges matching results without remounting the announcement when their ids change', () => {
+    const props = { pendingSendUndo: null, onUndoSend: vi.fn(), onDismissSend: vi.fn() };
+    const view = render(<MessageToastStack {...props} toasts={[
+      { id: 1, text: '邮件已归档' }, { id: 2, text: '邮件已归档' },
+    ]} />);
+    const announcement = screen.getByRole('status');
+    expect(document.querySelectorAll('.message-toast')).toHaveLength(1);
+    expect(screen.getByLabelText('重复 2 次').textContent).toBe('×2');
+    view.rerender(<MessageToastStack {...props} toasts={[
+      { id: 2, text: '邮件已归档' }, { id: 3, text: '邮件已归档' },
+    ]} />);
+    expect(screen.getByRole('status')).toBe(announcement);
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    view.rerender(<MessageToastStack {...props} toasts={[
+      { id: 2, text: '邮件已归档' }, { id: 3, text: '邮件已归档', tone: 'error' },
+    ]} />);
+    expect(screen.getByRole('alert').textContent).toBe('邮件已归档');
+    expect(document.querySelectorAll('.message-toast')).toHaveLength(2);
+  });
+
+  it('caps active and leaving messages together and reserves an accessible undo slot', () => {
+    const onUndoSend = vi.fn();
+    const props = { pendingSendUndo: pendingUndo(), onUndoSend, onDismissSend: vi.fn() };
+    const messages = Array.from({ length: 8 }, (_, id) => ({ id, text: `结果 ${id}` }));
+    const view = render(<MessageToastStack {...props} toasts={messages} />);
+    expect(document.querySelectorAll('.message-toast')).toHaveLength(3);
+    expect(Array.from(document.querySelectorAll('.message-toast-text')).map(node => node.textContent))
+      .toEqual(['结果 6', '结果 7']);
+    const undo = screen.getByRole('button', { name: '撤回发送' });
+    undo.focus();
+    fireEvent.click(undo);
+    expect(onUndoSend).toHaveBeenCalledTimes(1);
+    view.rerender(<MessageToastStack {...props} toasts={[{ id: 9, text: '最新结果' }]} />);
+    expect(document.querySelectorAll('.message-toast')).toHaveLength(3);
+    expect(document.querySelectorAll('.message-toast.leaving')).toHaveLength(1);
+    expect(document.activeElement).toBe(undo);
+  });
+
+  it('uses two slots in a short window and restores focus when its scrollable region unmounts', () => {
+    const messages = Array.from({ length: 5 }, (_, id) => ({ id, text: `结果 ${id}` }));
+    const outside = document.createElement('button');
+    outside.textContent = '邮件操作'; document.body.append(outside);
+    const view = render(<MessageToastStack toasts={messages} pendingSendUndo={pendingUndo()}
+      onUndoSend={vi.fn()} onDismissSend={vi.fn()} />);
+    vi.stubGlobal('innerHeight', 320);
+    fireEvent(window, new Event('resize'));
+    expect(document.querySelectorAll('.message-toast')).toHaveLength(2);
+    outside.focus();
+    act(() => screen.getByRole('region', { name: '最近通知' }).focus());
+    view.unmount();
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
   });
 });

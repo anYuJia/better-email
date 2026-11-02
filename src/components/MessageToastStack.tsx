@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, Check, Info, X } from 'lucide-react';
 import type { PendingSendUndo } from './UndoSnackbarStack';
 import { formatDate } from '../mailUtils';
@@ -9,7 +9,8 @@ export type MessageToast = {
   tone?: 'success' | 'error' | 'info';
 };
 
-type RenderedToast = MessageToast & { leaving?: boolean };
+type GroupedToast = MessageToast & { groupKey: string; count: number };
+type RenderedToast = GroupedToast & { leaving?: boolean };
 type RenderedUndo = PendingSendUndo & { leaving?: boolean };
 
 type MessageToastStackProps = {
@@ -21,24 +22,42 @@ type MessageToastStackProps = {
 
 const EXIT_MS = 260;
 
+function visibleSlots(): number {
+  return (window.visualViewport?.height ?? window.innerHeight) < 480 ? 2 : 3;
+}
+
+function groupToasts(toasts: MessageToast[]): GroupedToast[] {
+  const groups = new Map<string, GroupedToast>();
+  for (const toast of toasts) {
+    const groupKey = JSON.stringify([toast.tone ?? 'success', toast.text.trim()]);
+    const previous = groups.get(groupKey);
+    // A repeated result remains one announcement, while its visual count updates.
+    groups.delete(groupKey);
+    groups.set(groupKey, { ...toast, text: toast.text.trim(), groupKey, count: (previous?.count ?? 0) + 1 });
+  }
+  return [...groups.values()];
+}
+
 function remainingSeconds(expiresAt: string): number {
   return Math.max(0, Math.ceil((Date.parse(expiresAt) - Date.now()) / 1000));
 }
 
 function reconcileToasts(
   current: RenderedToast[],
-  incoming: MessageToast[],
+  incoming: GroupedToast[],
+  capacity: number,
 ): RenderedToast[] {
-  const incomingIds = new Set(incoming.map((toast) => toast.id));
-  const currentById = new Map(current.map((toast) => [toast.id, toast]));
+  const incomingIds = new Set(incoming.map((toast) => toast.groupKey));
+  const currentById = new Map(current.map((toast) => [toast.groupKey, toast]));
   const next: RenderedToast[] = incoming.map((toast) => {
-    const rendered = currentById.get(toast.id);
-    if (rendered && !rendered.leaving && rendered.text === toast.text) return rendered;
+    const rendered = currentById.get(toast.groupKey);
+    if (rendered && !rendered.leaving && rendered.count === toast.count) return rendered;
     return { ...toast };
   });
 
   for (const toast of current) {
-    if (incomingIds.has(toast.id)) continue;
+    if (next.length >= capacity) break;
+    if (incomingIds.has(toast.groupKey)) continue;
     next.push(toast.leaving ? toast : { ...toast, leaving: true });
   }
 
@@ -74,15 +93,40 @@ export default function MessageToastStack({
   onUndoSend,
   onDismissSend,
 }: MessageToastStackProps) {
+  const [slotCount, setSlotCount] = useState(visibleSlots);
+  const listRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const ownsFocusRef = useRef(false);
   const [secondsLeft, setSecondsLeft] = useState(() =>
     pendingSendUndo ? remainingSeconds(pendingSendUndo.expiresAt) : 0,
   );
-  const [renderedToasts, setRenderedToasts] = useState<RenderedToast[]>(() => (
-    toasts.map((toast) => ({ ...toast }))
-  ));
   const [renderedUndo, setRenderedUndo] = useState<RenderedUndo | null>(() => (
     pendingSendUndo ? { ...pendingSendUndo } : null
   ));
+  const toastCapacity = slotCount - (pendingSendUndo || renderedUndo ? 1 : 0);
+  const visibleToasts = useMemo(
+    () => groupToasts(toasts).slice(-toastCapacity),
+    [toasts, toastCapacity],
+  );
+  const [renderedToasts, setRenderedToasts] = useState<RenderedToast[]>(visibleToasts);
+  const hasRenderedToasts = renderedToasts.length > 0;
+
+  useEffect(() => {
+    const resize = () => setSlotCount(visibleSlots());
+    window.addEventListener('resize', resize);
+    window.visualViewport?.addEventListener('resize', resize);
+    return () => {
+      window.removeEventListener('resize', resize);
+      window.visualViewport?.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  useLayoutEffect(() => () => {
+    if (ownsFocusRef.current && previousFocusRef.current?.isConnected
+      && (document.activeElement === document.body || listRef.current?.contains(document.activeElement))) {
+      previousFocusRef.current.focus({ preventScroll: true });
+    }
+  }, [hasRenderedToasts]);
 
   useEffect(() => {
     if (!pendingSendUndo) return undefined;
@@ -92,13 +136,13 @@ export default function MessageToastStack({
     return () => window.clearInterval(id);
   }, [pendingSendUndo]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setRenderedUndo((current) => reconcileUndo(current, pendingSendUndo));
   }, [pendingSendUndo]);
 
-  useEffect(() => {
-    setRenderedToasts((current) => reconcileToasts(current, toasts));
-  }, [toasts]);
+  useLayoutEffect(() => {
+    setRenderedToasts((current) => reconcileToasts(current, visibleToasts, toastCapacity));
+  }, [visibleToasts, toastCapacity]);
 
   useEffect(() => {
     const hasLeavingToast = renderedToasts.some((toast) => toast.leaving);
@@ -125,9 +169,9 @@ export default function MessageToastStack({
           邮件将在 {pendingSendUndo.delaySeconds} 秒后发送。主题：{pendingSendUndo.subject}。可选择撤回发送。
         </span>
       )}
-      {toasts.map((toast) => (
+      {visibleToasts.map((toast) => (
         <span
-          key={`message-toast-announcement-${toast.id}`}
+          key={`message-toast-announcement-${toast.groupKey}`}
           className="status-live-region"
           role={toast.tone === 'error' ? 'alert' : 'status'}
           aria-live={toast.tone === 'error' ? 'assertive' : 'polite'}
@@ -141,6 +185,7 @@ export default function MessageToastStack({
           {renderedUndo && (
             <section
               className={`message-toast message-toast-undo${renderedUndo.leaving ? ' leaving' : ''}`}
+              aria-hidden={renderedUndo.leaving || undefined}
             >
               <div className="message-toast-undo-main">
                 <strong>
@@ -150,10 +195,10 @@ export default function MessageToastStack({
                   {renderedUndo.subject} · 预计 {formatDate(renderedUndo.expiresAt)}
                 </span>
               </div>
-              <button type="button" className="message-toast-undo-btn" onClick={onUndoSend}>
+              <button type="button" className="message-toast-undo-btn" disabled={renderedUndo.leaving} onClick={onUndoSend}>
                 撤回发送
               </button>
-              <button type="button" className="message-toast-close" aria-label="关闭发送提示" onClick={onDismissSend}>
+              <button type="button" className="message-toast-close" aria-label="关闭发送提示" disabled={renderedUndo.leaving} onClick={onDismissSend}>
                 <X size={13} />
               </button>
               <span
@@ -165,9 +210,26 @@ export default function MessageToastStack({
               />
             </section>
           )}
-          {renderedToasts.map((toast) => (
+          {renderedToasts.length > 0 && <div
+            ref={listRef}
+            className="message-toast-list"
+            role="region"
+            aria-label="最近通知"
+            tabIndex={0}
+            onFocusCapture={(event) => {
+              ownsFocusRef.current = true;
+              if (event.relatedTarget instanceof HTMLElement && !event.currentTarget.contains(event.relatedTarget)) {
+                previousFocusRef.current = event.relatedTarget;
+              }
+            }}
+            onBlurCapture={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) ownsFocusRef.current = false;
+            }}
+          >
+          {renderedToasts.slice(0, toastCapacity).map((toast) => (
             <div
-              key={toast.id}
+              key={toast.groupKey}
+              aria-hidden={toast.leaving || undefined}
               className={`message-toast toast-${toast.tone ?? 'success'}${toast.leaving ? ' leaving' : ''}${
                 renderedUndo?.leaving && !toast.leaving ? ' toast-delayed' : ''
               }`}
@@ -179,9 +241,11 @@ export default function MessageToastStack({
               ) : (
                 <Check size={14} strokeWidth={2.5} aria-hidden="true" />
               )}
-              <span>{toast.text}</span>
+              <span className="message-toast-text">{toast.text}</span>
+              {toast.count > 1 && <span className="message-toast-repeat" aria-label={`重复 ${toast.count} 次`}>×{toast.count}</span>}
             </div>
           ))}
+          </div>}
         </div>
       )}
     </>

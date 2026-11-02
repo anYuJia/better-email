@@ -1,3 +1,6 @@
+@import './composer-motion.css';
+@import './composer-tools.css';
+
 /*
  * Composer: canonical stylesheet
  *
@@ -35,34 +38,11 @@
   inset: 0;
   z-index: 1000;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 22px;
-  background: oklch(0.18 0.012 var(--primitive-hue-neutral) / 0.22);
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
 .composer {
-  width: min(760px, calc(100vw - 44px));
-  height: min(680px, calc(100vh - 44px));
-  max-height: calc(100vh - 44px);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-modal);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-popover);
   transform-origin: center;
 }
 
@@ -80,10 +60,7 @@
 }
 
 .composer-title-copy {
-  min-width: 0;
   flex: 1;
-  display: grid;
-  gap: 2px;
 }
 
 .composer-title-copy strong,
@@ -92,12 +69,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.composer-title-copy strong {
-  color: var(--ui-text);
-  font-size: 13px;
-  font-weight: 600;
 }
 
 .composer-title-copy small {
@@ -119,7 +90,7 @@
   box-shadow: var(--ui-box-shadow-none);
   font-size: 11px;
   font-weight: 500;
-  transition: none;
+  transition: var(--ui-transition-control);
 }
 
 .composer-header-actions button:hover {
@@ -128,14 +99,6 @@
 }
 
 /* 3. Recipient fields ==================================================== */
-
-.composer-primary-fields {
-  min-height: 0;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  background: var(--ui-surface);
-}
 
 .composer-field-row {
   min-height: 40px;
@@ -565,124 +528,11 @@
 }
 
 .composer-attachment-filemark {
-  width: 48px;
-  height: 52px;
-  position: relative;
+  width: 32px;
+  height: 36px;
   display: grid;
   place-items: center;
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-accent);
-  background: var(--ui-surface);
-}
-
-.composer-attachment-filemark::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  bottom: 0;
-  height: 15px;
-  background: var(--ui-accent-soft);
-}
-
-.composer-attachment-filemark-fold {
-  width: 13px;
-  height: 13px;
-  position: absolute;
-  right: -1px;
-  top: -1px;
-  border-left: 1px solid var(--ui-border);
-  border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-surface);
-}
-
-.composer-attachment-filemark-icon {
-  position: relative;
-  z-index: 1;
-  margin-top: -5px;
-}
-
-.composer-attachment-filemark-label {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 2px;
-  z-index: 1;
-  overflow: hidden;
-  padding: 0 4px;
-  color: currentColor;
-  font-size: 8.5px;
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 12px;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-/* Attachment type variants — semantic tokens only */
-.composer-attachment-tile.attachment-image .composer-attachment-filemark {
-  color: var(--ui-success);
-  border-color: var(--ui-success);
-  background: var(--ui-success-bg);
-}
-
-.composer-attachment-tile.attachment-image .composer-attachment-filemark::after {
-  background: var(--ui-success-bg);
-}
-
-.composer-attachment-tile.attachment-sheet .composer-attachment-filemark {
-  color: var(--ui-success);
-  border-color: var(--ui-success);
-  background: var(--ui-success-bg);
-}
-
-.composer-attachment-tile.attachment-sheet .composer-attachment-filemark::after {
-  background: var(--ui-success-bg);
-}
-
-.composer-attachment-tile.attachment-pdf .composer-attachment-filemark {
-  color: var(--ui-danger);
-  border-color: var(--ui-danger);
-  background: var(--ui-danger-bg);
-}
-
-.composer-attachment-tile.attachment-pdf .composer-attachment-filemark::after {
-  background: var(--ui-danger-bg);
-}
-
-.composer-attachment-tile.attachment-archive .composer-attachment-filemark {
-  color: var(--ui-warning);
-  border-color: var(--ui-warning-border);
-  background: var(--ui-warning-bg);
-}
-
-.composer-attachment-tile.attachment-archive .composer-attachment-filemark::after {
-  background: var(--ui-warning-bg);
-}
-
-/* The supplied file artwork already includes the document shape and label;
- * remove the CSS file mockup around it while keeping the tile compact. */
-.composer .composer-attachment-filemark.composer-attachment-filemark-has-asset,
-:root[data-theme="dark"] .composer .composer-attachment-filemark.composer-attachment-filemark-has-asset {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.composer .composer-attachment-filemark-has-asset::after,
-:root[data-theme="dark"] .composer .composer-attachment-filemark-has-asset::after {
-  display: none;
-}
-
-.composer .composer-attachment-filemark-has-asset img {
-  width: auto;
-  height: auto;
-  max-width: 38px;
-  max-height: 42px;
-  display: block;
-  object-fit: contain;
+  color: var(--ui-text-secondary);
 }
 
 .composer-attachment-tile-copy {
@@ -728,7 +578,7 @@
   padding: 7px 11px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
   box-shadow: var(--ui-box-shadow-none);
   font-size: 12px;
@@ -782,8 +632,7 @@
 .composer-send-progress-wrapper,
 .composer-attachment-progress-wrapper {
   flex: 1 1 220px;
-  max-width: 220px;
-  min-width: 120px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -794,11 +643,9 @@
   display: block;
   max-width: 100%;
   color: var(--ui-text-tertiary);
-  font-size: 10px;
-  line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .composer-send-progress-fill,
@@ -886,9 +733,7 @@
   }
 
   .composer footer > span,
-  .composer .composer-footer-status > span,
-  .composer .composer-attachment-progress-wrapper,
-  .composer .composer-attachment-progress-message {
+  .composer .composer-footer-status > span {
     display: none;
   }
 
@@ -896,17 +741,6 @@
     justify-content: flex-end;
   }
 
-  .composer footer .composer-send-progress,
-  .composer footer .composer-attachment-progress {
-    display: none;
-  }
-
-  .composer footer .composer-send-progress-wrapper,
-  .composer footer .composer-send-progress-message,
-  .composer footer .composer-attachment-progress-wrapper,
-  .composer footer .composer-attachment-progress-message {
-    display: none;
-  }
 }
 
 /* 22. Dark mode =========================================================== */
@@ -983,7 +817,7 @@
 
 :root[data-theme="dark"] .composer .composer-recipient-chip button {
   color: var(--ui-text-secondary);
-  background: var(--ui-surface);
+  background: transparent;
 }
 
 :root[data-theme="dark"] .composer .composer-recipient-chip button:hover {
@@ -1053,55 +887,8 @@
   color: var(--ui-text-tertiary);
 }
 
-:root[data-theme="dark"] .composer .composer-attachment-filemark,
-:root[data-theme="dark"] .composer .composer-attachment-filemark-fold {
-  border-color: var(--ui-border);
-  color: var(--ui-accent);
-  background: var(--ui-surface);
-}
-
-:root[data-theme="dark"] .composer .composer-attachment-filemark::after {
-  background: var(--ui-accent-soft);
-}
-
-:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-image .composer-attachment-filemark,
-:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-sheet .composer-attachment-filemark {
-  border-color: var(--ui-success);
-  color: var(--ui-success);
-  background: var(--ui-success-bg);
-}
-
-:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-image .composer-attachment-filemark::after,
-:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-sheet .composer-attachment-filemark::after {
-  background: var(--ui-success-bg);
-}
-
-:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-pdf .composer-attachment-filemark {
-  border-color: var(--ui-danger);
-  color: var(--ui-danger);
-  background: var(--ui-danger-bg);
-}
-
-:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-pdf .composer-attachment-filemark::after {
-  background: var(--ui-danger-bg);
-}
-
-:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-archive .composer-attachment-filemark {
-  border-color: var(--ui-warning-border);
-  color: var(--ui-warning);
-  background: var(--ui-warning-bg);
-}
-
-:root[data-theme="dark"] .composer .composer-attachment-tile.attachment-archive .composer-attachment-filemark::after {
-  background: var(--ui-warning-bg);
-}
-
-:root[data-theme="dark"] .composer .composer-attachment-filemark-label {
-  color: currentColor;
-}
-
 :root[data-theme="dark"] .composer .composer-attachment-tile button {
-  color: var(--ui-danger);
+  color: var(--ui-text-secondary);
 }
 
 :root[data-theme="dark"] .composer .composer-attachment-tile button:hover {
@@ -1111,7 +898,7 @@
 
 :root[data-theme="dark"] .composer .composer-body-attachment-empty {
   border-color: var(--ui-border-strong);
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
 }
 
@@ -1222,7 +1009,7 @@
 
 .custom-select-dropdown[data-portal-owner="composer-sender"] button > svg {
   flex: 0 0 auto;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
 }
 
 /* The editor is one continuous writing surface. Keep structural dividers
@@ -1332,17 +1119,22 @@
   background: color-mix(in oklch, var(--ui-accent-soft) 20%, var(--ui-surface));
 }
 
-/* Composer hover feedback is immediate: no breathing, fading, or hover glide.
- * Keep every interactive control at its authored geometry. The individual
- * `scale`, `translate`, and `rotate` properties are separate from
- * `transform`, so they must be reset explicitly as well. */
+/* Controls share feedback timing; shared-motion explicitly opts action groups
+ * into geometric feedback. Text inputs retain stable authored geometry. */
 .composer button,
 .composer summary,
+.custom-select-dropdown[data-portal-owner="composer-sender"] button {
+  transition: var(--ui-transition-control);
+  transform: none;
+  translate: none;
+  rotate: none;
+  scale: 1;
+}
+
 .composer input,
 .composer select,
 .composer textarea,
-.composer [contenteditable="true"],
-.custom-select-dropdown[data-portal-owner="composer-sender"] button {
+.composer [contenteditable="true"] {
   transition: none;
   transform: none;
   translate: none;
@@ -1401,7 +1193,7 @@
 }
 
 .composer .composer-schedule-picker-trigger.is-set > svg {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
 }
 
 .composer .composer-schedule-picker-trigger:hover {
@@ -1499,7 +1291,7 @@
   min-height: 28px;
   flex: 0 0 auto;
   padding: 0 8px;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   font-size: 11px;
   font-weight: 600;
 }
@@ -1521,7 +1313,7 @@
 .composer-schedule-picker-today:hover,
 .composer-schedule-picker-monthbar button:hover,
 .composer-schedule-picker-footer .composer-schedule-picker-clear:hover {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
 }
 
@@ -1529,11 +1321,6 @@
   color: var(--color-text-on-accent);
   border-color: var(--ui-accent-hover);
   background: var(--ui-accent-hover);
-}
-
-.composer-schedule-picker-confirm:active {
-  border-color: var(--ui-accent-pressed);
-  background: var(--ui-accent-pressed);
 }
 
 .composer-schedule-picker-monthbar {
@@ -1604,7 +1391,7 @@
 
 .composer-schedule-picker-day.is-today {
   border-color: color-mix(in oklch, var(--ui-accent) 58%, transparent);
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   font-weight: 600;
 }
 
@@ -1649,7 +1436,7 @@
 }
 
 .composer-schedule-picker-time > span > svg {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
 }
 
 .composer-schedule-picker-time-fields {
@@ -1713,7 +1500,7 @@
 
 .composer-schedule-time-options button:hover,
 .composer-schedule-time-options button[aria-selected="true"] {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
 }
 
@@ -1804,9 +1591,6 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-.composer-workspace.has-contacts {
-  grid-template-columns: minmax(0, 1fr) 304px;
-}
 
 .composer-editor-pane {
   min-width: 0;
@@ -1852,7 +1636,7 @@
   place-items: center;
   border: 1px solid color-mix(in oklch, var(--ui-accent) 22%, var(--ui-border));
   border-radius: 9px;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: color-mix(in oklch, var(--ui-accent-soft) 62%, var(--ui-surface));
 }
 
@@ -1936,7 +1720,7 @@
 
 .composer-contacts-tabs button:hover,
 .composer-contacts-tabs button.is-active {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
 }
 
@@ -1944,7 +1728,7 @@
   min-width: 16px;
   padding: 1px 4px;
   border-radius: var(--ui-radius-pill);
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
   font-size: 9px;
   font-variant-numeric: tabular-nums;
@@ -2046,7 +1830,7 @@
   display: grid;
   place-items: center;
   border-radius: 11px;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: normal;
@@ -2054,7 +1838,7 @@
 }
 
 .composer-contact-avatar.tone-blue {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
 }
 
@@ -2115,7 +1899,7 @@
   align-items: center;
   gap: 3px;
   margin-top: 1px;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   font-size: 9px;
   font-weight: 600;
 }
@@ -2140,7 +1924,7 @@
 
   border: 1px solid var(--ui-border);
   border-radius: 12px;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
 }
 
@@ -2162,12 +1946,12 @@
  * an empty address book should use the available space instead of floating
  * at the top of a large blank panel. */
 .composer .composer-contact-toggle[aria-expanded="true"] {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: color-mix(in oklch, var(--ui-accent-soft) 72%, var(--ui-surface));
 }
 
 .composer .composer-contact-toggle[aria-expanded="true"]:hover {
-  color: var(--ui-accent-hover);
+  color: var(--ui-text-accent);
   background: color-mix(in oklch, var(--ui-accent-soft) 82%, var(--ui-control-hover));
 }
 
@@ -2250,17 +2034,19 @@
  * canonical; do not add another tail override layer for compose surfaces.
  */
 .composer {
+  container: composer / inline-size;
   --compose-space-1: 4px;
   --compose-space-2: 8px;
   --compose-space-3: 12px;
   --compose-space-4: 16px;
   --compose-space-5: 20px;
-  --compose-header-height: 56px;
-  --compose-field-height: 56px;
-  --compose-toolbar-height: 48px;
+  --compose-header-height: 52px;
+  --compose-field-height: 48px;
+  --compose-toolbar-height: 44px;
   --compose-footer-height: 64px;
   --compose-control-height: 36px;
-  --compose-contact-row-height: 64px;
+  --compose-contact-row-height: 60px;
+  --compose-field-label-width: 4em;
   --compose-divider: color-mix(in oklch, var(--ui-border) 82%, var(--ui-surface));
   width: min(760px, calc(100vw - 32px));
   height: min(640px, calc(100vh - 32px));
@@ -2295,9 +2081,6 @@
   gap: 0;
 }
 
-.composer-workspace.has-contacts {
-  grid-template-columns: minmax(0, 1fr) 304px;
-}
 
 .composer-editor-pane,
 .composer-contacts-panel {
@@ -2341,28 +2124,10 @@
 
 .composer-title-copy strong {
   color: var(--ui-text);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: normal;
   white-space: nowrap;
-}
-
-.composer-autosave-status {
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-  color: var(--ui-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.composer-autosave-status > svg {
-  flex: 0 0 auto;
-  color: var(--ui-success);
 }
 
 .composer-header-actions {
@@ -2396,35 +2161,48 @@
   min-width: 96px;
   gap: 6px;
   padding: 0 10px;
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-text-secondary);
+  background: transparent;
   font-size: 13px;
   font-weight: 600;
 }
 
 .composer-header-actions .composer-contact-toggle:hover {
-  color: var(--ui-accent-hover);
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+.composer-header-actions .composer-contact-toggle[aria-expanded="true"] {
+  color: var(--ui-text-accent);
+  background: var(--ui-accent-soft);
+}
+
+.composer-header-actions .composer-contact-toggle[aria-expanded="true"]:hover {
+  color: var(--ui-text-accent);
   background: color-mix(in oklch, var(--ui-accent-soft) 78%, var(--ui-control-hover));
 }
 
 .composer .composer-sender-context {
   min-height: var(--compose-field-height);
   flex: 0 0 var(--compose-field-height);
+  font-size: 14px;
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
+  grid-template-columns: minmax(var(--compose-field-label-width), max-content) minmax(0, 1fr);
+  column-gap: 12px;
   align-items: center;
   padding: 0 var(--compose-space-5);
   border-bottom: 1px solid var(--compose-divider);
   background: var(--ui-surface);
 }
 
-.composer-sender-heading,
-.composer-field-row > span,
-.composer-subject-field > .sr-only {
-  color: var(--ui-text);
-  font-size: 14px;
-  font-weight: 500;
+.composer .composer-sender-heading,
+.composer .composer-field-row > span,
+.composer .composer-subject-field > .sr-only {
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+  font-weight: 400;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .composer-sender-selectors {
@@ -2443,8 +2221,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 8px;
-  border: 1px solid transparent;
+  padding: 0;
+  border: 0;
   border-color: transparent;
   border-radius: 8px;
   color: var(--ui-text);
@@ -2495,7 +2273,8 @@
 .composer .composer-field-row {
   min-height: var(--compose-field-height);
   display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
+  grid-template-columns: minmax(var(--compose-field-label-width), max-content) minmax(0, 1fr);
+  column-gap: 12px;
   align-items: center;
   margin: 0 var(--compose-space-5);
   padding: 0;
@@ -2537,7 +2316,11 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 5px 96px 5px 0;
+  padding: 5px 0;
+}
+
+.composer .composer-recipient-field:has(.composer-recipient-actions) .composer-recipient-editor {
+  padding-inline-end: 96px;
 }
 
 .composer .composer-recipient-editor input,
@@ -2582,24 +2365,25 @@
   height: 100%;
   display: inline-flex;
   align-items: center;
-  gap: 18px;
-  padding-left: 14px;
+  gap: 4px;
+  padding-left: 8px;
   background: var(--ui-surface);
 }
 
 .composer-recipient-actions button {
   min-height: 32px;
-  padding: 0;
+  padding: 0 6px;
   border: 0;
-  color: var(--ui-accent);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
   background: transparent;
   font-size: 13px;
   font-weight: 600;
 }
 
 .composer .recipient-suggestions {
-  left: 82px;
-  right: 112px;
+  left: calc(var(--compose-space-5) + var(--compose-field-label-width) + 12px);
+  right: auto;
   top: calc(100% + 4px);
   width: auto;
   max-height: 248px;
@@ -2657,14 +2441,14 @@
 }
 
 .composer-rich-toolbar button {
-  width: 30px;
-  min-width: 30px;
-  min-height: 30px;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
   display: inline-grid;
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
 }
@@ -2678,7 +2462,7 @@
 .composer-rich-toolbar button[aria-pressed="true"],
 .composer-rich-toolbar button[aria-pressed="true"]:hover,
 .composer-rich-toolbar button[aria-pressed="true"]:focus-visible {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
   box-shadow: inset 0 0 0 1px var(--ui-accent);
 }
@@ -2691,10 +2475,10 @@
 .composer-rich-toolbar .composer-rich-toolbar-select .custom-select-summary {
   width: auto;
   min-width: 66px;
-  min-height: 30px;
-  padding: 0 7px;
+  min-height: 32px;
+  padding: 0 8px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
   font-size: 13px;
@@ -2742,14 +2526,14 @@
 }
 
 .composer .composer-body-field .composer-richtext-body a {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   text-decoration-line: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
 
 .composer .composer-body-field .composer-richtext-body a:hover {
-  color: var(--ui-accent-hover);
+  color: var(--ui-text-accent);
 }
 
 .composer .composer-body-field .composer-richtext-body a:focus-visible {
@@ -2789,6 +2573,7 @@
   display: flex;
   align-items: center;
   gap: var(--compose-space-3);
+  padding-block: 8px 4px;
 }
 
 .composer-footer-progress:empty {
@@ -2829,6 +2614,7 @@
   min-height: 50px;
   display: flex;
   align-items: center;
+  padding: 0;
   overflow: hidden;
 }
 
@@ -2839,10 +2625,10 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 4px 6px;
+  padding: 0;
   overflow-x: auto;
-  border-radius: 8px;
-  background: var(--ui-surface-muted);
+  border-radius: 0;
+  background: transparent;
 }
 
 .composer-footer-tool-group button {
@@ -2851,10 +2637,10 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 0 9px;
+  padding: 0 8px;
   border: 0;
-  border-radius: 7px;
-  color: var(--ui-text);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
   background: transparent;
   font-size: 13px;
   font-weight: 500;
@@ -2877,28 +2663,8 @@
   min-width: 18px;
   display: inline-grid;
   place-items: center;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   font-size: 12px;
-}
-
-.composer-format-glyph,
-.composer-more-glyph {
-  display: inline-flex;
-  justify-content: center;
-}
-
-.composer-format-glyph {
-  width: 17px;
-  border-bottom: 2px solid currentColor;
-  font-family: Georgia, serif;
-  font-size: 19px;
-  line-height: 20px;
-}
-
-.composer-more-glyph {
-  width: 17px;
-  font-size: 16px;
-  letter-spacing: 1px;
 }
 
 .composer-recipient-error {
@@ -2914,221 +2680,9 @@
   pointer-events: none;
 }
 
-.composer-template-save-dialog strong {
-  color: var(--ui-text);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.composer-template-save-dialog label {
-  display: grid;
-  gap: 5px;
-  color: var(--ui-text-secondary);
-  font-size: 12px;
-}
-
-.composer-template-save-dialog input {
-  min-height: 34px;
-  width: 100%;
-  padding: 0 9px;
-  border: 1px solid var(--ui-border);
-  border-radius: 7px;
-  color: var(--ui-text);
-  background: var(--ui-surface);
-  font-size: 13px;
-}
-
-.composer-template-save-dialog input:focus {
-  border-color: var(--ui-accent);
-  outline: var(--ui-focus-outline);
-  outline-offset: 1px;
-}
-
-.composer-template-save-dialog footer {
-  min-height: 0;
-  display: flex;
-  flex-direction: row;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.composer-template-save-dialog footer button,
-.composer-template-save-entry {
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 7px;
-  color: var(--ui-text-secondary);
-  background: var(--ui-surface);
-  font-size: 12px;
-}
-
-.composer-template-save-dialog footer button:hover,
-.composer-template-save-entry:hover {
-  color: var(--ui-text);
-  background: var(--ui-control-hover);
-}
-
-.composer-template-save-dialog footer button.is-primary {
-  border-color: var(--ui-accent);
-  color: var(--color-text-on-accent);
-  background: var(--ui-accent);
-}
-
-.composer-template-save-dialog footer button.is-primary:hover {
-  background: var(--ui-accent-hover);
-}
-
-.composer-advanced-popover {
-  position: fixed;
-  z-index: 1300;
-  width: min(360px, calc(100vw - 24px));
-  max-height: min(520px, calc(100vh - 24px));
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  overflow: auto;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-panel);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-popover);
-}
-
-.composer-advanced-popover > header {
-  min-height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.composer-advanced-popover > header strong {
-  color: var(--ui-text);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.composer-advanced-popover > header button {
-  width: 28px;
-  min-height: 28px;
-  display: inline-grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  color: var(--ui-text-secondary);
-  background: transparent;
-}
-
-.composer-advanced-popover > header button:hover,
-.composer-advanced-popover > header button:focus-visible {
-  color: var(--ui-text);
-  background: var(--ui-control-hover);
-}
-
-.composer-template-list,
-.composer-more-menu {
-  display: grid;
-  gap: 4px;
-}
-
-.composer-template-row {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px;
-  gap: 4px;
-}
-
-.composer-template-row > button,
-.composer-more-menu > button {
-  min-width: 0;
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 9px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  color: var(--ui-text);
-  background: transparent;
-  font-size: 13px;
-  text-align: left;
-}
-
-.composer-template-row > button:first-child span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer-template-row > button:last-child {
-  justify-content: center;
-  padding: 0;
-  color: var(--ui-danger);
-}
-
-.composer-template-row > button:hover,
-.composer-template-row > button:focus-visible,
-.composer-more-menu > button:hover,
-.composer-more-menu > button:focus-visible {
-  border-color: var(--ui-border);
-  background: var(--ui-control-hover);
-}
-
-.composer-more-menu > button:disabled,
-.composer-advanced-popover > header button:disabled {
-  cursor: default;
-  opacity: 0.68;
-}
-
-.composer-template-row > button:last-child:hover,
-.composer-template-row > button:last-child:focus-visible {
-  color: var(--ui-danger);
-  background: var(--ui-danger-bg);
-}
-
-.composer-template-empty {
-  display: grid;
-  justify-items: start;
-  gap: 5px;
-  padding: 8px 2px;
-  color: var(--ui-text-secondary);
-  font-size: 13px;
-}
-
-.composer-template-empty small,
-.composer-more-empty {
-  color: var(--ui-text-tertiary);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.composer-template-save-entry {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  color: var(--ui-accent);
-}
-
-.composer-template-save-dialog {
-  display: grid;
-  gap: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--ui-border);
-}
-
 .composer-schedule-clear:hover,
 .composer-schedule-clear:focus-visible {
-  color: var(--ui-accent-hover);
+  color: var(--ui-text-accent);
   background: var(--ui-control-hover);
 }
 
@@ -3195,7 +2749,7 @@
   padding: 0 10px;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
   font-size: 13px;
   font-weight: 600;
@@ -3215,18 +2769,18 @@
   place-items: center;
   border: 0;
   border-radius: 6px;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: transparent;
 }
 
 .composer-send-split {
   position: relative;
-  min-width: 168px;
-  min-height: 42px;
+  min-width: 144px;
+  min-height: 40px;
   flex: 0 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 34px;
-  border-radius: var(--ui-radius-panel);
+  border-radius: var(--ui-radius-control);
   background: var(--ui-accent);
 }
 
@@ -3237,7 +2791,7 @@
 .composer-send-primary,
 .composer-send-menu-trigger {
   min-width: 0;
-  min-height: 42px;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3252,11 +2806,11 @@
 }
 
 .composer-send-split > .composer-send-primary {
-  border-radius: var(--ui-radius-panel) 0 0 var(--ui-radius-panel);
+  border-radius: var(--ui-radius-control) 0 0 var(--ui-radius-control);
 }
 
 .composer-send-split > .composer-send-menu-trigger {
-  border-radius: 0 var(--ui-radius-panel) var(--ui-radius-panel) 0;
+  border-radius: 0 var(--ui-radius-control) var(--ui-radius-control) 0;
 }
 
 .composer-send-primary {
@@ -3273,15 +2827,21 @@
   background: var(--ui-accent-hover);
 }
 
-.composer-send-primary:active:not(:disabled),
-.composer-send-menu-trigger:active:not(:disabled) {
-  background: var(--ui-accent-pressed);
-}
-
 .composer-send-primary:disabled,
 .composer-send-menu-trigger:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
+  cursor: default;
+  opacity: 1;
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+.composer-send-split:has(> .composer-send-primary:disabled) {
+  background: var(--ui-surface-muted);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+}
+
+.composer-send-menu-trigger:disabled {
+  border-left-color: var(--ui-border);
 }
 
 .composer-send-menu {
@@ -3316,10 +2876,6 @@
 }
 
 @media (max-width: 1280px) {
-  .composer .composer-recipient-editor {
-    padding-inline-end: 84px;
-  }
-
   .composer-schedule-label-full,
   .composer-send-label-full {
     display: none;
@@ -3348,16 +2904,16 @@
 .composer-contacts-panel {
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--composer-divider);
+  border-left: 1px solid var(--compose-divider);
 }
 
 .composer-contacts-header {
-  min-height: 54px;
-  flex: 0 0 54px;
+  min-height: var(--compose-header-height);
+  flex: 0 0 var(--compose-header-height);
   display: grid;
   align-items: center;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: var(--compose-space-3);
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: var(--compose-space-2);
   padding: 0 var(--compose-space-5);
   border-bottom: 1px solid var(--compose-divider);
 }
@@ -3381,7 +2937,7 @@
   display: inline-grid;
   place-items: center;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
 }
@@ -3429,6 +2985,8 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 0;
   border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .composer-contacts-tabs button {
@@ -3458,7 +3016,7 @@
 
 .composer-contacts-tabs button:hover,
 .composer-contacts-tabs button.is-active {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: transparent;
 }
 
@@ -3471,7 +3029,7 @@
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  padding: 0 var(--compose-space-5);
+  padding: 4px 8px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -3483,12 +3041,11 @@
   flex: 0 0 var(--compose-contact-row-height);
   position: relative;
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 0;
+  padding: 0 12px;
   border: 0;
-  border-bottom: 1px solid var(--compose-divider);
   border-radius: var(--ui-radius-control);
   background: transparent;
 }
@@ -3539,13 +3096,10 @@
 }
 
 .composer .composer-contact-add {
-  position: absolute;
-  top: 0;
-  right: 8px;
-  bottom: 0;
-  height: 28px;
+  position: static;
+  height: 32px;
   min-width: 48px;
-  min-height: 28px;
+  min-height: 32px;
   margin-block: auto;
   display: inline-flex;
   align-items: center;
@@ -3554,14 +3108,14 @@
   padding: 0 8px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-surface);
   font-size: var(--ui-font-size-aux);
   font-weight: 600;
   white-space: nowrap;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
   transition: none;
 }
 
@@ -3582,7 +3136,7 @@
 .composer-contact-add.is-added {
   min-width: 0;
   border-color: transparent;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
   opacity: 1;
   visibility: visible;
@@ -3612,22 +3166,68 @@
   outline-offset: 2px;
 }
 
-@media (max-width: 899px) {
+/* The compose surface owns this breakpoint, independent of the application
+ * viewport. A 760px floating editor therefore never loses 304px to a rail. */
+.composer-contacts-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  justify-content: flex-end;
+  background: color-mix(in oklch, var(--ui-text) 8%, transparent);
+}
+
+.composer-contacts-layer > .composer-contacts-panel {
+  width: min(360px, 100%);
+  height: 100%;
+  border-left: 1px solid var(--compose-divider);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+@container composer (min-width: 900px) {
   .composer-workspace.has-contacts {
-    position: relative;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 304px;
   }
 
-  .composer-workspace.has-contacts .composer-contacts-panel {
-    position: absolute;
-    inset: 0;
-    z-index: 20;
-    border-left: 0;
-    box-shadow: var(--ui-shadow-float);
+  .composer-contacts-layer {
+    position: static;
+    inset: auto;
+    z-index: auto;
+    background: transparent;
+  }
+
+  .composer-contacts-layer > .composer-contacts-panel {
+    width: 100%;
+    box-shadow: none;
+  }
+}
+
+@container composer (max-width: 600px) {
+  .composer .composer-sender-context {
+    min-height: max(var(--compose-field-height), calc(3.2em + 8px));
+    flex: 0 0 auto;
+    padding-block: 4px;
+  }
+
+  .composer .composer-sender-context .custom-select-summary > span {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .composer .composer-sender-context .custom-select-summary :is(strong, small) {
+    max-width: 100%;
   }
 }
 
 @media (max-width: 720px) {
+  .composer {
+    --compose-field-label-width: 3.5em;
+  }
+
   .composer-backdrop {
     padding: 0;
   }
@@ -3638,7 +3238,8 @@
 
   .composer .composer-sender-context,
   .composer .composer-field-row {
-    grid-template-columns: 58px minmax(0, 1fr);
+    grid-template-columns: minmax(var(--compose-field-label-width), max-content) minmax(0, 1fr);
+    column-gap: 8px;
     margin-inline: 16px;
     transition: none;
   }
@@ -3651,6 +3252,49 @@
   .composer footer {
     padding-inline: 16px;
     transition: none;
+  }
+
+  .composer .composer-recipient-field:has(.composer-recipient-actions) .composer-recipient-editor {
+    padding-inline-end: 44px;
+  }
+
+  .composer .composer-recipient-actions {
+    right: 16px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    background: transparent;
+  }
+
+  .composer .composer-recipient-details-toggle {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+
+  .composer .composer-recipient-editor input {
+    min-width: 32px;
+    min-height: 32px;
+    flex-basis: 32px;
+  }
+
+  .composer .composer-recipient-chip {
+    max-width: calc(100% - 38px);
+    min-height: 44px;
+  }
+
+  .composer .composer-recipient-chip button {
+    width: 44px;
+    min-height: 44px;
+    flex: 0 0 44px;
+  }
+
+  .composer .recipient-suggestions {
+    left: 16px;
+    max-width: calc(100% - 32px);
   }
 
   .composer-quick-tools {
@@ -3667,13 +3311,27 @@
   }
 
   .composer-send-split {
-    min-width: 180px;
+    min-width: 148px;
   }
 
   .composer-contacts-header,
-  .composer-contacts-toolbar,
-  .composer-contacts-list {
+  .composer-contacts-toolbar {
     padding-inline: 16px;
+  }
+
+  .composer-contacts-layer > .composer-contacts-panel {
+    width: 100%;
+    border-left: 0;
+    box-shadow: none;
+  }
+
+  .composer .composer-contact-add,
+  .composer .composer-contacts-search > button,
+  .composer-contacts-heading-actions button,
+  .composer-contacts-tabs button,
+  .composer .composer-contacts-search input {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 
@@ -3735,18 +3393,6 @@
   transform: none;
 }
 
-.composer-backdrop.is-native-window .composer-workspace.has-contacts {
-  grid-template-columns: minmax(0, 1fr) 304px;
-}
-
-.composer-backdrop.is-native-window .composer-workspace.has-contacts .composer-contacts-panel {
-  position: static;
-  inset: auto;
-  z-index: auto;
-  border-left: 1px solid var(--composer-divider);
-  box-shadow: none;
-}
-
 .standalone-composer-status {
   width: min(460px, calc(100vw - 48px));
   margin: auto;
@@ -3801,16 +3447,26 @@
     font-size: 0;
   }
 
-  .composer-footer-tool-group button:nth-child(n + 4) {
+  .composer :is(.composer-header-actions, .composer-footer-tool-group, .composer-rich-toolbar, .composer-send-split, .composer-contacts-heading-actions, .composer-recipient-chip) button > svg,
+  .composer-advanced-popover button > svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .composer-send-split {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .composer-footer-tool-group > .composer-tool-secondary {
     display: none;
   }
 
   .composer-send-split {
-    min-width: 158px;
+    min-width: 148px;
   }
 
   .composer-send-primary {
     padding-inline: 8px;
-    font-size: 12px;
+    font-size: 13px;
   }
 }

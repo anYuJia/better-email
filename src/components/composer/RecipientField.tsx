@@ -325,7 +325,7 @@ export default function RecipientField({
                   removeChip(index);
                 }}
               >
-                <X size={11} />
+                <X size={16} />
               </button>
             </span>
           ))}

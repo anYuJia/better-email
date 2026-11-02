@@ -1,5 +1,5 @@
 use super::common::is_pop3_account;
-use crate::db::{MailError, MailResult, MailStore, MessageRemoteRef};
+use crate::db::{MailResult, MailStore, MessageRemoteRef};
 use crate::imap_probe;
 use crate::models::{
     FolderReadReport, Message, MessageSummary, PendingRemoteWrite, ReleasedSnoozedCount,
@@ -12,7 +12,7 @@ use tauri::State;
 // The IPC contract intentionally keeps scope, search, sort, and paging fields
 // flat so the generated command schema remains backwards-compatible.
 #[allow(clippy::too_many_arguments)]
-pub fn list_messages(
+pub async fn list_messages(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
     folder_id: Option<i64>,
@@ -22,108 +22,135 @@ pub fn list_messages(
     offset: Option<i64>,
     limit: i64,
 ) -> MailResult<Vec<MessageSummary>> {
-    store.list_messages_for_scope_sorted_page(
-        account_id,
-        folder_id.unwrap_or_default(),
-        query,
-        filter,
-        sort,
-        offset.unwrap_or_default(),
-        limit,
-    )
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        store.list_messages_for_scope_sorted_page(
+            account_id,
+            folder_id.unwrap_or_default(),
+            query,
+            filter,
+            sort,
+            offset.unwrap_or_default(),
+            limit,
+        )
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn list_provider_write_validation_messages(
+pub async fn list_provider_write_validation_messages(
     store: State<'_, MailStore>,
     account_id: i64,
     validation_id: String,
 ) -> MailResult<Vec<Message>> {
-    store.list_provider_write_validation_messages(account_id, validation_id)
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        store.list_provider_write_validation_messages(account_id, validation_id)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn list_thread_messages(
+pub async fn list_thread_messages(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
     thread_key: String,
     limit: i64,
 ) -> MailResult<Vec<MessageSummary>> {
-    store.list_thread_messages(account_id, thread_key, limit)
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_thread_messages(account_id, thread_key, limit))
+        .await
 }
 
 #[tauri::command]
-pub fn get_message_detail(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
-    store.message_with_remote_image_policy(message_id)
+pub async fn get_message_detail(
+    store: State<'_, MailStore>,
+    message_id: i64,
+) -> MailResult<Message> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.message_with_remote_image_policy(message_id)).await
 }
 
 #[tauri::command]
-pub fn set_threads_muted(
+pub async fn set_threads_muted(
     store: State<'_, MailStore>,
     message_ids: Vec<i64>,
     muted: bool,
 ) -> MailResult<i64> {
-    store.set_threads_muted_for_messages(&message_ids, muted)
+    let store = store.inner().clone();
+    super::executor::database(move || store.set_threads_muted_for_messages(&message_ids, muted))
+        .await
 }
 
 #[tauri::command]
-pub fn list_muted_thread_keys(
+pub async fn list_muted_thread_keys(
     store: State<'_, MailStore>,
     account_id: i64,
 ) -> MailResult<Vec<String>> {
-    store.list_muted_thread_keys(account_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_muted_thread_keys(account_id)).await
 }
 
 #[tauri::command]
-pub fn list_pending_remote_writes(
+pub async fn list_pending_remote_writes(
     store: State<'_, MailStore>,
 ) -> MailResult<Vec<PendingRemoteWrite>> {
-    store.list_pending_remote_writes()
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_pending_remote_writes()).await
 }
 
 #[tauri::command]
-pub fn list_messages_by_ids(
+pub async fn list_messages_by_ids(
     store: State<'_, MailStore>,
     message_ids: Vec<i64>,
 ) -> MailResult<Vec<Message>> {
-    store.list_messages_by_ids(&message_ids)
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_messages_by_ids(&message_ids)).await
 }
 
 #[tauri::command]
-pub fn list_remote_image_trusts(
+pub async fn list_remote_image_trusts(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<Vec<RemoteImageTrust>> {
-    store.list_remote_image_trusts(account_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_remote_image_trusts(account_id)).await
 }
 
 #[tauri::command]
-pub fn trust_remote_images(
+pub async fn trust_remote_images(
     store: State<'_, MailStore>,
     input: RemoteImageTrustInput,
 ) -> MailResult<RemoteImageTrust> {
-    store.upsert_remote_image_trust(input)
+    let store = store.inner().clone();
+    super::executor::database(move || store.upsert_remote_image_trust(input)).await
 }
 
 #[tauri::command]
-pub fn delete_remote_image_trust(store: State<'_, MailStore>, trust_id: i64) -> MailResult<()> {
-    store.delete_remote_image_trust(trust_id)
+pub async fn delete_remote_image_trust(
+    store: State<'_, MailStore>,
+    trust_id: i64,
+) -> MailResult<()> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.delete_remote_image_trust(trust_id)).await
 }
 
 #[tauri::command]
-pub fn render_message_with_remote_image_policy(
+pub async fn render_message_with_remote_image_policy(
     store: State<'_, MailStore>,
     message_id: i64,
 ) -> MailResult<Message> {
-    store.message_with_remote_image_policy(message_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.message_with_remote_image_policy(message_id)).await
 }
 
 #[tauri::command]
-pub fn render_message_with_remote_images_once(
+pub async fn render_message_with_remote_images_once(
     store: State<'_, MailStore>,
     message_id: i64,
 ) -> MailResult<Message> {
-    store.persist_message_remote_images_once(message_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.persist_message_remote_images_once(message_id)).await
 }
 
 #[tauri::command]
@@ -132,8 +159,19 @@ pub async fn set_message_read(
     message_id: i64,
     is_read: bool,
 ) -> MailResult<RemoteActionReport> {
-    store.set_message_read(message_id, is_read)?;
-    sync_remote_seen(&store, message_id, is_read)
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let account_id = super::executor::database(move || {
+        lookup
+            .get_message_account(message_id)
+            .map(|account| account.id)
+    })
+    .await?;
+    super::executor::network(account_id, move || {
+        store.set_message_read(message_id, is_read)?;
+        sync_remote_seen(&store, message_id, is_read)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -143,6 +181,9 @@ pub async fn mark_folder_read(
     role: String,
     is_virtual: bool,
 ) -> MailResult<FolderReadReport> {
+    let store = store.inner().clone();
+    let account_id = 0;
+    super::executor::network(account_id, move || {
     let unread_messages = store.mark_folder_read(folder_id, &role, is_virtual)?;
     let updated_count = unread_messages.len() as i64;
     if unread_messages.is_empty() {
@@ -223,6 +264,8 @@ pub async fn mark_folder_read(
         remote_failed_count,
         message,
     })
+
+    }).await
 }
 
 #[tauri::command]
@@ -231,8 +274,19 @@ pub async fn set_message_starred(
     message_id: i64,
     is_starred: bool,
 ) -> MailResult<RemoteActionReport> {
-    store.set_message_starred(message_id, is_starred)?;
-    sync_remote_flagged(&store, message_id, is_starred)
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let account_id = super::executor::database(move || {
+        lookup
+            .get_message_account(message_id)
+            .map(|account| account.id)
+    })
+    .await?;
+    super::executor::network(account_id, move || {
+        store.set_message_starred(message_id, is_starred)?;
+        sync_remote_flagged(&store, message_id, is_starred)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -241,8 +295,19 @@ pub async fn move_message_to_role(
     message_id: i64,
     role: String,
 ) -> MailResult<RemoteActionReport> {
-    store.move_message_to_role(message_id, &role)?;
-    sync_remote_move(&store, message_id, &role)
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let account_id = super::executor::database(move || {
+        lookup
+            .get_message_account(message_id)
+            .map(|account| account.id)
+    })
+    .await?;
+    super::executor::network(account_id, move || {
+        store.move_message_to_role(message_id, &role)?;
+        sync_remote_move(&store, message_id, &role)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -250,15 +315,26 @@ pub async fn restore_message_to_inbox(
     store: State<'_, MailStore>,
     message_id: i64,
 ) -> MailResult<RestoreMessageReport> {
-    store.restore_message_to_inbox(message_id)?;
-    let mut remote = sync_remote_move(&store, message_id, "inbox")?;
-    remote.message = remote
-        .message
-        .replacen("本地已移动", "本地已恢复到收件箱", 1);
-    Ok(RestoreMessageReport {
-        restored: store.get_message(message_id)?,
-        remote,
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let account_id = super::executor::database(move || {
+        lookup
+            .get_message_account(message_id)
+            .map(|account| account.id)
     })
+    .await?;
+    super::executor::network(account_id, move || {
+        store.restore_message_to_inbox(message_id)?;
+        let mut remote = sync_remote_move(&store, message_id, "inbox")?;
+        remote.message = remote
+            .message
+            .replacen("本地已移动", "本地已恢复到收件箱", 1);
+        Ok(RestoreMessageReport {
+            restored: store.get_message(message_id)?,
+            remote,
+        })
+    })
+    .await
 }
 
 #[tauri::command]
@@ -266,10 +342,21 @@ pub async fn delete_message_permanently(
     store: State<'_, MailStore>,
     message_id: i64,
 ) -> MailResult<RemoteActionReport> {
-    let reference = store.delete_message_permanently(message_id)?;
-    // 草稿/邮件被永久删除后，其临时附件不再被任何草稿/发件箱引用，立即清理。
-    let _ = store.prune_temp_attachments(std::time::Duration::from_secs(0));
-    sync_remote_delete_reference(&store, &reference, "本地已永久删除")
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let account_id = super::executor::database(move || {
+        lookup
+            .get_message_account(message_id)
+            .map(|account| account.id)
+    })
+    .await?;
+    super::executor::network(account_id, move || {
+        let reference = store.delete_message_permanently(message_id)?;
+        // 草稿/邮件被永久删除后，其临时附件不再被任何草稿/发件箱引用，立即清理。
+        let _ = store.prune_temp_attachments(std::time::Duration::from_secs(0));
+        sync_remote_delete_reference(&store, &reference, "本地已永久删除")
+    })
+    .await
 }
 
 #[tauri::command]
@@ -277,6 +364,9 @@ pub async fn empty_trash(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<TrashActionReport> {
+    let store = store.inner().clone();
+    let network_key = account_id.unwrap_or_default();
+    super::executor::network(network_key, move || {
     let (local_deleted_count, references) = store.empty_trash_for_account(account_id)?;
     // 数据库删除已经提交，引用关系随之消失；立即回收不再被任何草稿/发件状态
     // 引用的临时附件。远端删除失败不影响本地生命周期状态。
@@ -354,55 +444,63 @@ pub async fn empty_trash(
         remote_failed_count,
         message,
     })
+
+    }).await
 }
 
 #[tauri::command]
-pub fn snooze_message(
+pub async fn snooze_message(
     store: State<'_, MailStore>,
     message_id: i64,
     snoozed_until: String,
 ) -> MailResult<Message> {
-    store.snooze_message(message_id, &snoozed_until)
+    let store = store.inner().clone();
+    super::executor::database(move || store.snooze_message(message_id, &snoozed_until)).await
 }
 
 #[tauri::command]
-pub fn snooze_messages(
+pub async fn snooze_messages(
     store: State<'_, MailStore>,
     message_ids: Vec<i64>,
     snoozed_until: String,
 ) -> MailResult<Vec<Message>> {
-    store.snooze_messages(&message_ids, &snoozed_until)
+    let store = store.inner().clone();
+    super::executor::database(move || store.snooze_messages(&message_ids, &snoozed_until)).await
 }
 
 #[tauri::command]
-pub fn unsnooze_message(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
-    store.unsnooze_message(message_id)
+pub async fn unsnooze_message(store: State<'_, MailStore>, message_id: i64) -> MailResult<Message> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.unsnooze_message(message_id)).await
 }
 
 #[tauri::command]
-pub fn release_due_snoozed_messages(
+pub async fn release_due_snoozed_messages(
     store: State<'_, MailStore>,
     now: String,
 ) -> MailResult<ReleasedSnoozedCount> {
-    store.release_due_snoozed_messages(&now)
+    let store = store.inner().clone();
+    super::executor::database(move || store.release_due_snoozed_messages(&now)).await
 }
 
 #[tauri::command]
-pub fn apply_label_to_message(
+pub async fn apply_label_to_message(
     store: State<'_, MailStore>,
     message_id: i64,
     label_id: i64,
 ) -> MailResult<()> {
-    store.apply_label_to_message(message_id, label_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.apply_label_to_message(message_id, label_id)).await
 }
 
 #[tauri::command]
-pub fn remove_label_from_message(
+pub async fn remove_label_from_message(
     store: State<'_, MailStore>,
     message_id: i64,
     label_id: i64,
 ) -> MailResult<()> {
-    store.remove_label_from_message(message_id, label_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.remove_label_from_message(message_id, label_id)).await
 }
 
 fn sync_remote_seen(
@@ -688,15 +786,10 @@ pub async fn list_threads(
     limit: i64,
 ) -> MailResult<Vec<ThreadSummary>> {
     let store = store.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    super::executor::database(move || {
         store.list_threads_for_scope_sorted(account_id, folder_id, query, filter, sort, limit)
     })
     .await
-    .map_err(|error| {
-        MailError::Io(std::io::Error::other(format!(
-            "list_threads task failed: {error}"
-        )))
-    })?
 }
 
 #[tauri::command]
@@ -708,13 +801,8 @@ pub async fn get_message_count(
     filter: Option<String>,
 ) -> MailResult<i64> {
     let store = store.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    super::executor::database(move || {
         store.count_messages_for_scope(account_id, folder_id.unwrap_or_default(), query, filter)
     })
     .await
-    .map_err(|error| {
-        MailError::Io(std::io::Error::other(format!(
-            "get_message_count task failed: {error}"
-        )))
-    })?
 }

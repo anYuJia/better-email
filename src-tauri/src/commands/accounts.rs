@@ -6,16 +6,18 @@ use crate::models::{
 };
 use tauri::State;
 #[tauri::command]
-pub fn list_accounts(store: State<'_, MailStore>) -> MailResult<Vec<Account>> {
-    store.list_accounts()
+pub async fn list_accounts(store: State<'_, MailStore>) -> MailResult<Vec<Account>> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_accounts()).await
 }
 
 #[tauri::command]
-pub fn get_account(
+pub async fn get_account(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<Option<Account>> {
-    store.get_account_by_id_optional(account_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.get_account_by_id_optional(account_id)).await
 }
 
 #[tauri::command]
@@ -51,8 +53,12 @@ pub async fn create_account(
 }
 
 #[tauri::command]
-pub fn set_default_account(store: State<'_, MailStore>, account_id: i64) -> MailResult<Account> {
-    store.set_default_account(account_id)
+pub async fn set_default_account(
+    store: State<'_, MailStore>,
+    account_id: i64,
+) -> MailResult<Account> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.set_default_account(account_id)).await
 }
 
 #[tauri::command]
@@ -111,11 +117,13 @@ pub async fn remove_account(
 }
 
 #[tauri::command]
-pub fn update_account_settings(
+pub async fn update_account_settings(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
     input: AccountSettingsInput,
 ) -> MailResult<Account> {
+    let store = store.inner().clone();
+    super::executor::database(move || {
     command_info(format!(
         "[better-email][account] update settings start account_id={account_id:?} provider={} protocol={} sync_mode={}",
         input.provider.trim(),
@@ -139,164 +147,224 @@ pub fn update_account_settings(
             Err(error)
         }
     }
+
+    }).await
 }
 
 #[tauri::command]
-pub fn set_account_onboarding_completed(
+pub async fn set_account_onboarding_completed(
     store: State<'_, MailStore>,
     account_id: i64,
     completed: bool,
 ) -> MailResult<Account> {
-    command_info(format!(
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        command_info(format!(
         "[better-email][account] onboarding complete account_id={account_id} completed={completed}"
     ));
-    store.set_account_onboarding_completed(account_id, completed)
+        store.set_account_onboarding_completed(account_id, completed)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn list_folders(
+pub async fn list_folders(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<Vec<Folder>> {
-    store.list_folders_for_account(account_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_folders_for_account(account_id)).await
 }
 
 #[tauri::command]
-pub fn create_custom_folder(
+pub async fn create_custom_folder(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
     name: String,
 ) -> MailResult<Folder> {
-    store.create_custom_folder(account_id, name)
+    let store = store.inner().clone();
+    super::executor::database(move || store.create_custom_folder(account_id, name)).await
 }
 
 #[tauri::command]
-pub fn rename_custom_folder(
+pub async fn rename_custom_folder(
     store: State<'_, MailStore>,
     folder_id: i64,
     name: String,
 ) -> MailResult<Folder> {
-    store.rename_custom_folder(folder_id, name)
+    let store = store.inner().clone();
+    super::executor::database(move || store.rename_custom_folder(folder_id, name)).await
 }
 
 #[tauri::command]
-pub fn delete_custom_folder(store: State<'_, MailStore>, folder_id: i64) -> MailResult<()> {
-    store.delete_custom_folder(folder_id)
+pub async fn delete_custom_folder(store: State<'_, MailStore>, folder_id: i64) -> MailResult<()> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.delete_custom_folder(folder_id)).await
 }
 
 #[tauri::command]
-pub fn list_labels(store: State<'_, MailStore>) -> MailResult<Vec<Label>> {
-    store.list_labels()
+pub async fn list_labels(store: State<'_, MailStore>) -> MailResult<Vec<Label>> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_labels()).await
 }
 
 #[tauri::command]
-pub fn create_label(store: State<'_, MailStore>, name: String, color: String) -> MailResult<Label> {
-    store.create_label(&name, &color)
+pub async fn create_label(
+    store: State<'_, MailStore>,
+    name: String,
+    color: String,
+) -> MailResult<Label> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.create_label(&name, &color)).await
 }
 
 #[tauri::command]
-pub fn update_label(
+pub async fn update_label(
     store: State<'_, MailStore>,
     id: i64,
     name: String,
     color: String,
 ) -> MailResult<()> {
-    store.update_label(id, &name, &color)
+    let store = store.inner().clone();
+    super::executor::database(move || store.update_label(id, &name, &color)).await
 }
 
 #[tauri::command]
-pub fn delete_label(store: State<'_, MailStore>, id: i64) -> MailResult<()> {
-    store.delete_label(id)
+pub async fn delete_label(store: State<'_, MailStore>, id: i64) -> MailResult<()> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.delete_label(id)).await
 }
 
 #[tauri::command]
-pub fn list_identities(
+pub async fn list_identities(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<Vec<MailIdentity>> {
-    store.list_identities_for_account(account_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_identities_for_account(account_id)).await
 }
 
 #[tauri::command]
-pub fn upsert_identity(
+pub async fn upsert_identity(
     store: State<'_, MailStore>,
     input: MailIdentityInput,
 ) -> MailResult<MailIdentity> {
-    store.upsert_identity(input)
+    let store = store.inner().clone();
+    super::executor::database(move || store.upsert_identity(input)).await
 }
 
 #[tauri::command]
-pub fn delete_identity(store: State<'_, MailStore>, identity_id: i64) -> MailResult<()> {
-    store.delete_identity(identity_id)
+pub async fn delete_identity(store: State<'_, MailStore>, identity_id: i64) -> MailResult<()> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.delete_identity(identity_id)).await
 }
 
 #[tauri::command]
-pub fn store_account_secret(
+pub async fn store_account_secret(
     store: State<'_, MailStore>,
     input: CredentialInput,
-) -> CredentialStatus {
-    command_info(format!(
-        "[better-email][credential] store start email={} has_secret={}",
-        mask_email(&input.account_email),
-        !input.secret.trim().is_empty(),
-    ));
-    let status = match store.store_account_secret(&input.account_email, &input.secret) {
-        Ok(status) => status,
-        Err(error) => CredentialStatus {
-            account_email: input.account_email.trim().to_ascii_lowercase(),
-            exists: false,
-            status: "failed".to_string(),
-            message: error.to_string(),
-        },
-    };
-    command_info(format!(
-        "[better-email][credential] store done email={} exists={} message={}",
-        mask_email(&input.account_email),
-        status.exists,
-        status.message,
-    ));
-    status
+) -> MailResult<CredentialStatus> {
+    let failure_email = input.account_email.trim().to_ascii_lowercase();
+    let store = store.inner().clone();
+    Ok(super::executor::database(move || {
+        Ok({
+            command_info(format!(
+                "[better-email][credential] store start email={} has_secret={}",
+                mask_email(&input.account_email),
+                !input.secret.trim().is_empty(),
+            ));
+            let status = match store.store_account_secret(&input.account_email, &input.secret) {
+                Ok(status) => status,
+                Err(error) => CredentialStatus {
+                    account_email: input.account_email.trim().to_ascii_lowercase(),
+                    exists: false,
+                    status: "failed".to_string(),
+                    message: error.to_string(),
+                },
+            };
+            command_info(format!(
+                "[better-email][credential] store done email={} exists={} message={}",
+                mask_email(&input.account_email),
+                status.exists,
+                status.message,
+            ));
+            status
+        })
+    })
+    .await
+    .unwrap_or_else(|error| CredentialStatus {
+        account_email: failure_email,
+        exists: false,
+        status: "failed".into(),
+        message: error.to_string(),
+    }))
 }
 
 #[tauri::command]
-pub fn check_account_secret(
+pub async fn check_account_secret(
     store: State<'_, MailStore>,
     account_email: String,
-) -> CredentialStatus {
-    match store.check_account_secret(&account_email) {
-        Ok(status) => status,
-        Err(error) => CredentialStatus {
-            account_email: account_email.trim().to_ascii_lowercase(),
-            exists: false,
-            status: "failed".to_string(),
-            message: error.to_string(),
-        },
-    }
+) -> MailResult<CredentialStatus> {
+    let failure_email = account_email.trim().to_ascii_lowercase();
+    let store = store.inner().clone();
+    Ok(super::executor::database(move || {
+        Ok({
+            match store.check_account_secret(&account_email) {
+                Ok(status) => status,
+                Err(error) => CredentialStatus {
+                    account_email: account_email.trim().to_ascii_lowercase(),
+                    exists: false,
+                    status: "failed".to_string(),
+                    message: error.to_string(),
+                },
+            }
+        })
+    })
+    .await
+    .unwrap_or_else(|error| CredentialStatus {
+        account_email: failure_email,
+        exists: false,
+        status: "failed".into(),
+        message: error.to_string(),
+    }))
 }
 
 #[tauri::command]
-pub fn delete_account_secret(
+pub async fn delete_account_secret(
     store: State<'_, MailStore>,
     account_email: String,
-) -> CredentialStatus {
-    command_info(format!(
-        "[better-email][credential] delete start email={}",
-        mask_email(&account_email),
-    ));
-    let status = match store.delete_account_secret(&account_email) {
-        Ok(status) => status,
-        Err(error) => CredentialStatus {
-            account_email: account_email.trim().to_ascii_lowercase(),
-            exists: false,
-            status: "failed".to_string(),
-            message: error.to_string(),
-        },
-    };
-    command_info(format!(
-        "[better-email][credential] delete done email={} exists={} message={}",
-        mask_email(&account_email),
-        status.exists,
-        status.message,
-    ));
-    status
+) -> MailResult<CredentialStatus> {
+    let failure_email = account_email.trim().to_ascii_lowercase();
+    let store = store.inner().clone();
+    Ok(super::executor::database(move || {
+        Ok({
+            command_info(format!(
+                "[better-email][credential] delete start email={}",
+                mask_email(&account_email),
+            ));
+            let status = match store.delete_account_secret(&account_email) {
+                Ok(status) => status,
+                Err(error) => CredentialStatus {
+                    account_email: account_email.trim().to_ascii_lowercase(),
+                    exists: false,
+                    status: "failed".to_string(),
+                    message: error.to_string(),
+                },
+            };
+            command_info(format!(
+                "[better-email][credential] delete done email={} exists={} message={}",
+                mask_email(&account_email),
+                status.exists,
+                status.message,
+            ));
+            status
+        })
+    })
+    .await
+    .unwrap_or_else(|error| CredentialStatus {
+        account_email: failure_email,
+        exists: false,
+        status: "failed".into(),
+        message: error.to_string(),
+    }))
 }

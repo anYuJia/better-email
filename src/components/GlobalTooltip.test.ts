@@ -3,6 +3,7 @@ import {
   getTooltipText,
   isTextOnlyTooltipButton,
   shouldShowGlobalTooltip,
+  summarizeTooltipText,
 } from './GlobalTooltip';
 
 function fakeElement({
@@ -40,6 +41,12 @@ function fakeElement({
 }
 
 describe('GlobalTooltip helpers', () => {
+  it('summarizes long content without splitting Unicode characters', () => {
+    expect(summarizeTooltipText('  插入\n 签名  ')).toBe('插入 签名');
+    const summary = summarizeTooltipText('😀'.repeat(140));
+    expect(Array.from(summary)).toHaveLength(120);
+    expect(summary.endsWith('😀…')).toBe(true);
+  });
   it('prefers native titles before restored title copies and aria labels', () => {
     const button = fakeElement({
       attributes: {

@@ -28,6 +28,27 @@ function renderView(onClick = vi.fn(), onLinkClick = vi.fn(), linksHidden = fals
 describe('EmailShadowView image vs link click routing', () => {
   afterEach(() => cleanup());
 
+  it('reveals and hides links without recreating the body, images, or formatted text', () => {
+    const html = '<p><a href="https://example.com"><strong>原始标题</strong></a></p><a href="https://example.com/image" aria-label="原始图片说明"><img alt="保持图片" src="data:image/png;base64,AA=="></a>';
+    const { container, rerender } = render(<EmailShadowView html={html} />);
+    const shadow = container.firstElementChild!.shadowRoot!;
+    const paragraph = shadow.querySelector('p');
+    const image = shadow.querySelector('img');
+    const strong = shadow.querySelector('strong');
+    rerender(<EmailShadowView html={html} linksHidden />);
+    expect(shadow.querySelector('a')?.getAttribute('href')).toBeNull();
+    expect(shadow.querySelector('a')?.textContent).toBe('已隐藏链接');
+    expect(shadow.querySelector('img')).toBe(image);
+    rerender(<EmailShadowView html={html} linksHidden={false} />);
+    expect(shadow.querySelector('p')).toBe(paragraph);
+    expect(shadow.querySelector('strong')).toBe(strong);
+    expect(strong?.textContent).toBe('原始标题');
+    expect(image?.parentElement?.getAttribute('aria-label')).toBe('原始图片说明');
+    expect(shadow.querySelector('a')?.getAttribute('href')).toBe('https://example.com');
+    rerender(<EmailShadowView html={html} linksHidden />);
+    expect(shadow.querySelector('a')?.getAttribute('href')).toBeNull();
+  });
+
   it('passes bare image clicks to the host (image preview) without link handling', () => {
     const { shadowRoot, onClick, onLinkClick } = renderView();
     const image = shadowRoot?.querySelector('img[alt="裸图"]') as HTMLImageElement;

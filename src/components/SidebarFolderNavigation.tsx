@@ -177,7 +177,7 @@ function FolderItems({
             >
               <span className="folder-name">
                 {folderIconForRole(folder.role)}
-                {displayNameForFolder(folder)}
+                <span className="folder-label">{displayNameForFolder(folder)}</span>
               </span>
               {folder.unread_count > 0 && <span className="badge">{folder.unread_count}</span>}
             </button>
@@ -189,7 +189,7 @@ function FolderItems({
                   aria-label={`${folder.name} 更多操作`}
                   onClick={(event) => onOpenContextMenu(event, folder)}
                 >
-                  <MoreHorizontal size={14} />
+                  <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               </span>
             )}

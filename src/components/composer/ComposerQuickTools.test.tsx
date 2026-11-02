@@ -22,6 +22,48 @@ describe('ComposerQuickTools', () => {
     cleanup();
   });
 
+  it('describes the signature action without putting the full signature in its tooltip', () => {
+    const onInsertSignature = vi.fn();
+    render(<ComposerQuickTools draft={draft} dropActive={false}
+      signature={'公司地址与法律声明。'.repeat(100)} hideRichToolbar
+      onInsertSignature={onInsertSignature} onPickAttachments={vi.fn()}
+      onAttachmentDrop={vi.fn()} onAttachmentDragEnter={vi.fn()}
+      onAttachmentDragLeave={vi.fn()} onAttachmentDragOver={vi.fn()} />);
+    const button = screen.getByRole('button', { name: '插入签名' });
+    expect(button.title).toBe('插入当前发件身份的签名');
+    fireEvent.click(button);
+    expect(onInsertSignature).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps attachment, formatting and more outside the mobile secondary-action group', () => {
+    const onOpenMore = vi.fn();
+    render(
+      <ComposerQuickTools
+        draft={draft}
+        dropActive={false}
+        signature="团队签名"
+        hideRichToolbar
+        onInsertSignature={vi.fn()}
+        onPickAttachments={vi.fn()}
+        onAttachmentDrop={vi.fn()}
+        onAttachmentDragEnter={vi.fn()}
+        onAttachmentDragLeave={vi.fn()}
+        onAttachmentDragOver={vi.fn()}
+        onOpenTemplates={vi.fn()}
+        onOpenMore={onOpenMore}
+      />,
+    );
+
+    for (const name of ['添加附件', '格式', '更多写信工具']) {
+      expect(screen.getByRole('button', { name }).classList.contains('composer-tool-secondary')).toBe(false);
+    }
+    for (const name of ['插入签名', '插入模板']) {
+      expect(screen.getByRole('button', { name }).classList.contains('composer-tool-secondary')).toBe(true);
+    }
+    fireEvent.click(screen.getByRole('button', { name: '更多写信工具' }));
+    expect(onOpenMore).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps rich-text source internal instead of rendering an HTML source box', () => {
     const { container } = render(
       <ComposerQuickTools

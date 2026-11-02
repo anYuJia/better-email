@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type {
   Account,
   Attachment,
@@ -17,30 +17,54 @@ import {
 } from '../app/forwarding';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
+import type { QuickReplySnapshot } from './useQuickReplyDraft';
 import type { OpenComposerOptions } from './useComposerController';
 
 type ComposeFromMessageOptions = {
   account: Account | null;
-  openComposer: (draft?: DraftInput, options?: OpenComposerOptions) => void;
+  openComposer: (draft?: DraftInput, options?: OpenComposerOptions) => boolean | void;
+  captureRequestGuard?: () => () => boolean;
+  resolveReplySource?: (message: MessageSummary) => QuickReplySnapshot | undefined;
+  resolveReplyPrefill?: (message: MessageSummary) => string | undefined;
+  onDraftOpened?: (accountId: number) => void;
   setStatus: Dispatch<SetStateAction<string>>;
 };
 
 export default function useComposeFromMessage({
   account,
   openComposer,
+  captureRequestGuard,
+  resolveReplyPrefill,
+  resolveReplySource,
+  onDraftOpened,
   setStatus,
 }: ComposeFromMessageOptions) {
+  const requestEpoch = useRef(0);
+  useEffect(() => () => { requestEpoch.current += 1; }, []);
+  const beginRequest = useCallback(() => {
+    const epoch = ++requestEpoch.current;
+    const isContextCurrent = captureRequestGuard?.();
+    return () => epoch === requestEpoch.current && (isContextCurrent?.() ?? true);
+  }, [captureRequestGuard]);
+
   const composeFromMessage = useCallback(async (
     message: MessageSummary,
     mode: 'reply' | 'replyAll' | 'forward',
-    prefillBody = '',
+    prefillBody?: string,
   ) => {
+    const isCurrent = beginRequest();
     let fullMessage: Message;
     if ('body' in message && typeof (message as Message).body === 'string') {
       fullMessage = message as Message;
     } else {
-      fullMessage = await invoke<Message>(IPC.GetMessageDetail, { messageId: message.id });
+      try {
+        fullMessage = await invoke<Message>(IPC.GetMessageDetail, { messageId: message.id });
+      } catch (error) {
+        if (!isCurrent()) return false;
+        throw error;
+      }
     }
+    if (!isCurrent()) return false;
     const threading = mode === 'forward' ? null : replyThreadingHeaders(fullMessage);
     const replyRecipients = mode === 'forward' ? '' : fullMessage.sender_email;
     const includeOriginalRecipients =
@@ -69,9 +93,17 @@ export default function useComposeFromMessage({
         };
       }
     }
+    if (!isCurrent()) return false;
     const quotedBody = quoteMessage(fullMessage);
-    const replyLead = mode === 'forward' ? '' : prefillBody.trimEnd();
-    openComposer({
+    const source = mode === 'forward' ? undefined : resolveReplySource?.(fullMessage);
+    const prefill = mode === 'forward' ? '' : (prefillBody ?? source?.body ?? resolveReplyPrefill?.(fullMessage) ?? '');
+    const replyLead = prefill.trimEnd();
+    // Explicit generated text (including an empty string) must never consume
+    // a different inline draft merely because it replies to the same message.
+    const ownsSource = source?.key === `${fullMessage.account_id}:${fullMessage.id}`
+      && source.body === prefill && mode !== 'forward';
+    const opened = openComposer({
+      ...(ownsSource ? { quick_reply_source: { ...source, mode } } : {}),
       draft_id: 0,
       account_id: fullMessage.account_id,
       identity_id: 0,
@@ -86,20 +118,31 @@ export default function useComposeFromMessage({
       in_reply_to: threading?.in_reply_to ?? '',
       references: threading?.references ?? '',
     }, { replaceExisting: true });
+    if (opened === false) return false;
+    onDraftOpened?.(fullMessage.account_id);
     setStatus(
       replyLead
-        ? '已将快速回复带入写信窗口，原快速回复仍保留'
+        ? '已在写信窗口继续回复'
         : mode === 'forward'
           ? forwardAttachmentStatus(forwardPlan)
           : mode === 'replyAll'
             ? '已创建回复全部草稿'
             : '已创建回复草稿',
     );
-  }, [account, openComposer, setStatus]);
+    return true;
+  }, [account, beginRequest, openComposer, onDraftOpened, resolveReplyPrefill, resolveReplySource, setStatus]);
 
   const editDraftMessage = useCallback(async (message: Message) => {
-    const draftAttachments = await invoke<Attachment[]>(IPC.ListAttachments, { messageId: message.id });
-    openComposer({
+    const isCurrent = beginRequest();
+    let draftAttachments: Attachment[];
+    try {
+      draftAttachments = await invoke<Attachment[]>(IPC.ListAttachments, { messageId: message.id });
+    } catch (error) {
+      if (!isCurrent()) return false;
+      throw error;
+    }
+    if (!isCurrent()) return false;
+    const opened = openComposer({
       draft_id: message.id,
       account_id: message.account_id,
       identity_id: 0,
@@ -121,8 +164,11 @@ export default function useComposeFromMessage({
         is_inline: attachment.is_inline,
       })),
     }, { replaceExisting: true });
+    if (opened === false) return false;
+    onDraftOpened?.(message.account_id);
     setStatus('已打开草稿继续编辑');
-  }, [openComposer, setStatus]);
+    return true;
+  }, [beginRequest, openComposer, onDraftOpened, setStatus]);
 
   return {
     composeFromMessage,

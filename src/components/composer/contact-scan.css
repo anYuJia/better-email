@@ -1,15 +1,15 @@
 .composer-contacts-scan {
-  min-height: 28px;
-  height: 28px;
+  min-height: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-self: center;
   gap: 4px;
   padding: 0 8px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border: 0;
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface);
+  background: transparent;
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -50,8 +50,8 @@
 
 @media (max-width: 720px) {
   .composer-contacts-scan {
-    min-height: 38px;
+    min-height: 44px;
     padding-inline: 9px;
-    font-size: 11px;
+    font-size: 12px;
   }
 }

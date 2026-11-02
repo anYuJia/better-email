@@ -5,15 +5,17 @@ import type {
   FilterMode,
   MessageSummary,
 } from '../app/types';
-import { messageMatchesLocalDateTimeRange, type LocalDateTimeRange } from '../mailUtils';
+import type { LocalDateTimeRange } from '../mailUtils';
 import MessageListCard from './MessageListCard';
 import usePullToRefresh from '../hooks/usePullToRefresh';
-import MessageDateRangePicker from './MessageDateRangePicker';
+import useVirtualRowMeasurements from '../hooks/useVirtualRowMeasurements';
+import MessageSelectionControls from './MessageSelectionControls';
 import { installScrollbarThumbDrag } from '../hooks/scrollbarThumbDrag';
 import {
   GROUP_HEADER_HEIGHT,
   LIST_FOOTER_HEIGHT,
   MOBILE_MESSAGE_ROW_HEIGHT,
+  MOBILE_GROUP_HEADER_HEIGHT,
   MESSAGE_ROW_HEIGHT,
   calculateVisibleRange,
 } from './messageListLayout';
@@ -39,6 +41,7 @@ type FlatListItem =
 type MessageListViewProps = {
   mobile?: boolean;
   showAccountSource?: boolean;
+  accountSourceLabels?: ReadonlyMap<number, string>;
   groups: MessageGroup[];
   messages: MessageSummary[];
   query: string;
@@ -70,6 +73,7 @@ type MessageListViewProps = {
 export default function MessageListView({
   mobile = false,
   showAccountSource = false,
+  accountSourceLabels,
   groups,
   messages,
   query,
@@ -117,6 +121,8 @@ export default function MessageListView({
   const isMobileViewport = mobile || isNarrowViewport;
   const [, setScrollTop] = useState(initialScrollTop);
   const [heightCacheVersion, setHeightCacheVersion] = useState(0);
+  const [measurementVersion, setMeasurementVersion] = useState(0);
+  const [visibilityVersion, setVisibilityVersion] = useState(0);
   const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
   const [isScrollbarDragging, setIsScrollbarDragging] = useState(false);
   const [scrollbarThumb, setScrollbarThumb] = useState({ top: 0, height: 0 });
@@ -128,6 +134,8 @@ export default function MessageListView({
     previousMessageIds: ReadonlySet<number>;
   } | null>(null);
   const messageRowHeight = isMobileViewport ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT;
+  const groupHeaderHeight = isMobileViewport ? MOBILE_GROUP_HEADER_HEIGHT : GROUP_HEADER_HEIGHT;
+  const heightCacheContextRef = useRef({ listStateKey, messageRowHeight });
 
   const { pullDistance, pullRefreshing, refreshError, runRefresh, handleTouchStart,
     handleTouchMove, handleTouchEnd, handleTouchCancel } =
@@ -137,10 +145,11 @@ export default function MessageListView({
     const listElement = listRef.current;
     if (!listElement) return;
     const viewportLength = listElement.clientHeight;
+    if (viewportLength <= 0) return;
     const contentLength = listElement.scrollHeight;
     const scrollRange = contentLength - viewportLength;
-    if (viewportLength <= 0 || scrollRange <= 0) {
-      setScrollbarThumb({ top: 0, height: 0 });
+    if (scrollRange <= 0) {
+      setScrollbarThumb((current) => current.height === 0 ? current : { top: 0, height: 0 });
       return;
     }
 
@@ -159,10 +168,11 @@ export default function MessageListView({
       1,
       Math.max(0, (scrollTopOverride ?? listElement.scrollTop) / scrollRange),
     );
-    setScrollbarThumb({
+    const nextThumb = {
       top: SCROLLBAR_INSET_PX + Math.round(thumbTravel * scrollRatio),
       height: Math.round(thumbHeight),
-    });
+    };
+    setScrollbarThumb((current) => current.top === nextThumb.top && current.height === nextThumb.height ? current : nextThumb);
   }, []);
 
   const revealScrollbar = useCallback((scrollTop: number) => {
@@ -247,7 +257,11 @@ export default function MessageListView({
     return set;
   }, [messages, listStateKey]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const previous = heightCacheContextRef.current;
+    heightCacheContextRef.current = { listStateKey, messageRowHeight };
+    if (previous.listStateKey === listStateKey && previous.messageRowHeight === messageRowHeight) return;
+    if (itemHeightCacheRef.current.size === 0) return;
     itemHeightCacheRef.current.clear();
     setHeightCacheVersion((current) => current + 1);
   }, [listStateKey, messageRowHeight]);
@@ -262,9 +276,11 @@ export default function MessageListView({
     onScrollTopChange(latestScrollTopRef.current);
   }, [listStateKey, onScrollTopChange]);
 
-  const flatItems = useMemo(() => {
+  const { flatItems, itemIndexByKey } = useMemo(() => {
     const list: FlatListItem[] = [];
+    const indexes = new Map<string, number>();
     for (const group of groups) {
+      indexes.set(`header-${group.id}`, list.length);
       list.push({
         type: 'header',
         id: group.id,
@@ -274,53 +290,24 @@ export default function MessageListView({
         messageIds: group.messages.map((message) => message.id),
       });
       for (const msg of group.messages) {
-        list.push({ type: 'message', key: `message-${group.id}-${msg.id}`, message: msg });
+        const key = `message-${group.id}-${msg.id}`;
+        indexes.set(key, list.length);
+        list.push({ type: 'message', key, message: msg });
       }
     }
-    return list;
+    return { flatItems: list, itemIndexByKey: indexes };
   }, [groups]);
 
   useEffect(() => {
-    const keys = new Set(flatItems.map((item) => item.key));
     for (const key of itemHeightCacheRef.current.keys()) {
-      if (!keys.has(key)) itemHeightCacheRef.current.delete(key);
+      if (!itemIndexByKey.has(key)) itemHeightCacheRef.current.delete(key);
     }
-  }, [flatItems]);
+  }, [itemIndexByKey]);
 
   const selectedMessageSet = useMemo(
     () => new Set(selectedMessageIds),
     [selectedMessageIds],
   );
-  const visibleMessageIds = useMemo(
-    () => messages.map((message) => message.id),
-    [messages],
-  );
-  const selectedVisibleMessageCount = useMemo(
-    () => visibleMessageIds.filter((id) => selectedMessageSet.has(id)).length,
-    [selectedMessageSet, visibleMessageIds],
-  );
-  const allMessagesSelected = isAllMessagesSelected || (
-    !hasMoreMessages
-    && visibleMessageIds.length > 0
-    && selectedMessageIds.length === visibleMessageIds.length
-    && selectedVisibleMessageCount === visibleMessageIds.length
-  );
-  const visibleSelectionIndeterminate = selectedMessageIds.length > 0 && !allMessagesSelected;
-  const visibleCheckboxRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (visibleCheckboxRef.current) {
-      visibleCheckboxRef.current.indeterminate = visibleSelectionIndeterminate;
-    }
-  }, [visibleSelectionIndeterminate]);
-
-  const toggleVisibleMessages = useCallback((checked: boolean) => {
-    // The list-level control means all messages in the current result, not
-    // merely the rows currently rendered by the virtual list. Reuse the
-    // existing controller so paginated results are expanded before selection.
-    onToggleAllVisible(checked);
-  }, [onToggleAllVisible]);
-
   const toggleMessageGroup = useCallback((messageIds: number[], checked: boolean) => {
     if (onToggleMessageGroup) {
       // The group id is attached by the virtual header item at call time.
@@ -349,25 +336,12 @@ export default function MessageListView({
     }
   }, [groups, headerCheckboxState]);
 
-  const handleDateRangeConfirm = useCallback((range: LocalDateTimeRange) => {
-    if (onSelectMessageDateRange) {
-      onSelectMessageDateRange(range);
-      return;
-    }
-    const matchingIds = new Set(
-      messages
-        .filter((message) => messageMatchesLocalDateTimeRange(message.received_at, range))
-        .map((message) => message.id),
-    );
-    messages.forEach((message) => onToggleMessageSelection(message.id, matchingIds.has(message.id)));
-  }, [messages, onSelectMessageDateRange, onToggleMessageSelection]);
-
   const { layout, totalHeight } = useMemo(() => {
     const getItemHeight = (item: FlatListItem) => {
       const cachedHeight = itemHeightCacheRef.current.get(item.key);
       return cachedHeight && cachedHeight > 0
         ? cachedHeight
-        : item.type === 'message' ? messageRowHeight : GROUP_HEADER_HEIGHT;
+        : item.type === 'message' ? messageRowHeight : groupHeaderHeight;
     };
     const layout: { top: number; height: number }[] = [];
     let currentTop = 0;
@@ -377,7 +351,7 @@ export default function MessageListView({
       currentTop += height;
     }
     return { layout, totalHeight: currentTop };
-  }, [flatItems, heightCacheVersion, messageRowHeight]);
+  }, [flatItems, heightCacheVersion, messageRowHeight, groupHeaderHeight]);
 
   const [visibleRange, setVisibleRange] = useState(() =>
     calculateVisibleRange(layout, latestScrollTopRef.current, viewportHeight)
@@ -388,6 +362,8 @@ export default function MessageListView({
 
   const previousLayout = useRef({ rows: flatItems, layout });
   const measuredWidthRef = useRef(0);
+  const wasHiddenRef = useRef(false);
+  const restoringFromHiddenRef = useRef(false);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
@@ -407,17 +383,21 @@ export default function MessageListView({
   useLayoutEffect(() => {
     const listElement = listRef.current;
     if (!listElement) return;
+    if (wasHiddenRef.current || listElement.closest('[hidden]')) return;
     const isNewView = restoredViewKeyRef.current !== listStateKey;
     const previous = previousLayout.current;
     const requestedScrollTop = isNewView ? initialScrollTop : anchoredScrollTop(
-      previous.rows, previous.layout, flatItems, layout, listElement.scrollTop,
+      previous.rows, previous.layout, flatItems, layout,
+      restoringFromHiddenRef.current ? latestScrollTopRef.current : listElement.scrollTop,
+      itemIndexByKey,
     );
+    restoringFromHiddenRef.current = false;
     previousLayout.current = { rows: flatItems, layout };
     listElement.scrollTop = requestedScrollTop;
     latestScrollTopRef.current = requestedScrollTop;
     setScrollTop(requestedScrollTop);
     const nextRange = calculateVisibleRange(layout, requestedScrollTop, viewportHeight);
-    setVisibleRange(nextRange);
+    setVisibleRange((current) => nextRange.startIdx === current.startIdx && nextRange.endIdx === current.endIdx ? current : nextRange);
     restoredViewKeyRef.current = listStateKey;
     if (isNewView) {
       listStateKeyRef.current = listStateKey;
@@ -425,7 +405,7 @@ export default function MessageListView({
     } else if (newMessageExceededRef.current) {
       baselineMessageIdsRef.current = new Set(messages.map((m) => m.id));
     }
-  }, [listStateKey, initialScrollTop, flatItems, layout, viewportHeight]);
+  }, [listStateKey, initialScrollTop, flatItems, itemIndexByKey, layout, viewportHeight, visibilityVersion]);
 
   // Absorb newly added ids after their appearance animation has finished, so
   // the is-new highlight is not replayed when virtualized cards remount.
@@ -441,18 +421,33 @@ export default function MessageListView({
   useLayoutEffect(() => {
     const listElement = listRef.current;
     if (!listElement) return;
-    setViewportHeight(listElement.clientHeight);
+    if (listElement.clientHeight > 0) setViewportHeight(listElement.clientHeight);
+    if (listElement.clientWidth > 0) measuredWidthRef.current = listElement.clientWidth;
     updateScrollbarThumb();
 
     if (typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver((entries) => {
         for (const entry of entries) {
-          setViewportHeight(entry.target.clientHeight);
+          const height = entry.target.clientHeight;
           const width = entry.target.clientWidth;
-          if (width !== measuredWidthRef.current) {
+          // Mobile keeps the inbox mounted behind its reader. display:none
+          // reports zero geometry; it is not a real density/width change.
+          if (height <= 0 || width <= 0) {
+            wasHiddenRef.current = true;
+            continue;
+          }
+          setViewportHeight(height);
+          const widthChanged = width !== measuredWidthRef.current;
+          if (widthChanged || wasHiddenRef.current) {
+            restoringFromHiddenRef.current = wasHiddenRef.current;
+            if (wasHiddenRef.current) setVisibilityVersion((current) => current + 1);
+            wasHiddenRef.current = false;
             measuredWidthRef.current = width;
-            itemHeightCacheRef.current.clear();
-            setHeightCacheVersion((current) => current + 1);
+            if (widthChanged && itemHeightCacheRef.current.size > 0) {
+              itemHeightCacheRef.current.clear();
+              setHeightCacheVersion((current) => current + 1);
+            }
+            setMeasurementVersion((current) => current + 1);
           }
           updateScrollbarThumb();
         }
@@ -463,6 +458,7 @@ export default function MessageListView({
   }, [updateScrollbarThumb]);
 
   function handleListScroll(event: React.UIEvent<HTMLDivElement>) {
+    if (wasHiddenRef.current || event.currentTarget.closest('[hidden]')) return;
     const nextScrollTop = event.currentTarget.scrollTop;
     latestScrollTopRef.current = nextScrollTop;
 
@@ -550,23 +546,18 @@ export default function MessageListView({
     setLoadMoreFocusRequest(null);
   }, []);
 
-  useLayoutEffect(() => {
-    let hasUpdate = false;
-    for (const { item } of visibleItems) {
-      const node = itemNodeRefs.current.get(item.key);
-      if (!node) continue;
-      const measuredHeight = Math.round((item.type === 'message' ? node.firstElementChild ?? node : node).getBoundingClientRect().height);
-      if (measuredHeight <= 0) continue;
-      const currentHeight = itemHeightCacheRef.current.get(item.key) ?? 0;
-      if (currentHeight !== measuredHeight) {
-        itemHeightCacheRef.current.set(item.key, measuredHeight);
-        hasUpdate = true;
-      }
-    }
-    if (hasUpdate) {
-      setHeightCacheVersion((current) => current + 1);
-    }
-  }, [visibleItems]);
+  const visibleRows = useMemo(() => visibleItems.map(({ item }) => item), [visibleItems]);
+  const handleRowHeightsChanged = useCallback(() => setHeightCacheVersion((current) => current + 1), []);
+  useVirtualRowMeasurements({
+    rows: visibleRows,
+    nodes: itemNodeRefs,
+    heightCache: itemHeightCacheRef,
+    messageHeight: messageRowHeight,
+    headerHeight: groupHeaderHeight,
+    contextKey: listStateKey,
+    version: measurementVersion,
+    onHeightsChanged: handleRowHeightsChanged,
+  });
 
   useLayoutEffect(() => {
     const request = loadMoreFocusRequest;
@@ -647,38 +638,19 @@ export default function MessageListView({
       )}
       {messages.length > 0 && (
         <>
-        {(!isMobileViewport || selectedMessageIds.length > 0) && (
-          <div className="message-selection-strip" aria-label="邮件批量选择操作">
-            <label className="message-selection-all">
-              <input
-                ref={visibleCheckboxRef}
-                type="checkbox"
-                aria-label="选择当前筛选结果中的全部邮件"
-                aria-checked={visibleSelectionIndeterminate ? 'mixed' : allMessagesSelected}
-                checked={allMessagesSelected}
-                disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
-                onChange={(event) => toggleVisibleMessages(event.target.checked)}
-              />
-              <span className="message-selection-all-label">全选</span>
-            </label>
-            <MessageDateRangePicker
-              onConfirm={handleDateRangeConfirm}
-              disabled={Boolean(loadMoreStatus) || isSelectingAll || isSelectingMessageGroup}
-            />
-            <span
-              className="message-selection-strip-summary"
-              aria-live="polite"
-              aria-busy={isSelectingAll || isSelectingMessageGroup}
-            >
-              {isSelectingAll
-                ? '正在选择全部邮件…'
-                : isSelectingMessageGroup
-                  ? '正在读取完整结果…'
-                : selectedMessageIds.length > 0
-                  ? `已选 ${selectedMessageIds.length} 封`
-                  : ''}
-            </span>
-          </div>
+        {isMobileViewport && selectedMessageIds.length > 0 && (
+          <MessageSelectionControls
+            messages={messages}
+            selectedMessageIds={selectedMessageIds}
+            hasMoreMessages={hasMoreMessages}
+            isAllMessagesSelected={isAllMessagesSelected}
+            isSelectingAll={isSelectingAll}
+            isSelectingMessageGroup={isSelectingMessageGroup}
+            loading={Boolean(loadMoreStatus)}
+            onToggleAllVisible={onToggleAllVisible}
+            onToggleMessageSelection={onToggleMessageSelection}
+            onSelectMessageDateRange={onSelectMessageDateRange}
+          />
         )}
         <div
           className="message-list-viewport-wrapper"
@@ -756,6 +728,7 @@ export default function MessageListView({
                   <MessageListCard
                     mobile={mobile}
                     showAccountSource={showAccountSource}
+                    accountSourceLabels={accountSourceLabels}
                     message={message}
                     isCurrentMessage={message.id === selectedId}
                     isSelected={selectedMessageSet.has(message.id)}

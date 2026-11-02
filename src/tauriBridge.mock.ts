@@ -10,12 +10,16 @@ export async function mockInvoke<T>(command: string, args?: Record<string, any>)
   if (typeof window !== 'undefined') {
     const mockWindow = window as Window & {
       __betterEmailMockInvocations?: Array<{ command: string; args?: InvokeArgs }>;
+      /** Isolated browser regression fixtures; never used by the native bridge. */
+      __betterEmailMockCommandOverride?: (command: string, args?: InvokeArgs) => Promise<{ value: unknown } | null>;
     };
     mockWindow.__betterEmailMockInvocations ??= [];
     mockWindow.__betterEmailMockInvocations.push({
       command,
       args: args ? JSON.parse(JSON.stringify(args)) as InvokeArgs : undefined,
     });
+    const overridden = await mockWindow.__betterEmailMockCommandOverride?.(command, args);
+    if (overridden) return overridden.value as T;
   }
   return routeCommand(command, args) as T;
 }

@@ -1,6 +1,6 @@
 # Better Email UI/UX Design Specification
 
-Version: 1.0
+Version: 1.1
 Status: Product UI source of truth
 
 ---
@@ -1306,3 +1306,41 @@ Better Email should feel:
 The final visual principle is:
 
 > 邮件是主角，界面退到背景。
+
+---
+
+# 46. Visual refinement — 2026-10-30
+
+The user explicitly authorized redesigning buttons, styling, icons and layout.
+This revision keeps the three-pane mail workspace and the separate Settings
+surface, and establishes the following shared implementation choices:
+
+* Neutral slate chrome and white reading paper; restrained emerald for primary
+  actions, selection cues and focus. Dark mode uses the same semantic tokens.
+* Standard desktop controls are 36px; compact toolbar utilities may be 32px,
+  and the composer's primary Send action is 40px. Mobile interactive targets
+  remain at least 44px.
+* Control / popover / dialog corner radii are 8 / 10 / 12px. Flat mail and
+  attachment rows do not become floating cards.
+* Lucide is the shared icon family, with 1.75 stroke width. Desktop icons use
+  16 or 18px; primary mobile icons use 20px. Disclosure marks may use 16px.
+* Mail rows prioritize sender, subject and preview in that order. Avatars are
+  small neutral identity cues. Mail / conversation uses a neutral segmented
+  control. In narrow desktop list panes, filter and sort use labelled icon
+  buttons while their menus retain the full option text.
+* The reader uses a 24px desktop / 22px mobile title, aligned identity metadata,
+  a compact action toolbar and flat attachment rows with explicit file states.
+* Composer uses a paper-like editor, aligned field labels and quiet utility
+  controls. Send remains the primary action. Pending attachments, save failures,
+  retry and sending progress keep their existing behavior and visible feedback.
+* Desktop Settings fills its application surface, with a 236px navigation pane
+  and a content column capped at 760px. Mobile Settings uses full-screen push
+  navigation with plain line icons and no desktop sidebar.
+* Mobile compose uses a labelled 48px-high action, at least 104px wide. Essential
+  actions must not depend on hover.
+* Keep the shared 80ms press, 120ms fast and 180ms surface motion rhythm. Respect
+  reduced motion and preserve interruptible menu / surface transitions.
+
+Implementation screenshots and verification results are recorded under
+`docs/quality/visual-redesign-2026-10-30/`. These are regression evidence, not a
+replacement for product behavior or accessibility requirements.

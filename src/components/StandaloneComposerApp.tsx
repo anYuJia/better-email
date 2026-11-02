@@ -79,8 +79,7 @@ export default function StandaloneComposerApp() {
   const frontendReadyRef = useRef(false);
   const loadErrorRef = useRef<string | null>(null);
   const openRequestedBeforeBootRef = useRef(false);
-  const closeComposerRef = useRef<() => void>(() => {});
-  const draftRef = useRef(emptyDraft);
+  const closeComposerRef = useRef<() => boolean>(() => false);
   const isPrewarmedWindow = new URLSearchParams(window.location.search).get('prewarm') === '1';
   const applyComposerRequestRef = useRef<(
     request: ComposerWindowRequest | null,
@@ -198,6 +197,9 @@ export default function StandaloneComposerApp() {
   const {
     draft,
     setDraft,
+    editorFlushRef,
+    getDraftSnapshot,
+    isSubmitting,
     isRichComposer,
     composeTemplates,
     templateName,
@@ -206,6 +208,11 @@ export default function StandaloneComposerApp() {
     isComposerOpen,
     isComposerMinimized,
     isComposerDropActive,
+    attachmentImports,
+    isImportingAttachments,
+    retryAttachmentImport,
+    dismissAttachmentImport,
+    sendIssue,
     composerFocusRequest,
     openComposer,
     closeComposer,
@@ -257,7 +264,6 @@ export default function StandaloneComposerApp() {
   });
 
   closeComposerRef.current = closeComposer;
-  draftRef.current = draft;
 
   const applyComposerRequest = useCallback((request: ComposerWindowRequest | null, restoreWhenMissing = false) => {
     if (request) {
@@ -422,11 +428,9 @@ export default function StandaloneComposerApp() {
         const nextUnlisten = await onCurrentWindowCloseRequested((event) => {
           event.preventDefault();
           if (closingRef.current) return;
-          if (isDraftEmpty(draftRef.current)) {
-            void finishNativeClose();
-            return;
-          }
-          closeComposerRef.current();
+          // The controller flushes pending rich input before deciding whether
+          // closing needs confirmation, including native title-bar requests.
+          if (closeComposerRef.current()) void finishNativeClose();
         });
         if (active) {
           unlisten = nextUnlisten;
@@ -484,17 +488,18 @@ export default function StandaloneComposerApp() {
   const openContactsSettings = useCallback(() => {
     void (async () => {
       try {
-        if (isDraftEmpty(draft)) {
+        if (isDraftEmpty(getDraftSnapshot().draft) && !attachmentImports.some(item => item.status !== 'ready')) {
           forceCloseComposer();
         } else {
-          await saveDraft();
+          const result = await saveDraft();
+          if (result.status !== 'saved') return;
         }
         await emitToMain(COMPOSER_CONTACTS_SETTINGS_EVENT);
       } catch (error) {
         setStatus(String(error));
       }
     })();
-  }, [draft, forceCloseComposer, saveDraft, setStatus]);
+  }, [attachmentImports, getDraftSnapshot, forceCloseComposer, saveDraft, setStatus]);
 
   if (loadError) {
     return (
@@ -522,6 +527,8 @@ export default function StandaloneComposerApp() {
     <main className={`standalone-composer-app${isComposerOpen ? '' : ' has-status'}`}>
       {isComposerOpen ? (
         <ComposerWindow
+          editorFlushRef={editorFlushRef}
+          submissionPending={isSubmitting}
           standaloneWindow
           platform={platform}
           minimized={isComposerMinimized}
@@ -570,6 +577,11 @@ export default function StandaloneComposerApp() {
           sendProgress={composerSendProgress}
           sendProgressMessage={composerSendProgressMessage}
           attachmentProgress={composerAttachmentProgress}
+              attachmentImports={attachmentImports}
+              isImportingAttachments={isImportingAttachments}
+              onRetryAttachmentImport={(id) => { void retryAttachmentImport(id); }}
+              onDismissAttachmentImport={dismissAttachmentImport}
+              sendIssue={sendIssue}
           crossAccountRisks={crossAccountRisks}
         />
       ) : (

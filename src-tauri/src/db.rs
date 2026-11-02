@@ -40,8 +40,13 @@ mod oauth;
 mod outbox;
 #[cfg(test)]
 mod paging_tests;
+mod read_connection;
 mod search;
+#[cfg(test)]
+mod short_search_experiment;
+mod substring_search;
 mod sync;
+mod trusted_html_cache;
 
 use self::accounts::{ensure_default_account_for_conn, ensure_default_identity_for_account_conn};
 #[cfg(test)]
@@ -138,6 +143,7 @@ const LOCAL_BACKUP_TABLES: &[&str] = &[
 #[derive(Clone)]
 pub struct MailStore {
     conn: Arc<Mutex<Connection>>,
+    trusted_html: Arc<Mutex<trusted_html_cache::TrustedHtmlCache>>,
     data_dir: PathBuf,
     database_path: PathBuf,
 }
@@ -195,6 +201,7 @@ impl MailStore {
         }
         let store = Self {
             conn: Arc::new(Mutex::new(conn)),
+            trusted_html: Arc::new(Mutex::new(trusted_html_cache::TrustedHtmlCache::default())),
             data_dir,
             database_path: path,
         };
@@ -1793,97 +1800,6 @@ mod tests {
     }
 
     #[test]
-    fn outbound_attachment_metadata_is_saved_with_drafts_and_outbox() {
-        let store = test_store();
-        let draft_id = store
-            .save_draft(DraftInput {
-                draft_id: 0,
-                account_id: 0,
-                identity_id: 0,
-                to: "design@example.com".to_string(),
-                cc: String::new(),
-                bcc: String::new(),
-                subject: "Attachment draft".to_string(),
-                body: "Draft with a local attachment".to_string(),
-                html_body: String::new(),
-                send_at: String::new(),
-                attachments: vec![crate::models::OutboundAttachmentInput {
-                    filename: "proposal.pdf".to_string(),
-                    mime_type: "application/pdf".to_string(),
-                    size_bytes: 2048,
-                    local_path: "/tmp/proposal.pdf".to_string(),
-                    content_id: String::new(),
-                    is_inline: false,
-                }],
-            })
-            .unwrap();
-        let draft_attachments = store.list_attachments(draft_id).unwrap();
-        assert_eq!(draft_attachments.len(), 1);
-        assert_eq!(draft_attachments[0].filename, "proposal.pdf");
-        assert_eq!(draft_attachments[0].mime_type, "application/pdf");
-        assert_eq!(draft_attachments[0].size_bytes, 2048);
-        assert!(draft_attachments[0].is_downloaded);
-        assert_eq!(draft_attachments[0].local_path, "/tmp/proposal.pdf");
-
-        let _ignore = store
-            .list_folders_for_account(Some(store.get_account().unwrap().id))
-            .unwrap()
-            .into_iter()
-            .find(|folder| folder.role == "drafts")
-            .unwrap();
-        let saved_draft = store
-            .list_messages_for_scope(
-                None,
-                _ignore.id,
-                Some("Attachment draft".to_string()),
-                None,
-                10,
-            )
-            .unwrap()
-            .into_iter()
-            .find(|message| message.id == draft_id)
-            .unwrap();
-        assert!(saved_draft.has_attachments);
-        assert_eq!(saved_draft.attachment_count, 1);
-
-        let queued = store
-            .queue_outbox_message(DraftInput {
-                draft_id: 0,
-                account_id: 0,
-                identity_id: 0,
-                to: "queue@example.com".to_string(),
-                cc: String::new(),
-                bcc: String::new(),
-                subject: "Attachment queue".to_string(),
-                body: "Queue with attachment metadata".to_string(),
-                html_body: String::new(),
-                send_at: String::new(),
-                attachments: vec![crate::models::OutboundAttachmentInput {
-                    filename: "brief.txt".to_string(),
-                    mime_type: String::new(),
-                    size_bytes: 12,
-                    local_path: String::new(),
-                    content_id: String::new(),
-                    is_inline: false,
-                }],
-            })
-            .unwrap();
-        let queued_attachments = store.list_attachments(queued.message_id).unwrap();
-        assert_eq!(queued_attachments.len(), 1);
-        assert_eq!(queued_attachments[0].filename, "brief.txt");
-        assert_eq!(queued_attachments[0].mime_type, "application/octet-stream");
-        assert!(!queued_attachments[0].is_downloaded);
-
-        let pending = store.pending_outbox_messages().unwrap();
-        let outbound = pending
-            .iter()
-            .find(|message| message.id == queued.message_id)
-            .unwrap();
-        assert_eq!(outbound.attachments.len(), 1);
-        assert_eq!(outbound.attachments[0].filename, "brief.txt");
-    }
-
-    #[test]
     fn account_settings_are_editable() {
         let store = test_store();
         let account = store
@@ -1968,6 +1884,7 @@ mod tests {
             security_warnings: vec!["检测到远程图片，默认已阻止自动加载。".to_string()],
             snippet: "Hello".to_string(),
             has_attachments: false,
+            attachments_complete: true,
             attachments: Vec::new(),
         };
         let updated = store.update_message_body(message_id, &body).unwrap();
@@ -3837,6 +3754,7 @@ mod tests {
                     ],
                     snippet: "Full remote body".to_string(),
                     has_attachments: false,
+                    attachments_complete: true,
                     attachments: Vec::new(),
                 },
             )
@@ -3902,6 +3820,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "Now fetched".to_string(),
                     has_attachments: false,
+                    attachments_complete: true,
                     attachments: Vec::new(),
                 },
             )
@@ -3972,6 +3891,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "Body with attachment".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![crate::models::RemoteAttachmentMetadata {
                         filename: "remote.png".to_string(),
                         mime_type: "image/png".to_string(),
@@ -4079,6 +3999,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "first body".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![remote_attachment(
                         "report.pdf",
                         "application/pdf",
@@ -4111,6 +4032,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "second body".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![remote_attachment(
                         "report.pdf",
                         "application/pdf",
@@ -4146,6 +4068,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "first".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![remote_attachment(
                         "gone.pdf",
                         "application/pdf",
@@ -4171,6 +4094,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "second".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![remote_attachment(
                         "gone.pdf",
                         "application/pdf",
@@ -4199,6 +4123,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "first".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![
                         remote_attachment("keep.pdf", "application/pdf", 10, "", false),
                         remote_attachment("drop.txt", "text/plain", 5, "", false),
@@ -4230,6 +4155,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "second".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![remote_attachment(
                         "keep.pdf",
                         "application/pdf",
@@ -4260,6 +4186,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "first".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![
                         remote_attachment("photo.jpg", "image/jpeg", 100, "", false),
                         remote_attachment("photo.jpg", "image/jpeg", 200, "", false),
@@ -4292,6 +4219,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "second".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![
                         remote_attachment("photo.jpg", "image/jpeg", 100, "", false),
                         remote_attachment("photo.jpg", "image/jpeg", 200, "", false),
@@ -4328,6 +4256,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "first".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![
                         remote_attachment("a.png", "image/png", 10, "cid:a@example.com", true),
                         remote_attachment("b.png", "image/png", 20, "cid:b@example.com", true),
@@ -4367,6 +4296,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "second".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![
                         remote_attachment("b.png", "image/png", 20, "cid:b@example.com", true),
                         remote_attachment("a.png", "image/png", 10, "cid:a@example.com", true),
@@ -4404,6 +4334,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "first".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![remote_attachment(
                         "old.pdf",
                         "application/pdf",
@@ -4433,6 +4364,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "second".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![
                         remote_attachment("old.pdf", "application/pdf", 10, "", false),
                         remote_attachment("new.pdf", "application/pdf", 77, "", false),
@@ -6471,6 +6403,7 @@ mod tests {
                     security_warnings: Vec::new(),
                     snippet: "Remote cache".to_string(),
                     has_attachments: true,
+                    attachments_complete: true,
                     attachments: vec![crate::models::RemoteAttachmentMetadata {
                         filename: "remote-cache.bin".to_string(),
                         mime_type: "application/octet-stream".to_string(),

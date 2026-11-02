@@ -5,14 +5,20 @@ function isWebLink(href: string): boolean {
   return normalized.startsWith('http://') || normalized.startsWith('https://');
 }
 
-function applyLinksVisibility(contentDiv: HTMLDivElement, linksHidden: boolean) {
-  contentDiv.querySelectorAll<HTMLAnchorElement>('a[href]').forEach((anchor) => {
-    const href = anchor.getAttribute('href') ?? '';
-    if (!isWebLink(href)) return;
-    const hasImageContent = Boolean(anchor.querySelector('img'));
+type HiddenLink = { href: string; children: Node[] | null; label: string | null };
+
+function applyLinksVisibility(contentDiv: HTMLDivElement, linksHidden: boolean, hiddenLinks: Map<HTMLAnchorElement, HiddenLink>) {
+  contentDiv.querySelectorAll<HTMLAnchorElement>('a').forEach((anchor) => {
     if (linksHidden) {
-      if (anchor.dataset.betterEmailHref) return;
-      anchor.dataset.betterEmailHref = href;
+      if (hiddenLinks.has(anchor)) return;
+      const href = anchor.getAttribute('href') ?? '';
+      if (!isWebLink(href)) return;
+      const hasImageContent = Boolean(anchor.querySelector('img'));
+      hiddenLinks.set(anchor, {
+        href,
+        children: hasImageContent ? null : Array.from(anchor.childNodes),
+        label: anchor.getAttribute('aria-label'),
+      });
       anchor.removeAttribute('href');
       anchor.setAttribute('data-better-email-hidden-link', 'true');
       if (hasImageContent) {
@@ -24,17 +30,15 @@ function applyLinksVisibility(contentDiv: HTMLDivElement, linksHidden: boolean) 
         anchor.textContent = '已隐藏链接';
       }
     } else {
-      const originalHref = anchor.dataset.betterEmailHref;
-      if (!originalHref) return;
-      anchor.setAttribute('href', originalHref);
-      if (!hasImageContent) {
-        anchor.textContent = originalHref;
-      } else {
-        anchor.removeAttribute('data-better-email-hidden-image-link');
-        anchor.removeAttribute('aria-label');
-      }
-      delete anchor.dataset.betterEmailHref;
+      const original = hiddenLinks.get(anchor);
+      if (!original) return;
+      anchor.setAttribute('href', original.href);
+      if (original.children) anchor.replaceChildren(...original.children);
+      anchor.removeAttribute('data-better-email-hidden-image-link');
+      if (original.label === null) anchor.removeAttribute('aria-label');
+      else anchor.setAttribute('aria-label', original.label);
       anchor.removeAttribute('data-better-email-hidden-link');
+      hiddenLinks.delete(anchor);
     }
   });
 }
@@ -61,6 +65,7 @@ export default function EmailShadowView({
   const containerRef = useRef<HTMLDivElement>(null);
   const shadowRootRef = useRef<ShadowRoot | null>(null);
   const contentDivRef = useRef<HTMLDivElement | null>(null);
+  const hiddenLinksRef = useRef(new Map<HTMLAnchorElement, HiddenLink>());
 
   useEffect(() => {
     const container = containerRef.current;
@@ -132,8 +137,15 @@ export default function EmailShadowView({
     const contentDiv = contentDivRef.current;
     if (contentDiv) {
       contentDiv.innerHTML = html;
-      applyLinksVisibility(contentDiv, linksHidden);
+      hiddenLinksRef.current.clear();
     }
+  }, [html]);
+
+  // Privacy toggles must not recreate the mail body, reload images, or discard
+  // text formatting. Only update the anchors affected by this policy.
+  useEffect(() => {
+    const contentDiv = contentDivRef.current;
+    if (contentDiv) applyLinksVisibility(contentDiv, linksHidden, hiddenLinksRef.current);
   }, [html, linksHidden]);
 
   useEffect(() => {

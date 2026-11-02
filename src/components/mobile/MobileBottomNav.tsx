@@ -6,6 +6,7 @@ type MobileBottomNavProps = {
   onOpenMail: () => void;
   onOpenStarred: () => void;
   onCompose: () => void;
+  onComposeIntent?: () => void;
   onOpenSettings: () => void;
 };
 
@@ -17,12 +18,12 @@ type MobileBottomNavProps = {
  * Keep the legacy callback shape for App-level compatibility while the shell
  * owns the migration; only onCompose is rendered here.
  */
-export default function MobileBottomNav({ onCompose }: MobileBottomNavProps) {
+export default function MobileBottomNav({ onCompose, onComposeIntent }: MobileBottomNavProps) {
   return (
     <div className="mobile-bottom-nav" role="group" aria-label="邮件快捷操作">
-      <button type="button" className="mobile-bottom-compose" aria-label="写邮件" onClick={onCompose}>
+      <button type="button" className="mobile-bottom-compose" aria-label="写邮件" onClick={onCompose} onPointerDown={onComposeIntent} onFocus={onComposeIntent}>
         <span className="mobile-bottom-compose-icon">
-          <PenLine size={22} aria-hidden="true" />
+          <PenLine size={20} strokeWidth={1.75} aria-hidden="true" />
         </span>
         <span>写邮件</span>
       </button>

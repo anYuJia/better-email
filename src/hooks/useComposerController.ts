@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   emptyDraft,
   isDraftEmpty,
@@ -15,7 +15,6 @@ import type {
   Folder,
   FolderRole,
   MailIdentity,
-  Message,
   MessageSummary,
   OutboundAttachmentInput,
   OutboxItem,
@@ -27,8 +26,10 @@ import { IPC } from '../ipc/commands';
 import useComposeFromMessage from './useComposeFromMessage';
 import useComposerSend from './useComposerSend';
 import useComposerRecovery from './useComposerRecovery';
+import useQuickReplyDraft from './useQuickReplyDraft';
 import useComposerTemplates from './useComposerTemplates';
 import useComposerAttachments from './useComposerAttachments';
+import { pendingAttachmentRecovery } from '../app/attachmentImports';
 import { canonicalRecipientEmails, parseRecipientInput, parseRecipientToken } from '../components/composer/recipientAddresses';
 
 
@@ -36,6 +37,8 @@ type LoadMetaResult = {
   folderId: number | null;
   folders: Folder[];
 };
+
+export type ReaderReplyTarget = { key: string; focus: () => void };
 
 export type OpenComposerOptions = {
   restoreAutosave?: boolean;
@@ -47,6 +50,7 @@ type UseComposerControllerOptions = {
   accounts: Account[];
   identities: MailIdentity[];
   selectedId: number | null;
+  quickReplyAccountId?: number | null;
   pendingSendUndo: PendingSendUndo | null;
   sendUndoDelaySeconds: SendUndoDelaySeconds;
   setOutbox: Dispatch<SetStateAction<OutboxItem[]>>;
@@ -69,6 +73,7 @@ export default function useComposerController({
   accounts,
   identities,
   selectedId,
+  quickReplyAccountId,
   pendingSendUndo,
   sendUndoDelaySeconds,
   setOutbox,
@@ -84,11 +89,49 @@ export default function useComposerController({
   setSendProgressMessage,
   setAttachmentProgress,
 }: UseComposerControllerOptions) {
-  const [draft, setDraft] = useState<DraftInput>(emptyDraft);
-  const [quickReplyBody, setQuickReplyBody] = useState('');
+  const [draft, setDraftState] = useState<DraftInput>(emptyDraft);
+  const draftRef = useRef(draft);
+  const draftRevisionRef = useRef(0);
+  const readerReplyRef = useRef<ReaderReplyTarget | null>(null);
+  const editorFlushRef = useRef<(() => void) | null>(null);
+  const submissionInFlight = useRef(false);
+  const composerActionRef = useRef(0);
+  const composeSelectionRef = useRef('');
+  composeSelectionRef.current = `${account?.id ?? ''}:${quickReplyAccountId ?? ''}:${selectedId ?? ''}`;
+  const captureComposeRequestGuard = useCallback(() => {
+    const action = composerActionRef.current;
+    const revision = draftRevisionRef.current;
+    const selection = composeSelectionRef.current;
+    return () => action === composerActionRef.current
+      && revision === draftRevisionRef.current
+      && selection === composeSelectionRef.current
+      && !submissionInFlight.current;
+  }, []);
+  const setDraft: Dispatch<SetStateAction<DraftInput>> = useCallback((value) => {
+    const next = typeof value === 'function' ? value(draftRef.current) : value;
+    if (next === draftRef.current) return;
+    draftRevisionRef.current += 1;
+    draftRef.current = next;
+    setDraftState(next);
+  }, []);
+  const getDraftSnapshot = useCallback(() => {
+    // Rich text input is batched by animation frame. Actions must first commit
+    // the editor DOM; setDraft updates this ref synchronously even while React
+    // batches the render, so an existing action closure sees the final edit.
+    editorFlushRef.current?.();
+    return { draft: draftRef.current, revision: draftRevisionRef.current };
+  }, []);
+  const {
+    quickReplyBody, setQuickReplyBody, getQuickReplySnapshot, clearSubmittedQuickReply,
+    quickReplySaveError, retryQuickReplySave,
+  } = useQuickReplyDraft(quickReplyAccountId ?? account?.id ?? null, selectedId, setStatus);
   const [isRichComposer, setRichComposer] = useState(true);
   const [isComposerOpen, setComposerOpen] = useState(false);
   const [isComposerMinimized, setComposerMinimized] = useState(false);
+  const updateComposerMinimized: Dispatch<SetStateAction<boolean>> = useCallback((value) => {
+    if (value !== false) getDraftSnapshot();
+    setComposerMinimized(value);
+  }, [getDraftSnapshot]);
   const [composerFocusRequest, setComposerFocusRequest] = useState(0);
   const [composerCloseConfirmOpen, setComposerCloseConfirmOpen] = useState(false);
   const [composerContextAccountId, setComposerContextAccountId] = useState<number | null>(null);
@@ -97,8 +140,6 @@ export default function useComposerController({
   const recoveryDraft = useMemo(() => ({
     ...draft, account_id: draft.account_id || fallbackRecoveryAccount,
   }), [draft, fallbackRecoveryAccount]);
-  const { composerAutosave, setComposerAutosave, clearComposerAutosave, retryComposerAutosave } =
-    useComposerRecovery(recoveryDraft, isRichComposer, isComposerOpen, setStatus);
   const {
     composeTemplates,
     setComposeTemplates,
@@ -172,6 +213,13 @@ export default function useComposerController({
   }, [setStatus]);
 
   const {
+    attachmentImports,
+    isImportingAttachments,
+    retryAttachmentImport,
+    dismissAttachmentImport,
+    resetAttachmentImports,
+    restoreAttachmentImports,
+    getAttachmentSendBlockReason,
     isComposerDropActive,
     pickDraftAttachments,
     buildInlineImageAttachments,
@@ -187,9 +235,18 @@ export default function useComposerController({
     onAttachmentsReady,
     onInlineImagesReady: insertInlineImagesAtEnd,
     setAttachmentProgress,
+    canImport: () => !submissionInFlight.current,
+    getCurrentAttachments: () => draftRef.current.attachments,
   });
+  const { composerAutosave, setComposerAutosave, clearComposerAutosave, retryComposerAutosave, ensureComposerRecovery } =
+    useComposerRecovery(recoveryDraft, isRichComposer, isComposerOpen, setStatus,
+      pendingAttachmentRecovery(attachmentImports, draft.attachments));
 
   const {
+    isSubmitting,
+    submissionKind,
+    sendIssue,
+    resetSendIssue,
     saveDraft,
     sendDraft,
     sendQuickReply,
@@ -197,12 +254,14 @@ export default function useComposerController({
     cancelOutboxItem,
     undoPendingSend,
   } = useComposerSend({
-    draft,
-    setDraft,
-    quickReplyBody,
-    setQuickReplyBody,
+    getDraftSnapshot,
+    clearSubmittedDraft,
+    getQuickReplySnapshot,
+    clearSubmittedQuickReply,
+    submissionInFlight,
+    getAttachmentSendBlockReason,
+    beforeSubmitDraft: ensureComposerRecovery,
     account,
-    selectedId,
     pendingSendUndo,
     sendUndoDelaySeconds,
     setOutbox,
@@ -211,8 +270,6 @@ export default function useComposerController({
     showToast,
     draftInputForCurrentAccount,
     threadingForDraft,
-    clearComposerAutosave,
-    forceCloseComposer,
     focusMailboxRole,
     refreshAll,
     refreshContacts,
@@ -223,12 +280,19 @@ export default function useComposerController({
   });
 
   const openComposer = useCallback((nextDraft?: DraftInput, options: OpenComposerOptions = {}) => {
+    composerActionRef.current += 1;
+    if (submissionInFlight.current) {
+      setStatus('正在提交邮件，请等待完成后再打开其他草稿');
+      return false;
+    }
     if (openExternalComposer) {
       openExternalComposer(nextDraft, options);
-      return;
+      return true;
     }
     const shouldReplaceDraft = !isComposerOpen || options.replaceExisting === true;
     if (shouldReplaceDraft) {
+      resetAttachmentImports();
+      resetSendIssue();
       setComposerContextAccountId(null);
       setRichComposer(true);
       setSendProgress?.(null);
@@ -238,6 +302,7 @@ export default function useComposerController({
         setDraft(nextDraft);
       } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
         setDraft(composerAutosave.draft);
+        restoreAttachmentImports(composerAutosave.pending_attachments);
         setStatus(`已从恢复点还原邮件：${formatDate(composerAutosave.saved_at)}`);
       }
     }
@@ -245,29 +310,49 @@ export default function useComposerController({
     setComposerMinimized(false);
     setComposerOpen(true);
     setComposerFocusRequest((current) => current + 1);
-  }, [draft, composerAutosave, isComposerOpen, openExternalComposer, setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress]);
+    return true;
+  }, [draft, composerAutosave, isComposerOpen, openExternalComposer, setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress, resetAttachmentImports, restoreAttachmentImports, resetSendIssue]);
   const {
-    composeFromMessage: rawComposeFromMessage,
-    editDraftMessage: rawEditDraftMessage,
+    composeFromMessage: openReplyComposer,
+    editDraftMessage,
   } = useComposeFromMessage({
     account,
     openComposer,
+    captureRequestGuard: captureComposeRequestGuard,
+    resolveReplySource: (message) => {
+      const snapshot = getQuickReplySnapshot();
+      // Keyboard and row-menu replies share the visible message's draft.
+      // A matching numeric message id alone is insufficient across accounts.
+      return snapshot.key === `${message.account_id}:${message.id}` ? snapshot : undefined;
+    },
+    onDraftOpened: (accountId) => {
+      setComposerContextAccountId(accountId);
+      setSendRiskConfirm(null);
+    },
     setStatus,
   });
+
   const composeFromMessage = useCallback(async (
-    message: MessageSummary,
-    mode: 'reply' | 'replyAll' | 'forward',
-    prefillBody = '',
+    message: MessageSummary, mode: 'reply' | 'replyAll' | 'forward', prefillBody?: string,
   ) => {
-    await rawComposeFromMessage(message, mode, prefillBody);
-    setComposerContextAccountId(message.account_id);
-    setSendRiskConfirm(null);
-  }, [rawComposeFromMessage]);
-  const editDraftMessage = useCallback(async (message: Message) => {
-    await rawEditDraftMessage(message);
-    setComposerContextAccountId(message.account_id);
-    setSendRiskConfirm(null);
-  }, [rawEditDraftMessage]);
+    const key = `${message.account_id}:${message.id}`;
+    const source = draftRef.current.quick_reply_source;
+    // Re-enter the same expanded reply without replacing edits made there.
+    // Explicit AI/generated prefills still request a distinct draft.
+    const inline = getQuickReplySnapshot();
+    if (source?.key === key && source.mode === mode
+      && (prefillBody === undefined || (inline.key === key && prefillBody === inline.body))) {
+      return openComposer();
+    }
+    if (mode === 'reply' && prefillBody === undefined && readerReplyRef.current?.key === key) {
+      composerActionRef.current += 1;
+      readerReplyRef.current.focus();
+      return true;
+    }
+    return openReplyComposer(message, mode, prefillBody);
+  }, [getQuickReplySnapshot, openComposer, openReplyComposer]);
+  const quickReplyComposerActive = isComposerOpen && draft.quick_reply_source?.mode === 'reply'
+    && draft.quick_reply_source.key === `${quickReplyAccountId ?? account?.id ?? 0}:${selectedId ?? 0}`;
 
   const crossAccountRisks = useMemo(
     () => analyzeCrossAccountRisks(draft, accounts, {
@@ -278,7 +363,7 @@ export default function useComposerController({
   );
 
   const requestSend = useCallback(async () => {
-    const risks = analyzeCrossAccountRisks(draft, accounts, {
+    const risks = analyzeCrossAccountRisks(getDraftSnapshot().draft, accounts, {
       originalMessageAccountId: composerContextAccountId,
       contextAccountId: null,
     });
@@ -287,7 +372,7 @@ export default function useComposerController({
       return;
     }
     await sendDraft();
-  }, [draft, accounts, composerContextAccountId, sendDraft]);
+  }, [getDraftSnapshot, accounts, composerContextAccountId, sendDraft]);
 
   const confirmSendRisk = useCallback(async () => {
     setSendRiskConfirm(null);
@@ -305,19 +390,36 @@ export default function useComposerController({
   }
 
   function closeComposer() {
-    if (!isDraftEmpty(draft)) {
+    composerActionRef.current += 1;
+    if (submissionInFlight.current) {
+      setStatus('正在提交邮件，请等待完成后再关闭写信窗口');
+      return false;
+    }
+    if (!isDraftEmpty(getDraftSnapshot().draft) || getAttachmentSendBlockReason()) {
       setComposerCloseConfirmOpen(true);
-      return;
+      return false;
     }
     setSendProgress?.(null);
     setSendProgressMessage?.(null);
     setAttachmentProgress?.(null);
+    resetAttachmentImports();
     setComposerOpen(false);
     setComposerMinimized(false);
     cleanupTempAttachments();
+    return true;
   }
 
   function forceCloseComposer() {
+    composerActionRef.current += 1;
+    if (submissionInFlight.current) {
+      setStatus('正在提交邮件，请等待完成后再关闭写信窗口');
+      return;
+    }
+    finishCloseComposer();
+  }
+
+  function finishCloseComposer() {
+    resetAttachmentImports();
     setSendProgress?.(null);
     setSendProgressMessage?.(null);
     setAttachmentProgress?.(null);
@@ -325,6 +427,14 @@ export default function useComposerController({
     setComposerMinimized(false);
     setComposerCloseConfirmOpen(false);
     cleanupTempAttachments();
+  }
+
+  function clearSubmittedDraft(revision: number) {
+    if (draftRevisionRef.current !== revision) return false;
+    setDraft(emptyDraft);
+    clearComposerAutosave();
+    finishCloseComposer();
+    return true;
   }
 
   /** 取消/丢弃/发送关闭编辑器后，立即清理不再被草稿/发件箱引用的临时附件。 */
@@ -433,8 +543,21 @@ export default function useComposerController({
   return {
     draft,
     setDraft,
+    editorFlushRef,
+    readerReplyRef,
+    quickReplyComposerActive,
+    getDraftSnapshot,
     quickReplyBody,
     setQuickReplyBody,
+    quickReplySaveError,
+    retryQuickReplySave,
+    isSubmitting,
+    submissionKind,
+    sendIssue,
+    attachmentImports,
+    isImportingAttachments,
+    retryAttachmentImport,
+    dismissAttachmentImport,
     isRichComposer,
     setRichComposer,
     composeTemplates,
@@ -447,7 +570,7 @@ export default function useComposerController({
     isComposerOpen,
     setComposerOpen,
     isComposerMinimized,
-    setComposerMinimized,
+    setComposerMinimized: updateComposerMinimized,
     composerFocusRequest,
     isComposerDropActive,
     composerCloseConfirmOpen,

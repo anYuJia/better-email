@@ -1,7 +1,8 @@
 import React from 'react';
 import {
-  Edit3,
+  PenLine,
   Keyboard,
+  MoreHorizontal,
   Settings,
   X,
 } from 'lucide-react';
@@ -14,6 +15,7 @@ import type {
 } from '../app/types';
 import AccountSwitcher from './AccountSwitcher';
 import SidebarFolderNavigation from './SidebarFolderNavigation';
+import { useDetailsMenu } from '../hooks/useDetailsMenu';
 
 export type SidebarProps = {
   accountScope: AccountScope;
@@ -29,6 +31,7 @@ export type SidebarProps = {
   onAccountScopeChange: (value: string) => void;
   onSetDefaultAccount: (accountId: number) => void;
   onCompose: () => void;
+  onComposeIntent?: () => void;
   onSavedSearchNameChange: (value: string) => void;
   onSaveCurrentSearch: () => void;
   onRunSavedSearch: (savedSearch: SavedSearch) => void;
@@ -110,6 +113,7 @@ function Sidebar({
   onAccountScopeChange,
   onSetDefaultAccount,
   onCompose,
+  onComposeIntent,
   onSavedSearchNameChange,
   onSaveCurrentSearch,
   onRunSavedSearch,
@@ -131,6 +135,11 @@ function Sidebar({
   onCloseNavigation,
 }: SidebarProps) {
   const activeTasks = backgroundTasks.filter(isVisibleTask);
+  const toolsMenuRef = React.useRef<HTMLDetailsElement>(null);
+  useDetailsMenu(toolsMenuRef, {
+    floating: true,
+    initialFocus: () => toolsMenuRef.current?.querySelector('input') ?? null,
+  });
 
   return (
     <aside
@@ -167,7 +176,7 @@ function Sidebar({
             aria-label="关闭邮箱导航"
             onClick={onCloseNavigation}
           >
-            <X size={18} aria-hidden="true" />
+            <X size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         )}
       </div>
@@ -178,8 +187,8 @@ function Sidebar({
         onSetDefault={onSetDefaultAccount}
         onAddAccount={onOpenSettings}
       />
-      <button className="compose-button" onClick={onCompose}>
-        <Edit3 size={17} /> 写邮件
+      <button type="button" className="compose-button" onClick={onCompose} onPointerEnter={onComposeIntent} onFocus={onComposeIntent}>
+        <PenLine size={18} strokeWidth={1.75} aria-hidden="true" /> <span>写邮件</span>
       </button>
       <SidebarFolderNavigation
         folders={folders}
@@ -196,11 +205,55 @@ function Sidebar({
         onMarkFolderRead={onMarkFolderRead}
         onEmptyTrash={onEmptyTrash}
         onFavoriteChange={onFolderFavoriteChange}
-      >
+      />
+
+
+      <div className={`sidebar-footer${activeTasks.length > 0 ? ' has-sync-status' : ''}`}>
+        {activeTasks.length > 0 && (
+          <div className="sidebar-task-stack" role="status" aria-live="polite">
+            {activeTasks.map((task) => {
+              const label = visibleTaskLabel(task);
+              const progress = Math.min(100, Math.max(0, task.progress));
+              return (
+                <div className="sidebar-task-item" key={task.id}>
+                  <span className="sidebar-task-title">{label}</span>
+                  <div
+                    className="sidebar-task-progress"
+                    role="progressbar"
+                    aria-label={`${label}进度`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={progress}
+                  >
+                    <span style={{ transform: `scaleX(${progress / 100})` }} />
+                  </div>
+                  {task.status === 'queued' && (
+                    <small className="sidebar-task-status">等待开始</small>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="sidebar-footer-actions">
+          <button
+            className="settings-button"
+            data-no-tooltip
+            onClick={onOpenSettings}
+          >
+            <Settings size={16} strokeWidth={1.75} aria-hidden="true" /> <span>设置</span>
+          </button>
+          <button
+            className="settings-button shortcut-help-button"
+            data-no-tooltip
+            onClick={onOpenShortcuts}
+          >
+            <Keyboard size={16} strokeWidth={1.75} aria-hidden="true" /> <span>快捷键</span>
+          </button>
         {import.meta.env.VITE_BETTER_EMAIL_UI_MOCK === '1' && (
-          <details className="sidebar-tools">
-            <summary>工具</summary>
-            <div className="sidebar-tool-stack">
+          <details ref={toolsMenuRef} className="sidebar-tools" data-floating-menu="true">
+            <summary aria-label="更多邮箱工具" title="更多邮箱工具"><MoreHorizontal size={18} strokeWidth={1.75} aria-hidden="true" /></summary>
+            <div className="sidebar-tool-stack" data-floating-menu-panel="true">
               <form
                 className="saved-search-form"
                 onSubmit={(event) => {
@@ -246,50 +299,6 @@ function Sidebar({
             </div>
           </details>
         )}
-      </SidebarFolderNavigation>
-
-      <div className={`sidebar-footer${activeTasks.length > 0 ? ' has-sync-status' : ''}`}>
-        {activeTasks.length > 0 && (
-          <div className="sidebar-task-stack" role="status" aria-live="polite">
-            {activeTasks.map((task) => {
-              const label = visibleTaskLabel(task);
-              const progress = Math.min(100, Math.max(0, task.progress));
-              return (
-                <div className="sidebar-task-item" key={task.id}>
-                  <span className="sidebar-task-title">{label}</span>
-                  <div
-                    className="sidebar-task-progress"
-                    role="progressbar"
-                    aria-label={`${label}进度`}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={progress}
-                  >
-                    <span style={{ transform: `scaleX(${progress / 100})` }} />
-                  </div>
-                  {task.status === 'queued' && (
-                    <small className="sidebar-task-status">等待开始</small>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <div className="sidebar-footer-actions">
-          <button
-            className="settings-button"
-            data-no-tooltip
-            onClick={onOpenSettings}
-          >
-            <Settings size={17} /> <span>设置</span>
-          </button>
-          <button
-            className="settings-button shortcut-help-button"
-            data-no-tooltip
-            onClick={onOpenShortcuts}
-          >
-            <Keyboard size={17} /> <span>快捷键</span>
-          </button>
         </div>
       </div>
     </aside>

@@ -7,6 +7,7 @@ describe('CustomSelect', () => {
     cleanup();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   const options = [
@@ -16,6 +17,56 @@ describe('CustomSelect', () => {
   ];
 
   const ariaLabel = '撤销发送延迟';
+
+  it('lets users scroll a long menu without revealing the old active option again', () => {
+    const nativeScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+    const reveal = vi.fn(function (this: HTMLElement) {
+      const menu = this.closest<HTMLElement>('[role="listbox"]');
+      if (menu) menu.scrollTop = 0;
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: reveal });
+    try {
+      render(<CustomSelect ariaLabel={ariaLabel} value="0"
+        options={Array.from({ length: 40 }, (_, i) => ({ value: String(i), label: `选项 ${i}` }))}
+        onChange={() => undefined} />);
+      fireEvent.click(getCombobox());
+      const listbox = screen.getByRole('listbox');
+      reveal.mockClear();
+      listbox.scrollTop = 400;
+      fireEvent.scroll(listbox);
+      expect(listbox.scrollTop).toBe(400);
+      expect(reveal).not.toHaveBeenCalled();
+      fireEvent.keyDown(getCombobox(true), { key: 'End' });
+      expect(reveal).toHaveBeenCalledTimes(1);
+      expect(getActiveOption(getCombobox(true)).textContent).toContain('选项 39');
+    } finally {
+      if (nativeScroll) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', nativeScroll);
+      else delete (HTMLElement.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView;
+    }
+  });
+
+  it('removes an inactive owner portal immediately without returning focus or reopening it', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    const onChange = vi.fn();
+    const view = (active: boolean) => <div>
+      <button type="button">其他操作</button>
+      <CustomSelect active={active} ariaLabel={ariaLabel} value="10" options={options} onChange={onChange} />
+    </div>;
+    const { rerender } = render(view(true));
+    fireEvent.click(screen.getByRole('combobox', { name: ariaLabel }));
+    expect(document.querySelector('.custom-select-dropdown')).not.toBeNull();
+    const next = screen.getByRole('button', { name: '其他操作' });
+    next.focus();
+    rerender(view(false));
+    expect(document.querySelector('.custom-select-dropdown')).toBeNull();
+    expect(document.activeElement).toBe(next);
+    expect(fireEvent.keyDown(document, { key: 'Escape' })).toBe(true);
+    rerender(view(true));
+    act(() => vi.advanceTimersByTime(180));
+    expect(document.querySelector('.custom-select-dropdown')).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
+  });
 
   function getCombobox(expanded = false) {
     return screen.getByRole('combobox', { name: ariaLabel, expanded });

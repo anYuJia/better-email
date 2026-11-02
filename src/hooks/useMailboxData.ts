@@ -170,6 +170,7 @@ export default function useMailboxData({
   const threadRequestEpochRef = useRef(0);
   const messagePageBufferRef = useRef<{ key: string; messages: MessageSummary[] } | null>(null);
   const messageCountRequestRef = useRef(0);
+  const messageSnapshotEpochRef = useRef(0);
   const internalMailboxRefreshRef = useRef(0);
   const mailboxRefreshRef = mailboxRefreshRefProp ?? internalMailboxRefreshRef;
   const activeMailboxScopeRef = useRef<AccountScope>(accountScope);
@@ -222,12 +223,22 @@ export default function useMailboxData({
     offset: nextOffset = 0,
     returnPageOnly: nextReturnPageOnly = false,
   }: MailboxLoadRequest) {
+    // A navigation generation can contain several refreshes (read/star,
+    // sync, draft save). Only the latest visible snapshot owns list commits;
+    // pagination belongs to the snapshot from which it was requested.
+    // Independent select-all reads must not invalidate the visible list.
+    const startsSnapshot = nextOffset === 0 && !nextReturnPageOnly
+      && isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest);
+    if (startsSnapshot) messageSnapshotEpochRef.current += 1;
+    const snapshotEpoch = messageSnapshotEpochRef.current;
+    const isSnapshotCurrent = () => (nextReturnPageOnly || snapshotEpoch === messageSnapshotEpochRef.current)
+      && isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest);
     if (nextSearchScope === 'folder' && !nextFolderId) {
       mailboxFlowLog('loadMessages skipped: missing folder', {
         searchScope: nextSearchScope,
         scope: nextScope,
       });
-      if (isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
+      if (!nextReturnPageOnly && isSnapshotCurrent()) {
         startTransition(() => {
           setMessageCount?.(null);
           setMessages([]);
@@ -240,7 +251,7 @@ export default function useMailboxData({
       return [];
     }
     const startedAt = performance.now();
-    if (nextOffset === 0) {
+    if (startsSnapshot) {
       threadCacheRef.current.clear();
       // A full mailbox reload invalidates both completed and in-flight thread
       // reads. The old Promise cannot be cancelled reliably, so its epoch is
@@ -270,6 +281,7 @@ export default function useMailboxData({
       nextOffset,
     );
     const shouldLoadMessageCount = Boolean(setMessageCount)
+      && nextOffset === 0
       && !nextReturnPageOnly
       && !nextIncludeThreads;
     const messageCountRequestId = shouldLoadMessageCount
@@ -280,37 +292,6 @@ export default function useMailboxData({
       if (nextOffset === 0 && isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
         setMessageCount?.(null);
       }
-      void invoke<number>(
-        IPC.GetMessageCount,
-        buildMailboxCountRequest(
-          nextScope,
-          currentAccountId,
-          nextFolderId ?? 0,
-          nextSearchScope,
-          nextQuery,
-          nextFilter,
-        ),
-      )
-        .then((count) => {
-          if (
-            typeof count !== 'number'
-            || !Number.isFinite(count)
-            || count < 0
-            || messageCountRequestId !== messageCountRequestRef.current
-            || !isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)
-          ) return;
-          setMessageCount?.(Math.floor(count));
-        })
-        .catch((error) => {
-          // The list itself remains usable if a count query fails. The loaded
-          // row count is the safe fallback until the next successful refresh.
-          mailboxFlowWarn('message count query failed', {
-            scope: nextScope,
-            folderId: nextFolderId ?? 0,
-            searchScope: nextSearchScope,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        });
     }
     mailboxFlowLog('loadMessages start', {
       scope: nextScope,
@@ -344,7 +325,7 @@ export default function useMailboxData({
       });
       throw error;
     }
-    if (!isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
+    if (!isSnapshotCurrent()) {
       mailboxFlowLog('loadMessages ignored stale mailbox result', {
         scope: nextScope,
         currentScope: activeMailboxScopeRef.current,
@@ -400,6 +381,41 @@ export default function useMailboxData({
         return visibleMessages[0]?.id ?? null;
       });
     });
+    // Prioritize the first page before scheduling the independent exact
+    // count query. Pagination keeps the established count.
+    if (shouldLoadMessageCount) {
+      void invoke<number>(
+        IPC.GetMessageCount,
+        buildMailboxCountRequest(
+          nextScope,
+          currentAccountId,
+          nextFolderId ?? 0,
+          nextSearchScope,
+          nextQuery,
+          nextFilter,
+        ),
+      )
+        .then((count) => {
+          if (
+            typeof count !== 'number'
+            || !Number.isFinite(count)
+            || count < 0
+            || messageCountRequestId !== messageCountRequestRef.current
+            || !isSnapshotCurrent()
+          ) return;
+          setMessageCount?.(Math.floor(count));
+        })
+        .catch((error) => {
+          // The list itself remains usable if a count query fails. The loaded
+          // row count is the safe fallback until the next successful refresh.
+          mailboxFlowWarn('message count query failed', {
+            scope: nextScope,
+            folderId: nextFolderId ?? 0,
+            searchScope: nextSearchScope,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+    }
     if (!frontendReadyRef.current) {
       frontendReadyRef.current = true;
       void reportStartupMilestone('first_message_list_query_complete');
@@ -436,7 +452,7 @@ export default function useMailboxData({
     nextOffset = 0,
     nextReturnPageOnly = false,
   ) {
-    const nextMessages = await loadMessages(
+    const messageRequest = loadMessages(
       nextFolderId,
       nextQuery,
       nextFilter,
@@ -449,7 +465,12 @@ export default function useMailboxData({
       nextOffset,
       nextReturnPageOnly,
     );
-    if (!isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
+    const snapshotEpoch = messageSnapshotEpochRef.current;
+    const nextMessages = await messageRequest;
+    if (
+      snapshotEpoch !== messageSnapshotEpochRef.current
+      || !isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)
+    ) {
       return nextMessages;
     }
     if (
@@ -467,7 +488,7 @@ export default function useMailboxData({
 
     const selectedFolder = visibleFolders.find((folder) => folder.id === nextFolderId);
     if (!selectedFolder || selectedFolder.unread_count <= 0) return nextMessages;
-    const unreadMessages = await loadMessages(
+    const unreadRequest = loadMessages(
       nextFolderId,
       '',
       'unread',
@@ -480,8 +501,11 @@ export default function useMailboxData({
       nextOffset,
       nextReturnPageOnly,
     );
+    const unreadSnapshotEpoch = messageSnapshotEpochRef.current;
+    const unreadMessages = await unreadRequest;
     if (
       unreadMessages.length === 0
+      || unreadSnapshotEpoch !== messageSnapshotEpochRef.current
       || !isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)
     ) {
       return nextMessages;

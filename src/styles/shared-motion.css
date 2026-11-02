@@ -7,10 +7,10 @@
  *  - global transition discipline: interactive controls only (no all-property
  *    transitions on big subtrees) with identical timing across surfaces,
  *  - the prefers-reduced-motion kill switch,
- *  - panel-level transition-property restrictions so hover feedback is quiet.
+ *  - tactile feedback on named actions, never entire rows or content panes.
  *
- * No scale transforms on press — desktop tools don't need to "squish".
- * Composer controls share the same discipline as the workspace panes.
+ * Components retain their own reveal/rotation transitions. Restricting every
+ * descendant's transition-property would also suppress those state changes.
  */
 
 /* Spinner rotation -------------------------------------------------------
@@ -40,37 +40,141 @@
 
 /* Global transition discipline: only interactive controls transition, and
  * only the properties those controls actually animate between. */
-button,
 .btn,
 .icon-button,
 .compose-button,
 .refresh-text-button,
 select,
 input,
-textarea,
-summary {
+textarea {
   transition:
     var(--ui-transition-standard-color-bg-border-box-shadow-opacity);
 }
 
-/* Panel-scoped transition restriction: hover feedback is colour/opacity only;
- * geometry and transforms must never animate inside large subtrees. */
-.sidebar *,
-.message-list-panel *,
-.reader-panel *,
-.account-switcher *,
-.composer * {
-  transition-property: color, background-color, border-color, opacity;
+/* Define the transition on each control: custom properties declared at :root
+ * resolve there, before a hovered/pressed control can supply its own timing.
+ * Scale always settles for 220ms, including release while still hovered. */
+button,
+summary,
+.composer .composer-send-split {
+  --ui-control-feedback: none;
+  --ui-control-duration: var(--ui-motion-settle);
+  --ui-control-scale-duration: var(--ui-motion-settle);
+  --ui-control-easing: var(--ui-ease-control);
+  --ui-control-scale: 1;
+  --ui-transition-control:
+    color var(--ui-control-duration) var(--ui-control-easing),
+    background-color var(--ui-control-duration) var(--ui-control-easing),
+    border-color var(--ui-control-duration) var(--ui-control-easing),
+    box-shadow var(--ui-control-duration) var(--ui-control-easing),
+    opacity var(--ui-control-duration) var(--ui-control-easing),
+    scale var(--ui-control-scale-duration) var(--ui-control-easing);
+  transition: var(--ui-transition-control);
 }
 
-/* No lift, no wobble: persistent-pane and composer controls never transform,
- * so their hover/active states stay purely surface-level. */
-.sidebar :is(button, summary, .folder, .folder-main),
-.message-list-panel :is(button, .message-card, .thread-card),
-.reader-panel :is(button, summary, select),
-.account-switcher :is(button, summary),
-.composer :is(button, summary, input, select, textarea) {
-  transform: none !important;
+/* Hover changes colour only. Toolbars stay still as the pointer crosses them. */
+@media (hover: hover) and (pointer: fine) {
+  :is(button, summary):hover,
+  .composer .composer-send-split:has(> button:hover:where(:not(:disabled))) {
+    --ui-control-duration: var(--ui-motion-hover);
+  }
+}
+
+:is(button, summary):active:where(:not([data-ui-pressed])),
+:is(button, summary)[data-ui-pressed="true"],
+.composer .composer-send-split:has(> button:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"])) {
+  --ui-control-duration: var(--ui-motion-press);
+  --ui-control-scale-duration: var(--ui-motion-press);
+  --ui-control-easing: var(--ui-ease-press);
+  --ui-control-scale: var(--ui-control-press-scale, 0.98);
+}
+
+:is(button, summary):is(:disabled, [aria-disabled="true"], [aria-busy="true"], [data-ui-pressed="false"]),
+.composer .composer-send-split:has(> button:is(:disabled, [aria-disabled="true"], [aria-busy="true"], [data-ui-pressed="false"])) {
+  /* Refuse a new press, but let an existing press settle into loading/cancel. */
+  --ui-control-duration: var(--ui-motion-settle);
+  --ui-control-scale-duration: var(--ui-motion-settle);
+  --ui-control-easing: var(--ui-ease-control);
+  --ui-control-scale: 1;
+}
+
+/* Press remains legible on stationary tools, including short touch/pen taps.
+ * The explicit false guard keeps a cancelled gesture from re-entering :active. */
+.app-shell .reader-actions :is(.icon-only-action, .reader-translate-action):is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled, [aria-disabled="true"], [aria-busy="true"]),
+.app-shell .reader-actions :is(.reader-more-menu, .reader-reply-menu) > summary:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not([aria-disabled="true"], [aria-busy="true"]),
+.app-shell :is(.titlebar-refresh, .mobile-header-icon, .narrow-navigation-button):is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled, [aria-disabled="true"], [aria-busy="true"]),
+.composer .composer-header-actions > button:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled, [aria-disabled="true"], [aria-busy="true"]),
+.composer .composer-rich-toolbar button:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled, [aria-disabled="true"], [aria-busy="true"]),
+.composer .composer-footer-tool-group button:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled, [aria-disabled="true"], [aria-busy="true"]) {
+  background-color: var(--ui-control-pressed);
+}
+
+/* Named controls keep immediate touch feedback; only primary actions opt into
+ * geometry below. Navigation rows, tools and menu items remain stationary. */
+@media (prefers-reduced-motion: no-preference) {
+  .compose-button,
+  .reader-actions .primary-action,
+  .reader-actions .icon-only-action,
+  .reader-actions .reader-translate-action,
+  .reader-more-menu > summary,
+  .reader-reply-menu > summary,
+  .reader-security-primary-action,
+  .reader-warning-primary-action,
+  .attachment-primary-button,
+  .attachment-preview-button,
+  .quick-reply > footer button,
+  .titlebar-refresh,
+  .narrow-navigation-button,
+  .narrow-reader-navigation > button,
+  .mobile-header-icon,
+  .mobile-bottom-compose,
+  .dialog-button,
+  .settings-modal .st-btn,
+  .settings-modal .settings-header-button,
+  .settings-modal .settings-close-button,
+  .settings-modal .settings-search-toggle,
+  .composer-schedule-picker-popover .composer-schedule-picker-confirm,
+  .composer-mini-actions > button,
+  .composer .composer-header-actions > button,
+  .composer .composer-rich-toolbar button,
+  .composer .composer-footer-tool-group button {
+    --ui-control-feedback: tactile;
+    transition: var(--ui-transition-control);
+  }
+
+  .compose-button,
+  .reader-actions .primary-action,
+  .reader-security-primary-action,
+  .reader-warning-primary-action,
+  .quick-reply-send,
+  .mobile-bottom-compose,
+  .dialog-button-primary,
+  .dialog-button-danger,
+  .settings-modal .st-btn-primary,
+  .settings-modal .settings-header-button.primary,
+  .composer-schedule-picker-popover .composer-schedule-picker-confirm {
+    --ui-control-feedback: tactile;
+    scale: var(--ui-control-scale);
+    transition: var(--ui-transition-control);
+  }
+
+  /* Move the joined halves around their shared seam, not their container:
+   * the send-options menu is also a child and must stay stationary. */
+  .composer .composer-send-split {
+    --ui-send-scale: var(--ui-control-scale);
+    --ui-send-transition: var(--ui-transition-control);
+  }
+
+  .composer .composer-send-split > button {
+    --ui-control-feedback: tactile;
+    scale: var(--ui-send-scale);
+    transition: var(--ui-send-transition);
+    transform-origin: right center;
+  }
+
+  .composer .composer-send-split > .composer-send-menu-trigger {
+    transform-origin: left center;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

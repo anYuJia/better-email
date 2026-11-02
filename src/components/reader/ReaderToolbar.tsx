@@ -11,7 +11,6 @@ import {
   RotateCcw,
   ShieldCheck,
   ShieldOff,
-  Star,
   Trash2,
 } from 'lucide-react';
 import { canSnoozeRole } from '../../app/snooze';
@@ -23,7 +22,7 @@ import type { Folder, Message } from '../../app/types';
 import SenderIdentity from './SenderIdentity';
 import ReaderAiContextActions from './ReaderAiContextActions';
 import { useDetailsMenu } from '../../hooks/useDetailsMenu';
-import { memo, useRef } from 'react';
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   buildSingleMessageContextItems,
   type MessageContextAction,
@@ -50,6 +49,8 @@ type ReaderToolbarProps = {
   onEditDraft: (message: Message) => void;
   onComposeNew?: (fields: { to: string }) => void;
   onComposeFromMessage: (message: Message, mode: ComposeMode, prefillBody?: string) => void;
+  onReply?: () => void;
+  metadata?: ReactNode;
   onRestoreFromTrash: () => void;
   onMoveArchive: () => void;
   onToggleRead: (message: Message) => void;
@@ -83,6 +84,8 @@ function ReaderToolbar({
   onEditDraft,
   onComposeNew,
   onComposeFromMessage,
+  onReply,
+  metadata,
   onRestoreFromTrash,
   onMoveArchive,
   onToggleRead,
@@ -103,6 +106,15 @@ function ReaderToolbar({
   const canArchive = canArchiveMessageRole(selected.folder_role);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenu = useDetailsMenu(moreMenuRef, { floating: true });
+  const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth <= 720);
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 720px)');
+    if (!media) return undefined;
+    const update = () => setIsMobileViewport(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
   const runContextAction = (action: MessageContextAction) => {
     switch (action) {
       case 'read':
@@ -154,42 +166,34 @@ function ReaderToolbar({
   }).filter((item) => ![
     'open',
     'reply',
-    'star-state',
     'snooze',
     'unsnooze',
     'archive',
     'restore',
     'copy-message-info',
   ].includes(item.id));
-  const isMobileViewport = typeof window !== 'undefined' && window.innerWidth <= 720;
   const extraItems: ContextMenuItem[] = [
     {
       id: 'export-eml',
       label: '导出 EML',
-      icon: <Download size={15} />,
+      icon: <Download size={16} />,
       separatorBefore: true,
       onSelect: onExportMessage,
     },
     ...(isMobileViewport
       ? [
-          {
-            id: 'menu-toggle-star',
-            label: selected.is_starred ? '取消星标' : '添加星标',
-            icon: <Star size={15} fill={selected.is_starred ? 'currentColor' : 'none'} />,
-            onSelect: () => onToggleStar(selected),
-          },
           ...(selected.folder_role === 'snoozed'
             ? [{
                 id: 'menu-unsnooze',
                 label: '取消稍后处理',
-                icon: <Clock size={15} />,
+                icon: <Clock size={16} />,
                 onSelect: onUnsnooze,
               }]
             : canSnoozeRole(selected.folder_role)
               ? [{
                   id: 'menu-snooze',
                   label: '稍后处理',
-                  icon: <Clock size={15} />,
+                  icon: <Clock size={16} />,
                   onSelect: onSnooze,
                 }]
               : []),
@@ -197,7 +201,7 @@ function ReaderToolbar({
             ? [{
                 id: 'menu-translate',
                 label: translationActive ? '显示原文' : '翻译邮件',
-                icon: <Languages size={15} />,
+                icon: <Languages size={16} />,
                 onSelect: translationCompleted ? onToggleTranslation : onTranslateMessage,
               }]
             : []),
@@ -207,7 +211,7 @@ function ReaderToolbar({
       ? [{
           id: 'fetch-body',
           label: '重新获取正文',
-          icon: <RefreshCw size={15} />,
+          icon: <RefreshCw size={16} />,
           onSelect: () => void onFetchBody(false),
         }]
       : []),
@@ -215,14 +219,14 @@ function ReaderToolbar({
       ? [{
           id: 'sender-safety',
           label: '发件人安全',
-          icon: <ShieldCheck size={15} />,
+          icon: <ShieldCheck size={16} />,
           separatorBefore: true,
           children: [
             ...(!selectedSenderTrusted && !selectedExternalBlocked
               ? [{
                   id: 'trust-sender',
                   label: '信任发件人',
-                  icon: <ShieldCheck size={15} />,
+                  icon: <ShieldCheck size={16} />,
                   onSelect: () => onTrustRemoteImages('sender'),
                 }]
               : []),
@@ -230,14 +234,14 @@ function ReaderToolbar({
               ? [{
                   id: 'trust-domain',
                   label: `信任 ${selectedSenderDomain}`,
-                  icon: <ShieldCheck size={15} />,
+                  icon: <ShieldCheck size={16} />,
                   onSelect: () => onTrustRemoteImages('domain'),
                 }]
               : []),
             {
               id: 'block-sender',
               label: '阻止该发件人',
-              icon: <ShieldOff size={15} />,
+              icon: <ShieldOff size={16} />,
               onSelect: onBlockSender,
             },
           ],
@@ -250,7 +254,7 @@ function ReaderToolbar({
     readerMenuItems.push({
       id: 'empty-trash',
       label: '清空废纸篓',
-      icon: <Trash2 size={15} />,
+      icon: <Trash2 size={16} />,
       danger: true,
       onSelect: onEmptyTrash,
     });
@@ -261,6 +265,7 @@ function ReaderToolbar({
       <div className="reader-title-block">
         <h1>{selected.subject || '(无主题)'}</h1>
         <SenderIdentity message={selected} onComposeNew={onComposeNew} />
+        {metadata}
       </div>
       <div className="reader-actions" aria-label="邮件操作">
         {isDraft ? (
@@ -272,21 +277,13 @@ function ReaderToolbar({
           </div>
         ) : canReply ? (
           <div className="reader-action-group reader-response-actions" role="group" aria-label="回复操作">
-            <button className="primary-action" title="回复" onClick={() => onComposeFromMessage(selected, 'reply')}>
+            <button className="primary-action" title="回复" onClick={onReply ?? (() => onComposeFromMessage(selected, 'reply'))}>
               <Reply size={16} />
               <span>回复</span>
             </button>
           </div>
         ) : null}
         <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">
-          <button
-            className="icon-only-action reader-star-action"
-            title={selected.is_starred ? '取消星标' : '添加星标'}
-            aria-label={selected.is_starred ? '取消星标' : '添加星标'}
-            onClick={() => onToggleStar(selected)}
-          >
-            <Star size={17} fill={selected.is_starred ? 'currentColor' : 'none'} />
-          </button>
           {isTrash ? (
             <button className="icon-only-action reader-restore-action" title="恢复到收件箱" aria-label="恢复到收件箱" onClick={onRestoreFromTrash}>
               <RotateCcw size={16} />
@@ -296,14 +293,14 @@ function ReaderToolbar({
               <Archive size={16} />
             </button>
           )}
-          <button
+          {isMobileViewport && <button
             className="icon-only-action reader-delete-action"
             title={isTrash ? '彻底删除' : '删除'}
             aria-label={isTrash ? '彻底删除' : '删除'}
             onClick={isTrash ? onPermanentlyDelete : onMoveTrash}
           >
             <Trash2 size={16} />
-          </button>
+          </button>}
           {selected.folder_role === 'snoozed' ? (
             <button
               className="icon-only-action reader-snooze-action"
@@ -334,9 +331,9 @@ function ReaderToolbar({
             disabled={translationLoading}
           >
             {translationLoading ? (
-              <Loader2 size={15} className="reader-translation-spinner" />
+              <Loader2 size={16} className="reader-translation-spinner" />
             ) : (
-              <Languages size={15} />
+              <Languages size={16} />
             )}
             <span>{translationActive ? '显示原文' : '翻译为中文'}</span>
           </button>
@@ -344,6 +341,7 @@ function ReaderToolbar({
         {!isDraft && (
           <div className="reader-ai-context-actions">
             <ReaderAiContextActions
+              key={`reader-ai:${selected.account_id}:${selected.id}`}
               message={selected}
               onComposeFromMessage={onComposeFromMessage}
             />
@@ -355,7 +353,7 @@ function ReaderToolbar({
           data-floating-menu="true"
         >
           <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
-            <MoreHorizontal size={17} />
+            <MoreHorizontal size={18} />
           </summary>
           <div
             className="context-menu-surface context-menu--anchored reader-more-menu-panel"

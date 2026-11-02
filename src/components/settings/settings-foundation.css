@@ -105,7 +105,7 @@
   transition: var(--ui-transition-fast-color-background-border);
 }
 
-.settings-modal :where(.settings-page-content, .settings-account-add-dialog) button:active:not(:disabled) {
+.settings-modal :where(.settings-page-content, .settings-account-add-dialog) button:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
   background-color: var(--st-surface-pressed);
 }
 
@@ -155,10 +155,12 @@
 
 /* ── Motion ─────────────────────────────────────────────────────── */
 
-.settings-modal :is(.settings-page-content, .settings-account-add-dialog) button,
-.settings-modal .settings-nav button,
-.settings-modal .settings-header-actions button {
+.settings-modal .settings-nav button {
   transition: var(--ui-transition-fast-color-background-border);
+}
+
+.settings-modal .settings-header-actions button {
+  transition: var(--ui-transition-control);
 }
 
 /* ── Mobile touch targets ───────────────────────────────────────── */

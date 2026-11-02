@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { useState } from 'react';
 import CompactDropdown from './CompactDropdown';
@@ -10,7 +10,7 @@ const options = [
   { id: 'starred', label: '星标' },
 ] as const;
 
-function StatefulDropdown() {
+function StatefulDropdown({ withIcon = false }: { withIcon?: boolean }) {
   const [value, setValue] = useState<(typeof options)[number]['id']>('all');
   const currentLabel = options.find((option) => option.id === value)?.label ?? '全部';
   return (
@@ -21,21 +21,19 @@ function StatefulDropdown() {
       value={value}
       options={options}
       onChange={setValue}
+      triggerIcon={withIcon ? <svg aria-label="筛选图形" /> : undefined}
     />
   );
 }
 
 describe('CompactDropdown', () => {
   beforeEach(() => {
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      callback(0);
-      return 0;
-    });
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
     cleanup();
-    vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it('exposes a labeled trigger, selected check, and live value', () => {
@@ -55,11 +53,23 @@ describe('CompactDropdown', () => {
     expect(details?.open).toBe(false);
   });
 
+  it('keeps the action and current value accessible when a compact trigger uses an icon', () => {
+    render(<StatefulDropdown withIcon />);
+    const trigger = screen.getByRole('button', { name: '筛选邮件，当前：全部' });
+    expect(trigger.querySelector('.compact-dropdown-trigger-icon')).toHaveAttribute('aria-hidden', 'true');
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '未读' }));
+    expect(screen.getByRole('button', { name: '筛选邮件，当前：未读' })).toBe(trigger);
+    expect(document.querySelector('details')?.open).toBe(false);
+  });
+
   it('supports arrow navigation, Enter selection, and Escape focus return', () => {
     render(<StatefulDropdown />);
     const trigger = screen.getByRole('button', { name: '筛选邮件，当前：全部' });
 
     fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    fireEvent(document.querySelector('details')!, new Event('toggle'));
+    act(() => vi.advanceTimersByTime(50));
     const unread = screen.getByRole('menuitemradio', { name: '未读' });
     expect(document.activeElement).toBe(unread);
     fireEvent.keyDown(unread, { key: 'Enter' });
@@ -76,6 +86,8 @@ describe('CompactDropdown', () => {
     const trigger = screen.getByRole('button', { name: '筛选邮件，当前：全部' });
 
     fireEvent.keyDown(trigger, { key: 'ArrowUp' });
+    fireEvent(document.querySelector('details')!, new Event('toggle'));
+    act(() => vi.advanceTimersByTime(50));
     const starred = screen.getByRole('menuitemradio', { name: '星标' });
     expect(document.activeElement).toBe(starred);
     fireEvent.keyDown(starred, { key: ' ' });
@@ -86,5 +98,29 @@ describe('CompactDropdown', () => {
     const active = screen.getByRole('menuitemradio', { name: '星标' });
     fireEvent.keyDown(active, { key: 'Tab' });
     expect(document.querySelector('details')?.hasAttribute('open')).toBe(false);
+  });
+
+  it('does not let queued opening focus steal focus after an immediate outside dismissal', () => {
+    render(<><StatefulDropdown /><button>下一个操作</button></>);
+    const trigger = screen.getByRole('button', { name: '筛选邮件，当前：全部' });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    fireEvent(document.querySelector('details')!, new Event('toggle'));
+    const next = screen.getByRole('button', { name: '下一个操作' });
+    fireEvent.pointerDown(next);
+    next.focus();
+    act(() => vi.advanceTimersByTime(100));
+    expect(document.querySelector('details')?.open).toBe(false);
+    expect(document.activeElement).toBe(next);
+  });
+
+  it('resumes Tab next to the trigger instead of leaving focus in the closed menu', () => {
+    render(<><StatefulDropdown /><button>下一个操作</button></>);
+    fireEvent.keyDown(screen.getByRole('button', { name: '筛选邮件，当前：全部' }), { key: 'ArrowDown' });
+    fireEvent(document.querySelector('details')!, new Event('toggle'));
+    act(() => vi.advanceTimersByTime(50));
+    fireEvent.keyDown(document.activeElement!, { key: 'Tab' });
+    expect(document.querySelector('details')?.open).toBe(false);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '下一个操作' }));
   });
 });

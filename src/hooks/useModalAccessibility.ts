@@ -6,6 +6,7 @@ const FOCUSABLE_SELECTOR = [
   'input:not([disabled]):not([type="hidden"])',
   'select:not([disabled])',
   'textarea:not([disabled])',
+  '[contenteditable="true"]',
   '[tabindex]:not([tabindex="-1"])',
 ].join(', ');
 
@@ -26,18 +27,18 @@ type UseModalAccessibilityOptions = {
 };
 
 function isAvailableFocusTarget(element: HTMLElement): boolean {
-  const style = window.getComputedStyle(element);
-  return !element.hasAttribute('disabled')
-    && !element.hidden
-    && element.getAttribute('aria-hidden') !== 'true'
-    && !element.closest('[inert]')
-    && style.display !== 'none'
-    && style.visibility !== 'hidden';
+  if (element.matches(':disabled') || element.hasAttribute('disabled')
+    || element.closest('[inert], [hidden], [aria-hidden="true"]')) return false;
+  for (let ancestor: HTMLElement | null = element; ancestor; ancestor = ancestor.parentElement) {
+    const style = window.getComputedStyle(ancestor);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+  }
+  return true;
 }
 
 function getFocusableElements(dialog: HTMLElement): HTMLElement[] {
   return Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    .filter(isAvailableFocusTarget);
+    .filter((element) => (!element.hasAttribute('tabindex') || element.tabIndex >= 0) && isAvailableFocusTarget(element));
 }
 
 /**
@@ -129,24 +130,25 @@ export default function useModalAccessibility({
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
+      if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return;
+      if (modalDialog.closest('[inert], [hidden], [aria-hidden="true"]')) return;
+      const activeModal = document.activeElement instanceof Element
+        ? document.activeElement.closest<HTMLElement>('[aria-modal="true"]')
+        : null;
+      // Nested and portaled dialogs own Escape as well as Tab. The outer
+      // listener may have been registered first, so ownership precedes both.
+      // A composer puts aria-modal on its parent instead of this inner panel.
+      if (activeModal && activeModal !== modalDialog && !activeModal.contains(modalDialog)) return;
 
       if (event.key === 'Escape') {
-        if (escapeDisabledRef.current || !onEscapeRef.current) return;
+        if (!onEscapeRef.current) return;
         event.preventDefault();
         event.stopPropagation();
-        onEscapeRef.current();
+        if (!escapeDisabledRef.current) onEscapeRef.current();
         return;
       }
 
       if (event.key !== 'Tab' || focusTrapDisabledRef.current) return;
-      const activeModal = document.activeElement instanceof Element
-        ? document.activeElement.closest<HTMLElement>('[aria-modal="true"]')
-        : null;
-      // A parent may carry aria-modal while its inner panel owns the hook
-      // (the composer does this). A separate modal that does not contain this
-      // dialog is newer/topmost and must own the keyboard event instead.
-      if (activeModal && activeModal !== modalDialog && !activeModal.contains(modalDialog)) return;
       const focusable = getFocusableElements(modalDialog);
       if (focusable.length === 0) {
         event.preventDefault();

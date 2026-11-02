@@ -200,35 +200,6 @@
 
 /* --- Reader --- */
 
-:root[data-theme="dark"] .reader-actions {
-  border: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary) {
-  border-color: transparent;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-:root[data-theme="dark"] .reader-actions :is(button, select, .reader-more-menu summary):hover {
-  border-color: transparent;
-  color: var(--ui-text);
-  background: var(--ui-control-hover);
-}
-
-:root[data-theme="dark"] .reader-actions .primary-action {
-  color: var(--ui-text-accent);
-  background: transparent;
-}
-
-:root[data-theme="dark"] .reader-actions .primary-action:hover:not(:disabled) {
-  color: var(--ui-accent-hover);
-  background: var(--ui-accent-soft);
-}
-
 :root[data-theme="dark"] :is(.body-text, .reader-html) {
   border-color: transparent;
   background: transparent;
@@ -238,57 +209,14 @@
 :root[data-theme="dark"] .reader-warning-panel {
   border-color: var(--ui-border);
   color: var(--ui-text-secondary);
-  background: color-mix(in srgb, var(--ui-surface-muted) 72%, var(--ui-reader));
-}
-
-:root[data-theme="dark"] .quick-reply {
-  border-color: var(--ui-border);
-  background: var(--ui-surface);
-}
-
-:root[data-theme="dark"] .quick-reply textarea {
-  border-color: transparent;
-  color: var(--ui-text);
   background: transparent;
-}
-
-:root[data-theme="dark"] .quick-reply textarea::placeholder,
-:root[data-theme="dark"] .quick-reply > footer > span {
-  color: var(--ui-text-tertiary);
-}
-
-:root[data-theme="dark"] .quick-reply > footer button {
-  border-color: transparent;
-  color: var(--ui-text-secondary);
-  background: transparent;
-}
-
-:root[data-theme="dark"] .quick-reply > footer button:hover:not(:disabled) {
-  border-color: transparent;
-  color: var(--ui-text);
-  background: var(--ui-control-hover);
-}
-
-:root[data-theme="dark"] .quick-reply > footer .quick-reply-send {
-  color: var(--color-text-on-accent);
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
-}
-
-:root[data-theme="dark"] .quick-reply > footer .quick-reply-send:disabled {
-  color: var(--ui-text-tertiary);
-  border-color: transparent;
-  background: var(--ui-surface-muted);
 }
 
 /* --- Icon buttons (toolbar / reader / composer chrome) --- */
 
 :root[data-theme="dark"] .icon-button,
-:root[data-theme="dark"] .composer header button,
 :root[data-theme="dark"] .label-tools button,
-:root[data-theme="dark"] .attachments button,
-:root[data-theme="dark"] .rich-toolbar button,
-:root[data-theme="dark"] .composer-mini-actions button {
+:root[data-theme="dark"] .rich-toolbar button {
   border-color: transparent;
   background: var(--ui-surface-muted);
   color: var(--ui-text-secondary);
@@ -300,11 +228,8 @@
 }
 
 :root[data-theme="dark"] .icon-button:hover,
-:root[data-theme="dark"] .composer header button:hover,
 :root[data-theme="dark"] .label-tools button:hover,
-:root[data-theme="dark"] .attachments button:hover,
-:root[data-theme="dark"] .rich-toolbar button:hover,
-:root[data-theme="dark"] .composer-mini-actions button:hover {
+:root[data-theme="dark"] .rich-toolbar button:hover {
   border-color: transparent;
   color: var(--ui-text);
   background: var(--ui-control-hover);

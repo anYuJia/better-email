@@ -1,0 +1,247 @@
+/* Template and more-tools popovers, including touch targets. */
+.composer-template-save-dialog strong {
+  color: var(--ui-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.composer-template-save-dialog label {
+  display: grid;
+  gap: 5px;
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+}
+
+.composer-template-save-dialog input {
+  min-height: 36px;
+  width: 100%;
+  padding: 0 9px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  font-size: 13px;
+}
+
+.composer-template-save-dialog input:focus {
+  border-color: var(--ui-accent);
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
+}
+
+.composer-template-save-dialog footer {
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.composer-template-save-dialog footer button,
+.composer-template-save-entry {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface);
+  font-size: 13px;
+}
+
+.composer-template-save-dialog footer button:hover,
+.composer-template-save-entry:hover {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+.composer-template-save-dialog footer button.is-primary {
+  border-color: var(--ui-accent);
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
+}
+
+.composer-template-save-dialog footer button.is-primary:hover {
+  background: var(--ui-accent-hover);
+}
+
+.composer-advanced-popover {
+  position: fixed;
+  z-index: 1300;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 24px));
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
+}
+
+.composer-more-popover {
+  width: min(200px, calc(100vw - 24px));
+  gap: 0;
+  padding: 6px;
+}
+
+.composer-save-feedback {
+  margin: 4px 0;
+  padding: 4px 8px;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-meta);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.composer-save-feedback[role="alert"] {
+  color: var(--ui-danger);
+}
+
+.composer-advanced-popover > header {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.composer-advanced-popover > header strong {
+  color: var(--ui-text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.composer-advanced-popover > header button {
+  width: 28px;
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: transparent;
+}
+
+.composer-advanced-popover > header button:hover,
+.composer-advanced-popover > header button:focus-visible {
+  color: var(--ui-text);
+  background: var(--ui-control-hover);
+}
+
+.composer-template-list,
+.composer-more-menu {
+  display: grid;
+  gap: 4px;
+}
+
+.composer-template-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  gap: 4px;
+}
+
+.composer-template-row > button,
+.composer-more-menu > button {
+  min-width: 0;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text);
+  background: transparent;
+  font-size: 13px;
+  text-align: left;
+}
+
+.composer-template-row > button:first-child span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-template-row > button:last-child {
+  justify-content: center;
+  padding: 0;
+  color: var(--ui-text-secondary);
+}
+
+.composer-template-row > button:hover,
+.composer-template-row > button:focus-visible,
+.composer-more-menu > button:hover,
+.composer-more-menu > button:focus-visible {
+  border-color: transparent;
+  background: var(--ui-control-hover);
+}
+
+.composer-more-menu > button:disabled,
+.composer-advanced-popover > header button:disabled {
+  cursor: default;
+  opacity: 0.68;
+}
+
+.composer-template-row > button:last-child:hover,
+.composer-template-row > button:last-child:focus-visible {
+  color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+}
+
+.composer-template-empty {
+  display: grid;
+  justify-items: start;
+  gap: 5px;
+  padding: 8px 2px;
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+}
+
+.composer-template-empty small,
+.composer-more-empty {
+  color: var(--ui-text-tertiary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.composer-template-save-entry {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--ui-text-accent);
+}
+
+.composer-template-save-dialog {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .composer-more-menu > button,
+  .composer-template-row > button,
+  .composer-template-save-entry,
+  .composer-template-save-dialog input,
+  .composer-template-save-dialog footer button,
+  .composer-advanced-popover > header button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .composer-template-row {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+}

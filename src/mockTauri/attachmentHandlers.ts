@@ -30,6 +30,11 @@ function handleLocalBackup(_args?: InvokeArgs) {
 }
 
 export const handlers: Record<string, MockCommandHandler> = {
+  'prepare_attachment_preview': (args) => {
+    const attachment = attachments.find((item) => item.id === args?.attachmentId);
+    if (!attachment?.is_downloaded || !attachment.local_path) throw new Error('附件尚未下载到本地。');
+    return { ...attachment };
+  },
   'list_attachments': (args) => attachments.filter((attachment) => attachment.message_id === args?.messageId),
   'download_attachment': downloadMockAttachment,
   'read_attachment_data_url': (args) => {

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isDraftEmpty, loadComposerAutosave, parseComposerAutosave } from '../app/composerConfig';
 import { composerAutosaveStorageKey } from '../app/storageConfig';
-import type { ComposerAutosave, DraftInput } from '../app/types';
+import type { ComposerAutosave, DraftInput, PendingAttachmentRecovery } from '../app/types';
+import { normalizePendingAttachments } from '../app/attachmentImports';
 import { IPC } from '../ipc/commands';
 import { invoke } from '../tauriBridge';
 
@@ -13,12 +14,23 @@ export default function useComposerRecovery(
   isRichComposer: boolean,
   enabled: boolean,
   onError: (message: string) => void,
+  pendingAttachments: readonly PendingAttachmentRecovery[] = [],
 ) {
+  // Progress ticks must not restart the draft debounce or serialize its body.
+  const normalizedPending = normalizePendingAttachments(pendingAttachments);
+  const pendingRef = useRef<PendingAttachmentRecovery[]>(normalizedPending);
+  if (normalizedPending.length !== pendingRef.current.length || normalizedPending.some((item, index) => {
+    const previous = pendingRef.current[index];
+    return !previous || item.filename !== previous.filename || item.size_bytes !== previous.size_bytes
+      || item.is_inline !== previous.is_inline || item.selection_unknown !== previous.selection_unknown;
+  })) pendingRef.current = normalizedPending;
+  const pending = pendingRef.current;
   const [composerAutosave, setComposerAutosave] = useState<ComposerAutosave | null>(loadComposerAutosave);
   const [retryVersion, setRetryVersion] = useState(0);
   const mounted = useRef(false);
   const revision = useRef(0);
   const generation = useRef(0);
+  const clearVersion = useRef(0);
   const hasLocalEdits = useRef(false);
   const hadEditableContent = useRef(false);
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -26,6 +38,8 @@ export default function useComposerRecovery(
   const flush = useRef<(() => void) | null>(null);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  const richComposerRef = useRef(isRichComposer);
+  richComposerRef.current = isRichComposer;
 
   const nextRevision = useCallback(() => {
     revision.current = Math.max(revision.current + 1, Date.now() * 1000);
@@ -60,7 +74,7 @@ export default function useComposerRecovery(
 
   useEffect(() => {
     const currentGeneration = ++generation.current;
-    const empty = isDraftEmpty(draft);
+    const empty = isDraftEmpty(draft) && pending.length === 0;
     if (!enabled || (empty && !hadEditableContent.current)) {
       if (!enabled) hadEditableContent.current = false;
       flush.current = null;
@@ -72,6 +86,7 @@ export default function useComposerRecovery(
     let timer: number | null = null;
     setComposerAutosave((previous) => ({
       draft, isRichComposer, saved_at: previous?.saved_at ?? '', save_state: 'saving',
+      ...(pending.length ? { pending_attachments: pending } : {}),
     }));
     const persist = () => {
       if (started || currentGeneration !== generation.current) return;
@@ -81,7 +96,8 @@ export default function useComposerRecovery(
       queue.current = queue.current.then(async () => {
         await ready.current;
         if (currentGeneration !== generation.current) return;
-        const snapshot: ComposerAutosave = { draft, isRichComposer, saved_at: new Date().toISOString() };
+        const snapshot: ComposerAutosave = { draft, isRichComposer, saved_at: new Date().toISOString(),
+          ...(pending.length ? { pending_attachments: pending } : {}) };
         const payloadJson = empty ? null : JSON.stringify(snapshot);
         const accepted = empty
           ? await invoke<boolean>(IPC.ClearComposerRecovery, { revision: nextRevision() })
@@ -103,6 +119,7 @@ export default function useComposerRecovery(
         setComposerAutosave((previous) => ({
           draft, isRichComposer, saved_at: previous?.saved_at ?? '',
           save_state: 'error', save_error: String(error),
+          ...(pending.length ? { pending_attachments: pending } : {}),
         }));
       });
     };
@@ -112,10 +129,54 @@ export default function useComposerRecovery(
       if (timer !== null) window.clearTimeout(timer);
       if (flush.current === persist) flush.current = null;
     };
-  }, [draft, isRichComposer, enabled, retryVersion, nextRevision]);
+  }, [draft, isRichComposer, enabled, retryVersion, nextRevision, pending]);
+
+  const ensureComposerRecovery = useCallback((draftSnapshot: DraftInput): Promise<void> => {
+    // Submission flushes the editor synchronously, before React may render that
+    // snapshot. Persist the explicit argument, never the previous render's draft.
+    const currentGeneration = ++generation.current;
+    const currentClearVersion = clearVersion.current;
+    const snapshot: ComposerAutosave = {
+      draft: draftSnapshot,
+      isRichComposer: richComposerRef.current,
+      saved_at: new Date().toISOString(),
+      ...(pendingRef.current.length ? { pending_attachments: pendingRef.current } : {}),
+    };
+    hasLocalEdits.current = true;
+    hadEditableContent.current = true;
+    flush.current = null;
+    if (mounted.current) setComposerAutosave({ ...snapshot, save_state: 'saving' });
+    const operation = queue.current.then(async () => {
+      await ready.current;
+      if (currentClearVersion !== clearVersion.current) throw new Error('草稿恢复点已清除，请重新确认当前草稿。');
+      const payloadJson = JSON.stringify(snapshot);
+      const accepted = await invoke<boolean>(IPC.SaveComposerRecovery, { payloadJson, revision: nextRevision() });
+      if (!accepted) throw new Error('存在更新的恢复点，未覆盖；请手动保存当前草稿。');
+      if (currentClearVersion !== clearVersion.current) throw new Error('草稿恢复点已清除，请重新确认当前草稿。');
+      // An editor-flush render may advance generation while this write waits.
+      // It must not cancel persistence or falsely acknowledge newer UI content.
+      if (currentGeneration !== generation.current) return;
+      try {
+        window.localStorage.setItem(composerAutosaveStorageKey, payloadJson);
+      } catch {
+        // The database acknowledgement remains the source of truth.
+      }
+      if (mounted.current) setComposerAutosave({ ...snapshot, save_state: 'saved' });
+    }).catch((error: unknown) => {
+      if (mounted.current && currentGeneration === generation.current) {
+        setComposerAutosave({ ...snapshot, save_state: 'error', save_error: String(error) });
+      }
+      throw error;
+    });
+    // Keep later autosaves usable after failure, but submission receives the
+    // rejecting promise and must not proceed without the database acknowledgement.
+    queue.current = operation.catch(() => undefined);
+    return operation;
+  }, [nextRevision]);
 
   const clearComposerAutosave = useCallback(() => {
     generation.current += 1;
+    clearVersion.current += 1;
     hadEditableContent.current = false;
     hasLocalEdits.current = true;
     flush.current = null;
@@ -135,5 +196,5 @@ export default function useComposerRecovery(
   }, [nextRevision]);
 
   const retryComposerAutosave = useCallback(() => setRetryVersion((value) => value + 1), []);
-  return { composerAutosave, setComposerAutosave, clearComposerAutosave, retryComposerAutosave };
+  return { composerAutosave, setComposerAutosave, clearComposerAutosave, retryComposerAutosave, ensureComposerRecovery };
 }

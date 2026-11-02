@@ -105,27 +105,27 @@ describe('MessageListView mobile viewport policy', () => {
   });
 
   it('keeps the inclusive 720px responsive breakpoint without a mobile override', () => {
-    render(<MessageListView {...makeProps()} />);
+    render(<MessageListView {...makeProps({ selectedMessageIds: [message.id] })} />);
     resizeTo(720);
-    expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).toBeNull();
-    resizeTo(721);
     expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).not.toBeNull();
-    resizeTo(390);
+    resizeTo(721);
     expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).toBeNull();
+    resizeTo(390);
+    expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).not.toBeNull();
   });
 
   it('uses the latest mobile prop before and after resize events', () => {
     resizeTo(1024);
-    const props = makeProps();
+    const props = makeProps({ selectedMessageIds: [message.id] });
     const view = render(<MessageListView {...props} mobile={false} />);
-    expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).not.toBeNull();
+    expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).toBeNull();
     view.rerender(<MessageListView {...props} mobile />);
     resizeTo(1280);
-    expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).toBeNull();
-    view.rerender(<MessageListView {...props} mobile={false} />);
     expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).not.toBeNull();
-    resizeTo(430);
+    view.rerender(<MessageListView {...props} mobile={false} />);
     expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).toBeNull();
+    resizeTo(430);
+    expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).not.toBeNull();
   });
 
   it('still exposes bulk selection in mobile mode when messages are selected', () => {

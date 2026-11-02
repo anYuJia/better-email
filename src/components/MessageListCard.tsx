@@ -1,15 +1,16 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { MoreHorizontal, Paperclip } from 'lucide-react';
+import { MoreHorizontal, Paperclip, Star } from 'lucide-react';
 import type { MessageSummary } from '../app/types';
-import { formatDate, mailboxListPreview } from '../mailUtils';
+import { formatDate, formatListDate, mailboxListPreview } from '../mailUtils';
 import { writeMessageDragPayload } from './messageDrag';
-import { senderAvatarTone } from '../app/messageDetailUtils';
 import Avatar from './Avatar';
 import useLongPress from '../hooks/useLongPress';
+import { MESSAGE_ROW_HEIGHT, MOBILE_MESSAGE_ROW_HEIGHT } from './messageListLayout';
 
 type MessageListCardProps = {
   mobile?: boolean;
   showAccountSource?: boolean;
+  accountSourceLabels?: ReadonlyMap<number, string>;
   message: MessageSummary;
   isCurrentMessage: boolean;
   isSelected: boolean;
@@ -31,6 +32,7 @@ type MessageListCardProps = {
 export default React.memo(function MessageListCard({
   mobile = false,
   showAccountSource = false,
+  accountSourceLabels,
   message,
   isCurrentMessage,
   isSelected,
@@ -50,7 +52,7 @@ export default React.memo(function MessageListCard({
 }: MessageListCardProps) {
   const mainButtonRef = useRef<HTMLButtonElement | null>(null);
   const accountSource = showAccountSource ? message.account_email.trim() : '';
-  const accountSourceShort = accountSource;
+  const accountSourceShort = accountSourceLabels?.get(message.account_id)?.trim() || accountSource;
   const preview = useMemo(() => mailboxListPreview(message), [message]);
   const metadataLabelState = useMemo(() => {
     const normalizedIdentity = new Set([
@@ -122,7 +124,7 @@ export default React.memo(function MessageListCard({
       className={[
         'message-card',
         message.is_read ? 'is-read' : 'is-unread',
-        isCurrentMessage ? 'selected is-current' : '',
+        isCurrentMessage && !mobile ? 'selected is-current' : '',
         isSelected ? 'is-selected' : '',
         isSelectionMode ? 'is-selection-mode' : '',
         isDragging ? 'dragging' : '',
@@ -130,7 +132,7 @@ export default React.memo(function MessageListCard({
       ].filter(Boolean).join(' ')}
       data-message-id={message.id}
       data-folder-role={message.folder_role}
-      style={{ width: '100%', height: '100%', minHeight: '0px', display: 'block' }}
+      style={{ minHeight: mobile ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT }}
       draggable={!mobile}
       onClick={() => onSelectMessage(message.id)}
       onTouchStart={longPress.onTouchStart}
@@ -163,7 +165,7 @@ export default React.memo(function MessageListCard({
         type="button"
         className="message-card-main"
         aria-label={cardLabel}
-        aria-current={isCurrentMessage ? 'true' : undefined}
+        aria-current={isCurrentMessage && !mobile ? 'true' : undefined}
         aria-keyshortcuts="Enter Space Shift+F10"
         tabIndex={isCurrentMessage ? 0 : -1}
         onKeyDown={(event) => {
@@ -200,7 +202,7 @@ export default React.memo(function MessageListCard({
             openMessageMenuAt(bounds.left, bounds.bottom + 4);
           }}
         >
-          <MoreHorizontal size={20} aria-hidden="true" />
+          <MoreHorizontal size={20} strokeWidth={1.75} aria-hidden="true" />
         </button>
       )}
       {!message.is_read && <span className="message-unread-dot" aria-hidden="true" />}
@@ -208,7 +210,7 @@ export default React.memo(function MessageListCard({
         <Avatar
           email={message.sender_email}
           name={message.sender_name}
-          className={`message-avatar avatar-tone-${senderAvatarTone(message.sender_name, message.sender_email)}`}
+          className="message-avatar"
         />
       </span>
       <label className="message-select" onClick={(event) => event.stopPropagation()}>
@@ -222,15 +224,15 @@ export default React.memo(function MessageListCard({
       </label>
       <div className="message-topline">
         <span className={message.is_read ? 'sender' : 'sender unread'}>{message.sender_name}</span>
-        <time>{formatDate(message.received_at)}</time>
+        <time dateTime={message.received_at} title={formatDate(message.received_at)}>{formatListDate(message.received_at)}</time>
       </div>
       <div className="message-subject-line">
         <span className={message.is_read ? 'subject' : 'subject unread'}>
-          {message.is_starred ? <span className="message-star-glyph" aria-label="星标">★ </span> : ''}{message.subject || '(无主题)'}
+          {message.is_starred && <span className="message-star-glyph" role="img" aria-label="星标"><Star size={14} strokeWidth={1.75} fill="currentColor" aria-hidden="true" /></span>}{message.subject || '(无主题)'}
         </span>
         {message.attachment_count > 0 && (
           <span className="message-attachment" title={`${message.attachment_count} 个附件`}>
-            <Paperclip size={11} aria-hidden="true" />
+            <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" />
             {message.attachment_count}
           </span>
         )}

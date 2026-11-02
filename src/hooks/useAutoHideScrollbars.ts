@@ -26,7 +26,9 @@ function hasScrollableOverflow(element: HTMLElement): boolean {
 }
 
 function usesLocalScrollbar(element: HTMLElement): boolean {
-  return element.dataset.localScrollbar === 'true';
+  // Native popovers render above body-level overlays. They keep a native
+  // scrollbar rather than a custom thumb hidden underneath the top layer.
+  return element.dataset.localScrollbar === 'true' || element.closest('[popover]') !== null;
 }
 
 function createThumb(axis: 'vertical' | 'horizontal'): HTMLDivElement {
@@ -127,6 +129,9 @@ export default function useAutoHideScrollbars() {
   useEffect(() => {
     const appDocument = document.body;
     if (!appDocument) return undefined;
+    let updateFrame: number | null = null;
+    const pendingScrollTargets = new Set<HTMLElement>();
+    const pendingGestureTargets = new Set<EventTarget | null>();
 
     const disposeOverlay = (element: HTMLElement) => {
       const overlay = overlaysRef.current.get(element);
@@ -226,17 +231,46 @@ export default function useAutoHideScrollbars() {
       }
     };
 
+    const scheduleUpdate = () => {
+      if (updateFrame !== null) return;
+      // The sentinel also supports hosts/tests that invoke rAF synchronously.
+      updateFrame = -1;
+      const frame = window.requestAnimationFrame(() => {
+        updateFrame = null;
+        for (const target of pendingGestureTargets) {
+          if (!(target instanceof HTMLElement) || !appDocument.contains(target)) continue;
+          const scrollable = findScrollableAncestor(target, appDocument);
+          if (scrollable) pendingScrollTargets.add(scrollable);
+        }
+        pendingGestureTargets.clear();
+        for (const target of pendingScrollTargets) showOverlay(target);
+        pendingScrollTargets.clear();
+      });
+      if (updateFrame !== null) updateFrame = frame;
+    };
+
     const handleScroll = (event: Event) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
-      showOverlay(target);
+      pendingScrollTargets.add(target);
+      scheduleUpdate();
     };
 
     const handleWheelOrTouchMove = (event: Event) => {
-      const target = findScrollableAncestor(event.target, appDocument);
-      if (!target) return;
-      window.requestAnimationFrame(() => showOverlay(target));
+      pendingGestureTargets.add(event.target);
+      scheduleUpdate();
     };
+
+    // A surface can unmount long after its hide timer has fired. Observe DOM
+    // removal as well, otherwise the map and thumb drag closures retain that
+    // detached settings page or popover until the whole window is resized.
+    const removalObserver = new MutationObserver((records) => {
+      if (!records.some((record) => record.removedNodes.length > 0)) return;
+      for (const element of overlaysRef.current.keys()) {
+        if (!appDocument.contains(element)) disposeOverlay(element);
+      }
+    });
+    removalObserver.observe(appDocument, { childList: true, subtree: true });
 
     const handleResize = () => {
       for (const [element, overlay] of overlaysRef.current) {
@@ -258,6 +292,10 @@ export default function useAutoHideScrollbars() {
       document.removeEventListener('wheel', handleWheelOrTouchMove, true);
       document.removeEventListener('touchmove', handleWheelOrTouchMove, true);
       window.removeEventListener('resize', handleResize);
+      removalObserver.disconnect();
+      if (updateFrame !== null) window.cancelAnimationFrame(updateFrame);
+      pendingScrollTargets.clear();
+      pendingGestureTargets.clear();
       for (const element of overlaysRef.current.keys()) disposeOverlay(element);
       timersRef.current.clear();
       overlaysRef.current.clear();

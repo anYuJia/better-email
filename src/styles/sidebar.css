@@ -27,7 +27,7 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding: 0 12px 14px 20px;
+  padding: 0 12px 14px;
   overflow: hidden;
   color: var(--ui-text-secondary);
   font-size: var(--ui-font-size-secondary);
@@ -82,28 +82,27 @@
  * the sidebar plane and gains a quiet tint only when the user engages it. */
 
 .compose-button {
-  min-height: 42px;
+  min-height: 36px;
+  flex-shrink: 0;
   margin: 0;
   padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 7px;
-  border: 1px solid var(--ui-accent);
+  gap: 8px;
+  border: 1px solid transparent;
   border-radius: var(--ui-radius-control);
   color: var(--color-text-on-accent);
   background: var(--ui-accent);
   box-shadow: var(--ui-box-shadow-none);
   font-size: var(--ui-font-size-secondary);
   font-weight: 600;
-  transition-property: color, background-color, border-color, scale;
-  transition-duration: var(--ui-motion-fast);
-  transition-timing-function: var(--ui-ease-standard);
+  transition: var(--ui-transition-control);
 }
 
 .compose-button svg {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   color: currentColor;
 }
 
@@ -113,10 +112,9 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.compose-button:active:not(:disabled) {
+.compose-button:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
   color: var(--color-text-on-accent);
   background: var(--ui-accent-pressed);
-  scale: 0.96;
 }
 
 .compose-button:disabled {
@@ -133,7 +131,7 @@
 
 .sidebar-label {
   margin: 5px 0 1px;
-  padding: 0 9px;
+  padding: 0 10px;
   color: var(--ui-text-tertiary);
   font-size: var(--ui-font-size-meta);
   font-weight: 500;
@@ -145,7 +143,11 @@
 .folder-list {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 2px;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 /* The mock-mode tools section hangs off the folder navigation. */
@@ -155,11 +157,12 @@
 
 .folder {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 2px;
-  min-height: 40px;
+  min-height: 36px;
   border: 0;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
@@ -169,14 +172,14 @@
 .folder-main {
   flex: 1;
   min-width: 0;
-  min-height: 40px;
-  padding: 0 9px;
+  min-height: 36px;
+  padding: 0 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   border: 0;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: inherit;
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
@@ -196,9 +199,9 @@
 
 .folder-name svg {
   flex: 0 0 auto;
-  width: 17px;
-  height: 17px;
-  stroke-width: 1.7;
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.75;
   color: currentColor;
 }
 
@@ -235,8 +238,8 @@
 
 .folder.active,
 .folder.active:hover {
-  color: var(--ui-text-accent);
-  background: var(--quiet-row-selected);
+  color: var(--ui-text);
+  background: var(--ui-surface);
 }
 
 .folder.active .folder-main {
@@ -244,8 +247,12 @@
   font-weight: 600;
 }
 
-.folder.active .badge {
+.folder.active .folder-name > svg {
   color: var(--ui-text-accent);
+}
+
+.folder.active .badge {
+  color: var(--ui-text-secondary);
   font-weight: 600;
 }
 
@@ -271,15 +278,15 @@
 }
 
 .folder-actions button {
-  width: 26px;
-  min-width: 26px;
-  min-height: 26px;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-tertiary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
@@ -328,7 +335,7 @@
   min-height: 28px;
   padding: 0 8px;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text);
   background: var(--ui-control-bg);
   font-size: var(--ui-font-size-meta);
@@ -343,9 +350,9 @@
 .folder-rename button,
 .custom-folder-form button {
   min-height: 28px;
-  padding: 0 9px;
+  padding: 0 10px;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: var(--ui-control-bg);
   font-size: var(--ui-font-size-meta);
@@ -367,17 +374,34 @@
   border-top: 0;
 }
 
+.sidebar-tools {
+  position: relative;
+  flex: 0 0 36px;
+}
+
 .sidebar-tools > summary {
   min-height: 36px;
-  padding: 0 9px;
+  width: 36px;
+  padding: 0;
+  justify-content: center;
+  list-style: none;
   display: flex;
   align-items: center;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   font-size: var(--ui-font-size-secondary);
   font-weight: 500;
   cursor: pointer;
   transition: var(--ui-transition-fast-color-background);
+}
+
+.sidebar-tools > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sidebar-tools > summary:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: -2px;
 }
 
 .sidebar-tools > summary:hover {
@@ -386,19 +410,21 @@
 }
 
 .sidebar-tools > .sidebar-tool-stack {
-  width: 100%;
-  position: static;
-  margin-top: 2px;
-  padding: 3px 0 5px 10px;
+  width: min(300px, calc(100vw - 32px));
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  margin: 0;
+  padding: 12px;
   display: grid;
   gap: 8px;
-  max-height: min(320px, 38vh);
+  max-height: min(320px, 60vh);
   overflow-x: hidden;
   overflow-y: auto;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-panel);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-popover);
 }
 
 .saved-search-form {
@@ -412,7 +438,7 @@
   min-height: 28px;
   padding: 0 8px;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text);
   background: var(--ui-control-bg);
   font-size: var(--ui-font-size-meta);
@@ -425,9 +451,9 @@
 
 .saved-search-form button {
   min-height: 28px;
-  padding: 0 9px;
+  padding: 0 10px;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: var(--ui-control-bg);
   font-size: var(--ui-font-size-meta);
@@ -459,7 +485,7 @@
   min-height: 30px;
   padding: 0 8px;
   border: 0;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
   font-size: 13px;
@@ -484,7 +510,7 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-tertiary);
   background: transparent;
   opacity: 0;
@@ -546,6 +572,7 @@
   gap: 6px;
   margin-top: auto;
   padding: 10px 0 2px;
+  border-top: 1px solid var(--ui-border);
   flex-shrink: 0;
 }
 
@@ -555,24 +582,26 @@
 }
 
 .settings-button {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 36px;
-  padding: 0 9px;
+  padding: 0 6px;
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
   border: 0;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font-size: var(--ui-font-size-meta);
   font-weight: 500;
+  white-space: nowrap;
   transition: var(--ui-transition-fast-color-background);
 }
 
 .settings-button svg {
+  flex-shrink: 0;
   width: 16px;
   height: 16px;
   color: currentColor;
@@ -590,6 +619,25 @@
   outline-offset: -2px;
 }
 
+/* Drawer navigation uses the same controls at a touch-friendly scale. */
+@media (max-width: 720px), (pointer: coarse) {
+  .sidebar :is(.compose-button, .folder, .folder-main, .settings-button, .sidebar-tools > summary) {
+    min-height: 44px;
+  }
+
+  .sidebar .folder-actions button {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    opacity: 1;
+  }
+
+  .sidebar .folder-name svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
 /* Reduced motion: rows only fade colour, never move. */
 @media (prefers-reduced-motion: reduce) {
   .sidebar .folder,
@@ -598,9 +646,5 @@
   .settings-button,
   .sidebar-tools > summary {
     transition: var(--ui-transition-none);
-  }
-
-  .compose-button:active:not(:disabled) {
-    scale: 1;
   }
 }

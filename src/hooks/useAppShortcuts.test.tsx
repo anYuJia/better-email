@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { useRef } from 'react';
 import useAppShortcuts from './useAppShortcuts';
+import { useDetailsMenu } from './useDetailsMenu';
+import { ContextMenuContent } from '../components/ContextMenu';
+import { CustomSelect } from '../components/settings/accounts/CustomSelect';
 import type { MessageSummary } from '../app/types';
 
 type ShortcutOptions = Parameters<typeof useAppShortcuts>[0];
@@ -8,6 +12,20 @@ type ShortcutOptions = Parameters<typeof useAppShortcuts>[0];
 function ShortcutHarness({ options }: { options: ShortcutOptions }) {
   useAppShortcuts(options);
   return null;
+}
+
+function MenuShortcutHarness({ options }: { options: ShortcutOptions }) {
+  useAppShortcuts(options);
+  const ref = useRef<HTMLDetailsElement>(null);
+  const menu = useDetailsMenu(ref);
+  return (
+    <details ref={ref}>
+      <summary>更多邮件操作</summary>
+      <div data-floating-menu-panel="true">
+        <ContextMenuContent items={[{ id: 'export', label: '导出邮件' }]} onClose={menu.closeMenu} />
+      </div>
+    </details>
+  );
 }
 
 function makeOptions(): ShortcutOptions {
@@ -48,6 +66,74 @@ afterEach(() => {
 });
 
 describe('useAppShortcuts text selection boundary', () => {
+  it.each(['composer', 'settings'] as const)('lets Escape close %s when a custom select is closed', (surface) => {
+    const options = makeOptions();
+    options.isComposerOpen = surface === 'composer';
+    options.isSettingsOpen = surface === 'settings';
+    render(<>
+      <ShortcutHarness options={options} />
+      <CustomSelect value="default" options={[{ value: 'default', label: '默认' }]} onChange={vi.fn()} ariaLabel="账号" />
+    </>);
+    const trigger = screen.getByRole('combobox', { name: '账号' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    expect(options.closeOverlays).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the first Escape inside an open custom select, then closes its owning surface', () => {
+    const options = makeOptions();
+    options.isComposerOpen = true;
+    render(<>
+      <ShortcutHarness options={options} />
+      <CustomSelect value="default" options={[{ value: 'default', label: '默认' }]} onChange={vi.fn()} ariaLabel="账号" />
+    </>);
+    const trigger = screen.getByRole('combobox', { name: '账号' });
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    // Mailbox commands must stay blocked even before the menu's enter frame.
+    fireEvent.keyDown(window, { key: 'c' });
+    expect(options.composeNew).not.toHaveBeenCalled();
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(options.closeOverlays).not.toHaveBeenCalled();
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    expect(options.closeOverlays).toHaveBeenCalledOnce();
+  });
+
+  it.each([false, true])('keeps all mailbox shortcuts inside an open menu (bulk selection: %s)', (bulk) => {
+    const options = makeOptions();
+    const message = { id: 1, folder_role: 'inbox', is_read: true, is_starred: false } as MessageSummary;
+    options.messages = [message, { ...message, id: 2 }];
+    options.selected = message;
+    options.selectedId = 1;
+    options.undoAction = {} as NonNullable<ShortcutOptions['undoAction']>;
+    if (bulk) {
+      options.selectedMessages = [message];
+      options.selectedMessageIds = [1];
+    }
+    render(<MenuShortcutHarness options={options} />);
+    const trigger = screen.getByRole('button', { name: '更多邮件操作' });
+    fireEvent.click(trigger);
+    const details = trigger.parentElement as HTMLDetailsElement;
+    fireEvent(details, new Event('toggle'));
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: '导出邮件' }));
+    // Also exercise the trigger: it can own focus during native toggle/paint.
+    trigger.focus();
+    for (const key of ['ArrowDown', 'ArrowUp', 'j', 'k', 's', 'm', 'e', '#', 'Delete', 'Backspace', 'r', 'f', 'a', 'c', '?']) {
+      fireEvent.keyDown(trigger, { key });
+    }
+    fireEvent.keyDown(trigger, { key: 'a', metaKey: true });
+    fireEvent.keyDown(trigger, { key: 'z', metaKey: true });
+    for (const name of ['setSelectedId', 'toggleStar', 'toggleRead', 'moveSelected', 'runBulkAction', 'composeFromMessage', 'composeNew', 'toggleAllVisibleMessages', 'restoreUndoAction', 'openShortcuts'] as const) {
+      expect(options[name]).not.toHaveBeenCalled();
+    }
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    expect(details.open).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+    fireEvent.keyDown(trigger, { key: 'Delete' });
+    expect(bulk ? options.runBulkAction : options.moveSelected).toHaveBeenCalledWith('trash');
+  });
+
   it('keeps command-a available to the browser while text is selected', () => {
     const options = makeOptions();
     render(<ShortcutHarness options={options} />);

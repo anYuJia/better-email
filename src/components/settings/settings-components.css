@@ -366,11 +366,7 @@
   line-height: 1;
   white-space: nowrap;
   box-shadow: none;
-  transition: var(--ui-transition-fast-color-background-border);
-}
-
-.settings-modal .st-btn:active:not(:disabled) {
-  transform: none;
+  transition: var(--ui-transition-control);
 }
 
 .settings-modal .st-btn-primary {
@@ -386,7 +382,7 @@
   box-shadow: none;
 }
 
-.settings-modal .st-btn-primary:active:not(:disabled) {
+.settings-modal .st-btn-primary:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
   border-color: var(--st-accent-pressed);
   background: var(--st-accent-pressed);
 }
@@ -403,8 +399,8 @@
   background: var(--st-accent-soft);
 }
 
-.settings-modal .st-btn-secondary:active:not(:disabled),
-.settings-modal .st-btn-ghost:active:not(:disabled) {
+.settings-modal .st-btn-secondary:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled),
+.settings-modal .st-btn-ghost:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
   color: var(--st-text);
   background: var(--st-surface-pressed);
 }

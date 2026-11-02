@@ -59,7 +59,7 @@
 
   /* Geometry follows the application scale instead of maintaining a second
      Settings-only radius system. */
-  --st-radius-sm: var(--ui-radius-sm);
+  --st-radius-sm: var(--ui-radius-control);
   --st-radius-md: var(--ui-radius-control);
   --st-radius-lg: var(--ui-radius-panel);
   --st-radius-modal: var(--ui-radius-modal);
@@ -81,8 +81,8 @@
   --st-focus-outline: var(--ui-focus-outline);
 
   /* Layout constants */
-  --st-sidebar-width: 216px;
-  --st-content-max-width: 704px;
+  --st-sidebar-width: 236px;
+  --st-content-max-width: 760px;
   --st-breakpoint-narrow: 900px;
   --st-breakpoint-mobile: 640px;
 }

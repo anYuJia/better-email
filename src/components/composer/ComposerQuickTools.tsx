@@ -11,8 +11,10 @@ import {
   Italic,
   List,
   ListOrdered,
+  MoreHorizontal,
   Paperclip,
   Redo2,
+  Type,
   Underline,
   Undo2,
 } from 'lucide-react';
@@ -76,8 +78,10 @@ function toolbarButton({ label, icon, pressed, onClick }: ToolbarButtonProps) {
 
 export function ComposerRichToolbar({
   editorRef,
+  active = true,
 }: {
   editorRef?: React.RefObject<HTMLDivElement | null>;
+  active?: boolean;
 }) {
   const [fontValue, setFontValue] = useState('');
   const [fontSizeValue, setFontSizeValue] = useState('');
@@ -118,7 +122,9 @@ export function ComposerRichToolbar({
 
   function restoreEditorFocus(editor: HTMLDivElement) {
     const selection = editorSelectionRef.current;
-    const restore = () => restoreEditorSelection(editor, selection);
+    const restore = () => {
+      if (editor.isConnected && !editor.closest('[inert]')) restoreEditorSelection(editor, selection);
+    };
     if (typeof window.requestAnimationFrame === 'function') {
       window.requestAnimationFrame(restore);
     } else {
@@ -133,7 +139,7 @@ export function ComposerRichToolbar({
     if (selection) editorSelectionRef.current = selection;
     const run = () => {
       const target = editorRef?.current ?? null;
-      if (!target) return;
+      if (!target || target.closest('[inert]')) return;
       runEditorCommand(target, command, value, selection);
       editorSelectionRef.current = saveEditorSelection(target) ?? selection ?? editorSelectionRef.current;
       setFormatState(readEditorFormatState(target, editorSelectionRef.current));
@@ -203,12 +209,13 @@ export function ComposerRichToolbar({
   return (
     <div className="composer-rich-toolbar" aria-label="富文本格式工具栏">
       <div className="composer-rich-toolbar-group" aria-label="撤销和重做">
-        {toolbarButton({ label: '撤销', icon: <Undo2 size={17} />, onClick: () => execute('undo') })}
-        {toolbarButton({ label: '重做', icon: <Redo2 size={17} />, onClick: () => execute('redo') })}
+        {toolbarButton({ label: '撤销', icon: <Undo2 size={18} />, onClick: () => execute('undo') })}
+        {toolbarButton({ label: '重做', icon: <Redo2 size={18} />, onClick: () => execute('redo') })}
       </div>
 
       <div className="composer-rich-toolbar-group composer-rich-toolbar-selects">
         <CustomSelect
+          active={active}
           ariaLabel="字体"
           value={fontValue}
           options={FONT_OPTIONS}
@@ -223,6 +230,7 @@ export function ComposerRichToolbar({
           }}
         />
         <CustomSelect
+          active={active}
           ariaLabel="字号"
           value={fontSizeValue}
           options={FONT_SIZE_OPTIONS}
@@ -239,26 +247,26 @@ export function ComposerRichToolbar({
       </div>
 
       <div className="composer-rich-toolbar-group" aria-label="文字样式">
-        {toolbarButton({ label: '加粗', icon: <Bold size={17} />, pressed: formatState.bold, onClick: () => executeInline('bold') })}
-        {toolbarButton({ label: '斜体', icon: <Italic size={17} />, pressed: formatState.italic, onClick: () => executeInline('italic') })}
-        {toolbarButton({ label: '下划线', icon: <Underline size={17} />, pressed: formatState.underline, onClick: () => executeInline('underline') })}
+        {toolbarButton({ label: '加粗', icon: <Bold size={18} />, pressed: formatState.bold, onClick: () => executeInline('bold') })}
+        {toolbarButton({ label: '斜体', icon: <Italic size={18} />, pressed: formatState.italic, onClick: () => executeInline('italic') })}
+        {toolbarButton({ label: '下划线', icon: <Underline size={18} />, pressed: formatState.underline, onClick: () => executeInline('underline') })}
         {toolbarButton({
           label: '文字高亮',
-          icon: <Highlighter size={17} />,
+          icon: <Highlighter size={18} />,
           pressed: formatState.highlight,
           onClick: () => executeInline('highlight'),
         })}
       </div>
 
       <div className="composer-rich-toolbar-group" aria-label="段落格式">
-        {toolbarButton({ label: '无序列表', icon: <List size={17} />, pressed: formatState.unorderedList, onClick: () => execute('insertUnorderedList') })}
-        {toolbarButton({ label: '有序列表', icon: <ListOrdered size={17} />, pressed: formatState.orderedList, onClick: () => execute('insertOrderedList') })}
-        {toolbarButton({ label: '左对齐', icon: <AlignLeft size={17} />, pressed: formatState.justifyLeft, onClick: () => execute('justifyLeft') })}
-        {toolbarButton({ label: '居中对齐', icon: <AlignCenter size={17} />, pressed: formatState.justifyCenter, onClick: () => execute('justifyCenter') })}
+        {toolbarButton({ label: '无序列表', icon: <List size={18} />, pressed: formatState.unorderedList, onClick: () => execute('insertUnorderedList') })}
+        {toolbarButton({ label: '有序列表', icon: <ListOrdered size={18} />, pressed: formatState.orderedList, onClick: () => execute('insertOrderedList') })}
+        {toolbarButton({ label: '左对齐', icon: <AlignLeft size={18} />, pressed: formatState.justifyLeft, onClick: () => execute('justifyLeft') })}
+        {toolbarButton({ label: '居中对齐', icon: <AlignCenter size={18} />, pressed: formatState.justifyCenter, onClick: () => execute('justifyCenter') })}
       </div>
 
       <div className="composer-rich-toolbar-group" aria-label="格式清理">
-        {toolbarButton({ label: '清除格式', icon: <Eraser size={17} />, onClick: clearFormatting })}
+        {toolbarButton({ label: '清除格式', icon: <Eraser size={18} />, onClick: clearFormatting })}
       </div>
     </div>
   );
@@ -317,7 +325,7 @@ export default function ComposerQuickTools({
         <div className="composer-quick-toolbar">
           <div className="composer-footer-tool-group" aria-label="写信工具">
             <button type="button" aria-label="添加附件" title="添加附件" onClick={onPickAttachments}>
-              <Paperclip size={17} />
+              <Paperclip size={18} />
               附件
               {regularAttachmentCount > 0 && <small>{regularAttachmentCount}</small>}
             </button>
@@ -328,22 +336,22 @@ export default function ComposerQuickTools({
               aria-pressed={formattingExpanded}
               onClick={onToggleFormatting}
             >
-              <span className="composer-format-glyph" aria-hidden="true">A</span>
+              <Type size={18} aria-hidden="true" />
               格式
             </button>
-            <button type="button" aria-label="插入签名" onClick={onInsertSignature} disabled={!signature} title={signature || '当前发件身份未设置签名'}>
-              <FileSignature size={17} />
+            <button className="composer-tool-secondary" type="button" aria-label="插入签名" onClick={onInsertSignature} disabled={!signature} title={signature ? '插入当前发件身份的签名' : '当前发件身份未设置签名'}>
+              <FileSignature size={18} />
               签名
             </button>
             {onOpenTemplates ? (
-              <button ref={templateButtonRef} type="button" aria-label="插入模板" title="插入模板" onClick={onOpenTemplates}>
-                <FileText size={17} />
+              <button ref={templateButtonRef} className="composer-tool-secondary" type="button" aria-label="插入模板" title="插入模板" onClick={onOpenTemplates}>
+                <FileText size={18} />
                 模板
               </button>
             ) : null}
             {onOpenMore ? (
-              <button ref={moreButtonRef} type="button" aria-label="更多写信工具" title="更多写信工具" onClick={onOpenMore}>
-                <span className="composer-more-glyph" aria-hidden="true">•••</span>
+              <button ref={moreButtonRef} className="composer-tool-more" type="button" aria-label="更多写信工具" title="更多写信工具" onClick={onOpenMore}>
+                <MoreHorizontal size={18} aria-hidden="true" />
                 更多
               </button>
             ) : null}

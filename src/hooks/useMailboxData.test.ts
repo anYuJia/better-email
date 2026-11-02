@@ -26,6 +26,137 @@ beforeEach(() => {
   mockInvoke.mockReset();
 });
 
+describe('visible list snapshot ownership within one mailbox generation', () => {
+  function setup() {
+    const setters = {
+      setMessages: vi.fn(), setMessageCount: vi.fn(), setThreads: vi.fn(),
+      setMessageLimit: vi.fn(), setHasMoreMessages: vi.fn(), setSelectedId: vi.fn(),
+      setSelectedMessageIds: vi.fn(), setFilter: vi.fn(), setStatus: vi.fn(),
+    };
+    const hook = renderHook(() => useMailboxData({
+      accountScope: 1, currentAccountId: 1, folderId: 101, searchScope: 'folder',
+      query: '', filter: 'all', listMode: 'messages', listSort: 'newest',
+      folders: [{ id: 101, account_id: 1, name: 'Inbox', role: 'inbox', unread_count: 2, is_virtual: false }],
+      imapMailboxes: [], mailboxRefreshRef: { current: 4 },
+      loadMeta: vi.fn().mockResolvedValue({ folderId: 101, folders: [] }),
+      maybeRunBenchmarkSync: vi.fn().mockResolvedValue(undefined), ...setters,
+    }));
+    return { ...hook, ...setters };
+  }
+
+  it('does not let an earlier refresh roll back a newer read/star snapshot', async () => {
+    const older = deferred<MessageSummary[]>();
+    const newer = deferred<MessageSummary[]>();
+    let calls = 0;
+    mockInvoke.mockImplementation((command) => (
+      command === IPC.ListMessages ? (++calls === 1 ? older.promise : newer.promise) : Promise.resolve(1)
+    ) as never);
+    const { result, setMessages, setSelectedId } = setup();
+    let first!: Promise<MessageSummary[]>;
+    let second!: Promise<MessageSummary[]>;
+    act(() => { first = result.current.loadMailbox({}); second = result.current.loadMailbox({}); });
+    const latest = [{ id: 1, is_read: true, is_starred: true } as MessageSummary];
+    await act(async () => { newer.resolve(latest); await second; });
+    setSelectedId.mockClear();
+    await act(async () => { older.resolve([{ id: 1, is_read: false, is_starred: false } as MessageSummary]); await first; });
+    expect(setMessages).toHaveBeenCalledTimes(1);
+    expect(setMessages).toHaveBeenLastCalledWith(latest);
+    expect(setSelectedId).not.toHaveBeenCalled();
+  });
+
+  it('discards an older pagination page after a fresh list replaces its base', async () => {
+    const page = deferred<MessageSummary[]>();
+    mockInvoke.mockImplementation((command, args) => (
+      command === IPC.ListMessages
+        ? args?.offset ? page.promise : Promise.resolve([{ id: 20 }])
+        : Promise.resolve(1)
+    ) as never);
+    const { result, setMessages, setMessageLimit } = setup();
+    let pending!: Promise<MessageSummary[]>;
+    act(() => { pending = result.current.loadMailbox({ offset: 50 }); });
+    await act(async () => { await result.current.loadMailbox({}); });
+    setMessageLimit.mockClear();
+    await act(async () => { page.resolve([{ id: 1 } as MessageSummary]); await pending; });
+    expect(setMessages).toHaveBeenCalledTimes(1);
+    expect(setMessages).toHaveBeenLastCalledWith([{ id: 20 }]);
+    expect(setMessageLimit).not.toHaveBeenCalled();
+  });
+
+  it('does not start an unread fallback from an obsolete empty refresh', async () => {
+    const older = deferred<MessageSummary[]>();
+    let calls = 0;
+    mockInvoke.mockImplementation((command) => (
+      command === IPC.ListMessages
+        ? ++calls === 1 ? older.promise : Promise.resolve([{ id: 20 }])
+        : Promise.resolve(1)
+    ) as never);
+    const { result, setMessages, setFilter } = setup();
+    let pending!: Promise<MessageSummary[]>;
+    act(() => { pending = result.current.loadMessagesWithVisibleFallback(); });
+    await act(async () => { await result.current.loadMailbox({}); });
+    await act(async () => { older.resolve([]); await pending; });
+    expect(calls).toBe(2);
+    expect(setMessages).toHaveBeenLastCalledWith([{ id: 20 }]);
+    expect(setFilter).not.toHaveBeenCalled();
+  });
+
+  it('keeps a pending visible refresh valid when select-all reads a separate page', async () => {
+    const visible = deferred<MessageSummary[]>();
+    let calls = 0;
+    mockInvoke.mockImplementation((command) => (
+      command === IPC.ListMessages
+        ? ++calls === 1 ? visible.promise : Promise.resolve([{ id: 2 }])
+        : Promise.resolve(1)
+    ) as never);
+    const { result, setMessages } = setup();
+    let pending!: Promise<MessageSummary[]>;
+    act(() => { pending = result.current.loadMailbox({}); });
+    await act(async () => {
+      expect(await result.current.loadMailbox({ returnPageOnly: true })).toEqual([{ id: 2 }]);
+    });
+    await act(async () => { visible.resolve([{ id: 1 } as MessageSummary]); await pending; });
+    expect(setMessages).toHaveBeenCalledTimes(1);
+    expect(setMessages).toHaveBeenLastCalledWith([{ id: 1 }]);
+  });
+
+  it('keeps select-all page size stable if a visible refresh starts during that read', async () => {
+    const page = deferred<MessageSummary[]>();
+    let calls = 0;
+    mockInvoke.mockImplementation((command) => (
+      command === IPC.ListMessages
+        ? ++calls === 1 ? page.promise : Promise.resolve([{ id: 20 }])
+        : Promise.resolve(1)
+    ) as never);
+    const { result, setMessages } = setup();
+    let pending!: Promise<MessageSummary[]>;
+    act(() => { pending = result.current.loadMailbox({ limit: 1, returnPageOnly: true }); });
+    await act(async () => { await result.current.loadMailbox({}); });
+    await act(async () => {
+      page.resolve([{ id: 1 }, { id: 2 }] as MessageSummary[]);
+      expect(await pending).toEqual([{ id: 1 }]);
+    });
+    expect(setMessages).toHaveBeenLastCalledWith([{ id: 20 }]);
+  });
+
+  it('does not roll back to an older snapshot when the latest refresh fails', async () => {
+    const older = deferred<MessageSummary[]>();
+    let calls = 0;
+    mockInvoke.mockImplementation((command) => (
+      command === IPC.ListMessages
+        ? ++calls === 1 ? older.promise : Promise.reject(new Error('latest refresh failed'))
+        : Promise.resolve(1)
+    ) as never);
+    const { result, setMessages } = setup();
+    let pending!: Promise<MessageSummary[]>;
+    act(() => { pending = result.current.loadMailbox({}); });
+    await act(async () => {
+      await expect(result.current.loadMailbox({})).rejects.toThrow('latest refresh failed');
+    });
+    await act(async () => { older.resolve([{ id: 1 } as MessageSummary]); await pending; });
+    expect(setMessages).not.toHaveBeenCalled();
+  });
+});
+
 describe('buildMailboxRequests', () => {
   it('keeps message and thread queries in the same scoped mailbox view', () => {
     expect(buildMailboxRequests(7, 7, 42, 'folder', '  subject:Roadmap  ', 'unread', 'sender', 50)).toEqual({
@@ -173,10 +304,11 @@ describe('buildMailboxRequests', () => {
 
 describe('useMailboxData request guard', () => {
   it('loads the exact scoped message count without delaying the list response', async () => {
+    const firstPage = deferred<MessageSummary[]>();
     const setMessageCount = vi.fn();
     mockInvoke.mockImplementation((command) => {
       if (command === IPC.ListMessages) {
-        return Promise.resolve([{ id: 1, subject: 'inbox' }] as MessageSummary[]) as never;
+        return firstPage.promise as never;
       }
       if (command === IPC.GetMessageCount) return Promise.resolve(1202) as never;
       return Promise.resolve(undefined) as never;
@@ -207,8 +339,14 @@ describe('useMailboxData request guard', () => {
       setStatus: vi.fn(),
     }));
 
+    let load: Promise<MessageSummary[]>;
+    act(() => {
+      load = result.current.loadMessages(-1, '', 'all', 'all', 4, 50, 'folder', false);
+    });
+    expect(mockInvoke.mock.calls.some(([command]) => command === IPC.GetMessageCount)).toBe(false);
     await act(async () => {
-      await result.current.loadMessages(-1, '', 'all', 'all', 4, 50, 'folder', false);
+      firstPage.resolve([{ id: 1, subject: 'inbox' }] as MessageSummary[]);
+      await load;
       await Promise.resolve();
     });
 
@@ -219,6 +357,10 @@ describe('useMailboxData request guard', () => {
       filter: 'all',
     });
     expect(setMessageCount).toHaveBeenLastCalledWith(1202);
+    await act(async () => {
+      await result.current.loadMailbox({ offset: 50, limit: 50 });
+    });
+    expect(mockInvoke.mock.calls.filter(([command]) => command === IPC.GetMessageCount)).toHaveLength(1);
   });
 
   it('does not commit a stale scoped count after the mailbox changes', async () => {

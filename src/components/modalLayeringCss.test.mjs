@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { createElement, useRef } from 'react';
+import { cleanup, render } from '@testing-library/react';
+import useSettingsSurfaceMotion from './settings/useSettingsSurfaceMotion';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -72,5 +75,62 @@ describe('modal 层叠层级契约', () => {
     // 组件类名契约：ContactImportDialog 渲染到 document.body 的遮罩必须使用该层级类。
     const componentSource = readCss('src/components/settings/ContactImportDialog.tsx');
     expect(componentSource).toContain('contact-import-backdrop');
+  });
+
+  it.each([
+    'settings-shell-enter',
+    'settings-shell-exit',
+    'settings-page-reveal',
+    'settings-mobile-page-forward',
+    'settings-mobile-page-backward',
+  ])('%s keeps fixed dialog positioning stable throughout the animation', (name) => {
+    const css = readCss('src/components/settings/settings-shell.css')
+      + readCss('src/components/settings/settings-responsive.css');
+    const frames = new RegExp(`@keyframes ${name}\\s*\\{((?:[^{}]|\\{[^{}]*\\})*)\\}`).exec(css)?.[1];
+    expect(frames).toBeDefined();
+    expect(frames).toMatch(/opacity\s*:/);
+    // These ancestors use overflow:hidden/auto and host fixed overlays directly
+    // or through a portal. Even a zero transform changes their containing block.
+    expect(frames).not.toMatch(/(?:^|[;{])\s*(?:transform|translate|scale|rotate|filter|perspective|contain|will-change)\s*:/);
+  });
+
+  it.each([true, false])('mobile shell active=%s keeps fixed positioning stable through its interruptible animation', (active) => {
+    const originalAnimate = HTMLElement.prototype.animate;
+    const animate = vi.fn(() => ({ cancel: vi.fn(), onfinish: null }));
+    HTMLElement.prototype.animate = animate;
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    const onExited = () => undefined;
+    function MotionSurface({ visible }) {
+      const ref = useRef(null);
+      useSettingsSurfaceMotion(ref, visible, { enabled: true, onExited });
+      return createElement('div', { ref });
+    }
+    try {
+      const view = render(createElement(MotionSurface, { visible: true }));
+      if (!active) view.rerender(createElement(MotionSurface, { visible: false }));
+      const frames = animate.mock.calls[animate.mock.calls.length - 1][0];
+      expect(frames).toHaveLength(2);
+      for (const frame of frames) {
+        // Only opacity and relative left may vary: transforms, filters or
+        // containment would capture the fixed account menus and dialogs.
+        expect(Object.keys(frame).sort()).toEqual(['left', 'opacity']);
+      }
+      expect(frames[1]).toEqual({ left: active ? '0px' : '12px', opacity: active ? 1 : 0 });
+      const shellCss = readCss('src/components/settings/settings-shell.css');
+      const shell = /\.settings-shell\.settings-modal\s*\{([^}]*)\}/.exec(shellCss)?.[1];
+      expect(shell).toMatch(/position:\s*relative/);
+      expect(shell).not.toMatch(/(?:^|;)\s*(?:transform|translate|scale|rotate|filter|perspective|contain|will-change)\s*:/);
+    } finally {
+      cleanup();
+      HTMLElement.prototype.animate = originalAnimate;
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('uses opposite small offsets for mobile navigation without a fixed containing block', () => {
+    const css = readCss('src/components/settings/settings-responsive.css');
+    expect(css).toMatch(/@keyframes settings-mobile-page-forward\s*\{\s*from\s*\{[^}]*left:\s*12px/);
+    expect(css).toMatch(/@keyframes settings-mobile-page-backward\s*\{\s*from\s*\{[^}]*left:\s*-12px/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.settings-page-motion-forward,\s*\.settings-page-motion-backward\s*\{\s*animation: none/);
   });
 });

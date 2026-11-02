@@ -242,28 +242,9 @@
   scrollbar-color: var(--ui-scrollbar-thumb) transparent;
 }
 
-.context-menu-branch:hover > .context-submenu,
 .context-menu-branch.is-pointer-open > .context-submenu,
 .context-menu-branch.is-keyboard-open > .context-submenu {
   display: block;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .context-menu-surface {
-    animation: var(--ui-animation-context-menu-enter);
-    transform-origin: top left;
-  }
-
-  @keyframes context-menu-enter {
-    from {
-      opacity: 0;
-      transform: translateY(-2px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
 }
 
 @media (max-width: 720px) {
@@ -304,10 +285,6 @@
 
   .context-submenu .context-menu-separator {
     margin-inline: 6px;
-  }
-
-  .context-menu-branch:hover > .context-submenu {
-    display: none;
   }
 
   .context-menu-branch.is-pointer-open > .context-submenu,

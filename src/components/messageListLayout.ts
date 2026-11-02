@@ -1,17 +1,17 @@
 export type LayoutItem = { top: number; height: number };
 
 /**
- * 邮件列表虚拟布局的行高常量 —— 单一事实来源。
+ * 邮件列表虚拟布局的初始行高估计与最小高度。
  *
- * 与 `styles/message-list.css` 中 `.message-list-item` 的 `height: 68px`
- * 以及 `.message-date-header` 的 `height: 30px` 保持严格一致：
- * 每封邮件是一行连续列表（无卡片间隙），日期分组标题固定 30px。
- * 虚拟计算高度必须与实际渲染高度一致，否则滚动、选中、悬停会错位。
+ * 默认桌面邮件行保持 68px；放大文字后由内容自然增高，ResizeObserver
+ * 测量实际高度更新虚拟位置与滚动锚点。日期分组标题固定 30px。
  */
 export const MESSAGE_ROW_HEIGHT = 68;
 /** Mobile keeps a comfortable touch target with mature typography hierarchy. */
 export const MOBILE_MESSAGE_ROW_HEIGHT = 80;
 export const GROUP_HEADER_HEIGHT = 30;
+/** A date-group selection target occupies a full touch row on mobile. */
+export const MOBILE_GROUP_HEADER_HEIGHT = 44;
 /** 列表底部“已显示 N 封 / 加载更多”区域的高度，计入外层包裹总高度。 */
 export const LIST_FOOTER_HEIGHT = 40;
 

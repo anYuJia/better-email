@@ -30,8 +30,6 @@ export default function SettingsPageShell({
   children,
 }: SettingsPageShellProps) {
   const pageRef = useRef<HTMLElement | null>(null);
-  const previousSectionRef = useRef(activeSection);
-  const [settledSection, setSettledSection] = useState<SettingsSectionId | null>(null);
   const presentation = getSettingsSectionPresentation(activeSection) ?? item;
   const accountWorkspace = accountScopedSections.has(activeSection);
   const scopedAccount = accountScope === 'all'
@@ -46,31 +44,30 @@ export default function SettingsPageShell({
           : scopedAccount.email
         : '当前邮箱账号'
     : null;
-  const previousSection = previousSectionRef.current;
-  const relationshipMotion = previousSection === activeSection
-    ? 'none'
-    : resolveSettingsNavigationSectionId(activeSection) === previousSection
-      ? 'forward'
-      : resolveSettingsNavigationSectionId(previousSection) === activeSection
-        ? 'backward'
-        : 'lateral';
   const historyMotion = typeof window !== 'undefined'
     ? window.history.state?.betterEmailSettingsDirection
     : undefined;
-  const requestedPageMotion = relationshipMotion !== 'none'
-    ? relationshipMotion
-    : historyMotion === 'forward' || historyMotion === 'backward'
-      ? historyMotion
-      : 'none';
-  const pageMotion = settledSection === activeSection ? 'none' : requestedPageMotion;
+  const [transition, setTransition] = useState(() => ({
+    section: activeSection,
+    motion: historyMotion === 'forward' || historyMotion === 'backward' ? historyMotion : 'none',
+  }));
+  // The keyed DOM node plays once per navigation. Form edits/theme updates must
+  // neither restart the reveal nor change its class midway through the motion.
+  if (transition.section !== activeSection) {
+    setTransition({
+      section: activeSection,
+      motion: resolveSettingsNavigationSectionId(activeSection) === transition.section
+        ? 'forward'
+        : resolveSettingsNavigationSectionId(transition.section) === activeSection
+          ? 'backward' : 'lateral',
+    });
+  }
+  const pageMotion = transition.motion;
 
   useEffect(() => {
     if (pageRef.current) {
       pageRef.current.scrollTop = 0;
     }
-    previousSectionRef.current = activeSection;
-    const settleTimer = window.setTimeout(() => setSettledSection(activeSection), 220);
-    return () => window.clearTimeout(settleTimer);
   }, [activeSection]);
 
   return (
@@ -84,14 +81,6 @@ export default function SettingsPageShell({
       aria-label={accountWorkspace ? presentation.label : undefined}
       aria-labelledby={accountWorkspace ? undefined : `settings-page-${activeSection}`}
       aria-describedby={accountWorkspace ? undefined : `settings-page-description-${activeSection}`}
-      onAnimationEnd={(event) => {
-        if (
-          event.currentTarget === event.target
-          && event.animationName.startsWith('settings-mobile-page-')
-        ) {
-          setSettledSection(activeSection);
-        }
-      }}
     >
       <header className="settings-page-header">
         <div className="settings-page-heading">
@@ -99,7 +88,7 @@ export default function SettingsPageShell({
           <p id={`settings-page-description-${activeSection}`}>{presentation.description}</p>
           {accountContext && (
             <span className="settings-account-context" data-settings-account-context>
-              {accountContext}
+              当前邮箱范围：{accountContext}
             </span>
           )}
         </div>

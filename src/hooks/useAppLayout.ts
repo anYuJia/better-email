@@ -12,9 +12,8 @@ import {
   appLayoutBounds,
   clampNumber,
   getDefaultAppLayout,
-  legacyAppLayoutStorageKey,
-  loadAppLayout,
 } from '../app/appConfig';
+import { fitAppLayout, loadAppLayoutPreference, removeAppStorage } from '../app/storageConfig';
 
 type ResizablePane = 'sidebar' | 'list';
 
@@ -29,27 +28,39 @@ type LayoutResize = {
 };
 
 export default function useAppLayout() {
-  const [appLayout, setAppLayout] = useState<AppLayout>(loadAppLayout);
+  const [preferredLayout, setPreferredLayout] = useState<AppLayout | null>(loadAppLayoutPreference);
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  const appLayout = fitAppLayout(preferredLayout ?? getDefaultAppLayout(viewportWidth), viewportWidth);
+  const preferenceChangedRef = useRef(false);
   const resizeRef = useRef<LayoutResize | null>(null);
   const resizeRafRef = useRef<number | null>(null);
   const resizeActiveRef = useRef(false);
   const latestClientXRef = useRef(0);
 
   useEffect(() => {
-    if (resizeActiveRef.current) return;
-    if (
-      window.localStorage.getItem(appLayoutStorageKey) == null &&
-      window.localStorage.getItem(legacyAppLayoutStorageKey) != null
-    ) {
-      return;
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (resizeActiveRef.current || !preferenceChangedRef.current) return;
+    try {
+      if (preferredLayout) {
+        window.localStorage.setItem(appLayoutStorageKey, JSON.stringify({ ...preferredLayout, version: 3 }));
+      } else {
+        removeAppStorage(appLayoutStorageKey);
+      }
+    } catch {
+      // Resizing remains usable when browser storage is unavailable.
     }
-    window.localStorage.setItem(appLayoutStorageKey, JSON.stringify(appLayout));
-  }, [appLayout]);
+  }, [preferredLayout]);
 
   const applyResize = useCallback((resize: LayoutResize, clientX: number) => {
+    preferenceChangedRef.current = true;
     const delta = clientX - resize.startX;
     if (resize.pane === 'sidebar') {
-      setAppLayout({
+      setPreferredLayout({
         ...resize.origin,
         sidebar: clampNumber(
           resize.origin.sidebar + delta,
@@ -59,7 +70,7 @@ export default function useAppLayout() {
       });
       return;
     }
-    setAppLayout({
+    setPreferredLayout({
       ...resize.origin,
       list: clampNumber(
         resize.origin.list + delta,
@@ -70,17 +81,19 @@ export default function useAppLayout() {
   }, []);
 
   const adjustAppLayout = useCallback((pane: ResizablePane, delta: number) => {
+    preferenceChangedRef.current = true;
     const bounds = APP_LAYOUT_BOUNDS[pane];
-    setAppLayout((current) => ({
-      ...current,
-      [pane]: clampNumber(current[pane] + delta, bounds.min, bounds.max),
-    }));
+    setPreferredLayout((current) => {
+      const visible = fitAppLayout(current ?? getDefaultAppLayout(), window.innerWidth);
+      return { ...visible, [pane]: clampNumber(visible[pane] + delta, bounds.min, bounds.max) };
+    });
   }, []);
 
   const resetAppLayoutPane = useCallback((pane: ResizablePane) => {
+    preferenceChangedRef.current = true;
     const responsiveDefault = getDefaultAppLayout();
-    setAppLayout((current) => ({
-      ...current,
+    setPreferredLayout((current) => ({
+      ...(current ?? responsiveDefault),
       [pane]: responsiveDefault[pane],
     }));
   }, []);
@@ -177,7 +190,8 @@ export default function useAppLayout() {
   }, [finishResize]);
 
   const resetAppLayout = useCallback(() => {
-    setAppLayout(getDefaultAppLayout());
+    preferenceChangedRef.current = true;
+    setPreferredLayout(null);
   }, []);
 
   return {

@@ -92,8 +92,12 @@ function renderController({
     setAttachments: vi.fn(),
     setStatus: vi.fn(),
   };
+  const initialProps: {
+    mailboxContextKey: string;
+    remoteImageTrusts?: Parameters<typeof useMailboxSelectionController>[0]['remoteImageTrusts'];
+  } = { mailboxContextKey };
   const hook = renderHook(
-    (props: { mailboxContextKey: string }) => useMailboxSelectionController({
+    (props: { mailboxContextKey: string; remoteImageTrusts?: Parameters<typeof useMailboxSelectionController>[0]['remoteImageTrusts'] }) => useMailboxSelectionController({
       messages,
       threadMessages,
       threads,
@@ -101,10 +105,10 @@ function renderController({
       folders,
       stats,
       mailboxContextKey: props.mailboxContextKey,
-      remoteImageTrusts,
+      remoteImageTrusts: props.remoteImageTrusts ?? remoteImageTrusts,
       ...setters,
     }),
-    { initialProps: { mailboxContextKey } },
+    { initialProps },
   );
   return { ...hook, setters };
 }
@@ -231,7 +235,7 @@ describe('useMailboxSelectionController', () => {
     expect(result.current.readerSelectedDetail?.id).toBe(2);
   });
 
-  it('keeps the previous detail visible while the new selection loads, then swaps', async () => {
+  it('hides the previous detail while a new selection loads so reader actions cannot target another message', async () => {
     let resolveDetail2!: (value: Message) => void;
     mockInvoke.mockImplementation(((command: string, args?: { messageId?: number }) => {
       if (command === 'get_message_detail') {
@@ -256,8 +260,9 @@ describe('useMailboxSelectionController', () => {
     act(() => {
       result.current.setSelectedId(2);
     });
-    expect(result.current.readerSelectedDetail?.id).toBe(1);
-    expect(result.current.readerDisplayedId).toBe(1);
+    expect(result.current.readerSelectedDetail).toBeNull();
+    expect(result.current.readerDisplayedId).toBeNull();
+    expect(result.current.detailLoadState).toEqual({ status: 'loading', messageId: 2 });
 
     act(() => {
       resolveDetail2(message(2));
@@ -483,5 +488,178 @@ describe('useMailboxSelectionController', () => {
     expect(result.current.bodyFetchState?.status).toBe('loading');
     act(() => result.current.markBodyFetchSucceeded(1));
     expect(result.current.bodyFetchState).toBeNull();
+  });
+
+  it('finishes a pending body when returning to its message before the fetch completes', async () => {
+    let resolveBody!: (value: Message) => void;
+    const pendingBody = new Promise<Message>((resolve) => { resolveBody = resolve; });
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === 'get_message_detail') {
+        const id = (args as { messageId: number }).messageId;
+        return id === 1 ? message(1, { body: '', sanitized_html: '' }) : message(id);
+      }
+      if (command === 'fetch_message_body') return pendingBody;
+      return [];
+    });
+    const { result } = renderController();
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('fetch_message_body', { messageId: 1 }));
+    act(() => result.current.setSelectedId(2));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(2));
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(1));
+    await act(async () => { resolveBody(message(1, { body: 'Fetched once', sanitized_html: '' })); });
+    await waitFor(() => expect(result.current.readerSelectedDetail?.body).toBe('Fetched once'));
+    expect(mockInvoke.mock.calls.filter(([command]) => command === 'fetch_message_body')).toHaveLength(1);
+  });
+
+  it('caches background body completion without leaving a loading state on return', async () => {
+    let resolveBody!: (value: Message) => void;
+    const pendingBody = new Promise<Message>((resolve) => { resolveBody = resolve; });
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === 'get_message_detail') {
+        const id = (args as { messageId: number }).messageId;
+        return id === 1 ? message(1, { body: '', sanitized_html: '' }) : message(id);
+      }
+      if (command === 'fetch_message_body') return pendingBody;
+      return [];
+    });
+    const { result } = renderController();
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('fetch_message_body', { messageId: 1 }));
+    act(() => result.current.setSelectedId(2));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(2));
+    await act(async () => { resolveBody(message(1, { body: 'Cached in background' })); });
+    expect(result.current.readerSelectedDetail?.id).toBe(2);
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.body).toBe('Cached in background'));
+    expect(result.current.bodyFetchState).toBeNull();
+  });
+
+  it('keeps the current body loading state when a different message fails, and restores that error on return', async () => {
+    let rejectFirst!: (error: Error) => void;
+    const firstBody = new Promise<Message>((_, reject) => { rejectFirst = reject; });
+    const secondBody = new Promise<Message>(() => undefined);
+    mockInvoke.mockImplementation(async (command, args) => {
+      const id = (args as { messageId: number }).messageId;
+      if (command === 'get_message_detail') return message(id, { body: '', sanitized_html: '' });
+      if (command === 'fetch_message_body') return id === 1 ? firstBody : secondBody;
+      return [];
+    });
+    const { result, setters } = renderController();
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('fetch_message_body', { messageId: 1 }));
+    act(() => result.current.setSelectedId(2));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('fetch_message_body', { messageId: 2 }));
+    setters.setStatus.mockClear();
+    await act(async () => { rejectFirst(new Error('First message offline')); });
+    expect(result.current.bodyFetchState).toEqual({ messageId: 2, status: 'loading', error: null });
+    expect(setters.setStatus).not.toHaveBeenCalled();
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(result.current.bodyFetchState).toEqual({ messageId: 1, status: 'error', error: 'First message offline' }));
+  });
+
+  it('preserves a successfully fetched body when refreshing its attachments fails', async () => {
+    let attachmentCalls = 0;
+    mockInvoke.mockImplementation(async (command) => {
+      if (command === 'get_message_detail') return message(1, { body: '', sanitized_html: '' });
+      if (command === 'fetch_message_body') return message(1, { body: 'Readable body', sanitized_html: '' });
+      if (command === 'list_attachments' && ++attachmentCalls > 1) throw new Error('Attachment database unavailable');
+      return [];
+    });
+    const { result, setters } = renderController();
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(setters.setStatus).toHaveBeenCalledWith('正文已加载，但附件列表刷新失败：Attachment database unavailable'));
+    expect(result.current.readerSelectedDetail?.body).toBe('Readable body');
+    expect(result.current.bodyFetchState).toBeNull();
+    expect(result.current.bodyFetchFailedRef.current.has(1)).toBe(false);
+    expect(result.current.attachmentsLoaded).toBe(true);
+  });
+
+  it.each([false, true])('restores trusted remote content on return (request already finished: %s)', async (finishBeforeReturn) => {
+    let resolveRender!: (value: Message) => void;
+    const pendingRender = new Promise<Message>((resolve) => { resolveRender = resolve; });
+    const source = message(1, {
+      body: '<p>Body</p><img src="https://example.com/picture.png">',
+      sanitized_html: '<p>Body</p>',
+    });
+    const rendered = { ...source, sanitized_html: source.body };
+    let policyCalls = 0;
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === 'get_message_detail') return (args as { messageId: number }).messageId === 1 ? source : message(2);
+      if (command === 'render_message_with_remote_image_policy') return ++policyCalls === 1 ? pendingRender : rendered;
+      return [];
+    });
+    const { result } = renderController({ remoteImageTrusts: [{
+      id: 1, account_id: 1, account_email: source.account_email,
+      scope: 'sender', value: source.sender_email, created_at: '',
+    }] });
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(policyCalls).toBe(1));
+    act(() => result.current.setSelectedId(2));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(2));
+    if (finishBeforeReturn) await act(async () => { resolveRender(rendered); });
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(1));
+    if (!finishBeforeReturn) await act(async () => { resolveRender(rendered); });
+    await waitFor(() => expect(result.current.readerSelectedDetail?.sanitized_html).toBe(source.body));
+    expect(policyCalls).toBe(finishBeforeReturn ? 2 : 1);
+  });
+
+  it('does not display or cache remote HTML from a request whose trust was revoked', async () => {
+    let resolveRender!: (value: Message) => void;
+    const pendingRender = new Promise<Message>((resolve) => { resolveRender = resolve; });
+    const source = message(1, {
+      body: '<p>Body</p><img src="https://example.com/picture.png">', sanitized_html: '<p>Body</p>',
+    });
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === 'get_message_detail') return (args as { messageId: number }).messageId === 1 ? source : message(2);
+      if (command === 'render_message_with_remote_image_policy') return pendingRender;
+      return [];
+    });
+    const { result, rerender } = renderController({ remoteImageTrusts: [{
+      id: 1, account_id: 1, account_email: source.account_email,
+      scope: 'sender', value: source.sender_email, created_at: '',
+    }] });
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('render_message_with_remote_image_policy', { messageId: 1 }));
+    rerender({ mailboxContextKey: '1|101||all|messages', remoteImageTrusts: [] });
+    await act(async () => { resolveRender({ ...source, sanitized_html: source.body }); });
+    expect(result.current.readerSelectedDetail?.sanitized_html).toBe('<p>Body</p>');
+    act(() => result.current.setSelectedId(2));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(2));
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(1));
+    expect(result.current.readerSelectedDetail?.sanitized_html).toBe('<p>Body</p>');
+    expect(mockInvoke.mock.calls.filter(([command]) => command === 'render_message_with_remote_image_policy')).toHaveLength(1);
+  });
+});
+
+describe('message detail failures', () => {
+  beforeEach(() => { mockInvoke.mockReset(); localStorage.clear(); });
+  it('exposes a retryable error without showing the previously selected message', async () => {
+    let failSecond = true;
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === 'get_message_detail') {
+        const id = (args as { messageId: number }).messageId;
+        if (id === 2 && failSecond) throw new Error('database unavailable');
+        return message(id);
+      }
+      return [];
+    });
+    const { result } = renderController();
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(1));
+    act(() => result.current.setSelectedId(2));
+    await waitFor(() => expect(result.current.detailLoadState).toEqual({
+      status: 'error', messageId: 2, error: 'database unavailable',
+    }));
+    expect(result.current.readerSelectedDetail).toBeNull();
+    expect(result.current.selected?.id).toBe(2);
+    failSecond = false;
+    act(() => result.current.retrySelectedDetail());
+    expect(result.current.detailLoadState).toEqual({ status: 'loading', messageId: 2 });
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(2));
+    expect(result.current.detailLoadState).toEqual({ status: 'idle' });
   });
 });

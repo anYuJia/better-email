@@ -184,7 +184,7 @@ describe('settings de-AI contract — toggle is compact 36x20px', () => {
 
 describe('settings de-AI contract — radius tokens share application geometry', () => {
   it('aliases every settings radius level to its application semantic token', () => {
-    expect(settingsTokensCss).toMatch(/--st-radius-sm:\s*var\(--ui-radius-sm\)/);
+    expect(settingsTokensCss).toMatch(/--st-radius-sm:\s*var\(--ui-radius-control\)/);
     expect(settingsTokensCss).toMatch(/--st-radius-md:\s*var\(--ui-radius-control\)/);
     expect(settingsTokensCss).toMatch(/--st-radius-lg:\s*var\(--ui-radius-panel\)/);
     expect(settingsTokensCss).toMatch(/--st-radius-modal:\s*var\(--ui-radius-modal\)/);

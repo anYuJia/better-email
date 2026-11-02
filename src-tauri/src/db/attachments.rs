@@ -3,9 +3,37 @@ use super::*;
 use sha2::{Digest, Sha256};
 use std::io::Read;
 
-pub(super) type AttachmentStorageIndex = (BTreeSet<PathBuf>, Vec<(i64, PathBuf)>);
+pub(super) type AttachmentStorageIndex = (BTreeSet<PathBuf>, Vec<(i64, PathBuf, String)>);
 
 impl MailStore {
+    pub fn is_sent_attachment(&self, attachment_id: i64, expected_path: &str) -> MailResult<bool> {
+        self.with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM attachments a
+                 JOIN messages m ON m.id=a.message_id JOIN folders f ON f.id=m.folder_id
+                 LEFT JOIN outbox_queue q ON q.message_id=m.id
+                 WHERE a.id=?1 AND a.local_path=?2 AND
+                 (f.role='sent' OR q.status IN ('sent','sent_remote_pending','archiving')))",
+                params![attachment_id, expected_path],
+                |row| row.get(0),
+            )?)
+        })
+    }
+
+    /// A stale reader error must not clear a newer download or promoted copy.
+    pub fn mark_attachment_missing_if_path(
+        &self,
+        attachment_id: i64,
+        expected_path: &str,
+    ) -> MailResult<bool> {
+        self.with_conn(|conn| {
+            Ok(conn.execute(
+                "UPDATE attachments SET is_downloaded=0,local_path='' WHERE id=?1 AND local_path=?2",
+                params![attachment_id, expected_path],
+            )? == 1)
+        })
+    }
+
     pub fn list_attachments(&self, message_id: i64) -> MailResult<Vec<Attachment>> {
         self.with_conn(|conn| {
             let mut stmt = conn.prepare(
@@ -239,7 +267,7 @@ impl MailStore {
                   AND a.content_sha256 = ?2
                   AND a.content_sha256 <> ''
                   AND f.role <> 'drafts'
-                  AND q.message_id IS NULL
+                  AND (q.message_id IS NULL OR q.status IN ('sent', 'sent_remote_pending', 'archiving'))
                 ",
             )?;
             let rows = stmt
@@ -327,7 +355,7 @@ impl MailStore {
         let (protected_paths, reclaimable_rows) = self.attachment_storage_index()?;
 
         for (path, _) in collect_regular_files(&attachment_root)? {
-            if !protected_paths.contains(&path) {
+            if !protected_paths.contains(&path) && !self.attachment_path_has_active_writer(&path)? {
                 fs::remove_file(path)?;
             }
         }
@@ -335,10 +363,15 @@ impl MailStore {
         if !reclaimable_rows.is_empty() {
             self.with_conn(|conn| {
                 let transaction = conn.unchecked_transaction()?;
-                for (attachment_id, _) in &reclaimable_rows {
+                for (attachment_id, path, expected_path) in &reclaimable_rows {
+                    let current = attachment_for_conn(conn, *attachment_id)?;
+                    if path.exists() || self.has_active_outbox_lease(current.message_id)?
+                        || current.local_path != *expected_path {
+                        continue;
+                    }
                     transaction.execute(
-                        "UPDATE attachments SET is_downloaded = 0, local_path = '' WHERE id = ?1",
-                        params![attachment_id],
+                        "UPDATE attachments SET is_downloaded = 0, local_path = '' WHERE id = ?1 AND local_path = ?2",
+                        params![attachment_id, current.local_path],
                     )?;
                 }
                 transaction.commit()?;
@@ -361,14 +394,31 @@ impl MailStore {
             storage,
         })
     }
+
+    fn attachment_path_has_active_writer(&self, path: &Path) -> MailResult<bool> {
+        let root = canonical_or_normalized_path(&self.attachment_root());
+        let message_id = path
+            .strip_prefix(root)
+            .ok()
+            .and_then(|relative| relative.components().next())
+            .and_then(|part| part.as_os_str().to_str())
+            .and_then(|id| id.parse::<i64>().ok());
+        match message_id {
+            Some(message_id) => self.has_active_outbox_lease(message_id),
+            None => Ok(false),
+        }
+    }
+
     fn attachment_storage_index(&self) -> MailResult<AttachmentStorageIndex> {
         let attachment_root = canonical_or_normalized_path(&self.data_dir.join("attachments"));
         self.with_conn(|conn| {
             let mut statement = conn.prepare(
                 "
-                SELECT a.id, a.local_path, m.remote_mailbox, m.remote_uid
+                SELECT a.id, a.local_path, m.remote_mailbox, m.remote_uid, m.id,
+                       COALESCE(q.status, '')
                 FROM attachments a
                 JOIN messages m ON m.id = a.message_id
+                LEFT JOIN outbox_queue q ON q.message_id = m.id
                 WHERE a.is_downloaded = 1 AND a.local_path <> ''
                 ",
             )?;
@@ -379,21 +429,40 @@ impl MailStore {
                         row.get::<_, String>(1)?,
                         row.get::<_, String>(2)?,
                         row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
+                        row.get::<_, String>(5)?,
                     ))
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
 
             let mut protected_paths = BTreeSet::new();
             let mut reclaimable_rows = Vec::new();
-            for (attachment_id, local_path, remote_mailbox, remote_uid) in rows {
+            for (attachment_id, local_path, remote_mailbox, remote_uid, message_id, status) in rows
+            {
                 // 数据库存量路径可能是 macOS `/var/...`，而扫描结果会解析为
                 // `/private/var/...`。索引侧也必须用同一规范化表示才能比较。
-                let path = canonical_or_normalized_path(&PathBuf::from(local_path));
+                let path = canonical_or_normalized_path(&PathBuf::from(&local_path));
                 if !is_managed_attachment_path(&attachment_root, &path) {
                     continue;
                 }
-                if remote_uid > 0 && !remote_mailbox.trim().is_empty() {
-                    reclaimable_rows.push((attachment_id, path));
+                let pending_outbox = matches!(
+                    status.as_str(),
+                    "queued"
+                        | "retry"
+                        | "scheduled"
+                        | "failed"
+                        | "cancelled"
+                        | "sending"
+                        | "send_unknown"
+                        | "archiving"
+                        | "sent_remote_pending"
+                );
+                if remote_uid > 0
+                    && !remote_mailbox.trim().is_empty()
+                    && !pending_outbox
+                    && !self.has_active_outbox_lease(message_id)?
+                {
+                    reclaimable_rows.push((attachment_id, path, local_path));
                 } else {
                     protected_paths.insert(path);
                 }

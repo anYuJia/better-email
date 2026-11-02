@@ -420,6 +420,7 @@ impl MailStore {
                  ON accounts(is_default) WHERE is_default = 1;",
             )?;
             add_column_if_missing(conn, "messages", "sanitizer_version", "INTEGER NOT NULL DEFAULT 0")?;
+            add_column_if_missing(conn, "messages", "remote_body_fetched", "INTEGER NOT NULL DEFAULT 0")?;
             add_column_if_missing(conn, "messages", "cc", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(conn, "messages", "bcc", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(
@@ -657,6 +658,7 @@ impl MailStore {
             )?;
             migrate_thread_keys_if_needed(conn)?;
             migrate_fts_update_trigger_if_needed(conn)?;
+            super::substring_search::migrate(conn)?;
             ensure_default_identities_for_conn(conn)?;
             add_column_if_missing(
                 conn,

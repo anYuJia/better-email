@@ -111,7 +111,7 @@ impl MailStore {
         offset: i64,
         limit: i64,
     ) -> MailResult<Vec<MessageSummary>> {
-        self.with_conn(|conn| {
+        self.with_read_conn(|conn| {
             let limit = limit.clamp(1, 200);
             let offset = offset.max(0);
             let search = query
@@ -170,7 +170,7 @@ impl MailStore {
         query: Option<String>,
         filter: Option<String>,
     ) -> MailResult<i64> {
-        self.with_conn(|conn| {
+        self.with_read_conn(|conn| {
             let search = query
                 .map(|q| q.trim().to_string())
                 .filter(|q| !q.is_empty());
@@ -388,7 +388,43 @@ impl MailStore {
         })
     }
     pub fn get_message(&self, message_id: i64) -> MailResult<Message> {
-        self.with_conn(|conn| message_for_conn(conn, message_id))
+        let (mut message, needs_upgrade) = self.with_conn(|conn| {
+            let message = message_for_conn(conn, message_id)?;
+            let needs_upgrade: bool = conn.query_row(
+                "SELECT sanitizer_version < 1 AND NOT EXISTS(SELECT 1 FROM outbox_queue WHERE message_id=?1) FROM messages WHERE id=?1",
+                [message_id], |row| row.get(0),
+            )?;
+            let needs_upgrade = needs_upgrade && !matches!(message.folder_role.as_str(), "drafts" | "outbox");
+            Ok((message, needs_upgrade))
+        })?;
+        if !needs_upgrade {
+            return Ok(message);
+        }
+        // Legacy truncation recovery can parse megabytes. Do it after releasing
+        // SQLite, then compare the source before persisting the repaired HTML.
+        let previous_html = message.sanitized_html.clone();
+        if looks_like_html_fragment(&message.body) && message.body.len() > 20_000 {
+            message.sanitized_html = if crate::protocol::html_has_remote_images(&previous_html) {
+                super::trusted_html_cache::sanitize(&self.trusted_html, message.id, &message.body)
+            } else {
+                crate::protocol::sanitize_html(&message.body)
+            };
+        }
+        self.with_conn(|conn| {
+            conn.execute(
+                "UPDATE messages SET sanitized_html=?2, sanitizer_version=1
+                 WHERE id=?1 AND body=?3 AND sanitized_html=?4 AND sanitizer_version<1
+                   AND NOT EXISTS(SELECT 1 FROM outbox_queue WHERE message_id=?1)
+                   AND folder_id NOT IN (SELECT id FROM folders WHERE role IN ('drafts','outbox'))",
+                params![
+                    message_id,
+                    message.sanitized_html,
+                    message.body,
+                    previous_html
+                ],
+            )?;
+            message_for_conn(conn, message_id)
+        })
     }
     /// 按本地 message id 批量取消息（新邮件通知候选来源）。
     pub fn list_messages_by_ids(&self, message_ids: &[i64]) -> MailResult<Vec<Message>> {
@@ -510,45 +546,93 @@ impl MailStore {
         })
     }
     pub fn message_with_remote_image_policy(&self, message_id: i64) -> MailResult<Message> {
-        self.with_conn(|conn| {
-            let mut message = message_for_conn(conn, message_id)?;
-            if !should_allow_remote_images_for_message(conn, &message)? {
-                return Ok(message);
-            }
-            if !looks_like_html_fragment(&message.body) {
-                return Ok(message);
-            }
-            message.sanitized_html =
-                crate::protocol::sanitize_html_with_remote_images(&message.body);
-            message
-                .security_warnings
-                .retain(|warning| !warning.contains("远程图片"));
-            Ok(message)
+        self.render_message_with_remote_image_policy(message_id, |message| {
+            super::trusted_html_cache::sanitize(&self.trusted_html, message.id, &message.body)
         })
     }
-    pub fn persist_message_remote_images_once(&self, message_id: i64) -> MailResult<Message> {
-        self.with_conn(|conn| {
-            let mut message = message_for_conn(conn, message_id)?;
-            if !message.body.trim().is_empty() && looks_like_html_fragment(&message.body) {
-                message.sanitized_html =
-                    crate::protocol::sanitize_html_with_remote_images(&message.body);
+
+    fn render_message_with_remote_image_policy(
+        &self,
+        message_id: i64,
+        render: impl FnOnce(&Message) -> String,
+    ) -> MailResult<Message> {
+        let message = self.get_message(message_id)?;
+        let allow_remote =
+            self.with_conn(|conn| should_allow_remote_images_for_message(conn, &message))?;
+        // Sanitization is CPU work, not database work. Never hold the shared
+        // connection while parsing a potentially very large trusted message.
+        if !allow_remote || !looks_like_html_fragment(&message.body) {
+            return Ok(message);
+        }
+        let html = render(&message);
+        let (mut current, still_allowed) = self.with_conn(|conn| {
+            let current = message_for_conn(conn, message_id)?;
+            let still_allowed = should_allow_remote_images_for_message(conn, &current)?;
+            Ok((current, still_allowed))
+        })?;
+        if still_allowed
+            && current.body == message.body
+            && current.sanitized_html == message.sanitized_html
+        {
+            current.sanitized_html = html;
+            current
+                .security_warnings
+                .retain(|warning| !warning.contains("远程图片"));
+        } else {
+            // Trust/source changed while parsing. Use the newest source with
+            // the conservative policy; do not return the old trusted render.
+            // This fallback also stays outside the shared SQLite mutex.
+            current.sanitized_html = crate::protocol::sanitize_html(&current.body);
+            if crate::protocol::html_has_remote_images(&current.body)
+                && !current
+                    .security_warnings
+                    .iter()
+                    .any(|warning| warning.contains("远程图片"))
+            {
+                current
+                    .security_warnings
+                    .push("检测到远程图片，默认已阻止自动加载。".into());
             }
-            message
+        }
+        Ok(current)
+    }
+    pub fn persist_message_remote_images_once(&self, message_id: i64) -> MailResult<Message> {
+        self.persist_remote_image_render(self.get_message(message_id)?, false)
+    }
+
+    fn persist_remote_image_render(
+        &self,
+        message: Message,
+        require_trust: bool,
+    ) -> MailResult<Message> {
+        let html = if looks_like_html_fragment(&message.body) {
+            super::trusted_html_cache::sanitize(&self.trusted_html, message.id, &message.body)
+        } else {
+            message.sanitized_html.clone()
+        };
+        self.with_conn(|conn| {
+            let mut current = message_for_conn(conn, message.id)?;
+            // A concurrent body refresh or trust revocation must win over a
+            // rendering job that started with an older snapshot.
+            if current.body != message.body
+                || current.sanitized_html != message.sanitized_html
+                || (require_trust && !should_allow_remote_images_for_message(conn, &current)?)
+            {
+                return Ok(current);
+            }
+            current.sanitized_html = html;
+            current
                 .security_warnings
                 .retain(|warning| !warning.contains("远程图片"));
             conn.execute(
-                "
-                UPDATE messages
-                SET sanitized_html = ?2, security_warnings = ?3
-                WHERE id = ?1
-                ",
+                "UPDATE messages SET sanitized_html=?2, security_warnings=?3 WHERE id=?1",
                 params![
-                    message_id,
-                    message.sanitized_html,
-                    warning_lines_to_text(&message.security_warnings)
+                    current.id,
+                    current.sanitized_html,
+                    warning_lines_to_text(&current.security_warnings)
                 ],
             )?;
-            Ok(message)
+            Ok(current)
         })
     }
     pub fn update_message_body(
@@ -556,12 +640,43 @@ impl MailStore {
         message_id: i64,
         body: &RemoteMessageBody,
     ) -> MailResult<Message> {
-        self.with_conn(|conn| {
+        self.update_message_body_checked(message_id, body, None)
+    }
+
+    pub fn update_message_body_from_remote(
+        &self,
+        message_id: i64,
+        body: &RemoteMessageBody,
+        expected: &MessageRemoteRef,
+    ) -> MailResult<Message> {
+        self.update_message_body_checked(message_id, body, Some(expected))
+    }
+
+    fn update_message_body_checked(
+        &self,
+        message_id: i64,
+        body: &RemoteMessageBody,
+        expected: Option<&MessageRemoteRef>,
+    ) -> MailResult<Message> {
+        let message = self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let conn = &transaction;
+            if let Some(expected) = expected {
+                let actual = message_remote_ref_for_conn(conn, message_id)?;
+                if actual.account_id != expected.account_id
+                    || actual.remote_mailbox != expected.remote_mailbox
+                    || actual.remote_uid != expected.remote_uid
+                {
+                    return Err(MailError::Cancelled);
+                }
+            }
             let has_attachments = body.has_attachments || !body.attachments.is_empty();
             conn.execute(
                 "
                 UPDATE messages
-                SET body = ?2, sanitized_html = ?3, security_warnings = ?4, snippet = ?5, has_attachments = ?6
+                SET body = ?2, sanitized_html = ?3, security_warnings = ?4, snippet = ?5,
+                    has_attachments = CASE WHEN ?7 THEN ?6 ELSE MAX(has_attachments, ?6) END,
+                    sanitizer_version = 1, remote_body_fetched = 1
                 WHERE id = ?1
                 ",
                 params![
@@ -570,89 +685,75 @@ impl MailStore {
                     body.sanitized_html,
                     warning_lines_to_text(&body.security_warnings),
                     body.snippet,
-                    bool_to_int(has_attachments)
+                    bool_to_int(has_attachments),
+                    body.attachments_complete
                 ],
             )?;
             // 正文重拉前先读取既有附件，以便按稳定身份匹配新旧附件并保留
             // 已下载状态（is_downloaded/local_path），避免重拉正文把已下载
             // 附件重置为未下载、产生孤儿文件。
-            let old_attachments = attachment_rows_for_conn(conn, message_id)?;
-            let mut old_by_content_id = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
-            let mut old_by_filename = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
-            for old in old_attachments {
-                let target = if old.content_id.trim().is_empty() {
-                    &mut old_by_filename
-                } else {
-                    &mut old_by_content_id
-                };
-                target
-                    .entry(if old.content_id.trim().is_empty() {
-                        old.filename.clone()
+            if body.attachments_complete {
+                let old_attachments = attachment_rows_for_conn(conn, message_id)?;
+                let mut old_by_content_id = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
+                let mut old_by_filename = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
+                for old in old_attachments {
+                    let target = if old.content_id.trim().is_empty() {
+                        &mut old_by_filename
                     } else {
-                        old.content_id.clone()
-                    })
-                    .or_default()
-                    .push_back(old);
-            }
-            conn.execute(
-                "DELETE FROM attachments WHERE message_id = ?1",
-                params![message_id],
-            )?;
-            for attachment in &body.attachments {
-                let matched = match_old_attachment(
-                    attachment,
-                    &mut old_by_content_id,
-                    &mut old_by_filename,
-                );
-                let (is_downloaded, local_path, size_bytes, content_sha256) =
-                    preserve_attachment_download_state(&matched, attachment);
+                        &mut old_by_content_id
+                    };
+                    target
+                        .entry(if old.content_id.trim().is_empty() {
+                            old.filename.clone()
+                        } else {
+                            old.content_id.clone()
+                        })
+                        .or_default()
+                        .push_back(old);
+                }
                 conn.execute(
-                    "INSERT INTO attachments(
+                    "DELETE FROM attachments WHERE message_id = ?1",
+                    params![message_id],
+                )?;
+                for attachment in &body.attachments {
+                    let matched = match_old_attachment(
+                        attachment,
+                        &mut old_by_content_id,
+                        &mut old_by_filename,
+                    );
+                    let (is_downloaded, local_path, size_bytes, content_sha256) =
+                        preserve_attachment_download_state(&matched, attachment);
+                    conn.execute(
+                        "INSERT INTO attachments(
                         message_id, filename, mime_type, size_bytes, is_downloaded,
                         local_path, content_sha256, content_id, is_inline
                      )
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                    params![
-                        message_id,
-                        attachment.filename,
-                        attachment.mime_type,
-                        size_bytes,
-                        bool_to_int(is_downloaded),
-                        local_path,
-                        content_sha256,
-                        attachment.content_id,
-                        bool_to_int(attachment.is_inline)
-                    ],
-                )?;
-            }
-            message_for_conn(conn, message_id)
-                .and_then(|message| {
-                    if !should_allow_remote_images_for_message(conn, &message)?
-                        || !looks_like_html_fragment(&message.body)
-                    {
-                        return Ok(message);
-                    }
-                    let mut message = message;
-                    message.sanitized_html =
-                        crate::protocol::sanitize_html_with_remote_images(&message.body);
-                    message
-                        .security_warnings
-                        .retain(|warning| !warning.contains("远程图片"));
-                    conn.execute(
-                        "
-                        UPDATE messages
-                        SET sanitized_html = ?2, security_warnings = ?3
-                        WHERE id = ?1
-                        ",
                         params![
                             message_id,
-                            message.sanitized_html,
-                            warning_lines_to_text(&message.security_warnings)
+                            attachment.filename,
+                            attachment.mime_type,
+                            size_bytes,
+                            bool_to_int(is_downloaded),
+                            local_path,
+                            content_sha256,
+                            attachment.content_id,
+                            bool_to_int(attachment.is_inline)
                         ],
                     )?;
-                    Ok(message)
-                })
-        })
+                }
+            }
+            let message = message_for_conn(conn, message_id)?;
+            transaction.commit()?;
+            Ok(message)
+        })?;
+        let allow_remote =
+            self.with_conn(|conn| should_allow_remote_images_for_message(conn, &message))?;
+        if allow_remote && looks_like_html_fragment(&message.body) {
+            self.persist_remote_image_render(message, true)
+        } else {
+            Ok(message)
+        }
     }
     pub fn list_messages_missing_body(
         &self,
@@ -677,6 +778,8 @@ impl MailStore {
                       AND remote_mailbox = ?2
                       AND remote_uid > 0
                       AND body = ''
+                      AND remote_body_fetched = 0
+                      AND NOT EXISTS (SELECT 1 FROM outbox_queue WHERE message_id = messages.id)
                     ORDER BY id ASC
                     LIMIT ?3
                     ",
@@ -700,6 +803,8 @@ impl MailStore {
                       AND remote_mailbox = ?2
                       AND remote_uid > 0
                       AND body = ''
+                      AND remote_body_fetched = 0
+                      AND NOT EXISTS (SELECT 1 FROM outbox_queue WHERE message_id = messages.id)
                     ORDER BY id DESC
                     LIMIT ?3
                     ",
@@ -1408,7 +1513,7 @@ impl MailStore {
         sort: Option<String>,
         limit: i64,
     ) -> MailResult<Vec<ThreadSummary>> {
-        self.with_conn(|conn| {
+        self.with_read_conn(|conn| {
             let limit = limit.clamp(1, 200);
             let search = query
                 .map(|value| value.trim().to_string())
@@ -1750,7 +1855,7 @@ fn preserve_attachment_download_state(
 }
 
 pub(super) fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult<Message> {
-    let (mut message, sanitizer_version) = conn.query_row(
+    let message = conn.query_row(
         "
         SELECT m.id, m.account_id, a.email, m.folder_id, f.role, m.sender_name, m.sender_email, m.recipients,
                m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
@@ -1763,31 +1868,8 @@ pub(super) fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult
         WHERE m.id = ?1
         ",
         params![message_id],
-        |row| Ok((map_message_row(conn, row)?, row.get::<_, i64>(25)?)),
+        |row| map_message_row(conn, row),
     )?;
-    if sanitizer_version < 1 && !matches!(message.folder_role.as_str(), "drafts" | "outbox") {
-        let is_outbound: bool = conn.query_row(
-            "SELECT EXISTS(SELECT 1 FROM outbox_queue WHERE message_id = ?1)",
-            [message_id],
-            |row| row.get(0),
-        )?;
-        if !is_outbound && looks_like_html_fragment(&message.body) && message.body.len() > 20_000 {
-            message.sanitized_html =
-                if crate::protocol::html_has_remote_images(&message.sanitized_html) {
-                    crate::protocol::sanitize_html_with_remote_images(&message.body)
-                } else {
-                    crate::protocol::sanitize_html(&message.body)
-                };
-            conn.execute(
-                "UPDATE messages SET sanitized_html = ?2 WHERE id = ?1",
-                params![message_id, message.sanitized_html],
-            )?;
-        }
-        conn.execute(
-            "UPDATE messages SET sanitizer_version = 1 WHERE id = ?1",
-            [message_id],
-        )?;
-    }
     Ok(message)
 }
 pub(super) fn decode_thread_participants(value: &str) -> String {
@@ -2214,6 +2296,105 @@ pub(super) fn snippet_from_body(body: &str) -> String {
 mod completeness_recovery_tests {
     use super::*;
 
+    fn trusted_message() -> (tempfile::TempDir, MailStore, i64, RemoteImageTrust) {
+        let dir = tempfile::tempdir().unwrap();
+        let store = MailStore::open_at_with_seed(dir.path().join("test.sqlite3"), true).unwrap();
+        let message = store
+            .list_messages_for_scope(None, 0, None, None, 1)
+            .unwrap()
+            .remove(0);
+        let body = r#"<p>Original</p><img src="https://example.invalid/tracker.png">"#;
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE messages SET body=?2,sanitized_html=?3,sanitizer_version=1 WHERE id=?1",
+                    params![message.id, body, crate::protocol::sanitize_html(body)],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let trust = store
+            .upsert_remote_image_trust(RemoteImageTrustInput {
+                account_id: message.account_id,
+                scope: "sender".into(),
+                value: message.sender_email,
+            })
+            .unwrap();
+        (dir, store, message.id, trust)
+    }
+
+    #[test]
+    fn trust_revoked_while_rendering_cannot_return_remote_images() {
+        let (_dir, store, id, trust) = trusted_message();
+        let result = store
+            .render_message_with_remote_image_policy(id, |source| {
+                let html = crate::protocol::sanitize_html_with_remote_images(&source.body);
+                assert!(html.contains("tracker.png"));
+                // Deterministically interleave a policy change in the lock-free
+                // rendering interval; no timing assumptions or sleeping needed.
+                store.delete_remote_image_trust(trust.id).unwrap();
+                html
+            })
+            .unwrap();
+        assert!(!result.sanitized_html.contains("tracker.png"));
+        assert!(result
+            .security_warnings
+            .iter()
+            .any(|warning| warning.contains("远程图片")));
+    }
+
+    #[test]
+    fn body_refreshed_while_rendering_returns_the_new_safe_source() {
+        let (_dir, store, id, _trust) = trusted_message();
+        let result = store.render_message_with_remote_image_policy(id, |source| {
+            store.with_conn(|conn| {
+                conn.execute("UPDATE messages SET body='<p>Newest body</p>',sanitized_html='<p>Newest body</p>' WHERE id=?1",[id])?;
+                Ok(())
+            }).unwrap();
+            crate::protocol::sanitize_html_with_remote_images(&source.body)
+        }).unwrap();
+        assert!(result.sanitized_html.contains("Newest body"));
+        assert!(!result.sanitized_html.contains("Original"));
+        assert!(!result.sanitized_html.contains("tracker.png"));
+    }
+
+    #[test]
+    fn late_remote_body_cannot_overwrite_a_message_that_moved_mailboxes() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = MailStore::open_at_with_seed(dir.path().join("test.sqlite3"), true).unwrap();
+        let message = store
+            .list_messages_for_scope(None, 0, None, None, 1)
+            .unwrap()
+            .remove(0);
+        let original = store.get_message(message.id).unwrap();
+        let expected = store.get_message_remote_reference(message.id).unwrap();
+        store
+            .set_message_remote_ref(message.id, "Moved", expected.remote_uid + 10)
+            .unwrap();
+        let body = RemoteMessageBody {
+            body: "stale result".into(),
+            sanitized_html: "<p>stale result</p>".into(),
+            security_warnings: Vec::new(),
+            snippet: "stale result".into(),
+            has_attachments: false,
+            attachments_complete: true,
+            attachments: Vec::new(),
+        };
+        assert!(matches!(
+            store.update_message_body_from_remote(message.id, &body, &expected),
+            Err(MailError::Cancelled)
+        ));
+        assert_eq!(store.get_message(message.id).unwrap().body, original.body);
+        let current = store.get_message_remote_reference(message.id).unwrap();
+        assert_eq!(
+            store
+                .update_message_body_from_remote(message.id, &body, &current)
+                .unwrap()
+                .body,
+            body.body
+        );
+    }
+
     #[test]
     fn opening_a_legacy_truncated_message_recovers_the_tail_from_preserved_html() {
         let dir = tempfile::tempdir().unwrap();
@@ -2245,5 +2426,123 @@ mod completeness_recovery_tests {
             store.get_message(message_id).unwrap().sanitized_html,
             restored.sanitized_html
         );
+    }
+}
+
+#[cfg(test)]
+mod attachment_metadata_tests {
+    use super::*;
+
+    fn fixture() -> (tempfile::TempDir, MailStore, i64) {
+        let dir = tempfile::tempdir().unwrap();
+        let store =
+            MailStore::open_at_with_seed(dir.path().join("metadata.sqlite3"), true).unwrap();
+        let id = store
+            .with_conn(|conn| {
+                Ok(conn.query_row("SELECT id FROM messages LIMIT 1", [], |row| row.get(0))?)
+            })
+            .unwrap();
+        store.set_message_remote_ref(id, "Sent", 42).unwrap();
+        (dir, store, id)
+    }
+
+    fn body(complete: bool) -> RemoteMessageBody {
+        RemoteMessageBody {
+            body: String::new(),
+            sanitized_html: String::new(),
+            security_warnings: Vec::new(),
+            snippet: String::new(),
+            has_attachments: false,
+            attachments_complete: complete,
+            attachments: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn body_only_sync_preserves_attachment_rows_until_complete_metadata_arrives() {
+        let (_dir, store, id) = fixture();
+        let initial = RemoteMessageBody {
+            has_attachments: true,
+            attachments: vec![crate::models::RemoteAttachmentMetadata {
+                filename: "large.zip".into(),
+                mime_type: "application/zip".into(),
+                size_bytes: 20_000_000,
+                content_id: String::new(),
+                is_inline: false,
+            }],
+            ..body(true)
+        };
+        store.update_message_body(id, &initial).unwrap();
+        let before = store.list_attachments(id).unwrap();
+        let incomplete = store.update_message_body(id, &body(false)).unwrap();
+        assert!(incomplete.has_attachments);
+        assert_eq!(store.list_attachments(id).unwrap()[0].id, before[0].id);
+        assert_eq!(
+            store.list_attachments(id).unwrap()[0].size_bytes,
+            20_000_000
+        );
+        // A genuinely complete, empty inventory is still authoritative.
+        assert!(
+            !store
+                .update_message_body(id, &body(true))
+                .unwrap()
+                .has_attachments
+        );
+        assert!(store.list_attachments(id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn successfully_fetched_empty_body_is_not_requested_on_every_sync() {
+        let (_dir, store, id) = fixture();
+        let account = store.get_message(id).unwrap().account_id;
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE messages SET body='',remote_body_fetched=0 WHERE id=?1",
+                    [id],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        assert!(store
+            .list_messages_missing_body(account, "Sent", 20)
+            .unwrap()
+            .iter()
+            .any(|item| item.0 == id));
+        store.update_message_body(id, &body(false)).unwrap();
+        assert!(!store
+            .list_messages_missing_body(account, "Sent", 20)
+            .unwrap()
+            .iter()
+            .any(|item| item.0 == id));
+    }
+
+    #[test]
+    fn failed_attachment_replacement_rolls_back_body_and_existing_inventory() {
+        let (_dir, store, id) = fixture();
+        let initial = RemoteMessageBody {
+            body: "original body".into(),
+            has_attachments: true,
+            attachments: vec![crate::models::RemoteAttachmentMetadata {
+                filename: "original.zip".into(),
+                mime_type: "application/zip".into(),
+                size_bytes: 12,
+                content_id: String::new(),
+                is_inline: false,
+            }],
+            ..body(true)
+        };
+        store.update_message_body(id, &initial).unwrap();
+        let attachment_id = store.list_attachments(id).unwrap()[0].id;
+        store.with_conn(|conn| {
+            conn.execute_batch("CREATE TEMP TRIGGER reject_new_attachment BEFORE INSERT ON attachments WHEN NEW.filename='broken.zip' BEGIN SELECT RAISE(FAIL,'injected write failure'); END;")?;
+            Ok(())
+        }).unwrap();
+        let mut replacement = initial.clone();
+        replacement.body = "replacement body".into();
+        replacement.attachments[0].filename = "broken.zip".into();
+        assert!(store.update_message_body(id, &replacement).is_err());
+        assert_eq!(store.get_message(id).unwrap().body, "original body");
+        assert_eq!(store.list_attachments(id).unwrap()[0].id, attachment_id);
     }
 }

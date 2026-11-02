@@ -25,7 +25,7 @@
     flex-basis: auto;
     display: grid;
     grid-template-columns: minmax(0, 1fr) 44px auto;
-    grid-template-rows: 52px 50px;
+    grid-template-rows: minmax(52px, auto) minmax(50px, auto);
     gap: 0 4px;
     padding: 0 8px 0 4px;
   }
@@ -44,7 +44,7 @@
     padding: 0 6px 0 2px;
     border: 0;
     border-radius: var(--st-radius-md);
-    color: var(--st-accent);
+    color: var(--ui-text-accent);
     background: transparent;
     box-shadow: none;
     font-size: 14px;
@@ -138,6 +138,12 @@
     right: 8px;
     left: 8px;
     width: auto;
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    background: var(--st-canvas);
     z-index: 10;
     justify-self: stretch;
   }
@@ -154,6 +160,36 @@
 
   .settings-header-search.is-mobile-expanded .settings-search-field input {
     min-height: 42px;
+  }
+
+  .settings-search-field > button {
+    width: 44px;
+    min-width: 44px;
+  }
+
+  .settings-search-cancel {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--st-radius-md);
+    background: transparent;
+    color: var(--ui-text-accent);
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .settings-search-cancel:is(:hover, :focus-visible) {
+    background: var(--st-surface-muted);
+  }
+
+  .settings-search-cancel:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: -2px;
+  }
+
+  .settings-search-shortcut {
+    display: none;
   }
 
   .settings-search-popover {
@@ -188,6 +224,8 @@
   .settings-page {
     width: 100%;
     scrollbar-gutter: auto;
+    /* Relative positioning leaves fixed descendant dialogs viewport-bound. */
+    position: relative;
   }
 
   .settings-page-motion-forward {
@@ -198,12 +236,9 @@
     animation: settings-mobile-page-backward var(--ui-motion-normal) var(--ui-ease-standard) backwards;
   }
 
-  .settings-shell.settings-modal {
-    animation: settings-mobile-shell-enter var(--ui-motion-normal) var(--ui-ease-standard) backwards;
-  }
-
+  .settings-shell.settings-modal,
   .settings-workspace.is-closing .settings-shell.settings-modal {
-    animation: settings-mobile-shell-exit var(--ui-motion-normal) var(--ui-ease-standard) forwards;
+    animation: none;
   }
 
   .settings-page-header {
@@ -306,24 +341,14 @@
   }
 }
 
-@keyframes settings-mobile-shell-enter {
-  from { transform: translateX(18px); }
-  to { transform: translateX(0); }
-}
-
-@keyframes settings-mobile-shell-exit {
-  from { transform: translateX(0); }
-  to { transform: translateX(100%); }
-}
-
 @keyframes settings-mobile-page-forward {
-  from { transform: translateX(12px); }
-  to { transform: translateX(0); }
+  from { opacity: 0.84; left: 12px; }
+  to { opacity: 1; left: 0; }
 }
 
 @keyframes settings-mobile-page-backward {
-  from { transform: translateX(-12px); }
-  to { transform: translateX(0); }
+  from { opacity: 0.84; left: -12px; }
+  to { opacity: 1; left: 0; }
 }
 
 @media (max-width: 420px) {
@@ -424,6 +449,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .settings-page-motion-forward,
+  .settings-page-motion-backward {
+    animation: none;
+  }
+
+  .settings-workspace .settings-shell.settings-modal,
+  .settings-workspace.is-closing .settings-shell.settings-modal {
+    animation: none;
+  }
+
   .settings-workspace *,
   .settings-workspace *::before,
   .settings-workspace *::after {

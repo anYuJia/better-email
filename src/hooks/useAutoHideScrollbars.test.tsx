@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import useAutoHideScrollbars from './useAutoHideScrollbars';
 
@@ -29,10 +29,17 @@ function createScrollableSurface(parent: HTMLElement = document.body) {
 }
 
 describe('useAutoHideScrollbars', () => {
+  beforeEach(() => {
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+  });
   afterEach(() => {
     cleanup();
     document.body.replaceChildren();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('shows a scrolling surface briefly, then removes its state', () => {
@@ -118,6 +125,51 @@ describe('useAutoHideScrollbars', () => {
     act(() => fireEvent.pointerDown(thumb, { button: 0, pointerId: 9, clientY: 10 }));
     view.unmount();
 
+    expect(document.querySelector('.auto-scrollbar-thumb')).toBeNull();
+    expect(surface.hasAttribute('data-scrollbar-scrolling')).toBe(false);
+  });
+
+  it('removes overlay nodes when a surface unmounts after its hide timer', async () => {
+    vi.useFakeTimers();
+    render(<Harness />);
+    for (let index = 0; index < 3; index += 1) {
+      const surface = createScrollableSurface();
+      act(() => surface.dispatchEvent(new Event('scroll')));
+      act(() => vi.advanceTimersByTime(1250));
+      expect(document.querySelectorAll('.auto-scrollbar-thumb')).toHaveLength(2);
+      await act(async () => { surface.remove(); });
+      expect(document.querySelectorAll('.auto-scrollbar-thumb')).toHaveLength(0);
+    }
+  });
+
+  it('coalesces wheel, touch and scroll activity into one overlay update per frame', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    render(<Harness />);
+    const surface = createScrollableSurface();
+    for (let index = 0; index < 5; index += 1) {
+      fireEvent.wheel(surface, { deltaY: 20 });
+      fireEvent.touchMove(surface);
+      fireEvent.scroll(surface);
+    }
+    expect(frames).toHaveLength(1);
+    expect(surface.getBoundingClientRect).not.toHaveBeenCalled();
+    act(() => frames[0](0));
+    expect(surface.getBoundingClientRect).toHaveBeenCalledTimes(1);
+    expect(document.querySelectorAll('.auto-scrollbar-thumb')).toHaveLength(2);
+  });
+
+  it('leaves native top-layer popovers to their own visible scrollbar', () => {
+    render(<Harness />);
+    const popover = document.createElement('div');
+    popover.setAttribute('popover', 'manual');
+    document.body.append(popover);
+    const surface = createScrollableSurface(popover);
+    fireEvent.scroll(surface);
+    fireEvent.wheel(surface, { deltaY: 20 });
     expect(document.querySelector('.auto-scrollbar-thumb')).toBeNull();
     expect(surface.hasAttribute('data-scrollbar-scrolling')).toBe(false);
   });

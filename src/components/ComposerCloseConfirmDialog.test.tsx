@@ -3,13 +3,14 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ComposerCloseConfirmDialog from './ComposerCloseConfirmDialog';
 import useModalAccessibility from '../hooks/useModalAccessibility';
+import type { ComposerSaveResult } from '../app/types';
 
 afterEach(cleanup);
 
 type HarnessProps = {
   onClose?: () => void;
   onDiscard?: () => void;
-  onSaveDraft?: () => Promise<void>;
+  onSaveDraft?: () => Promise<ComposerSaveResult | void>;
   closeOnDiscard?: boolean;
 };
 
@@ -191,5 +192,17 @@ describe('ComposerCloseConfirmDialog modal accessibility', () => {
       fireEvent.click(screen.getByRole('button', { name: '保存并关闭' }));
     });
     expect(onSaveDraft).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['blocked', 'empty'] as const)('retains the confirmation after a %s save and closes only after success', async (status) => {
+    const message = status === 'blocked' ? '附件仍在准备，请稍后重试' : '草稿为空，未保存';
+    const onSaveDraft = vi.fn().mockResolvedValueOnce({ status, message }).mockResolvedValueOnce({ status: 'saved' });
+    render(<Harness onSaveDraft={onSaveDraft} />);
+    openDialog();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存并关闭' })); });
+    expect(screen.getByRole('alert').textContent).toBe(message);
+    expect(screen.getByRole('button', { name: '继续编辑' }).hasAttribute('disabled')).toBe(false);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存并关闭' })); });
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

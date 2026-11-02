@@ -43,7 +43,7 @@ export default function SenderIdentity({ message, onComposeNew }: SenderIdentity
           className={`reader-avatar avatar-tone-${senderAvatarTone(message.sender_name, message.sender_email)}`}
         />
         <span className="reader-sender-copy">
-          <strong>{message.sender_name || message.sender_email}</strong>
+          <strong title={message.sender_name || message.sender_email}>{message.sender_name || message.sender_email}</strong>
           <span className="reader-sender-email-line">
             {senderEmail && onComposeNew ? (
               <button
@@ -61,7 +61,7 @@ export default function SenderIdentity({ message, onComposeNew }: SenderIdentity
               <span className="reader-sender-email-text">{message.sender_email}</span>
             )}
             {recipientSummary && (
-              <span className="reader-recipient-summary">{recipientSummary}</span>
+              <span className="reader-recipient-summary" title={allRecipientText}>{recipientSummary}</span>
             )}
             {hasRecipientOverflow && (
               <button

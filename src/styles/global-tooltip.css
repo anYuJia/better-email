@@ -3,9 +3,12 @@
  * This file owns the GlobalTooltip component styles; the dark theme
  * variant lives in dark-mode.css. */
 .global-tooltip {
+  box-sizing: border-box;
   position: fixed;
   z-index: var(--ui-z-tooltip, 10000);
   max-width: min(300px, calc(100vw - 24px));
+  max-height: calc(100dvh - 20px);
+  overflow: hidden;
   padding: 6px 10px;
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-control, 8px);
@@ -20,6 +23,13 @@
   animation: var(--ui-animation-global-tooltip-in);
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+.global-tooltip-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--tooltip-visible-lines, 5);
+  overflow: hidden;
 }
 
 /* Keyframes required by --ui-animation-global-tooltip-in (also from

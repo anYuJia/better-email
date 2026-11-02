@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Message } from '../app/types';
 import { bodyLooksLikeHtml, isMessageBodyCorrupted } from '../mailUtils';
 
@@ -16,6 +16,8 @@ type ReaderCompletionOptions = {
   readTriggerKey: number;
   completionTriggerKey?: string;
   onReadComplete: (message: Message) => void;
+  canRenderBody?: boolean;
+  canCompleteReading?: boolean;
 };
 
 export default function useReaderCompletion({
@@ -23,6 +25,8 @@ export default function useReaderCompletion({
   selectedId,
   readTriggerKey,
   onReadComplete,
+  canRenderBody = true,
+  canCompleteReading = true,
 }: ReaderCompletionOptions) {
   const [bodyRenderMessageId, setBodyRenderMessageId] = useState<number | null>(null);
   const [showPlaceholder, setShowPlaceholder] = useState(false);
@@ -39,7 +43,7 @@ export default function useReaderCompletion({
       setShowPlaceholder(false);
     }
 
-    if (!selectedId || !selected) return undefined;
+    if (!selectedId || !selected || !canRenderBody) return undefined;
 
     const isPlainText = !selected.sanitized_html?.trim() &&
                         !bodyLooksLikeHtml(selected.body) &&
@@ -77,11 +81,14 @@ export default function useReaderCompletion({
         if (idleHandle !== null) scheduler.cancelIdleCallback?.(idleHandle);
       };
     }
-  }, [selectedId, selected?.id, selected?.attachment_count, bodyRenderMessageId]);
+  }, [selectedId, selected?.id, selected?.attachment_count, bodyRenderMessageId, canRenderBody]);
 
-  const isSelectedBodyCorrupted = Boolean(selected && isMessageBodyCorrupted(selected.body));
+  const isSelectedBodyCorrupted = useMemo(
+    () => canRenderBody && Boolean(selected && isMessageBodyCorrupted(selected.body)),
+    [canRenderBody, selected?.body],
+  );
   const bodySelected = bodyRenderMessageId === selected?.id ? selected : null;
-  const isBodyRenderReady = bodyRenderMessageId === selected?.id && Boolean(bodySelected) && !isSelectedBodyCorrupted;
+  const isBodyRenderReady = canRenderBody && bodyRenderMessageId === selected?.id && Boolean(bodySelected) && !isSelectedBodyCorrupted;
 
   useEffect(() => {
     if (!selected?.id) return;
@@ -93,7 +100,7 @@ export default function useReaderCompletion({
   }, [selected?.id, selected?.is_read, readTriggerKey]);
 
   const maybeCompleteReading = useCallback(() => {
-    if (!selected || selected.is_read || !isBodyRenderReady) return;
+    if (!selected || selected.id !== selectedId || selected.is_read || !isBodyRenderReady || !canCompleteReading) return;
     if (completedReadMessageIdsRef.current.has(selected.id)) return;
     const readerElement = readerRef.current;
     if (!readerElement) return;
@@ -101,10 +108,10 @@ export default function useReaderCompletion({
     if (distanceToBottom > 48) return;
     completedReadMessageIdsRef.current.add(selected.id);
     onReadComplete(selected);
-  }, [selected, isBodyRenderReady, onReadComplete]);
+  }, [selected, selectedId, isBodyRenderReady, canCompleteReading, onReadComplete]);
 
   useEffect(() => {
-    if (!selected || selected.is_read || !isBodyRenderReady) return undefined;
+    if (!selected || selected.id !== selectedId || selected.is_read || !isBodyRenderReady || !canCompleteReading) return undefined;
     if (completedReadMessageIdsRef.current.has(selected.id)) {
       return undefined;
     }
@@ -120,7 +127,7 @@ export default function useReaderCompletion({
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [selected?.id, selected?.is_read, isBodyRenderReady, onReadComplete, readTriggerKey]);
+  }, [selected?.id, selected?.is_read, selectedId, isBodyRenderReady, canCompleteReading, onReadComplete, readTriggerKey]);
 
   return {
     readerRef,

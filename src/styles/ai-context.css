@@ -1,6 +1,8 @@
 /* Contextual AI belongs to the mail task, not a separate dashboard surface. */
 .reader-ai-context {
-  position: relative;
+  /* Results align to the full toolbar so pane paint containment cannot clip
+     a wide result extending left of this small trigger. */
+  position: static;
   display: inline-flex;
   align-items: center;
 }
@@ -54,8 +56,8 @@
   z-index: 41;
   top: calc(100% + 6px);
   right: 0;
-  width: min(380px, calc(100vw - 32px));
-  padding: 12px 34px 12px 13px;
+  width: min(380px, 100%);
+  padding: 12px 48px 12px 13px;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-panel);
   background: var(--color-surface-raised);
@@ -86,8 +88,10 @@
   right: 8px;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
   border-radius: var(--ui-radius-sm);
@@ -125,13 +129,30 @@
     padding: 0;
   }
 
+  .reader-ai-trigger > svg {
+    width: 20px;
+    height: 20px;
+  }
+
   .reader-ai-result {
     position: fixed;
     top: auto;
     right: 12px;
-    bottom: 16px;
+    bottom: calc(64px + env(safe-area-inset-bottom));
     left: 12px;
     width: auto;
+    max-height: calc(100dvh - 132px - env(safe-area-inset-bottom));
+    padding-right: 56px;
+    overflow-y: auto;
+  }
+
+  .reader-ai-result > button {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    top: 4px;
+    right: 4px;
   }
 }
 

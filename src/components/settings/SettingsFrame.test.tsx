@@ -230,20 +230,105 @@ describe('SettingsFrame application shell', () => {
     expect(unifiedDescription?.textContent).toContain('所有邮箱账号');
   });
 
-  it('guards a scope change while settings are dirty', () => {
+  it.each(['general', 'about', 'backup', 'tools', 'ai', 'mcp'] as const)(
+    'does not imply that global %s preferences belong to the current mailbox', (activeSection) => {
+      const { container } = renderFrame({ activeSection, accountScope: 1 });
+      expect(screen.queryByRole('region', { name: '邮箱范围' })).toBeNull();
+      expect(container.querySelector('[data-settings-account-context]')).toBeNull();
+      expect(container.querySelector('.settings-shell')?.getAttribute('data-account-scoped')).toBe('false');
+    },
+  );
+
+  it.each(['accounts', 'providers', 'contacts', 'rules', 'templates'] as const)(
+    'identifies the mailbox range for %s on mobile', (activeSection) => {
+      vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: query === '(max-width: 720px)', addEventListener: vi.fn(), removeEventListener: vi.fn(),
+      }));
+      const { container } = renderFrame({
+        activeSection, accountScope: 1,
+        accounts: [{ id: 1, display_name: '工作邮箱', email: 'work@example.com', provider: 'imap' } as Account],
+      });
+      expect(screen.getByRole('region', { name: '邮箱范围' }).getAttribute('data-account-scope')).toBe('1');
+      expect(container.querySelector('[data-settings-account-context]')?.textContent).toBe('当前邮箱范围：工作邮箱 · work@example.com');
+      expect(container.querySelector('.settings-shell')?.getAttribute('data-account-scoped')).toBe('true');
+    },
+  );
+
+  it('lets mobile search cancel and Escape return to the page before leaving Settings', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(max-width: 720px)', addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    }));
+    const onClose = vi.fn();
+    renderFrame({ onClose });
+    fireEvent.click(screen.getByRole('button', { name: '打开设置搜索' }));
+    const input = screen.getByRole('searchbox', { name: '搜索设置' });
+    expect(document.activeElement).toBe(input);
+    fireEvent.input(input, { target: { value: '主题' } });
+    expect(screen.getByLabelText('设置搜索结果')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '取消设置搜索' }));
+    expect(screen.queryByRole('searchbox', { name: '搜索设置' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '打开设置搜索' }));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '打开设置搜索' }));
+    expect((screen.getByRole('searchbox', { name: '搜索设置' }) as HTMLInputElement).value).toBe('');
+    fireEvent.keyDown(screen.getByRole('searchbox', { name: '搜索设置' }), { key: 'Escape' });
+    expect(screen.queryByRole('searchbox', { name: '搜索设置' })).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('opens mobile search via Cmd+F and lets Back close the search first', () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(max-width: 720px)', addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    }));
+    const onClose = vi.fn();
+    const { container } = renderFrame({ onClose });
+    fireEvent.keyDown(window, { key: 'f', metaKey: true });
+    expect(document.activeElement).toBe(screen.getByRole('searchbox', { name: '搜索设置' }));
+    fireEvent.click(container.querySelector('.settings-mobile-back')!);
+    expect(screen.queryByRole('searchbox', { name: '搜索设置' })).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps composition Escape inside search and clears desktop results without closing Settings', () => {
+    const onClose = vi.fn();
+    renderFrame({ onClose });
+    const input = screen.getByRole('searchbox', { name: '搜索设置' });
+    fireEvent.compositionStart(input);
+    fireEvent.input(input, { target: { value: '主题' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.getByLabelText('设置搜索结果')).not.toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.compositionEnd(input);
+    vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 100);
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(document.activeElement?.classList.contains('settings-search-result')).toBe(true);
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    expect(screen.queryByLabelText('设置搜索结果')).toBeNull();
+    expect(document.activeElement).toBe(input);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it.each(['sync', 'accounts'] as const)('guards a scope change while %s settings are dirty', (activeSection) => {
+    if (activeSection === 'accounts') {
+      vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: query === '(max-width: 720px)',
+        addEventListener: vi.fn(), removeEventListener: vi.fn(),
+      }));
+    }
     const onScopeChange = vi.fn();
     const onDiscardChanges = vi.fn();
     const accounts = [
       { id: 1, email: 'one@example.com', display_name: '账号一', provider: 'imap' } as Account,
       { id: 2, email: 'two@example.com', display_name: '账号二', provider: 'imap' } as Account,
     ];
-    renderFrame({
-      activeSection: 'sync',
+    const { container } = renderFrame({
+      activeSection,
       accounts,
       isDirty: true,
       onAccountScopeChange: onScopeChange,
       onDiscardChanges,
     });
+    expect(container.querySelector('.settings-shell')?.getAttribute('data-settings-section')).toBe(activeSection);
 
     fireEvent.click(screen.getByRole('button', { name: /统一邮箱/ }));
     fireEvent.click(screen.getByRole('menuitemradio', { name: /账号二/ }));
@@ -345,14 +430,14 @@ describe('SettingsFrame application shell', () => {
 
   it('keeps Tab focus inside the settings surface', () => {
     renderFrame();
-    const accountScope = screen.getByRole('button', { name: /统一邮箱/ });
+    const search = screen.getByRole('searchbox', { name: '搜索设置' });
     const pageInput = screen.getByPlaceholderText('设置内输入框');
 
     pageInput.focus();
     fireEvent.keyDown(document, { key: 'Tab' });
-    expect(document.activeElement).toBe(accountScope);
+    expect(document.activeElement).toBe(search);
 
-    accountScope.focus();
+    search.focus();
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
     expect(document.activeElement).toBe(pageInput);
   });
@@ -442,6 +527,32 @@ describe('SettingsFrame application shell', () => {
     expect(onClose).not.toHaveBeenCalled();
 
     act(() => vi.advanceTimersByTime(180));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts its own exit animation completion once and ignores child animation events', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+    })));
+    const onClose = vi.fn();
+    const { container } = renderFrame({ onClose });
+    fireEvent.click(screen.getByRole('button', { name: '关闭设置' }));
+    const exitEvent = (name: string) => {
+      const event = new Event(name, { bubbles: true });
+      Object.defineProperty(event, 'animationName', { value: 'settings-shell-exit' });
+      return event;
+    };
+    // React uses the prefixed event in jsdom, which has no AnimationEvent API.
+    for (const name of ['animationend', 'webkitAnimationEnd']) {
+      fireEvent(screen.getByPlaceholderText('设置内输入框'), exitEvent(name));
+    }
+    expect(onClose).not.toHaveBeenCalled();
+    for (const name of ['animationend', 'webkitAnimationEnd']) {
+      fireEvent(container.querySelector('.settings-shell')!, exitEvent(name));
+    }
+    expect(onClose).toHaveBeenCalledTimes(1);
+    act(() => vi.advanceTimersByTime(500));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

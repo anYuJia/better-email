@@ -1,5 +1,13 @@
 import type { OutboundAttachmentInput } from './message';
 
+/** Frontend recovery provenance. Never used to construct MIME or choose recipients. */
+export type QuickReplyDraftSource = {
+  key: string;
+  body: string;
+  revision: string;
+  mode: 'reply' | 'replyAll';
+};
+
 export type DraftInput = {
   draft_id: number;
   account_id: number;
@@ -14,6 +22,7 @@ export type DraftInput = {
   attachments: OutboundAttachmentInput[];
   in_reply_to?: string;
   references?: string;
+  quick_reply_source?: QuickReplyDraftSource;
 };
 
 
@@ -25,6 +34,10 @@ export type DraftSaveReport = {
   remote_uid: number;
   message: string;
 };
+
+export type ComposerSaveResult =
+  | { status: 'saved' }
+  | { status: 'blocked' | 'empty'; message: string };
 
 
 export type ComposeTemplate = {
@@ -42,12 +55,20 @@ export type ComposeTemplate = {
 };
 
 
+export type PendingAttachmentRecovery = {
+  filename: string;
+  size_bytes: number | null;
+  is_inline: boolean;
+  selection_unknown?: true;
+};
+
 export type ComposerAutosave = {
   save_state?: 'saving' | 'saved' | 'error';
   save_error?: string;
   draft: DraftInput;
   isRichComposer: boolean;
   saved_at: string;
+  pending_attachments?: PendingAttachmentRecovery[];
 };
 
 

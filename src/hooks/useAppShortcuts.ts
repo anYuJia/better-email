@@ -113,11 +113,19 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       const key = event.key.toLowerCase();
       const editable = isEditableTarget(event.target);
       const inInteractiveOverlay = isInteractiveOverlayTarget(event.target);
-      const hasActivePopup = Boolean(document.querySelector('.message-date-picker-popover, .context-menu, .custom-select-menu'));
+      const hasActivePopup = Boolean(document.querySelector(
+        'details[data-menu-managed][open], .message-date-picker-popover, .context-menu, ' +
+        '.custom-select-dropdown.is-open[aria-hidden="false"], .custom-select-summary[aria-expanded="true"]',
+      ));
       const commandModifier = event.metaKey || event.ctrlKey;
 
       if (isAccountLoginRequired) return;
       if (document.body.dataset.imagePreviewModal === '1') return;
+      // The active popup owns the entire keyboard interaction, even while
+      // focus is still on its trigger or is being transferred into the panel.
+      // This includes every mutation (Delete, Backspace, archive, star, read,
+      // undo, bulk selection), not just message navigation keys.
+      if (hasActivePopup) return;
 
       if (key === 'escape' && (isComposerOpen || isSettingsOpen || isShortcutsOpen)) {
         event.preventDefault();
@@ -138,7 +146,6 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       }
 
       if (editable || inInteractiveOverlay) return;
-      if (hasActivePopup && ['j', 'k', 'arrowdown', 'arrowup', 's', 'm', 'e', 'd'].includes(key)) return;
 
       if (key === 'escape' && document.querySelector('.context-menu')) {
         return;

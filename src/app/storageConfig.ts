@@ -33,24 +33,32 @@ const legacyStorageKeyByCurrent: Record<string, string> = {
   [listSortStorageKey]: 'swiftmail.listSort.v1',
 };
 
-/*
- * Desktop pane defaults follow the reference composition as a ratio of the
- * available window, rather than carrying the old fixed 236/388 split into
- * every viewport. The clamp range leaves room for manual resizing while
- * keeping the first render balanced at the supported desktop widths.
- */
+/* Navigation stays compact; the reader receives the remaining space. */
 export const appLayoutBounds = {
   sidebar: { min: 218, max: 320 },
-  // Keep the persisted/manual resize floor compatible with existing layouts;
-  // responsive defaults still land at 448px (1280) and 512px (1440).
   list: { min: 340, max: 560 },
 } as const;
 
 export function getDefaultAppLayout(viewportWidth = typeof window === 'undefined' ? 1440 : window.innerWidth): AppLayout {
   const width = Number.isFinite(viewportWidth) ? viewportWidth : 1440;
   return {
-    sidebar: clampNumber(Math.round(width * 0.1375 + 48), 218, 252),
-    list: clampNumber(Math.round(width * 0.4 - 64), 430, 525),
+    sidebar: clampNumber(Math.round(width * 0.1 + 92), 220, 244),
+    list: clampNumber(Math.round(width * 0.15 + 180), 360, 410),
+  };
+}
+
+/** Fit the visible panes without overwriting the user's preferred sizes. */
+export function fitAppLayout(layout: AppLayout, viewportWidth: number): AppLayout {
+  const width = Number.isFinite(viewportWidth) ? viewportWidth : 1440;
+  // Below this breakpoint CSS uses fixed compact panes / full-screen navigation.
+  if (width <= 1180) return layout;
+  const paneBudget = width - 560 - 2;
+  const sidebar = clampNumber(layout.sidebar, appLayoutBounds.sidebar.min,
+    Math.min(appLayoutBounds.sidebar.max, paneBudget - appLayoutBounds.list.min));
+  return {
+    sidebar,
+    list: clampNumber(layout.list, appLayoutBounds.list.min,
+      Math.min(appLayoutBounds.list.max, paneBudget - sidebar)),
   };
 }
 
@@ -173,22 +181,29 @@ export function loadSavedSearches(): SavedSearch[] {
   }
 }
 
-export function loadAppLayout(): AppLayout {
+export function loadAppLayoutPreference(): AppLayout | null {
   try {
     const responsiveDefault = getDefaultAppLayout();
     const stored = readAppStorage(appLayoutStorageKey);
-    if (!stored) return responsiveDefault;
+    if (!stored) return null;
     const parsed = JSON.parse(stored);
     const sidebar = Number(parsed.sidebar);
     const list = Number(parsed.list);
-    if (sidebar === 236 && list === 388) {
-      return responsiveDefault;
-    }
+    // Earlier builds saved first-render defaults as though they were manual
+    // choices. Migrate the known defaults; keep all other saved dimensions.
+    // Version 3 marks an explicit resize, including a deliberate old-default size.
+    const previousDefaults = [[236, 388], [218, 430], [224, 448], [246, 512], [252, 525]];
+    if (parsed.version !== 3 && previousDefaults.some(([a, b]) => sidebar === a && list === b)) return null;
     return {
       sidebar: clampNumber(Number.isFinite(sidebar) ? sidebar : responsiveDefault.sidebar, appLayoutBounds.sidebar.min, appLayoutBounds.sidebar.max),
       list: clampNumber(Number.isFinite(list) ? list : responsiveDefault.list, appLayoutBounds.list.min, appLayoutBounds.list.max),
     };
   } catch {
-    return getDefaultAppLayout();
+    return null;
   }
+}
+
+export function loadAppLayout(): AppLayout {
+  return fitAppLayout(loadAppLayoutPreference() ?? getDefaultAppLayout(),
+    typeof window === 'undefined' ? 1440 : window.innerWidth);
 }

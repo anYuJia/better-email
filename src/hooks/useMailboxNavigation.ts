@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { messagePageSize } from '../app/appConfig';
 import type {
   Account,
@@ -82,6 +82,10 @@ export default function useMailboxNavigation({
   setThreadMessages,
 }: UseMailboxNavigationOptions) {
   const [scopeRevision, setScopeRevision] = useState(0);
+  const threadRequestRef = useRef(0);
+  const activeScopeRef = useRef(accountScope);
+  activeScopeRef.current = accountScope;
+  const invalidateThreadRequest = useCallback(() => { threadRequestRef.current += 1; }, []);
   const accountIdForScope = useCallback((scope: AccountScope): number | null => {
     return scope === 'all' ? null : scope;
   }, []);
@@ -206,11 +210,22 @@ export default function useMailboxNavigation({
   }, [folders]);
 
   const openThread = useCallback(async (thread: ThreadSummary, announce = true) => {
-    const nextMessages = await invoke<MessageSummary[]>(IPC.ListThreadMessages, {
-      accountId: accountIdForScope(accountScope),
-      threadKey: thread.thread_key,
-      limit: 80,
-    });
+    const requestId = ++threadRequestRef.current;
+    const refreshId = mailboxRefreshRef.current;
+    const isCurrent = () => requestId === threadRequestRef.current
+      && refreshId === mailboxRefreshRef.current && accountScope === activeScopeRef.current;
+    let nextMessages: MessageSummary[];
+    try {
+      nextMessages = await invoke<MessageSummary[]>(IPC.ListThreadMessages, {
+        accountId: accountIdForScope(accountScope),
+        threadKey: thread.thread_key,
+        limit: 80,
+      });
+    } catch (error) {
+      if (!isCurrent()) return [];
+      throw error;
+    }
+    if (!isCurrent()) return [];
     setActiveThread(thread);
     setThreadMessages(nextMessages);
     setSelectedId(nextMessages[nextMessages.length - 1]?.id ?? null);
@@ -219,7 +234,7 @@ export default function useMailboxNavigation({
       setStatus(`已打开会话：${thread.subject} · ${nextMessages.length} 封`);
     }
     return nextMessages;
-  }, [accountScope, accountIdForScope, setActiveThread, setSelectedId, setSelectedMessageIds, setStatus, setThreadMessages]);
+  }, [accountScope, accountIdForScope, mailboxRefreshRef, setActiveThread, setSelectedId, setSelectedMessageIds, setStatus, setThreadMessages]);
 
   const changeAccountScope = useCallback((value: string) => {
     mailboxRefreshRef.current += 1;
@@ -266,6 +281,7 @@ export default function useMailboxNavigation({
     currentFolderAccountId,
     visibleFolderIdForRole,
     openThread,
+    invalidateThreadRequest,
     changeAccountScope,
     selectFolder,
   };

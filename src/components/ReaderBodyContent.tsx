@@ -4,6 +4,7 @@ import EmailShadowView from './reader/EmailShadowView';
 import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
 import { parseMailtoUrl } from '../mailUtils';
 import { logWarn } from '../app/logger';
+import { MAX_AUTO_RENDER_BODY_LENGTH } from '../app/messageBodyPolicy';
 
 type ReaderBodyContentProps = {
   isBodyRenderReady: boolean;
@@ -21,6 +22,7 @@ type ReaderBodyContentProps = {
   bodyFetchStatus?: 'loading' | 'error' | null;
   bodyFetchError?: string | null;
   onRetryBodyFetch?: () => void | Promise<void>;
+  largeBodyApproved?: boolean;
 };
 
 export default function ReaderBodyContent({
@@ -39,17 +41,15 @@ export default function ReaderBodyContent({
   bodyFetchStatus = null,
   bodyFetchError = null,
   onRetryBodyFetch,
+  largeBodyApproved = false,
 }: ReaderBodyContentProps) {
   const [expandedBody, setExpandedBody] = useState<string | null>(null);
   const activeBody = hasRenderableHtml ? readerHtml : plainBodyForReader;
-  const requiresExplicitRender = activeBody.length > 256_000 && expandedBody !== activeBody;
+  const requiresExplicitRender = !largeBodyApproved && activeBody.length > MAX_AUTO_RENDER_BODY_LENGTH && expandedBody !== activeBody;
   // While the next message's body is being prepared, show the loading skeleton
   // instead of stale content from the previously rendered message.
   if (bodyFetchStatus === 'loading') {
     return <EmailReaderSkeleton />;
-  }
-  if (!isBodyRenderReady) {
-    return showPlaceholder ? <EmailReaderSkeleton /> : null;
   }
   if (bodyFetchStatus === 'error') {
     return (
@@ -70,6 +70,9 @@ export default function ReaderBodyContent({
         ) : undefined}
       />
     );
+  }
+  if (!isBodyRenderReady) {
+    return showPlaceholder ? <EmailReaderSkeleton /> : null;
   }
   if (requiresExplicitRender) {
     return (

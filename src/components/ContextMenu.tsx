@@ -1,7 +1,9 @@
-import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronRight } from 'lucide-react';
 import { useWheelContainment } from '../hooks/useWheelContainment';
+import { focusMenuItem, focusPastMenu } from '../app/menuFocus';
+import { enterMenu, exitMenu, finishMenuEnter } from '../app/transientMenuMotion';
 import './context-menu.css';
 
 export type ContextMenuItem = {
@@ -42,6 +44,9 @@ function positionSubmenuForBranch(branch: HTMLElement) {
   const submenu = branch.querySelector<HTMLElement>(':scope > .context-submenu');
   const trigger = branch.querySelector<HTMLElement>(':scope > button');
   if (!submenu || !trigger) return;
+  // A transformed ancestor changes the containing block of a fixed flyout.
+  // Settle the parent before measuring a submenu opened during its entrance.
+  finishMenuEnter(branch.closest<HTMLElement>('.context-menu-surface, [data-floating-menu-panel="true"]'));
 
   const margin = 8;
   const gap = 6;
@@ -86,14 +91,19 @@ function MenuItems({
   items: ContextMenuItem[];
   onClose: () => void;
 }) {
-  const [pointerOpenId, setPointerOpenId] = useState<string | null>(null);
+  const [openBranch, setOpenBranch] = useState<{ id: string; input: 'pointer' | 'keyboard' } | null>(null);
   const closeTimerRef = useRef<number | null>(null);
+  const focusChildRef = useRef<HTMLButtonElement | null>(null);
   const detailIdPrefix = useId();
   const reserveLeadingSlot = items.some((item) => item.icon || item.checked !== undefined);
 
   useEffect(() => () => {
     if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
   }, []);
+  useLayoutEffect(() => {
+    if (focusChildRef.current) focusMenuItem(focusChildRef.current);
+    focusChildRef.current = null;
+  }, [openBranch]);
 
   function cancelScheduledClose() {
     if (closeTimerRef.current === null) return;
@@ -107,9 +117,8 @@ function MenuItems({
     // which can accidentally activate a newly inserted child command.
     if (usesInlineSubmenu()) return;
     cancelScheduledClose();
-    setPointerOpenId(
-      event.currentTarget.querySelector(':scope > button')?.getAttribute('data-context-item') ?? null,
-    );
+    const id = event.currentTarget.querySelector(':scope > button')?.getAttribute('data-context-item');
+    setOpenBranch(id ? { id, input: 'pointer' } : null);
     positionSubmenuForBranch(event.currentTarget);
   }
 
@@ -119,7 +128,7 @@ function MenuItems({
     // Leave enough time to cross the small visual gap between two fixed
     // surfaces. Entering the submenu cancels this timer through the branch.
     closeTimerRef.current = window.setTimeout(() => {
-      setPointerOpenId((current) => current === itemId ? null : current);
+      setOpenBranch((current) => current?.id === itemId && current.input === 'pointer' ? null : current);
       closeTimerRef.current = null;
     }, 260);
   }
@@ -134,10 +143,31 @@ function MenuItems({
       {item.separatorBefore && <div className="context-menu-separator" role="separator" />}
       <div
         className={item.children?.length
-          ? `context-menu-branch${pointerOpenId === item.id ? ' is-pointer-open' : ''}`
+          ? `context-menu-branch${openBranch?.id === item.id ? ` is-${openBranch.input}-open` : ''}`
           : undefined}
         onPointerEnter={item.children?.length ? positionSubmenu : undefined}
         onPointerLeave={item.children?.length ? () => scheduleSubmenuClose(item.id) : undefined}
+        onKeyDown={item.children?.length ? event => {
+          if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+          const branch = event.currentTarget;
+          const trigger = branch.querySelector<HTMLButtonElement>(':scope > button');
+          const submenu = branch.querySelector<HTMLElement>(':scope > .context-submenu');
+          if (event.key === 'ArrowRight' && event.target === trigger) {
+            const child = submenu?.querySelector<HTMLButtonElement>(':scope > div > button:not(:disabled)');
+            if (!child) return;
+            event.preventDefault(); event.stopPropagation();
+            cancelScheduledClose();
+            positionSubmenuForBranch(branch);
+            focusChildRef.current = child;
+            setOpenBranch({ id: item.id, input: 'keyboard' });
+          } else if (event.key === 'ArrowLeft' && event.target instanceof Element
+            && event.target.closest('[role="menu"]') === submenu) {
+            event.preventDefault(); event.stopPropagation();
+            cancelScheduledClose();
+            setOpenBranch(null);
+            focusMenuItem(trigger);
+          }
+        } : undefined}
       >
         <button
           type="button"
@@ -155,7 +185,7 @@ function MenuItems({
           ].filter(Boolean).join(' ') || undefined}
           disabled={item.disabled}
           aria-haspopup={item.children?.length ? 'menu' : undefined}
-          aria-expanded={item.children?.length ? pointerOpenId === item.id : undefined}
+          aria-expanded={item.children?.length ? openBranch?.id === item.id : undefined}
           aria-controls={submenuId}
           title={item.tooltip}
           onClick={(event) => {
@@ -169,7 +199,8 @@ function MenuItems({
               const branch = event.currentTarget.parentElement;
               if (branch) positionSubmenuForBranch(branch);
               cancelScheduledClose();
-              setPointerOpenId(item.id);
+              setOpenBranch(current => usesInlineSubmenu() && current?.id === item.id
+                ? null : { id: item.id, input: 'pointer' });
               return;
             }
             if (!item.onSelect) return;
@@ -224,43 +255,16 @@ export function ContextMenuItems({
       const nextIndex = currentIndex < 0
         ? 0
         : (currentIndex + direction + buttons.length) % buttons.length;
-      buttons[nextIndex]?.focus({ preventScroll: true });
+      focusMenuItem(buttons[nextIndex]);
       return;
     }
 
     if (event.key === 'Home' || event.key === 'End') {
       event.preventDefault();
-      buttons[event.key === 'Home' ? 0 : buttons.length - 1]?.focus({ preventScroll: true });
+      focusMenuItem(buttons[event.key === 'Home' ? 0 : buttons.length - 1]);
       return;
     }
 
-    if (event.key === 'ArrowRight') {
-      const branch = activeButton?.parentElement?.classList.contains('context-menu-branch')
-        ? activeButton.parentElement
-        : null;
-      const submenu = branch?.querySelector<HTMLElement>(':scope > .context-submenu') ?? null;
-      const firstChild = submenu?.querySelector<HTMLButtonElement>(
-        ':scope > div > button:not(:disabled)',
-      );
-      if (branch && firstChild) {
-        event.preventDefault();
-        positionSubmenuForBranch(branch);
-        branch.classList.add('is-keyboard-open');
-        activeButton?.setAttribute('aria-expanded', 'true');
-        firstChild.focus({ preventScroll: true });
-      }
-      return;
-    }
-
-    if (event.key === 'ArrowLeft' && activeMenu.classList.contains('context-submenu')) {
-      const parentButton = activeMenu.parentElement?.querySelector<HTMLButtonElement>(':scope > button');
-      if (parentButton) {
-        event.preventDefault();
-        activeMenu.parentElement?.classList.remove('is-keyboard-open');
-        parentButton.setAttribute('aria-expanded', 'false');
-        parentButton.focus({ preventScroll: true });
-      }
-    }
   }
 
   return (
@@ -313,8 +317,22 @@ export default function ContextMenu({
   useWheelContainment(menuRef);
   const [position, setPosition] = useState({ x, y });
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const motionOwnerRef = useRef<object | null>(null);
   // Tab 关闭时浏览器已把焦点移到下一个自然目标，不能再把焦点拉回触发元素。
   const skipFocusRestoreRef = useRef(false);
+  const dismissedRef = useRef(false);
+  const dismiss = useCallback(() => {
+    if (dismissedRef.current) return;
+    dismissedRef.current = true;
+    const menu = menuRef.current;
+    exitMenu(menu, motionOwnerRef.current ?? document.body);
+    if (!skipFocusRestoreRef.current) previousFocusRef.current?.focus({ preventScroll: true });
+    skipFocusRestoreRef.current = true;
+    menu?.setAttribute('inert', '');
+    menu?.setAttribute('aria-hidden', 'true');
+    if (menu) menu.style.pointerEvents = 'none';
+    onClose();
+  }, [closeIgnoreRef, onClose]);
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
@@ -330,21 +348,34 @@ export default function ContextMenu({
         window.innerHeight - margin * 2,
       );
       menu.style.setProperty('--context-menu-max-height', `${window.innerHeight - margin * 2}px`);
-      setPosition({
+      const nextPosition = {
         x: Math.max(margin, Math.min(x, window.innerWidth - width - margin)),
         y: Math.max(margin, Math.min(y, window.innerHeight - height - margin)),
-      });
+      };
+      // Set the final position before starting the animation or measuring its
+      // origin; React keeps the declarative style in sync in the next render.
+      menu.style.left = `${nextPosition.x}px`;
+      menu.style.top = `${nextPosition.y}px`;
+      setPosition(nextPosition);
     };
 
     updatePosition();
+    dismissedRef.current = false;
+    menu.removeAttribute('inert');
+    menu.removeAttribute('aria-hidden');
+    menu.style.removeProperty('pointer-events');
+    const bounds = menu.getBoundingClientRect();
+    motionOwnerRef.current ??= closeIgnoreRef?.current ?? previousFocusRef.current ?? document.activeElement ?? document.body;
+    enterMenu(menu, motionOwnerRef.current,
+      Math.max(0, Math.min(x - bounds.left, bounds.width)),
+      Math.max(0, Math.min(y - bounds.top, bounds.height)), y <= bounds.top + bounds.height / 2);
     // Mobile submenus expand inside the parent surface. Re-clamp after that
     // disclosure changes the menu height, otherwise the new lower actions
     // can extend past the viewport with no remaining internal scroll range.
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(updatePosition);
-    observer.observe(menu);
-    return () => observer.disconnect();
-  }, [x, y]);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updatePosition);
+    observer?.observe(menu);
+    return () => { observer?.disconnect(); finishMenuEnter(menu); };
+  }, [x, y, closeIgnoreRef]);
 
   useEffect(() => {
     // 记录打开菜单前的焦点（右键目标或触发按钮），关闭时按规则恢复。
@@ -375,23 +406,27 @@ export default function ContextMenu({
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
+      if (dismissedRef.current) return;
       const target = event.target as Node;
       if (menuRef.current?.contains(target) || closeIgnoreRef?.current?.contains(target)) return;
-      onClose();
+      dismiss();
     }
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (dismissedRef.current) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
-        onClose();
+        dismiss();
         return;
       }
 
       if (event.key === 'Tab') {
         skipFocusRestoreRef.current = true;
-        onClose();
+        const menu = menuRef.current;
+        if (menu && focusPastMenu(previousFocusRef.current, menu, event.shiftKey)) event.preventDefault();
+        dismiss();
         return;
       }
 
@@ -405,7 +440,7 @@ export default function ContextMenu({
       ) {
         return;
       }
-      onClose();
+      dismiss();
     }
 
     document.addEventListener('pointerdown', handlePointerDown, true);
@@ -419,7 +454,7 @@ export default function ContextMenu({
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };
-  }, [closeIgnoreRef, onClose]);
+  }, [closeIgnoreRef, dismiss]);
 
   return createPortal(
     <div
@@ -434,7 +469,7 @@ export default function ContextMenu({
     >
       <ContextMenuContent
         items={items}
-        onClose={onClose}
+        onClose={dismiss}
         ariaLabel={ariaLabel}
         title={title}
         detail={detail}

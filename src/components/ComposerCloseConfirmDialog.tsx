@@ -1,11 +1,12 @@
 import { Mail, X } from 'lucide-react';
 import { useId, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import useModalAccessibility from '../hooks/useModalAccessibility';
+import type { ComposerSaveResult } from '../app/types';
 
 type ComposerCloseConfirmDialogProps = {
   onClose: () => void;
   onDiscard: () => void;
-  onSaveDraft: () => Promise<void>;
+  onSaveDraft: () => Promise<ComposerSaveResult | void>;
   setOpen: Dispatch<SetStateAction<boolean>>;
 };
 
@@ -32,11 +33,16 @@ export default function ComposerCloseConfirmDialog({
     setPending(true);
     setError(null);
     try {
-      await onSaveDraft();
+      const result = await onSaveDraft();
+      if (result && result.status !== 'saved') {
+        setError(result.message);
+        return;
+      }
       setOpen(false);
     } catch (saveError) {
       const message = saveError instanceof Error ? saveError.message : String(saveError);
-      setError(message || '未知错误');
+      setError(`保存草稿失败：${message || '未知错误'}`);
+    } finally {
       setPending(false);
     }
   }
@@ -93,7 +99,7 @@ export default function ComposerCloseConfirmDialog({
         </p>
         {error && (
           <div className="confirm-dialog-error" role="alert">
-            保存草稿失败：{error}
+            {error}
           </div>
         )}
         <footer className="composer-close-dialog-actions">
@@ -107,7 +113,7 @@ export default function ComposerCloseConfirmDialog({
             继续编辑
           </button>
           <button
-            className="dialog-button dialog-button-danger"
+            className="dialog-button dialog-button-danger-secondary"
             type="button"
             disabled={pending}
             onClick={onDiscard}

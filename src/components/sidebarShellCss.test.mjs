@@ -94,9 +94,13 @@ describe('sidebar de-AI contract', () => {
     expect(block[1]).not.toMatch(/box-shadow:\s*var\(--ui-shadow/);
   });
 
-  it('selected state stays distinguishable via surface + text weight', () => {
-    expect(sidebarCss).toMatch(/\.folder\.active[\s\S]*?background:\s*var\(--quiet-row-selected\)/);
+  it('selected state combines a neutral surface, stronger text and an accent icon', () => {
+    const selected = sidebarCss.match(/\.folder\.active,\s*\.folder\.active:hover\s*\{([^}]*)\}/);
+    expect(selected).not.toBeNull();
+    expect(selected[1]).toMatch(/background:\s*var\(--ui-surface\)/);
+    expect(selected[1]).toMatch(/color:\s*var\(--ui-text\)/);
     expect(sidebarCss).toMatch(/\.folder\.active \.folder-main\s*\{[^}]*font-weight:\s*600/);
+    expect(sidebarCss).toMatch(/\.folder\.active \.folder-name > svg\s*\{[^}]*color:\s*var\(--ui-text-accent\)/);
   });
 
   it('keeps keyboard focus visible on interactive rows', () => {

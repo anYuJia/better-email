@@ -30,7 +30,8 @@ describe('final mobile polish contract', () => {
 
   it('reduces reader, settings and composer feature-showcase chrome', () => {
     expect(finalCss).toMatch(/\.reader-actions \.primary-action > span\s*\{[\s\S]*?clip-path:\s*inset\(50%\)/);
-    expect(finalCss).toMatch(/\.mobile-settings-row-icon\s*\{[\s\S]*?display:\s*none;/);
+    expect(finalCss).toMatch(/\.mobile-settings-row-icon\s*\{[^}]*display:\s*grid;/);
+    expect(finalCss).toMatch(/\.mobile-settings-row-icon\s*\{[^}]*background:\s*transparent;/);
     expect(finalCss).toContain('button[aria-label="收起写信"]');
     expect(finalCss).not.toContain('linear-gradient');
     expect(finalCss).not.toContain('backdrop-filter');

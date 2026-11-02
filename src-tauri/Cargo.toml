@@ -42,10 +42,13 @@ chacha20poly1305 = "0.10"
 getrandom = "0.2"
 calamine = "0.36.1"
 dirs = "6.0.0"
+tokio = { version = "1.52.3", features = ["sync"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 native-tls = { version = "0.2.14", features = ["vendored"] }
 
 [dev-dependencies]
+# The rejected short-search prototype only runs in explicit local experiments.
+rusqlite = { version = "0.32.1", features = ["functions"] }
 tempfile = "3.27.0"
 zip = "8.6"

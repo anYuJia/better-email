@@ -106,8 +106,29 @@ describe('ContextMenu focus management', () => {
 
     fireEvent.keyDown(document.activeElement as Element, { key: 'Tab' });
     expect(screen.queryByRole('menu')).toBeNull();
-    // Tab 关闭时不应把焦点拉回触发元素（jsdom 无法真正执行 Tab 导航）。
-    expect(document.activeElement).not.toBe(trigger);
+    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: '下一个元素' }));
+  });
+
+  it('keeps Home and End focus visible inside a long menu without scrolling its page', () => {
+    render(<ContextMenu x={0} y={0} items={items} onClose={vi.fn()} />);
+    const first = screen.getByRole('menuitem', { name: '打开' });
+    const last = screen.getByRole('menuitem', { name: '删除' });
+    const surface = first.closest('.context-menu-surface') as HTMLElement;
+    surface.style.overflowY = 'auto';
+    Object.defineProperties(surface, {
+      clientHeight: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, value: 400 },
+    });
+    vi.spyOn(surface, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 100 } as DOMRect);
+    vi.spyOn(first, 'getBoundingClientRect').mockImplementation(() => ({ top: -surface.scrollTop, bottom: 34 - surface.scrollTop } as DOMRect));
+    vi.spyOn(last, 'getBoundingClientRect').mockImplementation(() => ({ top: 330 - surface.scrollTop, bottom: 364 - surface.scrollTop } as DOMRect));
+    fireEvent.keyDown(first, { key: 'End' });
+    expect(document.activeElement).toBe(last);
+    expect(surface.scrollTop).toBe(264);
+    expect(document.documentElement.scrollTop).toBe(0);
+    fireEvent.keyDown(last, { key: 'Home' });
+    expect(document.activeElement).toBe(first);
+    expect(surface.scrollTop).toBe(0);
   });
 
   it('degrades safely when the trigger element was removed', () => {
@@ -232,5 +253,47 @@ describe('ContextMenu focus management', () => {
 
     fireEvent.click(trigger);
     expect(branch.classList.contains('is-pointer-open')).toBe(true);
+    fireEvent.click(trigger);
+    expect(branch.classList.contains('is-pointer-open')).toBe(false);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('closes a clicked submenu with ArrowLeft and can reopen it from the keyboard', () => {
+    render(<ContextMenu x={10} y={10} items={[{
+      id: 'move', label: '移动到', children: [{ id: 'archive', label: '归档' }],
+    }]} onClose={vi.fn()} />);
+    const trigger = screen.getByRole('menuitem', { name: '移动到' });
+    const child = screen.getByRole('menuitem', { name: '归档' });
+    const branch = trigger.parentElement as HTMLElement;
+    fireEvent.click(trigger);
+    fireEvent.keyDown(trigger, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(child);
+    fireEvent.keyDown(child, { key: 'ArrowLeft' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(branch.className).toBe('context-menu-branch');
+    expect(document.activeElement).toBe(trigger);
+    fireEvent.keyDown(trigger, { key: 'ArrowRight' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement).toBe(child);
+  });
+
+  it('returns one submenu level at a time and ignores composing arrow keys', () => {
+    render(<ContextMenu x={10} y={10} items={[{
+      id: 'move', label: '移动到', children: [{
+        id: 'team', label: '团队', children: [{ id: 'archive', label: '归档' }],
+      }],
+    }]} onClose={vi.fn()} />);
+    const root = screen.getByRole('menuitem', { name: '移动到' });
+    const team = screen.getByRole('menuitem', { name: '团队' });
+    const child = screen.getByRole('menuitem', { name: '归档' });
+    fireEvent.keyDown(root, { key: 'ArrowRight' });
+    fireEvent.keyDown(team, { key: 'ArrowRight', isComposing: true });
+    expect(team.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.keyDown(team, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(child);
+    fireEvent.keyDown(child, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(team);
+    expect(team.getAttribute('aria-expanded')).toBe('false');
+    expect(root.getAttribute('aria-expanded')).toBe('true');
   });
 });

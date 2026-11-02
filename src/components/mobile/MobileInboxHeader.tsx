@@ -57,13 +57,23 @@ export default function MobileInboxHeader({
 }: MobileInboxHeaderProps) {
   const ime = useCompositionGuard();
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const restoreSearchFocusRef = useRef(false);
   const filterMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
-    if (!searchOpen) return;
-    searchInputRef.current?.focus({ preventScroll: true });
+    if (searchOpen) searchInputRef.current?.focus({ preventScroll: true });
+    else if (restoreSearchFocusRef.current) {
+      restoreSearchFocusRef.current = false;
+      searchTriggerRef.current?.focus({ preventScroll: true });
+    }
   }, [searchOpen]);
+
+  function closeSearch() {
+    restoreSearchFocusRef.current = true;
+    onCloseSearch();
+  }
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     if (ime.isComposing()) { event.preventDefault(); return; }
@@ -102,6 +112,14 @@ export default function MobileInboxHeader({
       selectionRole: 'radio',
       onSelect: onShowThreads,
     },
+    {
+      id: 'mobile-refresh',
+      label: isRefreshing ? '正在刷新邮件…' : '刷新邮件',
+      icon: <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" />,
+      disabled: isRefreshing,
+      separatorBefore: true,
+      onSelect: onRefresh,
+    },
   ];
 
   if (searchOpen) {
@@ -111,12 +129,12 @@ export default function MobileInboxHeader({
           type="button"
           className="mobile-header-icon"
           aria-label="关闭搜索"
-          onClick={onCloseSearch}
+          onClick={closeSearch}
         >
-          <ArrowLeft size={22} aria-hidden="true" />
+          <ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" />
         </button>
         <form className="mobile-search-form" role="search" onSubmit={submitSearch}>
-          <Search size={18} aria-hidden="true" />
+          <Search size={20} strokeWidth={1.75} aria-hidden="true" />
           <input
             ref={searchInputRef}
             type="search"
@@ -126,6 +144,11 @@ export default function MobileInboxHeader({
             onChange={(event) => onQueryChange(event.currentTarget.value)}
             onCompositionStart={ime.onCompositionStart}
             onCompositionEnd={ime.onCompositionEnd}
+            onKeyDown={(event) => {
+              if (event.key !== 'Escape' || ime.isComposing(event)) return;
+              event.preventDefault();
+              closeSearch();
+            }}
           />
           {query && (
             <button
@@ -135,9 +158,10 @@ export default function MobileInboxHeader({
               onClick={() => {
                 onQueryChange('');
                 onClearSearchAndFilter();
+                searchInputRef.current?.focus({ preventScroll: true });
               }}
             >
-              <X size={17} aria-hidden="true" />
+              <X size={20} strokeWidth={1.75} aria-hidden="true" />
             </button>
           )}
         </form>
@@ -154,7 +178,7 @@ export default function MobileInboxHeader({
           aria-label="打开邮箱导航"
           onClick={onOpenMailbox}
         >
-          <Menu size={22} aria-hidden="true" />
+          <Menu size={20} strokeWidth={1.75} aria-hidden="true" />
         </button>
         <div className="mobile-inbox-title">
           <span className="mobile-inbox-title-copy">
@@ -179,15 +203,16 @@ export default function MobileInboxHeader({
               setFilterMenu({ x: Math.max(8, bounds.right - 208), y: bounds.bottom + 4 });
             }}
           >
-            <SlidersHorizontal size={19} aria-hidden="true" />
+            <SlidersHorizontal size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
           <button
+            ref={searchTriggerRef}
             type="button"
             className="mobile-header-icon"
             aria-label="搜索邮件"
             onClick={onOpenSearch}
           >
-            <Search size={20} aria-hidden="true" />
+            <Search size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -195,7 +220,7 @@ export default function MobileInboxHeader({
         <div className={`mobile-inbox-sync-bar${refreshNotice && !isRefreshing ? ' is-notice' : ''}`} role="status" aria-live="polite">
           {isRefreshing ? (
             <>
-              <RefreshCw size={13} className="animate-spin" aria-hidden="true" />
+              <RefreshCw size={16} strokeWidth={1.75} className="animate-spin" aria-hidden="true" />
               <span>{refreshNotice || '正在同步邮件…'}</span>
             </>
           ) : (

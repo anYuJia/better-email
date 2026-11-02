@@ -1,39 +1,37 @@
 /*
  * Application-level Settings shell.
  * Native desktop Settings fills its own application window. Browser/mock
- * desktop keeps the compact centered fallback and mobile remains a native
- * full-screen surface. Every form stays flat, bordered and shadow-free.
+ * desktop and mobile use an application-level surface. Every form stays flat,
+ * bordered and shadow-free.
  */
 
 .settings-workspace {
-  --st-sidebar-width: 228px;
-  --st-content-max-width: 720px;
-  --st-window-max-width: 1040px;
-  --st-window-max-height: 720px;
+  --st-sidebar-width: 236px;
+  --st-content-max-width: 760px;
   position: fixed;
   inset: 0;
   z-index: 200;
   display: grid;
-  place-items: center;
-  padding: clamp(24px, 5vh, 48px) clamp(24px, 5vw, 64px);
+  place-items: stretch;
+  padding: 0;
   overflow: hidden;
   background: var(--st-surface-muted);
 }
 
 .settings-shell.settings-modal {
   position: relative;
-  width: min(100%, var(--st-window-max-width));
-  height: min(100%, var(--st-window-max-height));
-  max-width: var(--st-window-max-width);
-  max-height: var(--st-window-max-height);
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   display: flex;
   flex-direction: column;
   margin: 0;
   overflow: hidden;
   isolation: isolate;
-  border: 1px solid var(--st-border-strong);
-  border-radius: var(--st-radius-modal);
-  background: var(--st-canvas);
+  border: 0;
+  border-radius: 0;
+  background: var(--st-surface);
   box-shadow: none;
   animation: settings-shell-enter var(--ui-motion-normal) var(--ui-ease-standard) backwards;
 }
@@ -131,7 +129,7 @@ body[data-settings-window-platform='macos']
   align-items: center;
 }
 
-.settings-header-leading .settings-desktop-title {
+.settings-shell[data-account-scoped='true'] .settings-header-leading .settings-desktop-title {
   display: none;
 }
 
@@ -237,6 +235,12 @@ body[data-settings-window-platform='macos']
   box-shadow: none;
 }
 
+/* The shared clear action owns its accessible name and touch target. */
+.settings-search-field input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 .settings-search-field > button {
   width: 26px;
   min-width: 26px;
@@ -270,7 +274,7 @@ body[data-settings-window-platform='macos']
 }
 
 .settings-header-button {
-  min-height: 34px;
+  min-height: var(--ui-control-height);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -288,8 +292,8 @@ body[data-settings-window-platform='macos']
   background: var(--st-surface-muted);
 }
 
-.settings-header-button.secondary:active:not(:disabled),
-.settings-close-button:active:not(:disabled) {
+.settings-header-button.secondary:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled),
+.settings-close-button:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
   color: var(--st-text);
   background: var(--st-surface-pressed);
 }
@@ -306,15 +310,15 @@ body[data-settings-window-platform='macos']
   background: var(--st-accent-hover);
 }
 
-.settings-header-button.primary:active:not(:disabled) {
+.settings-header-button.primary:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
   border-color: var(--st-accent-pressed);
   background: var(--st-accent-pressed);
 }
 
 .settings-close-button {
-  width: 32px;
-  min-width: 32px;
-  min-height: 32px;
+  width: var(--ui-control-height);
+  min-width: var(--ui-control-height);
+  min-height: var(--ui-control-height);
   display: grid;
   place-items: center;
   padding: 0;
@@ -345,7 +349,7 @@ body[data-settings-window-platform='macos']
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 12px 8px 8px;
+  padding: 20px 12px 12px;
   border-right: 1px solid var(--st-border);
   background: var(--st-sidebar);
 }
@@ -358,6 +362,16 @@ body[data-settings-window-platform='macos']
   background: var(--st-surface-muted);
   font: inherit;
   font-size: 11px;
+}
+
+.settings-nav-heading {
+  flex: 0 0 auto;
+  margin: 0 9px 20px;
+  color: var(--st-text);
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: -.02em;
 }
 
 .settings-nav-scroll {
@@ -431,7 +445,7 @@ body[data-settings-window-platform='macos']
 
 .settings-nav-parent.active {
   color: var(--st-text);
-  background: var(--st-accent-soft);
+  background: var(--st-surface-muted);
   font-weight: 600;
 }
 
@@ -643,6 +657,17 @@ body[data-settings-window-platform='macos']
   animation: none;
 }
 
+.settings-page-motion-forward,
+.settings-page-motion-backward,
+.settings-page-motion-lateral {
+  animation: settings-page-reveal var(--ui-motion-normal) var(--ui-ease-standard) backwards;
+}
+
+@keyframes settings-page-reveal {
+  from { opacity: 0.84; }
+  to { opacity: 1; }
+}
+
 .settings-page-header {
   flex: 0 0 auto;
   min-height: 76px;
@@ -650,7 +675,7 @@ body[data-settings-window-platform='macos']
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 18px 24px 15px;
+  padding: 28px 24px 20px;
   position: sticky;
   top: 0;
   z-index: 3;
@@ -661,7 +686,7 @@ body[data-settings-window-platform='macos']
 .settings-page-heading {
   min-width: 0;
   display: grid;
-  gap: 3px;
+  gap: 6px;
 }
 
 .settings-page-heading h2 {
@@ -820,12 +845,14 @@ body[data-settings-window-platform='macos']
   100% { background-color: transparent; }
 }
 
+/* The shell hosts fixed dialog portals, and pages can host inline fixed
+ * overlays. Keep both motion layers free of containing-block transforms. */
 @keyframes settings-shell-enter {
-  from { transform: translateY(4px); }
-  to { transform: translateY(0); }
+  from { opacity: 0.84; }
+  to { opacity: 1; }
 }
 
 @keyframes settings-shell-exit {
-  from { transform: translateY(0); }
-  to { transform: translateY(4px); }
+  from { opacity: 1; }
+  to { opacity: 0; }
 }

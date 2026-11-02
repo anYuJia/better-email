@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useState } from 'react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cloneElement, useState } from 'react';
 import type { Contact, DraftInput } from '../../app/types';
 import ComposerPrimaryFields from './ComposerPrimaryFields';
 import { localFileAssetUrl } from '../../tauriBridge';
@@ -10,6 +10,7 @@ vi.mock('../../tauriBridge', () => ({
 }));
 
 const mockLocalFileAssetUrl = vi.mocked(localFileAssetUrl);
+afterEach(cleanup);
 
 const ada: Contact = {
   id: 1,
@@ -56,7 +57,7 @@ function renderFields(
   onPatchDraft = vi.fn(),
   contacts: Contact[] = [ada],
 ) {
-  const result = render(
+  const view = (
     <ComposerPrimaryFields
       draft={input}
       contacts={contacts}
@@ -72,15 +73,39 @@ function renderFields(
       onAttachmentPaste={vi.fn()}
       buildInlineImageAttachments={vi.fn(async () => [])}
       onInlineImagesAdded={vi.fn()}
-    />,
+    />
   );
-  return { ...result, onPatchDraft };
+  const result = render(view);
+  return { ...result, onPatchDraft, view };
 }
 
 function recipientInput(container: HTMLElement, index = 0) {
   const inputs = Array.from(container.querySelectorAll<HTMLInputElement>('.composer-recipient-editor input'));
   return inputs[index];
 }
+
+it('keeps keyboard focus in the attachment workflow after removing files', () => {
+  const attachments = ['first.txt', 'second.txt'].map(filename => ({ filename, mime_type: 'text/plain', size_bytes: 12, local_path: `/tmp/${filename}` }));
+  const initial = draft({ attachments });
+  const { view, unmount } = renderFields(initial);
+  unmount();
+  function Harness() {
+    const [current, setCurrent] = useState(initial);
+    return <section className="composer">
+      {cloneElement(view, { draft: current, onRemoveAttachment: (index: number) => setCurrent(prev => ({
+        ...prev, attachments: prev.attachments.filter((_, item) => item !== index),
+      })) })}
+      <button aria-label="添加附件">附件</button>
+    </section>;
+  }
+  render(<Harness />);
+  const first = screen.getByRole('button', { name: '移除 first.txt' });
+  first.focus();
+  fireEvent.click(first);
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: '移除 second.txt' }));
+  fireEvent.click(document.activeElement!);
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: '添加附件' }));
+});
 
 function ControlledComposerFields({ initialDraft }: { initialDraft: DraftInput }) {
   const [currentDraft, setCurrentDraft] = useState(initialDraft);
@@ -323,5 +348,68 @@ describe('ComposerPrimaryFields', () => {
     });
 
     expect(editor?.innerHTML).toBe('Hello &lt;team&gt;<br>Next line');
+  });
+
+  it('keeps hydrated image and text nodes when reactivating the same draft, but applies a changed draft', async () => {
+    mockLocalFileAssetUrl.mockResolvedValue('asset://localhost/retained-image.png');
+    const original = draft({
+      html_body: '<p>继续编辑</p><img src="cid:retained-image">',
+      attachments: [{ filename: 'image.png', mime_type: 'image/png', size_bytes: 12,
+        local_path: '/retained-image.png', content_id: 'retained-image', is_inline: true }],
+    });
+    const { container, rerender, view, onPatchDraft } = renderFields(original);
+    const editor = container.querySelector('.composer-richtext-body') as HTMLElement;
+    const text = editor.querySelector('p')!.firstChild;
+    const image = editor.querySelector('img')!;
+    await waitFor(() => expect(image.getAttribute('src')).toBe('asset://localhost/retained-image.png'));
+    const setImageAttribute = vi.spyOn(image, 'setAttribute');
+    fireEvent.blur(editor);
+    expect(onPatchDraft).toHaveBeenLastCalledWith({ body: '继续编辑', html_body: original.html_body });
+    onPatchDraft.mockClear();
+    fireEvent.blur(editor);
+    expect(onPatchDraft).not.toHaveBeenCalled();
+    expect(setImageAttribute).not.toHaveBeenCalled();
+    expect(image.getAttribute('src')).toBe('asset://localhost/retained-image.png');
+    rerender(cloneElement(view, { active: false }));
+    rerender(cloneElement(view, { active: true }));
+    expect(editor.querySelector('p')!.firstChild).toBe(text);
+    expect(editor.querySelector('img')).toBe(image);
+    expect(image.getAttribute('src')).toBe('asset://localhost/retained-image.png');
+    const changed = { ...original, html_body: '<p>新模板正文</p>' };
+    rerender(cloneElement(view, { active: false, draft: changed }));
+    expect(editor.querySelector('p')!.firstChild).toBe(text);
+    rerender(cloneElement(view, { active: true, draft: changed }));
+    expect(editor.textContent).toBe('新模板正文');
+    expect(editor.querySelector('img')).toBeNull();
+  });
+
+  it('hydrates a newly recreated rich editor after switching out of plain text', () => {
+    const { container, rerender, view } = renderFields(draft({ body: '继续编辑', html_body: '<p>继续编辑</p>' }));
+    rerender(cloneElement(view, { richComposer: false }));
+    rerender(cloneElement(view, { richComposer: true }));
+    expect(container.querySelector('.composer-richtext-body')?.textContent).toBe('继续编辑');
+  });
+
+  it('cancels the pending input frame on blur so it cannot overwrite a newer draft', () => {
+    let callback: FrameRequestCallback | undefined;
+    vi.stubGlobal('requestAnimationFrame', vi.fn((next: FrameRequestCallback) => { callback = next; return 1; }));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    try {
+      const { container, rerender, view, onPatchDraft } = renderFields(draft());
+      const editor = container.querySelector('.composer-richtext-body') as HTMLElement;
+      editor.innerHTML = '待同步的旧编辑';
+      fireEvent.input(editor);
+      expect(onPatchDraft).not.toHaveBeenCalled();
+      fireEvent.blur(editor);
+      expect(onPatchDraft).toHaveBeenCalledTimes(1);
+      expect(cancelAnimationFrame).toHaveBeenCalled();
+      onPatchDraft.mockClear();
+      rerender(cloneElement(view, { draft: draft({ body: '新的草稿', html_body: '<p>新的草稿</p>' }) }));
+      act(() => callback?.(0));
+      expect(editor.textContent).toBe('新的草稿');
+      expect(onPatchDraft).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

@@ -115,12 +115,18 @@ impl SearchCriteria {
     pub(super) fn params(&self) -> Vec<String> {
         let mut params = Vec::new();
         if let Some(text) = &self.text {
-            let value = if should_use_fts(text) {
+            let value = if should_use_substring_fts(text) {
+                build_substring_fts_query(text)
+            } else if should_use_fts(text) {
                 build_fts_query(text)
             } else {
                 build_like_query(text)
             };
-            let repeat = if should_use_fts(text) { 1 } else { 5 };
+            let repeat = if should_use_fts(text) || should_use_substring_fts(text) {
+                1
+            } else {
+                6
+            };
             params.extend(std::iter::repeat_n(value, repeat));
         }
         if let Some(from) = &self.from {
@@ -236,7 +242,11 @@ pub(super) fn thread_order_clause(sort: Option<&str>) -> &'static str {
 pub(super) fn build_message_filter_clause(search: &SearchCriteria, filter: &str) -> String {
     let mut sql = String::new();
     if let Some(term) = &search.text {
-        if should_use_fts(term) {
+        if should_use_substring_fts(term) {
+            sql.push_str(
+                "AND m.id IN (SELECT rowid FROM message_substring_search WHERE message_substring_search MATCH ?) ",
+            );
+        } else if should_use_fts(term) {
             sql.push_str(
                 "AND m.id IN (
                     SELECT rowid FROM message_search WHERE message_search MATCH ?
@@ -250,6 +260,7 @@ pub(super) fn build_message_filter_clause(search: &SearchCriteria, filter: &str)
                     OR m.sender_email LIKE ? ESCAPE '\\'
                     OR m.recipients LIKE ? ESCAPE '\\'
                     OR m.snippet LIKE ? ESCAPE '\\'
+                    OR m.body LIKE ? ESCAPE '\\'
                 ) ",
             );
         }
@@ -327,6 +338,15 @@ pub(super) fn build_message_filter_clause(search: &SearchCriteria, filter: &str)
 }
 pub(super) fn should_use_fts(term: &str) -> bool {
     term.is_ascii() && !term.trim().is_empty()
+}
+// Trigram phrases preserve substring matching for Chinese and mixed text.
+// FTS5 cannot index fewer than three Unicode characters: short searches use
+// the same complete-body LIKE fallback instead of silently missing matches.
+pub(super) fn should_use_substring_fts(term: &str) -> bool {
+    !term.is_ascii() && term.chars().take(3).count() == 3 && !term.contains('\0')
+}
+fn build_substring_fts_query(term: &str) -> String {
+    format!("\"{}\"", term.replace('"', "\"\""))
 }
 pub(super) fn build_fts_query(term: &str) -> String {
     term.split_whitespace()

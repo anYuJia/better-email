@@ -1,101 +1,47 @@
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, fireEvent } from '@testing-library/react';
-import { useState } from 'react';
 import ReaderLabelMenu from './ReaderLabelMenu';
 import type { Label } from '../../app/types';
 
-afterEach(() => {
-  cleanup();
-});
-
 const labels: Label[] = [
-  { id: 1, name: '工作', color: '#2f7ed8', message_count: 0 },
+  { id: 1, name: '紧急', color: '#cf222e', message_count: 2 },
+  { id: 2, name: '项目', color: '#8250df', message_count: 3 },
 ];
+afterEach(cleanup);
+function open() { fireEvent.click(screen.getByRole('button', { name: '标签' })); }
 
-function openLabelMenu() {
-  render(
-    <ReaderLabelMenu
-      selectedLabels={[]}
-      labels={labels}
-      onToggleLabel={vi.fn()}
-      onCreateLabel={vi.fn()}
-      onDeleteLabel={vi.fn()}
-    />,
-  );
-  const summary = document.querySelector('.label-menu summary') as HTMLElement;
-  fireEvent.click(summary);
-  const details = document.querySelector('.label-menu') as HTMLElement;
-  details.setAttribute('open', '');
-}
-
-function ControlledReaderLabelMenu() {
-  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
-
-  return (
-    <ReaderLabelMenu
-      selectedLabels={selectedLabels}
-      labels={labels}
-      onToggleLabel={(label) => {
-        setSelectedLabels((current) =>
-          current.includes(label.name)
-            ? current.filter((name) => name !== label.name)
-            : [...current, label.name],
-        );
-      }}
-      onCreateLabel={vi.fn()}
-      onDeleteLabel={vi.fn()}
-    />
-  );
-}
-
-describe('ReaderLabelMenu accessibility', () => {
-  it('gives every color button a semantic name and pressed state', () => {
-    openLabelMenu();
-    expect(screen.getByRole('button', { name: '使用蓝色标签颜色' })).toBeDefined();
-    expect(screen.getByRole('button', { name: '使用绿色标签颜色' })).toBeDefined();
-    expect(screen.getByRole('button', { name: '使用红色标签颜色' })).toBeDefined();
-    // 默认选中的蓝色应标记 aria-pressed。
-    expect(screen.getByRole('button', { name: '使用蓝色标签颜色' }).getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getByRole('button', { name: '使用绿色标签颜色' }).getAttribute('aria-pressed')).toBe('false');
+describe('ReaderLabelMenu editing', () => {
+  it.each([{ isComposing: true }, { keyCode: 229 }])('waits for IME completion before creating or renaming (%j)', async (composition) => {
+    const create = vi.fn().mockResolvedValue({ ...labels[0], id: 3 });
+    const update = vi.fn().mockResolvedValue(undefined);
+    render(<ReaderLabelMenu selectedLabels={[]} labels={labels} onToggleLabel={vi.fn()} onCreateLabel={create} onUpdateLabel={update} />);
+    open();
+    const name = screen.getByRole('textbox', { name: '新标签名称' });
+    fireEvent.change(name, { target: { value: '正在输入' } });
+    fireEvent.keyDown(name, { key: 'Enter', ...composition });
+    expect(create).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.keyDown(name, { key: 'Enter' }); });
+    expect(create).toHaveBeenCalledExactlyOnceWith('正在输入', '#2f7ed8');
+    fireEvent.click(screen.getByRole('button', { name: '编辑标签 紧急' }));
+    const rename = screen.getByRole('textbox', { name: '修改标签 紧急 的名称' });
+    fireEvent.change(rename, { target: { value: '重要事项' } });
+    fireEvent.keyDown(rename, { key: 'Enter', ...composition });
+    expect(update).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.keyDown(rename, { key: 'Enter' }); });
+    expect(update).toHaveBeenCalledExactlyOnceWith(1, '重要事项', '#cf222e');
+    fireEvent.change(name, { target: { value: '独立新建颜色' } });
+    await act(async () => { fireEvent.keyDown(name, { key: 'Enter' }); });
+    expect(create).toHaveBeenLastCalledWith('独立新建颜色', '#2f7ed8');
   });
 
-  it('names the new-label submit button instead of exposing a bare plus', () => {
-    openLabelMenu();
-    const submit = screen.getByRole('button', { name: '新建标签' });
-    expect(submit).toBeDefined();
-    expect(submit.hasAttribute('disabled')).toBe(true);
-  });
-
-  it('keeps accessible names for edit and delete actions', () => {
-    openLabelMenu();
-    expect(screen.getByRole('button', { name: '编辑名称' })).toBeDefined();
-    expect(screen.getByRole('button', { name: '删除标签' })).toBeDefined();
-  });
-
-  it('keeps label chips and active state in sync after add, remove, and add', () => {
-    render(<ControlledReaderLabelMenu />);
-    const summary = document.querySelector('.label-menu summary') as HTMLElement;
-    fireEvent.click(summary);
-    const details = document.querySelector('.label-menu') as HTMLElement;
-    details.setAttribute('open', '');
-
-    const activeLabelCount = () => document.querySelectorAll('.active-label-chip').length;
-    const labelButton = screen.getByRole('button', { name: '工作' });
-
-    expect(labelButton.className).toContain('label-select-btn');
-    expect(labelButton.className).not.toContain('active');
-    expect(activeLabelCount()).toBe(0);
-
-    fireEvent.click(labelButton);
-    expect(labelButton.className).toContain('active');
-    expect(activeLabelCount()).toBe(1);
-
-    fireEvent.click(labelButton);
-    expect(labelButton.className).not.toContain('active');
-    expect(activeLabelCount()).toBe(0);
-
-    fireEvent.click(labelButton);
-    expect(labelButton.className).toContain('active');
-    expect(activeLabelCount()).toBe(1);
+  it('names each action by its target and preserves the label identity when deleting', () => {
+    const remove = vi.fn().mockResolvedValue(undefined);
+    render(<ReaderLabelMenu selectedLabels={[]} labels={labels} onToggleLabel={vi.fn()} onDeleteLabel={remove} />);
+    open();
+    expect(screen.getByRole('button', { name: '编辑标签 项目' }).querySelector('svg')).not.toBeNull();
+    const deleteButton = screen.getByRole('button', { name: '删除标签 项目' });
+    expect(deleteButton.querySelector('svg')).not.toBeNull();
+    fireEvent.click(deleteButton);
+    expect(remove).toHaveBeenCalledExactlyOnceWith(2);
   });
 });

@@ -215,8 +215,8 @@ export default function AccountSettingsPage({
                   添加第一个邮箱账号后，即可配置服务器、登录、身份、同步和隐私。
                 </SettingsEmptyState>
               ) : (
-                <SettingsNotice tone="info" title="顶部已统一管理邮箱范围">
-                  <p>切换邮箱账号、设为默认或添加账号都在页面顶部完成。下面的账号偏好会在保存后应用到所有支持的账号。</p>
+                <SettingsNotice tone="info" title="为多个账号统一设置偏好">
+                  <p>下方修改会在保存后应用到所有支持的账号。配置服务器、认证或身份时，先用上方邮箱范围选择具体账号。</p>
                 </SettingsNotice>
               )}
             </SettingsSection>

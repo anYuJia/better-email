@@ -10,71 +10,79 @@ use std::fs;
 use tauri::{AppHandle, State};
 use tauri_plugin_dialog::DialogExt;
 #[tauri::command]
-pub fn get_stats(store: State<'_, MailStore>, account_id: Option<i64>) -> MailResult<MailStats> {
-    store.get_stats_for_account(account_id)
+pub async fn get_stats(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+) -> MailResult<MailStats> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.get_stats_for_account(account_id)).await
 }
 
 #[tauri::command]
-pub fn export_diagnostics(store: State<'_, MailStore>) -> MailResult<String> {
-    let accounts = store
-        .list_accounts()?
-        .into_iter()
-        .map(|account| DiagnosticAccount {
-            id: account.id,
-            email_masked: mask_email(&account.email),
-            display_name: account.display_name,
-            provider: account.provider,
-            imap_host: account.imap_host,
-            smtp_host: account.smtp_host,
-            incoming_protocol: account.incoming_protocol,
-            auth_type: account.auth_type,
-            sync_mode: account.sync_mode,
-            remote_images_allowed: account.remote_images_allowed,
-            signature_enabled: !account.signature.trim().is_empty(),
-        })
-        .collect();
-    let oauth_sessions = store
-        .list_oauth_sessions()?
-        .into_iter()
-        .map(|session| DiagnosticOAuthSession {
-            id: session.id,
-            provider: session.provider,
-            redirect_uri: session.redirect_uri,
-            scopes: session.scopes,
-            status: session.status,
-            created_at: session.created_at,
-            completed_at: session.completed_at,
-            message: session.message,
-        })
-        .collect();
-    let outbox = store
-        .list_outbox()?
-        .into_iter()
-        .map(|item| DiagnosticOutboxItem {
-            id: item.id,
-            message_id: item.message_id,
-            recipients_masked: mask_recipient_list(&item.recipients),
-            subject_present: !item.subject.trim().is_empty(),
-            status: item.status,
-            attempts: item.attempts,
-            last_error: item.last_error,
-            queued_at: item.queued_at,
-            next_attempt_at: item.next_attempt_at,
-        })
-        .collect();
-    let export = DiagnosticExport {
-        generated_at: Utc::now().to_rfc3339(),
-        app_version: env!("CARGO_PKG_VERSION").to_string(),
-        accounts,
-        unified_stats: store.get_stats_for_account(None)?,
-        imap_mailboxes: store.list_imap_mailboxes()?,
-        sync_runs: store.list_sync_runs()?,
-        oauth_sessions,
-        outbox,
-    };
+pub async fn export_diagnostics(store: State<'_, MailStore>) -> MailResult<String> {
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let accounts = store
+            .list_accounts()?
+            .into_iter()
+            .map(|account| DiagnosticAccount {
+                id: account.id,
+                email_masked: mask_email(&account.email),
+                display_name: account.display_name,
+                provider: account.provider,
+                imap_host: account.imap_host,
+                smtp_host: account.smtp_host,
+                incoming_protocol: account.incoming_protocol,
+                auth_type: account.auth_type,
+                sync_mode: account.sync_mode,
+                remote_images_allowed: account.remote_images_allowed,
+                signature_enabled: !account.signature.trim().is_empty(),
+            })
+            .collect();
+        let oauth_sessions = store
+            .list_oauth_sessions()?
+            .into_iter()
+            .map(|session| DiagnosticOAuthSession {
+                id: session.id,
+                provider: session.provider,
+                redirect_uri: session.redirect_uri,
+                scopes: session.scopes,
+                status: session.status,
+                created_at: session.created_at,
+                completed_at: session.completed_at,
+                message: session.message,
+            })
+            .collect();
+        let outbox = store
+            .list_outbox()?
+            .into_iter()
+            .map(|item| DiagnosticOutboxItem {
+                id: item.id,
+                message_id: item.message_id,
+                recipients_masked: mask_recipient_list(&item.recipients),
+                subject_present: !item.subject.trim().is_empty(),
+                status: item.status,
+                attempts: item.attempts,
+                last_error: item.last_error,
+                queued_at: item.queued_at,
+                next_attempt_at: item.next_attempt_at,
+            })
+            .collect();
+        let export = DiagnosticExport {
+            generated_at: Utc::now().to_rfc3339(),
+            app_version: env!("CARGO_PKG_VERSION").to_string(),
+            accounts,
+            unified_stats: store.get_stats_for_account(None)?,
+            imap_mailboxes: store.list_imap_mailboxes()?,
+            sync_runs: store.list_sync_runs()?,
+            oauth_sessions,
+            outbox,
+        };
 
-    serde_json::to_string_pretty(&export)
-        .map_err(|error| crate::db::MailError::Imap(format!("诊断导出序列化失败：{error}")))
+        serde_json::to_string_pretty(&export)
+            .map_err(|error| crate::db::MailError::Imap(format!("诊断导出序列化失败：{error}")))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -134,8 +142,9 @@ pub async fn import_local_backup(
 }
 
 #[tauri::command]
-pub fn get_storage_usage(store: State<'_, MailStore>) -> MailResult<StorageUsage> {
-    store.storage_usage()
+pub async fn get_storage_usage(store: State<'_, MailStore>) -> MailResult<StorageUsage> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.storage_usage()).await
 }
 
 #[tauri::command]
@@ -144,8 +153,9 @@ pub async fn clear_attachment_cache(store: State<'_, MailStore>) -> MailResult<C
 }
 
 #[tauri::command]
-pub fn get_app_settings(store: State<'_, MailStore>) -> MailResult<AppSettingsReport> {
-    app_settings_report(&store)
+pub async fn get_app_settings(store: State<'_, MailStore>) -> MailResult<AppSettingsReport> {
+    let store = store.inner().clone();
+    super::executor::database(move || app_settings_report(&store)).await
 }
 
 /// 弹出原生文件夹选择器，让用户设置「默认附件下载位置」。
@@ -190,9 +200,13 @@ pub async fn set_download_dir(store: State<'_, MailStore>) -> MailResult<Downloa
 }
 
 #[tauri::command]
-pub fn reset_download_dir(store: State<'_, MailStore>) -> MailResult<AppSettingsReport> {
-    store.reset_download_dir()?;
-    app_settings_report(&store)
+pub async fn reset_download_dir(store: State<'_, MailStore>) -> MailResult<AppSettingsReport> {
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        store.reset_download_dir()?;
+        app_settings_report(&store)
+    })
+    .await
 }
 
 fn app_settings_report(store: &MailStore) -> MailResult<AppSettingsReport> {

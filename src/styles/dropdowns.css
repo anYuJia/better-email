@@ -121,8 +121,8 @@
   transform: translateY(-3px);
   transform-origin: top center;
   transition:
-    opacity var(--ui-motion-fast) var(--ui-ease-standard),
-    transform var(--ui-motion-fast) var(--ui-ease-standard);
+    opacity var(--ui-motion-menu-exit, 120ms) var(--ui-ease-standard),
+    transform var(--ui-motion-menu-exit, 120ms) var(--ui-ease-standard);
   will-change: opacity, transform;
 }
 
@@ -134,6 +134,7 @@
 .custom-select-dropdown.is-open {
   opacity: 1;
   transform: translateY(0);
+  transition-duration: var(--ui-motion-menu-enter, 180ms);
 }
 
 .custom-select-dropdown button {

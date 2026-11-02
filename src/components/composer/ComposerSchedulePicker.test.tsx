@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import ComposerSchedulePicker from './ComposerSchedulePicker';
 
@@ -22,6 +22,76 @@ function ControlledPicker({ initialValue }: { initialValue: string }) {
 describe('ComposerSchedulePicker', () => {
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();
+  });
+
+  it('retains the edited calendar inertly on cancel, restores focus immediately, and reopens from the committed value', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    const onChange = vi.fn();
+    const initial = localValue();
+    render(<ComposerSchedulePicker value={initial} onChange={onChange} />);
+    const trigger = screen.getByRole('button', { name: '定时发送时间' });
+    fireEvent.click(trigger);
+    const panel = screen.getByRole('dialog', { name: '选择定时发送时间' });
+    fireEvent.click(screen.getByRole('button', { name: '今天' }));
+    const edited = panel.textContent;
+    const top = panel.style.top;
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(document.activeElement).toBe(trigger);
+    expect(panel.isConnected).toBe(true);
+    expect(panel.hasAttribute('inert')).toBe(true);
+    expect(panel.textContent).toBe(edited);
+    expect(panel.style.top).toBe(top);
+    expect(onChange).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(60));
+    fireEvent.click(trigger);
+    expect(screen.getByRole('dialog', { name: '选择定时发送时间' })).toBe(panel);
+    expect(screen.getByRole('gridcell', { name: dateLabel(initial) }).getAttribute('aria-pressed')).toBe('true');
+    act(() => vi.advanceTimersByTime(120));
+    expect(panel.isConnected).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(initial);
+    expect(panel.isConnected).toBe(true);
+    expect(panel.hasAttribute('inert')).toBe(true);
+    expect(document.activeElement).toBe(trigger);
+    act(() => vi.advanceTimersByTime(120));
+    expect(panel.isConnected).toBe(false);
+  });
+
+  it('deactivates nested time picker listeners immediately while the outer calendar exits', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    const onChange = vi.fn();
+    const { rerender } = render(<ComposerSchedulePicker value="" onChange={onChange} />);
+    fireEvent.click(screen.getByRole('button', { name: '定时发送时间' }));
+    fireEvent.click(screen.getByRole('combobox', { name: '小时' }));
+    expect(screen.getByRole('listbox', { name: '小时' })).not.toBeNull();
+    rerender(<ComposerSchedulePicker active={false} value="" onChange={onChange} />);
+    expect(document.querySelector('.composer-schedule-picker-popover[inert]')).not.toBeNull();
+    expect(screen.queryByRole('listbox')).toBeNull();
+    expect(fireEvent.keyDown(document, { key: 'Escape' })).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('deactivates its portal without restoring focus or replaying stale open requests', () => {
+    const onChange = vi.fn();
+    const view = (active: boolean, openRequest: number) => <div>
+      <button type="button">其他操作</button>
+      <ComposerSchedulePicker active={active} value="" onChange={onChange} openRequest={openRequest} />
+    </div>;
+    const { rerender } = render(view(true, 0));
+    fireEvent.click(screen.getByRole('button', { name: '定时发送时间' }));
+    expect(screen.getByRole('dialog', { name: '选择定时发送时间' })).not.toBeNull();
+    const next = screen.getByRole('button', { name: '其他操作' });
+    next.focus();
+    rerender(view(false, 1));
+    expect(screen.queryByRole('dialog', { name: '选择定时发送时间' })).toBeNull();
+    expect(document.activeElement).toBe(next);
+    expect(fireEvent.keyDown(document, { key: 'Escape' })).toBe(true);
+    rerender(view(true, 1));
+    expect(screen.queryByRole('dialog', { name: '选择定时发送时间' })).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('uses a transactional app-owned calendar instead of the native datetime picker', () => {

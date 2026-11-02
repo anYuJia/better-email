@@ -24,7 +24,7 @@ export default function MobileSettingsRoot({
     <section className="mobile-settings-root" aria-label="设置">
       <header className="mobile-settings-header">
         <button type="button" className="mobile-header-icon" aria-label="返回邮箱" onClick={onBack}>
-          <ArrowLeft size={22} aria-hidden="true" />
+          <ArrowLeft size={20} aria-hidden="true" />
         </button>
         <h1>设置</h1>
         <span aria-hidden="true" />
@@ -44,7 +44,7 @@ export default function MobileSettingsRoot({
             <strong>{account?.display_name || account?.email || '账号'}</strong>
             <span>{account?.email || (accounts.length ? `${accounts.length} 个账号` : '添加或管理邮箱账号')}</span>
           </div>
-          <ChevronRight size={18} aria-hidden="true" />
+          <ChevronRight size={16} aria-hidden="true" />
         </button>
 
         {settingsNavigationGroups.map((group) => (
@@ -74,7 +74,7 @@ export default function MobileSettingsRoot({
                       <strong>{item.label}</strong>
                       <small>{item.description}</small>
                     </span>
-                    <ChevronRight size={18} aria-hidden="true" />
+                    <ChevronRight size={16} aria-hidden="true" />
                   </button>
                 );
               })}

@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import {
   ArrowLeft,
   Mail,
@@ -24,17 +24,23 @@ import InlineImageNotice from './reader/InlineImageNotice';
 import ReaderBodyContent from './ReaderBodyContent';
 import ImageContextMenuOverlay from './reader/ImageContextMenuOverlay';
 import useReaderCompletion from '../hooks/useReaderCompletion';
-import QuickReplySection from './reader/QuickReplySection';
+import useReaderScrollPosition from '../hooks/useReaderScrollPosition';
+import useReaderReveal from '../hooks/useReaderReveal';
+import QuickReplySection, { type QuickReplyHandle } from './reader/QuickReplySection';
 import AttachmentList from './reader/AttachmentList';
 import ReaderLabelMenu from './reader/ReaderLabelMenu';
 import ReaderSecurityBanner from './reader/ReaderSecurityBanner';
 import ReaderToolbar from './reader/ReaderToolbar';
 import ReaderTranslationPanel from './reader/ReaderTranslationPanel';
 import useMessageTranslation from '../hooks/useMessageTranslation';
+import type { ReaderReplyTarget } from '../hooks/useComposerController';
 import type { ReaderBodyFetchState } from '../hooks/useReaderBodyLoading';
 import EmailReaderSkeleton from './EmailReaderSkeleton';
 import DeferredSurface from './DeferredSurface';
 import ReaderDeliveryStatus from './reader/ReaderDeliveryStatus';
+import { EmptyMessageBody } from './reader/PlainMessageBody';
+import { MAX_AUTO_RENDER_BODY_LENGTH } from '../app/messageBodyPolicy';
+import type { MessageDetailLoadState } from '../hooks/useMailboxSelectionController';
 
 const ImagePreviewOverlay = lazy(() => import('./reader/ImagePreviewOverlay'));
 const ThreadReaderList = lazy(() => import('./reader/ThreadReaderList'));
@@ -59,6 +65,8 @@ export type ReaderPaneProps = {
   selected: Message | null;
   selectedId: number | null;
   activeSelectedId: number | null;
+  detailLoadState?: MessageDetailLoadState;
+  onRetryDetail?: () => void;
   attachmentsLoaded: boolean;
   accountScope: AccountScope;
   folders: Folder[];
@@ -73,6 +81,11 @@ export type ReaderPaneProps = {
   selectedInterceptsHttps: boolean;
   onOpenHttpsLink: (href: string) => void;
   quickReplyBody: string;
+  readerReplyRef?: MutableRefObject<ReaderReplyTarget | null>;
+  quickReplyComposerActive?: boolean;
+  quickReplySaveError?: string | null;
+  onRetryQuickReplySave?: () => void;
+  submissionPending?: boolean;
   onSelectMessage: (messageId: number) => void;
   readTriggerKey: number;
   onComposeNew: (fields?: ComposeNewFields) => void;
@@ -107,12 +120,14 @@ export type ReaderPaneProps = {
   onUpdateLabel?: (id: number, name: string, color: string) => Promise<void>;
   onDeleteLabel?: (id: number) => Promise<void>;
   onOpenAttachment: (attachment: Attachment) => void;
+  onRefreshAttachments?: (messageId: number) => Promise<void>;
   onDownloadAttachment: (attachment: Attachment) => void | Promise<Attachment | null | undefined>;
   onSaveAttachmentAs: (attachment: Attachment) => void;
   onQuickReplyChange: (value: string) => void;
   onSendQuickReply: (message: Message) => void;
   onBackToList?: () => void;
   hasNoSearchResults?: boolean;
+  scrollPositions?: Map<string, number>;
 };
 
 function NarrowReaderNavigation({ onBack }: { onBack?: () => void }) {
@@ -120,7 +135,7 @@ function NarrowReaderNavigation({ onBack }: { onBack?: () => void }) {
   return (
     <nav className="narrow-reader-navigation" aria-label="阅读导航">
       <button type="button" data-narrow-reader-back onClick={onBack}>
-        <ArrowLeft size={17} aria-hidden="true" />
+        <ArrowLeft size={18} strokeWidth={1.75} aria-hidden="true" />
         返回邮件列表
       </button>
     </nav>
@@ -136,6 +151,8 @@ function ReaderPane({
   selected,
   selectedId,
   activeSelectedId,
+  detailLoadState = { status: 'idle' },
+  onRetryDetail,
   attachmentsLoaded,
   readTriggerKey,
   accountScope,
@@ -151,6 +168,11 @@ function ReaderPane({
   selectedInterceptsHttps,
   onOpenHttpsLink,
   quickReplyBody,
+  readerReplyRef,
+  quickReplyComposerActive,
+  quickReplySaveError,
+  onRetryQuickReplySave,
+  submissionPending,
   onSelectMessage,
   onComposeNew,
   onComposeFromMessage,
@@ -184,14 +206,28 @@ function ReaderPane({
   onUpdateLabel,
   onDeleteLabel,
   onOpenAttachment,
+  onRefreshAttachments,
   onDownloadAttachment,
   onSaveAttachmentAs,
   onQuickReplyChange,
   onSendQuickReply,
   onBackToList,
   hasNoSearchResults = false,
+  scrollPositions,
 }: ReaderPaneProps) {
   const [linksRevealed, setLinksRevealed] = useState(false);
+  const quickReplyRef = useRef<QuickReplyHandle>(null);
+  const [expandedBody, setExpandedBody] = useState<{ id: number; source: string } | null>(null);
+  const selectedBodySource = selected ? selected.body || selected.sanitized_html : '';
+  const isBodyExpanded = Boolean(selected && expandedBody?.id === selected.id
+    && expandedBody.source === selectedBodySource);
+  const requiresExplicitRender = Boolean(selected
+    && Math.max(selected.body.length, selected.sanitized_html.length) > MAX_AUTO_RENDER_BODY_LENGTH
+    && !isBodyExpanded);
+  const activeBodyFetchState = bodyFetchState?.messageId === selected?.id ? bodyFetchState : null;
+  const isActiveMessage = Boolean(selected && selected.id === activeSelectedId);
+  const canCompleteReading = isActiveMessage && !activeThread && activeBodyFetchState == null;
+  useEffect(() => setExpandedBody(null), [selected?.id]);
   const {
     readerRef,
     bodySelected,
@@ -203,6 +239,8 @@ function ReaderPane({
     selectedId,
     readTriggerKey,
     onReadComplete,
+    canRenderBody: !requiresExplicitRender,
+    canCompleteReading,
   });
 
 
@@ -273,6 +311,7 @@ function ReaderPane({
     selectedId,
     onDownloadAttachment,
     onOpenAttachment,
+    onRefreshAttachments,
     onSaveAttachmentAs,
     openImagePreview,
   });
@@ -286,8 +325,8 @@ function ReaderPane({
     isRefreshingInlineImages,
     handleLoadInlineImages,
   } = useInlineImages({
-    selected: bodySelected,
-    attachments: bodySelected ? attachments : [],
+    selected: requiresExplicitRender ? null : bodySelected,
+    attachments: bodySelected && !requiresExplicitRender ? attachments : [],
     attachmentErrors,
     setAttachmentErrors,
     onFetchBody: () => onFetchBody(true),
@@ -303,61 +342,86 @@ function ReaderPane({
     [selected?.security_warnings, selectedSenderTrusted],
   );
   const readerHtml = inlineImageResolution.html;
-  const hasRenderableHtml = Boolean(
-    bodySelected?.sanitized_html.trim()
+  const hasRenderableHtml = useMemo(() => Boolean(
+    !requiresExplicitRender && bodySelected?.sanitized_html.trim()
       && htmlHasRenderableContent(readerHtml),
-  );
-  const selectedBodyLooksLikeHtml = Boolean(bodySelected && bodyLooksLikeHtml(bodySelected.body));
-  const selectedHasRemoteVisualContent = Boolean(
+  ), [requiresExplicitRender, bodySelected?.sanitized_html, readerHtml]);
+  const selectedBodyLooksLikeHtml = useMemo(() => !requiresExplicitRender && Boolean(bodySelected && bodyLooksLikeHtml(bodySelected.body)), [requiresExplicitRender, bodySelected?.body]);
+  const selectedHasRemoteVisualContent = useMemo(() => !requiresExplicitRender && Boolean(
     bodySelected && htmlHasRemoteVisualContent(bodySelected.body),
-  );
+  ), [requiresExplicitRender, bodySelected?.body]);
   const shouldOfferRemoteContent = Boolean(
     bodySelected
       && (selectedHasRemoteImageWarning || selectedHasRemoteVisualContent)
       && !hasRenderableHtml
       && bodySelected.body.trim(),
   );
-  const isSelectedBodyCorrupted = Boolean(bodySelected && isMessageBodyCorrupted(bodySelected.body));
-  const plainBodyForReader = bodySelected && !bodySelected.sanitized_html.trim() && !selectedBodyLooksLikeHtml && !isSelectedBodyCorrupted
+  const isSelectedBodyCorrupted = useMemo(() => !requiresExplicitRender && Boolean(bodySelected && isMessageBodyCorrupted(bodySelected.body)), [requiresExplicitRender, bodySelected?.body]);
+  const plainBodyForReader = !requiresExplicitRender && bodySelected && !bodySelected.sanitized_html.trim() && !selectedBodyLooksLikeHtml && !isSelectedBodyCorrupted
     ? bodySelected.body
     : '';
   const selectedHasLinks = useMemo(() => {
-    if (!bodySelected) return false;
+    if (!bodySelected || requiresExplicitRender) return false;
     if (/href\s*=\s*["']https?:\/\//i.test(bodySelected.sanitized_html)) return true;
     return /https?:\/\/[^\s"'<>]+/i.test(bodySelected.body);
-  }, [bodySelected?.sanitized_html, bodySelected?.body]);
+  }, [requiresExplicitRender, bodySelected?.sanitized_html, bodySelected?.body]);
   const linksHidden = Boolean(selectedInterceptsHttps && !linksRevealed);
 
   useEffect(() => {
     setLinksRevealed(false);
   }, [selectedId]);
   // 正文真正渲染出来、且展示的就是当前选中的邮件时才显示快速回复框：
-  // 切换加载期间（冻结展示上一封）、正文未就绪、附件列表未加载完
+  // 切换加载期间、正文未就绪、附件列表未加载完
   // 或内嵌图片尚未解析完成时都不出现，避免回复框先于内容出现
   // （含"有图片的邮件先出回复框、图片后加载出来"的情况）
-  const isActiveMessage = Boolean(selected && selected.id === activeSelectedId);
   const inlineImagesSettled = Boolean(
     inlineImageResolution.pendingAttachments.length === 0 || inlineImageError,
   );
-  const hasRenderedBodyContent = isBodyRenderReady && isActiveMessage && attachmentsLoaded
-    && inlineImagesSettled && Boolean(
-      hasRenderableHtml || plainBodyForReader.trim() || shouldOfferRemoteContent,
-    );
+  // A successfully loaded empty message is still replyable. Loading and failed
+  // fetches must not be mistaken for that empty state (including cached reloads).
+  const canShowQuickReply = isBodyRenderReady && isActiveMessage && attachmentsLoaded
+    && inlineImagesSettled && activeBodyFetchState == null;
+
+  const replyTargetKey = selected && !activeThread && selected.folder_role !== 'drafts' && selected.folder_role !== 'trash' && canShowQuickReply
+    ? `${selected.account_id}:${selected.id}` : null;
+  useLayoutEffect(() => {
+    if (!readerReplyRef || !replyTargetKey) return undefined;
+    const target = { key: replyTargetKey, focus: () => quickReplyRef.current?.focus() };
+    readerReplyRef.current = target;
+    return () => { if (readerReplyRef.current === target) readerReplyRef.current = null; };
+  }, [readerReplyRef, replyTargetKey]);
+
+  // Thread summaries remember scroll without participating in the single
+  // message's "read to the bottom" completion policy.
+  const threadReaderRef = useRef<HTMLElement | null>(null);
+  useReaderScrollPosition(
+    activeThread ? threadReaderRef : readerRef,
+    activeThread ? `thread:${accountScope}:${activeThread.thread_key}`
+      : selected ? `${selected.account_id}:${selected.id}` : null,
+    activeThread ? threadMessages.length > 0
+      : isBodyRenderReady && attachmentsLoaded && activeBodyFetchState == null,
+    scrollPositions,
+  );
+  useReaderReveal(
+    readerRef,
+    selected && !activeThread ? `${selected.account_id}:${selected.id}` : null,
+    isBodyRenderReady && activeBodyFetchState == null,
+  );
 
   useEffect(() => {
     maybeCompleteReading();
-  }, [selected?.id, selected?.is_read, isBodyRenderReady, readerHtml, plainBodyForReader]);
+  }, [maybeCompleteReading, readerHtml, plainBodyForReader]);
 
   const {
     needsTranslation,
     translationState,
     translate: translateMessage,
     toggleTranslation,
-  } = useMessageTranslation(selected, {});
+  } = useMessageTranslation(requiresExplicitRender ? null : selected, {});
 
-if (activeThread && threadMessages.length > 0) {
+  if (activeThread && threadMessages.length > 0) {
     return (
-      <section className="reader-panel">
+      <section className="reader-panel" ref={threadReaderRef}>
         <NarrowReaderNavigation onBack={onBackToList} />
         <article className="reader thread-reader">
           <Suspense fallback={<EmailReaderSkeleton />}>
@@ -383,10 +447,17 @@ if (activeThread && threadMessages.length > 0) {
   }
 
   if (!selected) {
+    const detailFailed = detailLoadState.status === 'error' && detailLoadState.messageId === activeSelectedId;
     return (
       <section className="reader-panel">
         <NarrowReaderNavigation onBack={onBackToList} />
-        <div className="empty-reader">
+        {activeSelectedId && !detailFailed ? <article className="reader" aria-busy="true" aria-label="正在加载邮件"><EmailReaderSkeleton /></article>
+          : detailFailed ? <article className="reader"><EmptyMessageBody
+            role="alert"
+            title="无法加载这封邮件"
+            detail="邮件列表仍可使用。请重试，或选择另一封邮件。"
+            action={<button type="button" className="reader-warning-primary-action" onClick={onRetryDetail}>重新加载邮件</button>}
+          /></article> : <div className="empty-reader">
           {hasNoSearchResults ? (
             <div className="empty-reader-quiet" aria-live="polite">
               <span>无可阅读的搜索结果</span>
@@ -404,7 +475,7 @@ if (activeThread && threadMessages.length > 0) {
               </button>
             </div>
           )}
-        </div>
+        </div>}
       </section>
     );
   }
@@ -434,6 +505,19 @@ if (activeThread && threadMessages.length > 0) {
           onEditDraft={onEditDraft}
           onComposeNew={onComposeNew}
           onComposeFromMessage={onComposeFromMessage}
+          onReply={() => {
+            if (readerReplyRef) {
+              onComposeFromMessage(selected, 'reply');
+              return;
+            }
+            if (quickReplyRef.current) {
+              quickReplyRef.current.focus();
+              return;
+            }
+            // A body still loading (or requiring explicit approval) has no
+            // inline editor. Preserve its saved reply in the full composer.
+            onComposeFromMessage(selected, 'reply', quickReplyBody);
+          }}
           onRestoreFromTrash={onRestoreFromTrash}
           onMoveArchive={onMoveArchive}
           onToggleRead={onToggleRead}
@@ -447,27 +531,30 @@ if (activeThread && threadMessages.length > 0) {
           onPermanentlyDelete={onPermanentlyDelete}
           onEmptyTrash={onEmptyTrash}
           onMoveToFolder={onMoveToFolder}
+          metadata={(
+            <div className="reader-context-row">
+              <div className="reader-meta">
+                <time dateTime={selected.received_at}>{formatDate(selected.received_at)}</time>
+                {accountScope === 'all' && <span className="reader-account-source" title={`所属账号：${selected.account_email}`}>{selected.account_email}</span>}
+                {selected.snoozed_until && <span>稍后到 {formatDate(selected.snoozed_until)}</span>}
+              </div>
+              <ReaderLabelMenu
+                selectedLabels={selected.labels}
+                labels={labels}
+                onToggleLabel={onToggleLabel}
+                onCreateLabel={onCreateLabel}
+                onUpdateLabel={onUpdateLabel}
+                onDeleteLabel={onDeleteLabel}
+              />
+            </div>
+          )}
         />
 
         {deliveryStatus?.message_id === selected.id && <ReaderDeliveryStatus key={deliveryStatus.id} item={deliveryStatus} onResolve={onResolveDelivery} />}
 
-        <div className="reader-meta">
-          <span>{formatDate(selected.received_at)}</span>
-          {accountScope === 'all' && <span>{selected.account_email}</span>}
-          {selected.snoozed_until && <span>稍后到 {formatDate(selected.snoozed_until)}</span>}
-        </div>
-
-        <ReaderLabelMenu
-          selectedLabels={selected.labels}
-          labels={labels}
-          onToggleLabel={onToggleLabel}
-          onCreateLabel={onCreateLabel}
-          onUpdateLabel={onUpdateLabel}
-          onDeleteLabel={onDeleteLabel}
-        />
-
         {regularAttachments.length > 0 && (
           <AttachmentList
+            key={`attachments:${selected.account_id}:${selected.id}`}
             attachments={regularAttachments}
             pendingAttachmentCount={pendingAttachmentCount}
             totalSize={regularAttachmentTotalSize}
@@ -510,7 +597,14 @@ if (activeThread && threadMessages.length > 0) {
           onTrustDomain={() => onTrustRemoteImages('domain')}
         />
 
-        <ReaderBodyContent
+        {requiresExplicitRender && !activeBodyFetchState ? (
+          <EmptyMessageBody
+            title="这封邮件较大，尚未渲染完整内容"
+            detail="正文完整保存在本机。按需加载可以保持阅读与切换流畅。"
+            action={<button type="button" className="reader-warning-primary-action" onClick={() => setExpandedBody({ id: selected.id, source: selectedBodySource })}>加载完整邮件</button>}
+          />
+        ) : <ReaderBodyContent
+          largeBodyApproved={isBodyExpanded}
           isBodyRenderReady={isBodyRenderReady}
           showPlaceholder={showPlaceholder}
           hasRenderableHtml={hasRenderableHtml}
@@ -523,10 +617,10 @@ if (activeThread && threadMessages.length > 0) {
           onAllowRemoteImagesOnce={onAllowRemoteImagesOnce}
           onOpenLink={onOpenHttpsLink}
           onComposeNew={onComposeNew}
-          bodyFetchStatus={bodyFetchState?.status ?? null}
-          bodyFetchError={bodyFetchState?.error ?? null}
+          bodyFetchStatus={activeBodyFetchState?.status ?? null}
+          bodyFetchError={activeBodyFetchState?.error ?? null}
           onRetryBodyFetch={() => onFetchBody(false)}
-        />
+        />}
 
         <ReaderTranslationPanel
           state={translationState}
@@ -537,10 +631,16 @@ if (activeThread && threadMessages.length > 0) {
 
 
 
-        {!isDraft && !isTrash && hasRenderedBodyContent && (
+        {!isDraft && !isTrash && canShowQuickReply && (
           <QuickReplySection
+            key={`quick-reply:${selected.account_id}:${selected.id}`}
+            ref={quickReplyRef}
+            submissionPending={submissionPending}
+            saveError={quickReplySaveError}
+            onRetrySave={onRetryQuickReplySave}
             selected={selected}
             quickReplyBody={quickReplyBody}
+            continuingInComposer={quickReplyComposerActive}
             onQuickReplyChange={onQuickReplyChange}
             onComposeFromMessage={onComposeFromMessage}
             onSendQuickReply={onSendQuickReply}

@@ -66,14 +66,49 @@ describe('useDetailsMenu', () => {
     expect(details.hasAttribute('open')).toBe(false);
   });
 
-  it('closes on outside pointerdown and restores summary focus', () => {
+  it('closes on outside pointerdown without taking focus from the next control', () => {
     render(<MenuHarness />);
     const { summary, details } = openDetails();
     expect(details.hasAttribute('open')).toBe(true);
 
-    fireEvent.pointerDown(screen.getByRole('button', { name: '外部按钮' }));
+    summary.focus();
+    const outside = screen.getByRole('button', { name: '外部按钮' });
+    outside.focus();
+    fireEvent.pointerDown(outside);
     expect(details.hasAttribute('open')).toBe(false);
+    expect(document.activeElement).toBe(outside);
+  });
+
+  it('hands a pointer-opened command menu to its first action', () => {
+    render(<MenuHarness />);
+    const { summary, details } = openDetails();
+    summary.focus();
+    fireEvent(details, new Event('toggle'));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '命令A' }));
+  });
+
+  it('opens from either arrow key and navigates the shared command menu', () => {
+    render(<MenuHarness />);
+    const summary = screen.getByRole('button', { name: '菜单' });
+    summary.focus();
+    fireEvent.keyDown(summary, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '命令B' }));
+    fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '命令A' }));
+    fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' });
     expect(document.activeElement).toBe(summary);
+    fireEvent.keyDown(summary, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '命令A' }));
+  });
+
+  it('resumes Tab outside the command menu and closes it', () => {
+    render(<MenuHarness />);
+    const { details } = openDetails();
+    const command = screen.getByRole('button', { name: '命令A' });
+    command.focus();
+    fireEvent.keyDown(command, { key: 'Tab' });
+    expect(details.hasAttribute('open')).toBe(false);
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '外部按钮' }));
   });
 
   it('closes on Escape from within the menu', () => {
@@ -81,6 +116,20 @@ describe('useDetailsMenu', () => {
     const { details } = openDetails();
     const command = screen.getByRole('button', { name: '命令B' });
     command.focus();
+    fireEvent.keyDown(command, { key: 'Escape' });
+    expect(details.hasAttribute('open')).toBe(false);
+  });
+
+  it.each([{ isComposing: true }, { keyCode: 229 }])('keeps a menu open while Escape cancels IME composition (%j)', (composition) => {
+    render(<MenuHarness />);
+    const { details } = openDetails();
+    const command = screen.getByRole('button', { name: '命令B' });
+    command.focus();
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true, ...composition });
+    fireEvent(command, escape);
+    expect(escape.defaultPrevented).toBe(false);
+    expect(details.hasAttribute('open')).toBe(true);
+    expect(document.activeElement).toBe(command);
     fireEvent.keyDown(command, { key: 'Escape' });
     expect(details.hasAttribute('open')).toBe(false);
   });

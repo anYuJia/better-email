@@ -32,10 +32,11 @@ describe('ReaderBodyContent remote body states', () => {
     expect(screen.queryByText('无正文')).toBeNull();
   });
 
-  it('distinguishes a body fetch failure from a genuinely empty message and retries inline', () => {
+  it.each([true, false])('keeps fetch failures retryable when body render readiness is %s', (isBodyRenderReady) => {
     const onRetryBodyFetch = vi.fn();
     renderBody({
       bodyFetchStatus: 'error',
+      isBodyRenderReady,
       bodyFetchError: '网络连接不可用',
       onRetryBodyFetch,
     });

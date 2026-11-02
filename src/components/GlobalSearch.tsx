@@ -40,6 +40,12 @@ export default function GlobalSearch({
   onApplySearchShortcut,
 }: GlobalSearchProps) {
   const ime = useCompositionGuard();
+  const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const setInputRef = React.useCallback((input: HTMLInputElement | null) => {
+    inputRef.current = input;
+    if (typeof searchInputRef === 'function') searchInputRef(input);
+    else if (searchInputRef) (searchInputRef as React.MutableRefObject<HTMLInputElement | null>).current = input;
+  }, [searchInputRef]);
   const scopeHintId = React.useId();
   const [searchFocused, setSearchFocused] = React.useState(false);
   const [activeSearchSuggestionIndex, setActiveSearchSuggestionIndex] = React.useState(-1);
@@ -47,6 +53,7 @@ export default function GlobalSearch({
   const searchSuggestionListId = React.useId();
   const searchScopeMenuRef = React.useRef<HTMLDetailsElement>(null);
   const searchSuggestionPanelRef = React.useRef<HTMLDivElement>(null);
+  const keyboardNavigationRef = React.useRef(false);
   const searchScopeMenu = useDetailsMenu(searchScopeMenuRef, { floating: true });
   const deferredQuery = React.useDeferredValue(query);
   const activeSearchScope = searchScopeOptions.find((item) => item.id === searchScope)
@@ -62,9 +69,20 @@ export default function GlobalSearch({
   );
   const showSearchSuggestions = searchFocused && trimmedQuery.length >= 1 && searchSuggestions.length > 0;
   useWheelContainment(searchSuggestionPanelRef, showSearchSuggestions);
-  const activeSearchSuggestion = activeSearchSuggestionIndex >= 0
+  const activeSearchSuggestion = showSearchSuggestions && activeSearchSuggestionIndex >= 0
     ? searchSuggestions[activeSearchSuggestionIndex]
     : null;
+
+  React.useLayoutEffect(() => {
+    if (!activeSearchSuggestion || !keyboardNavigationRef.current) return;
+    const panel = searchSuggestionPanelRef.current;
+    const option = panel?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!panel || !option) return;
+    const bounds = panel.getBoundingClientRect();
+    const item = option.getBoundingClientRect();
+    if (item.bottom > bounds.bottom) panel.scrollTop += item.bottom - bounds.bottom + 4;
+    else if (item.top < bounds.top) panel.scrollTop -= bounds.top - item.top + 4;
+  }, [activeSearchSuggestion]);
 
   const clearSearchBlurTimer = React.useCallback(() => {
     if (searchBlurTimerRef.current === null) return;
@@ -89,13 +107,14 @@ export default function GlobalSearch({
       onSubmit={(event) => {
         if (ime.isComposing()) { event.preventDefault(); return; }
         setSearchFocused(false);
+        setActiveSearchSuggestionIndex(-1);
         onSearchSubmit(event);
       }}
       role="search"
     >
       <Search size={16} aria-hidden="true" />
       <input
-        ref={searchInputRef}
+        ref={setInputRef}
         value={query}
         onChange={(event) => {
           setSearchFocused(true);
@@ -122,6 +141,7 @@ export default function GlobalSearch({
           if (!showSearchSuggestions) return;
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
+            keyboardNavigationRef.current = true;
             const direction = event.key === 'ArrowDown' ? 1 : -1;
             setActiveSearchSuggestionIndex((current) => {
               if (current < 0) return direction > 0 ? 0 : searchSuggestions.length - 1;
@@ -129,8 +149,9 @@ export default function GlobalSearch({
             });
             return;
           }
-          if (event.key === 'Home' || event.key === 'End') {
+          if ((event.key === 'Home' || event.key === 'End') && activeSearchSuggestion && keyboardNavigationRef.current) {
             event.preventDefault();
+            keyboardNavigationRef.current = true;
             setActiveSearchSuggestionIndex(event.key === 'Home' ? 0 : searchSuggestions.length - 1);
             return;
           }
@@ -162,7 +183,10 @@ export default function GlobalSearch({
           className="search-clear-button"
           title="清空搜索和筛选"
           aria-label="清空搜索和筛选"
-          onClick={onClearSearchAndFilter}
+          onClick={() => {
+            onClearSearchAndFilter();
+            inputRef.current?.focus({ preventScroll: true });
+          }}
         >
           <X size={14} aria-hidden="true" />
         </button>
@@ -210,24 +234,26 @@ export default function GlobalSearch({
           role="listbox"
           aria-label="搜索建议"
         >
-          <span className="search-suggestion-title" aria-hidden="true">搜索范围</span>
+          <span className="search-suggestion-title" aria-hidden="true">搜索方式</span>
           {searchSuggestions.map((item, index) => (
             <button
               type="button"
               role="option"
               id={`${searchSuggestionListId}-${item.id}`}
               key={item.id}
-              className={item.active || index === activeSearchSuggestionIndex ? 'active' : ''}
+              className={index === activeSearchSuggestionIndex ? 'active' : ''}
               aria-selected={index === activeSearchSuggestionIndex}
               tabIndex={-1}
               onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => setActiveSearchSuggestionIndex(index)}
+              onMouseEnter={() => {
+                keyboardNavigationRef.current = false;
+                setActiveSearchSuggestionIndex(index);
+              }}
               onClick={() => applySuggestedSearch(item.query)}
             >
               <span>
                 <strong>{item.label}</strong>
               </span>
-              <em>{item.count} 封</em>
             </button>
           ))}
         </div>

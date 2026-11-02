@@ -42,6 +42,7 @@ export default function useInlineImages({
   const inlineImageDownloadAttemptsRef = useRef<Set<number>>(new Set());
   /** Attachments already attempted via Data URL fallback (success or failure) — avoid re-trigger. */
   const inlineImageDataUrlAttemptsRef = useRef<Set<number>>(new Set());
+  const inlineImageUrlInFlightRef = useRef<Set<number>>(new Set());
   const onFetchBodyRef = useRef(onFetchBody);
 
   useEffect(() => {
@@ -59,6 +60,7 @@ export default function useInlineImages({
     inlineImageRefreshAttemptsRef.current = new Set();
     inlineImageDownloadAttemptsRef.current = new Set();
     inlineImageDataUrlAttemptsRef.current = new Set();
+    inlineImageUrlInFlightRef.current = new Set();
 
     return () => {
       // Also invalidate requests when the hook unmounts. For a normal rerender
@@ -66,7 +68,7 @@ export default function useInlineImages({
       // request remains authoritative for that message.
       inlineImageRefreshGenerationRef.current += 1;
     };
-  }, [selected?.id]);
+  }, [selected?.account_id, selected?.id]);
 
   const inlineImageResolution = useMemo(
     () => resolveCidInlineImages(
@@ -96,62 +98,69 @@ export default function useInlineImages({
       && Boolean(attachment.content_id.trim())
       && !inlineImageDataUrls[attachment.id]
       && !inlineImageAssetUrls[attachment.id]
+      && !inlineImageUrlInFlightRef.current.has(attachment.id)
       && !inlineImageDataUrlAttemptsRef.current.has(attachment.id));
     if (readyInlineImages.length === 0) return;
 
-    let cancelled = false;
+    // URL-map updates from a sibling image are normal same-message renders.
+    // Only selection changes or unmount invalidate these requests. Capture
+    // the set as well so an old completion cannot remove a new request's ID.
+    const generation = inlineImageRefreshGenerationRef.current;
+    const inFlight = inlineImageUrlInFlightRef.current;
+    const isCurrent = () => generation === inlineImageRefreshGenerationRef.current;
     readyInlineImages.forEach(async (attachment) => {
+      inFlight.add(attachment.id);
       try {
-        const assetUrl = await localFileAssetUrl(attachment.local_path);
-        if (cancelled) return;
-        if (assetUrl && assetUrl.trim()) {
-          setInlineImageAssetUrls((current) => ({
+        try {
+          const assetUrl = await localFileAssetUrl(attachment.local_path);
+          if (!isCurrent()) return;
+          if (assetUrl && assetUrl.trim()) {
+            setInlineImageAssetUrls((current) => ({
+              ...current,
+              [attachment.id]: assetUrl,
+            }));
+            return;
+          }
+        } catch (e) {
+          if (!isCurrent()) return;
+          logError('Failed to get local asset URL, falling back to data URL if size allows', e);
+        }
+
+        if (!isCurrent()) return;
+
+        // Only fall back for small attachments to keep React state bounded.
+        if (
+          typeof attachment.size_bytes === 'number'
+          && attachment.size_bytes > INLINE_IMAGE_DATA_URL_FALLBACK_MAX_BYTES
+        ) {
+          inlineImageDataUrlAttemptsRef.current.add(attachment.id);
+          setAttachmentErrors((current) => ({
             ...current,
-            [attachment.id]: assetUrl,
+            [attachment.id]: '内嵌图片资源地址不可用，且附件过大无法使用备用预览。',
           }));
           return;
         }
-      } catch (e) {
-        logError('Failed to get local asset URL, falling back to data URL if size allows', e);
-      }
 
-      if (cancelled) return;
-
-      // Only fall back to Data URL for small attachments; skip large ones to avoid bloating React state.
-      if (
-        typeof attachment.size_bytes === 'number'
-        && attachment.size_bytes > INLINE_IMAGE_DATA_URL_FALLBACK_MAX_BYTES
-      ) {
         inlineImageDataUrlAttemptsRef.current.add(attachment.id);
-        setAttachmentErrors((current) => ({
-          ...current,
-          [attachment.id]: '内嵌图片资源地址不可用，且附件过大无法使用备用预览。',
-        }));
-        return;
-      }
-
-      // Mark attempted so we don't re-trigger fallback for this attachment.
-      inlineImageDataUrlAttemptsRef.current.add(attachment.id);
-      try {
-        const dataUrl = await invoke<string>(IPC.ReadAttachmentDataUrl, { attachmentId: attachment.id });
-        if (cancelled || !dataUrl.trim()) return;
-        setInlineImageDataUrls((current) => ({
-          ...current,
-          [attachment.id]: dataUrl,
-        }));
-      } catch (error) {
-        if (cancelled) return;
-        setAttachmentErrors((current) => ({
-          ...current,
-          [attachment.id]: attachmentErrorMessage(error),
-        }));
+        try {
+          const dataUrl = await invoke<string>(IPC.ReadAttachmentDataUrl, { attachmentId: attachment.id });
+          if (!isCurrent() || !dataUrl.trim()) return;
+          setInlineImageDataUrls((current) => ({
+            ...current,
+            [attachment.id]: dataUrl,
+          }));
+        } catch (error) {
+          if (!isCurrent()) return;
+          setAttachmentErrors((current) => ({
+            ...current,
+            [attachment.id]: attachmentErrorMessage(error),
+          }));
+        }
+      } finally {
+        inFlight.delete(attachment.id);
       }
     });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [attachments, inlineImageAssetUrls, inlineImageDataUrls, selected?.id, setAttachmentErrors]);
+  }, [attachments, inlineImageAssetUrls, inlineImageDataUrls, selected?.account_id, selected?.id, setAttachmentErrors]);
 
   // Effect: Auto-refresh body if inline images have missing content IDs
   useEffect(() => {

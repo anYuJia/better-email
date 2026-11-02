@@ -47,13 +47,13 @@
   width: 100%;
   max-width: 880px;
   margin: 0 auto;
-  padding: 22px clamp(24px, 3vw, 32px) 44px;
+  padding: 20px clamp(24px, 3vw, 32px) 40px;
   overflow: visible;
 }
 
 .app-shell .reader {
   max-width: 880px;
-  padding: 22px clamp(24px, 3vw, 32px) 44px;
+  padding: 20px clamp(24px, 3vw, 32px) 40px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -63,15 +63,15 @@
 .reader-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 12px;
+  margin-bottom: 20px;
   padding-bottom: 0;
   border-bottom: 0;
 }
 
 .app-shell .reader-header {
-  gap: 16px;
-  margin-bottom: 18px;
+  gap: 12px;
+  margin-bottom: 20px;
   padding-bottom: 0;
   border-bottom: 0;
 }
@@ -81,24 +81,17 @@
   order: 2;
 }
 
-/* Subject: the most important heading, but not a hero. 18–20px, 600,
-   line-height ~1.3. Long subjects wrap naturally to two lines. */
-.reader-header h1 {
-  max-width: 100%;
-  margin: 0 0 8px;
-  color: var(--ui-text);
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.3;
-  text-wrap: wrap;
-  overflow-wrap: anywhere;
-}
-
+/* The subject leads the reading surface; controls stay subordinate. */
+.reader-header h1,
 .app-shell .reader-header h1 {
-  margin-bottom: 10px;
-  font-size: var(--ui-font-size-title);
-  font-weight: 600;
+  max-width: 100%;
+  margin: 0 0 14px;
+  color: var(--ui-text);
+  font-size: clamp(22px, 4.8cqi, 24px);
+  font-weight: 650;
   line-height: 1.3;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
 }
 
 .reader-header p {
@@ -108,230 +101,108 @@
   line-height: 1.45;
 }
 
-/* Toolbar action groups */
+/* A single 36px toolbar rhythm, with one quietly emphasized reply action. */
 .reader-actions {
+  position: relative;
   width: 100%;
+  min-width: 0;
   max-width: 100%;
-  padding: 0;
   display: flex;
   align-items: center;
-  gap: 4px;
   flex-wrap: wrap;
-  row-gap: 4px;
-  min-height: 40px;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 0 8px;
+  order: 1;
   border: 0;
+  border-bottom: 1px solid var(--ui-border);
   border-radius: 0;
   background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  order: 1;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--ui-border);
-}
-
-.app-shell .reader-actions {
-  gap: 4px;
-  row-gap: 4px;
+  box-shadow: none;
 }
 
 .reader-action-group {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  min-height: 40px;
-}
-
-.app-shell .reader-action-group {
-  gap: 4px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  min-height: 36px;
 }
 
 .reader-message-actions {
-  margin-inline-start: var(--ui-space-2);
-  padding-inline-start: var(--ui-space-2);
+  margin-inline-start: 4px;
+  padding-inline-start: 8px;
   border-inline-start: 1px solid var(--ui-border);
 }
 
-.app-shell .reader-message-actions {
-  margin-inline-start: var(--ui-space-2);
-  padding-inline-start: var(--ui-space-2);
-  border-inline-start: 1px solid var(--ui-border);
-}
-
-/* Toolbar controls: 40px pointer targets, transparent default, neutral hover.
-   No pill, no shadow, no gradient. */
-.reader-actions button,
-.reader-actions .reader-more-menu summary,
-.reader-actions .reader-reply-menu summary,
-.reader-actions select {
+.reader-actions :is(.reader-action-group > button, .reader-translate-action, .reader-ai-trigger, .reader-more-menu > summary, .reader-reply-menu > summary) {
   width: auto;
-  min-width: 40px;
-  min-height: 40px;
-  height: 40px;
-  padding: 0 12px;
+  min-width: 36px;
+  min-height: 36px;
+  height: 36px;
+  padding: 0 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  border: 0;
-  border-radius: var(--ui-radius-sm);
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 12.5px;
+  box-shadow: none;
+  font-size: 13px;
   line-height: 1;
   white-space: nowrap;
-  transition-property: color, background-color, box-shadow, scale;
-  transition-duration: var(--ui-motion-fast);
-  transition-timing-function: var(--ui-ease-standard);
+  transition: var(--ui-transition-control);
 }
 
-.app-shell .reader-actions button,
-.app-shell .reader-actions .reader-more-menu summary,
-.app-shell .reader-actions .reader-reply-menu summary,
-.app-shell .reader-actions select {
-  min-height: 40px;
-  height: 40px;
-  border: 0;
-  border-radius: 7px;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.reader-actions button:hover:not(:disabled),
-.reader-actions .reader-more-menu summary:hover,
-.reader-actions .reader-reply-menu summary:hover {
+.reader-actions :is(.reader-action-group > button, .reader-translate-action, .reader-ai-trigger, .reader-more-menu > summary, .reader-reply-menu > summary):hover:not(:disabled) {
   color: var(--ui-text);
   background: var(--quiet-row-hover);
-  box-shadow: var(--ui-box-shadow-none);
 }
 
-.app-shell .reader-actions button:hover:not(:disabled),
-.app-shell .reader-actions .reader-more-menu summary:hover,
-.app-shell .reader-actions .reader-reply-menu summary:hover {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.reader-actions .icon-only-action {
-  width: 40px;
+.reader-actions :is(button.icon-only-action, summary.icon-only-summary) {
+  width: 36px;
   padding: 0;
 }
 
-.reader-actions .icon-only-summary {
-  width: 40px;
-  padding: 0;
-}
-
-.reader-reply-menu {
-  position: relative;
-}
-
-.reader-reply-menu > div {
-  left: 0;
-  right: auto;
-}
-
-/* Primary reply action: icon + text, quiet emphasis */
-.reader-actions .primary-action {
-  width: auto;
-  min-width: 76px;
-  padding-inline: 13px;
-  border: 0;
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-accent);
+.reader-actions button.primary-action {
+  min-width: 72px;
+  padding-inline: 12px;
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
-  box-shadow: var(--ui-box-shadow-none);
-  font-weight: 600;
-}
-
-.app-shell .reader-actions .primary-action {
-  min-width: 76px;
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  box-shadow: var(--ui-box-shadow-none);
   font-weight: 600;
 }
 
 .reader-actions .primary-action:hover:not(:disabled) {
-  color: var(--ui-accent-hover);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
+  border-color: color-mix(in srgb, var(--ui-accent) 20%, transparent);
 }
 
-.app-shell .reader-actions .primary-action:hover:not(:disabled) {
-  color: var(--ui-accent-hover);
-  background: var(--ui-accent-soft);
+.reader-actions svg {
+  flex-shrink: 0;
+  stroke-width: 1.75;
 }
 
-.reader-actions button > svg,
-.reader-actions summary > svg {
-  flex: 0 0 auto;
-}
-
-.reader-actions button:active:not(:disabled),
-.reader-actions summary:active {
-  scale: 0.96;
-}
-
-.app-shell .reader-actions .compact-menu > div {
-  border: 0;
-}
-
-/* Delete: neutral by default, danger on hover. Not a permanent red hot-spot. */
 .reader-actions .danger-action:hover:not(:disabled) {
   color: var(--ui-danger);
   background: var(--ui-danger-bg);
 }
 
-/* Translate action: same utility language as other toolbar controls */
-.reader-actions .reader-translate-action {
-  width: auto;
-  min-width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-text-secondary);
-  background: transparent;
-  font-size: 12.5px;
-  font-weight: 600;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.reader-actions .reader-translate-action:hover:not(:disabled),
 .reader-actions .reader-translate-action.active {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
+  color: var(--ui-text-accent);
+  background: var(--ui-accent-soft);
 }
 
-.reader-actions .reader-translate-action:disabled {
+.reader-actions button:disabled {
   color: var(--ui-text-tertiary);
-  background: transparent;
   cursor: default;
+  opacity: 0.55;
 }
 
-.app-shell .reader-actions .reader-translate-action,
-.app-shell .reader-actions .reader-translate-action.active {
-  color: var(--ui-text-secondary);
-  background: transparent;
-}
+.reader-reply-menu { position: relative; }
+.reader-reply-menu > div { left: 0; right: auto; }
 
-.app-shell .reader-actions .reader-translate-action:hover:not(:disabled),
-.app-shell .reader-actions .reader-translate-action.active:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-/* Danger menu item: danger colour on hover for destructive actions in the
-   more-menu (permanent delete, empty trash). */
 .compact-menu .danger-menu-item:hover {
   color: var(--ui-danger);
   background: var(--ui-danger-bg);
@@ -402,24 +273,6 @@
   }
 }
 
-/* Desktop-only density pass: keep the reader controls and content intact,
- * while reducing the empty vertical air above the subject and between the
- * action strip and the message header. Mobile reader rhythm remains native. */
-@media (min-width: 721px) {
-  .app-shell .reader {
-    padding-top: 18px;
-  }
-
-  .app-shell .reader-header {
-    gap: 14px;
-    margin-bottom: 16px;
-  }
-
-  .app-shell .reader-actions {
-    gap: 4px;
-  }
-}
-
 @media (max-width: 720px) {
   .app-shell .reader-actions {
     align-items: center;
@@ -469,14 +322,14 @@
   gap: 2px;
 }
 
-/* Primary: sender display name, 13–14px, 600 */
+/* Sender identity remains readable without competing with the subject. */
 .reader-sender-copy strong {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ui-text);
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -501,6 +354,8 @@
 
 .reader-sender-email-line {
   width: 100%;
+  flex-wrap: wrap;
+  row-gap: 2px;
 }
 
 .reader-sender-email-text,
@@ -512,11 +367,12 @@
 }
 
 .reader-sender-email-text {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
 }
 
 .reader-recipient-summary {
   flex: 1 1 auto;
+  color: var(--ui-text-tertiary);
 }
 
 .reader-recipient-expand {
@@ -524,7 +380,7 @@
   min-height: 22px;
   padding: 0 3px;
   border: 0;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
   font: inherit;
@@ -534,7 +390,7 @@
 
 .reader-recipient-expand:hover,
 .reader-recipient-expand:focus-visible {
-  color: var(--ui-accent-hover);
+  color: var(--ui-text-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -546,9 +402,12 @@
 
 /* Sender email is actionable but doesn't look like a browser link */
 .app-shell .reader-sender-email {
-  display: inline-flex;
-  align-items: center;
+  display: block;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   min-height: 24px;
   margin-block: -5px;
   padding: 5px 0;
@@ -570,7 +429,7 @@
 
 .app-shell .reader-sender-email:hover,
 .app-shell .reader-sender-email:focus-visible {
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -666,38 +525,47 @@
  * 4. Metadata
  * --------------------------------------------------------------------------- */
 
+.reader-context-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 8px;
+}
+
 .reader-meta {
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
   margin: 0;
-  padding: 0 0 9px;
+  padding: 0;
   border-top: 0;
   color: var(--ui-text-tertiary);
 }
 
-.reader-meta,
-.label-tools {
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.app-shell .reader-meta,
-.app-shell .label-tools {
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.reader-meta span {
+.reader-meta :is(time, span) {
   padding: 0;
   border-radius: 0;
   color: var(--ui-text-tertiary);
-  background: var(--ui-surface-muted);
+  background: transparent;
   font-size: 12.5px;
+  overflow-wrap: anywhere;
 }
 
-.app-shell .reader-meta span,
+.reader-meta time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.reader-meta .reader-account-source {
+  padding-inline-start: 8px;
+  border-inline-start: 1px solid var(--ui-border);
+}
+
+.app-shell .reader-meta :is(time, span),
 .app-shell .active-label-chip,
 .app-shell .label-empty {
   color: var(--ui-text-tertiary);
@@ -710,13 +578,8 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 0 0 8px;
+  margin: 0;
   position: relative;
-  z-index: 100;
-}
-
-.label-tools:not(:has(.active-label-chip)) {
-  margin-bottom: 4px;
 }
 
 .label-empty {
@@ -797,11 +660,12 @@
 }
 
 .label-tools .label-menu > .label-menu-container {
+  --floating-menu-width: 220px;
   position: absolute;
   left: 0;
   right: auto;
   top: calc(100% + 4px);
-  width: 220px;
+  width: var(--floating-menu-width);
   min-width: 220px;
   max-height: min(320px, calc(100vh - 180px));
   overflow-y: auto;
@@ -853,7 +717,7 @@
   background: transparent;
   cursor: pointer;
   padding: 0;
-  transition: var(--ui-transition-transform-fast), var(--ui-transition-fast-border-shadow);
+  transition: var(--ui-transition-fast-color-background-border);
 }
 
 .color-dot-btn::before {
@@ -865,7 +729,8 @@
 }
 
 .color-dot-btn:hover {
-  transform: scale(1.15);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-control-hover);
 }
 
 .color-dot-btn.active {
@@ -958,8 +823,13 @@
   transition: var(--ui-transition-opacity-fast);
 }
 
-.label-menu-item-row:hover .label-item-actions {
+.label-menu-item-row:hover .label-item-actions,
+.label-menu-item-row:focus-within .label-item-actions {
   opacity: 1;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .label-item-actions { opacity: 1; }
 }
 
 .label-item-actions button {
@@ -1044,7 +914,8 @@
   }
 
   .mobile-app-surface .label-tools .label-menu > .label-menu-container {
-    width: min(280px, calc(100vw - 24px));
+    --floating-menu-width: min(280px, calc(100vw - 24px));
+    width: var(--floating-menu-width);
     min-width: 0;
     max-height: min(520px, calc(100dvh - 24px));
     padding: 8px;
@@ -1322,20 +1193,20 @@
    download/open action. */
 .attachment-section {
   max-width: 760px;
-  margin: var(--ui-space-4) 0 var(--ui-space-5);
+  margin: 4px 0 8px;
 }
 
 .attachment-section-header {
   min-height: 36px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 0 6px;
+  gap: 8px;
+  padding: 0;
   border-bottom: 0;
 }
 
-.attachment-section-header > span {
+.attachment-summary-copy {
   min-width: 0;
   display: flex;
   align-items: baseline;
@@ -1343,17 +1214,23 @@
 }
 
 .attachment-section-header strong {
+  min-width: 0;
+  overflow: hidden;
   color: var(--ui-text);
   font-size: 13px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .attachment-section-header small {
+  flex-shrink: 0;
   color: var(--ui-text-tertiary);
   font-size: 12px;
+  white-space: nowrap;
 }
 
-.attachment-section-header button {
+.attachment-section-header > button {
   min-height: 36px;
   display: inline-flex;
   align-items: center;
@@ -1370,159 +1247,78 @@
   transition: var(--ui-transition-color-fast);
 }
 
-.attachment-section-header button:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: transparent;
-  text-decoration: underline;
+.attachment-section-header .attachment-summary-toggle {
+  min-width: 0;
+  justify-content: flex-start;
+  padding-inline: 0;
+  text-align: start;
 }
 
-.attachment-section-header button:disabled {
+.attachment-summary-toggle > svg {
+  flex-shrink: 0;
+  color: var(--ui-text-tertiary);
+}
+
+.attachment-summary-toggle[aria-expanded="true"] > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.attachment-summary-error {
+  display: block;
+  color: var(--ui-danger);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.attachment-section-header > button:hover:not(:disabled) {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.attachment-section-header > button:disabled {
   color: var(--ui-text-tertiary);
   cursor: progress;
   background: transparent;
 }
 
-/* Attachment list: compact rows with divider, not card grid */
+/* Flat file rows share a subtle separator; file types use the UI icon family. */
 .attachments {
   display: grid;
-  gap: 4px;
+  gap: 0;
   margin: 0;
-  border-bottom: 0;
-  margin-top: 14px;
 }
 
-.app-shell .attachments {
-  gap: 4px;
-  border-bottom: 0;
-}
-
-/* Individual attachment row: flat, 44–48px height, no card */
 .attachments .attachment-item {
-  grid-template-columns: 36px minmax(0, 1fr) auto;
   display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
   width: 100%;
-  min-height: 48px;
+  min-height: 56px;
   align-items: center;
-  gap: 10px;
-  padding: 6px 0;
+  gap: 8px;
+  padding: 8px 0;
   border: 0;
-  border-top: 0;
+  border-top: 1px solid var(--ui-border);
   border-radius: 0;
   background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.app-shell .attachments .attachment-item {
-  width: 100%;
-  min-height: 48px;
-  padding: 6px 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  box-shadow: none;
 }
 
 .attachments .attachment-item:hover {
   background: var(--quiet-row-hover);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.app-shell .attachments .attachment-item:hover {
-  background: var(--quiet-row-hover);
-  box-shadow: var(--ui-box-shadow-none);
 }
 
 .attachments .attachment-item.attachment-download-failed {
   background: var(--ui-danger-bg);
 }
 
-/* File icon: small, flat, semantic. No gradient, no large card icon. */
 .attachments .attachment-file-icon {
-  width: 32px;
-  height: 36px;
-  flex-basis: 32px;
+  width: 28px;
+  height: 32px;
   display: grid;
   place-items: center;
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-/* Use the supplied transparent artwork without turning the compact row into
- * a card. Unknown formats keep the semantic fallback below. */
-.attachments .attachment-file-icon-has-asset {
-  border: 0;
-  border-radius: 0;
   background: transparent;
-}
-
-.attachments .attachment-file-icon-has-asset img {
-  width: auto;
-  height: auto;
-  max-width: 32px;
-  max-height: 36px;
-  display: block;
-  object-fit: contain;
-}
-
-.attachment-file-icon {
-  position: relative;
-  width: 44px;
-  height: 52px;
-  flex: 0 0 44px;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
-  box-shadow: var(--ui-box-shadow-none);
-  --attachment-accent: var(--ui-text-tertiary);
-}
-
-.attachment-file-icon-image {
-  color: var(--ui-success);
-  --attachment-accent: var(--ui-success);
-}
-
-.attachment-file-icon-archive {
-  color: var(--ui-warning);
-  --attachment-accent: var(--ui-warning);
-}
-
-.attachment-file-icon-presentation {
-  color: var(--ui-danger);
-  --attachment-accent: var(--ui-danger);
-}
-
-.attachment-file-icon-spreadsheet {
-  color: var(--ui-success);
-  --attachment-accent: var(--ui-success);
-}
-
-.attachment-file-icon-audio,
-.attachment-file-icon-video {
-  color: var(--ui-text-secondary);
-  --attachment-accent: var(--ui-text-secondary);
-}
-
-.attachment-file-type-mark {
-  position: relative;
-  z-index: 1;
-  display: inline-grid;
-  min-width: 30px;
-  height: 20px;
-  place-items: center;
-  border-radius: 4px;
-  color: var(--color-text-on-accent);
-  background: var(--attachment-accent);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 1;
 }
 
 /* File copy: filename primary, metadata secondary */
@@ -1546,8 +1342,8 @@
 }
 
 .attachments .attachment-copy strong {
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .attachment-copy small {
@@ -1588,7 +1384,7 @@
 .attachment-actions button {
   width: auto;
   min-width: 0;
-  min-height: 28px;
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1600,20 +1396,26 @@
   font-size: 12px;
   line-height: 1;
   white-space: nowrap;
+  gap: 6px;
 }
 
 .attachments .attachment-actions button {
-  min-height: 28px;
   padding: 0 8px;
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
   font-size: 12px;
-  transition: var(--ui-transition-fast-color-background);
+  transition: var(--ui-transition-control);
 }
 
-.attachment-actions button:hover {
+.attachment-actions .attachment-more-button {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+
+.attachment-actions button:hover:not(:disabled) {
   color: var(--ui-text);
   background: var(--quiet-row-hover);
 }
@@ -1628,7 +1430,7 @@
   background: transparent;
 }
 
-.attachment-actions .attachment-preview-button:hover {
+.attachment-actions .attachment-preview-button:hover:not(:disabled) {
   color: var(--ui-text-secondary);
   background: var(--quiet-row-hover);
 }
@@ -1669,6 +1471,7 @@
   font-size: 12px;
   font-weight: 500;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .attachments .attachment-transfer-status {
@@ -1678,6 +1481,26 @@
   margin-left: 0;
   color: var(--ui-danger);
   font-size: 12px;
+}
+
+@container (max-width: 440px) {
+  .attachment-section-multiple .attachment-item {
+    grid-template-columns: 28px minmax(0, 1fr);
+    row-gap: 4px;
+  }
+
+  .attachment-section-multiple .attachment-actions {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
+@media (pointer: coarse) {
+  .attachment-section-header > button,
+  .attachment-section .attachment-actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* Inline image notice */
@@ -1704,7 +1527,7 @@
   display: grid;
   place-items: center;
   border-radius: 7px;
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
 }
 
@@ -1734,7 +1557,7 @@
   padding: 0 10px;
   border: 0;
   border-radius: var(--ui-radius-sm);
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
   font-size: 12px;
   font-weight: 600;
@@ -1760,43 +1583,41 @@
    to scan before loading remote content or revealing links. */
 .reader-warning-panel {
   max-width: 760px;
-  margin: var(--ui-space-3) 0 var(--ui-space-4);
-  padding: 10px 12px;
-  display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
+  margin: var(--ui-space-2) 0 var(--ui-space-2);
+  padding: 4px 0;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-control);
+  gap: 8px;
+  border: 0;
+  border-bottom: 1px solid var(--ui-border);
+  border-radius: 0;
   color: var(--ui-text-secondary);
-  background: color-mix(in srgb, var(--ui-surface-muted) 72%, var(--ui-reader));
+  background: transparent;
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.app-shell .reader-warning-panel {
-  padding: 10px 12px;
-  border-color: var(--ui-border);
-}
-
 .reader-warning-icon {
-  width: 30px;
-  height: 30px;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   align-self: start;
   border-radius: var(--ui-radius-control);
-  color: var(--ui-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-text-accent);
+  background: transparent;
 }
 
 .reader-warning-panel.is-caution .reader-warning-icon {
   color: var(--ui-warning);
-  background: var(--ui-warning-bg);
+  background: transparent;
 }
 
 .reader-warning-content {
   min-width: 0;
+  flex: 1 1 10em;
   display: grid;
   gap: 2px;
 }
@@ -1814,6 +1635,28 @@
   gap: 2px;
 }
 
+.reader-warning-messages[hidden] { display: none; }
+
+.reader-security-disclosure {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-meta);
+  text-align: left;
+}
+.reader-security-disclosure:hover { color: var(--ui-text); }
+.reader-security-disclosure[aria-expanded="true"] svg { transform: rotate(180deg); }
+.reader-security-disclosure:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+
 .reader-warning-panel p {
   margin: 0;
   color: var(--ui-text-secondary);
@@ -1826,7 +1669,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  justify-self: end;
+  max-width: 100%;
+  margin-inline-start: auto;
+  flex-wrap: wrap;
+}
+
+.reader-warning-panel.is-caution .reader-warning-content {
+  flex-basis: calc(100% - 28px);
 }
 
 .reader-warning-more > summary {
@@ -1861,16 +1710,16 @@
   padding: 0 11px;
   border: 0;
   border-radius: var(--ui-radius-sm);
-  color: var(--ui-accent);
+  color: var(--ui-text-accent);
   background: var(--ui-accent-soft);
   font-size: 12px;
   font-weight: 600;
   box-shadow: var(--ui-box-shadow-none);
-  transition: var(--ui-transition-fast-color-background);
+  transition: var(--ui-transition-control);
 }
 
 .reader-security-primary-action:hover {
-  color: var(--ui-accent-hover);
+  color: var(--ui-text-accent);
   background: color-mix(in srgb, var(--ui-accent-soft) 76%, var(--ui-surface));
 }
 
@@ -1881,25 +1730,9 @@
   box-shadow: var(--ui-focus-ring);
 }
 
-@container (max-width: 560px) {
-  .reader-warning-panel {
-    grid-template-columns: 30px minmax(0, 1fr);
-  }
-
-  .reader-warning-action-row {
-    grid-column: 2;
-    justify-self: start;
-    flex-wrap: wrap;
-  }
-
-  .reader-security-primary-action {
-    min-height: var(--ui-control-height);
-  }
-}
-
 @media (max-width: 720px) {
   .app-shell.is-mobile-app .reader-warning-panel {
-    padding: 12px;
+    padding: 8px 0;
   }
 
   .app-shell.is-mobile-app .reader-security-primary-action,
@@ -1923,7 +1756,7 @@
   font-size: 12px;
   font-weight: 600;
   box-shadow: var(--ui-box-shadow-none);
-  transition: var(--ui-transition-fast-color-background);
+  transition: var(--ui-transition-control);
 }
 
 .reader-warning-primary-action:hover {
@@ -1997,45 +1830,70 @@
  * 10. Quick reply
  * --------------------------------------------------------------------------- */
 
-/* Quick reply: a quiet inline entry, not a large input card. Border-top,
-   compact textarea, small actions. */
+/* One quiet editor surface, one primary action. Draft content owns the space. */
 .quick-reply {
   max-width: none;
-  margin-top: 18px;
-  padding: 12px 16px 10px;
+  margin-top: 24px;
+  padding: 12px 14px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   overflow: visible;
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-control);
-  background: var(--ui-surface);
-  box-shadow: var(--ui-box-shadow-none);
-  transition: all var(--ui-motion-duration-fast, 150ms) ease;
-}
-
-.quick-reply.is-collapsed:not(:focus-within) {
-  padding: 0;
-  gap: 0;
-  border-color: color-mix(in srgb, var(--ui-border) 70%, transparent);
-  background: var(--ui-surface-muted);
-}
-
-.quick-reply.is-collapsed:not(:focus-within) > header,
-.quick-reply.is-collapsed:not(:focus-within) > footer {
-  display: none;
-}
-
-.quick-reply.is-collapsed:not(:focus-within) textarea {
-  min-height: 38px;
-  height: 38px;
-  padding: 9px 12px;
-  font-size: 13px;
-  cursor: pointer;
+  background: var(--ui-reader);
+  box-shadow: none;
+  transition: border-color var(--ui-motion-fast) var(--ui-ease-standard);
 }
 
 .quick-reply:focus-within {
   border-color: var(--ui-accent);
   box-shadow: var(--ui-focus-ring);
+}
+
+.quick-reply.is-collapsed {
+  padding: 0;
+  gap: 0;
+}
+
+.quick-reply-entry {
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: inherit;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  text-align: start;
+  font-size: var(--ui-font-size-body);
+  transition: background-color var(--ui-motion-fast) var(--ui-ease-standard),
+    color var(--ui-motion-fast) var(--ui-ease-standard);
+}
+
+.quick-reply-entry > svg {
+  flex-shrink: 0;
+  color: var(--ui-text-tertiary);
+}
+
+.quick-reply-entry > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-reply-entry:hover,
+.quick-reply-entry:active {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+}
+
+.quick-reply-entry:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
 }
 
 .quick-reply > header {
@@ -2052,14 +1910,14 @@
 .quick-reply > header > div {
   min-width: 0;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
 
 .quick-reply > header strong {
   color: var(--ui-text);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: inherit;
+  font-weight: 500;
 }
 
 .quick-reply > header span {
@@ -2076,7 +1934,7 @@
 }
 
 .quick-reply textarea {
-  min-height: 68px;
+  min-height: 84px;
   width: 100%;
   padding: 7px 0;
   border: 0;
@@ -2084,9 +1942,9 @@
   color: var(--ui-text);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 13.5px;
-  line-height: 1.55;
-  resize: none;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
 }
 
 .quick-reply textarea::placeholder {
@@ -2104,7 +1962,7 @@
 }
 
 .quick-reply > footer {
-  min-height: 30px;
+  min-height: 36px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -2120,6 +1978,20 @@
   font-size: 12px;
 }
 
+.quick-reply-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--ui-danger);
+  font-size: var(--ui-font-size-meta);
+}
+
+.quick-reply-error button {
+  min-height: 32px;
+  color: inherit;
+}
+
 .quick-reply > footer > div {
   display: inline-flex;
   align-items: center;
@@ -2127,14 +1999,18 @@
 }
 
 .quick-reply > footer button {
-  min-height: 28px;
-  padding: 0 9px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
+  box-shadow: none;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -2665,11 +2541,6 @@
   .empty-state,
   .empty-reader {
     animation: var(--ui-animation-none);
-  }
-
-  .reader-actions button:active:not(:disabled),
-  .reader-actions summary:active {
-    scale: 1;
   }
 }
 

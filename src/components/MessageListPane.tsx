@@ -18,6 +18,7 @@ import type {
 import { messageDateGroup, type LocalDateTimeRange } from '../mailUtils';
 import ContextMenu from './ContextMenu';
 import MessageListToolbar from './MessageListToolbar';
+import MessageSelectionControls from './MessageSelectionControls';
 import MessageListView from './MessageListView';
 import ThreadListView from './ThreadListView';
 import {
@@ -33,6 +34,7 @@ export type { BulkMessageAction, MessageContextAction } from './messageContextMe
 export type MessageListPaneProps = {
   mobile?: boolean;
   showAccountSource?: boolean;
+  accountSourceLabels?: ReadonlyMap<number, string>;
   appliedQuery: string;
   filter: FilterMode;
   listMode: ListMode;
@@ -88,6 +90,7 @@ export type MessageListPaneProps = {
 function MessageListPane({
   mobile = false,
   showAccountSource = false,
+  accountSourceLabels,
   appliedQuery,
   filter,
   listMode,
@@ -308,6 +311,21 @@ function MessageListPane({
           onRequestSnooze={onRequestSnooze}
           onMoveBulkToFolder={onMoveBulkToFolder}
           onToggleBulkLabel={onToggleBulkLabel}
+          selectionControls={(
+            <MessageSelectionControls
+              compact
+              messages={messages}
+              selectedMessageIds={selectedMessageIds}
+              hasMoreMessages={hasMoreMessages}
+              isAllMessagesSelected={isAllMessagesSelected}
+              isSelectingAll={isSelectingAll}
+              isSelectingMessageGroup={isSelectingMessageGroup}
+              loading={Boolean(loadMoreStatus)}
+              onToggleAllVisible={onToggleAllVisible}
+              onToggleMessageSelection={onToggleMessageSelection}
+              onSelectMessageDateRange={onSelectMessageDateRange}
+            />
+          )}
         />
       )}
       {listMode === 'threads' ? (
@@ -321,6 +339,7 @@ function MessageListPane({
         <MessageListView
           mobile={mobile}
           showAccountSource={showAccountSource}
+          accountSourceLabels={accountSourceLabels}
           groups={groupedMessages}
           messages={messages}
           query={appliedQuery}

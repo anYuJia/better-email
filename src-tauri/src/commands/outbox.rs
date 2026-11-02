@@ -86,6 +86,20 @@ fn record_outbox_failure(store: &MailStore, message_id: i64, error: &MailError) 
     }
 }
 
+fn record_direct_send_failure(
+    store: &MailStore,
+    message_id: i64,
+    error: &MailError,
+) -> MailResult<()> {
+    // 直发失败后编辑器仍保留草稿供用户处理；不能同时让后台自动重发旧记录，
+    // 否则用户再次点击发送会和自动重试生成两封邮件。队列发送保留退避重试。
+    if matches!(error, MailError::Smtp(_)) {
+        store.mark_outbox_blocked(message_id, &error.to_string())
+    } else {
+        record_outbox_failure(store, message_id, error)
+    }
+}
+
 fn read_verified_outbound_message_attachments_with_progress(
     store: &MailStore,
     message: &OutboundMessage,
@@ -93,6 +107,7 @@ fn read_verified_outbound_message_attachments_with_progress(
     start_progress: i64,
     end_progress: i64,
 ) -> MailResult<Vec<Vec<u8>>> {
+    crate::commands::attachments::validate_outbound_message_total_size(message)?;
     let attachments = &message.attachments;
     if attachments.is_empty() {
         if let Some(task_progress) = task_progress {
@@ -132,8 +147,41 @@ fn read_verified_outbound_message_attachments_with_progress(
             )?;
         }
 
-        let bytes =
-            crate::commands::attachments::read_verified_outbound_attachment(store, attachment)?;
+        let mut last_report = std::time::Instant::now();
+        let mut last_report_bytes = 0;
+        let bytes = crate::commands::attachments::read_verified_outbound_attachment_with_progress(
+            store,
+            attachment,
+            |read_bytes| {
+                // 每 1 MiB / 100 ms 检查取消并发布进度，不让 64 KiB 读取循环
+                // 对 SQLite 产生每块一次的写入，也不必等待整个大附件读完。
+                if read_bytes == 0
+                    || read_bytes >= attachment.size_bytes.max(0) as u64
+                    || read_bytes.saturating_sub(last_report_bytes) >= 1024 * 1024
+                    || last_report.elapsed() >= std::time::Duration::from_millis(100)
+                {
+                    if let Some(progress) = task_progress {
+                        ensure_outbox_task_not_cancelled(store, Some(progress.task_id))?;
+                        let read_total = loaded_size.saturating_add(read_bytes as i64);
+                        progress.set(
+                            store,
+                            start_progress + span * read_total / total_size.max(1),
+                            &format!(
+                                "读取附件 {} / {}：{}，累计 {} / {}",
+                                index + 1,
+                                total_count,
+                                attachment.filename,
+                                format_attachment_progress(read_total as u64),
+                                format_attachment_progress(total_size.max(0) as u64),
+                            ),
+                        )?;
+                    }
+                    last_report = std::time::Instant::now();
+                    last_report_bytes = read_bytes;
+                }
+                Ok(())
+            },
+        )?;
         loaded_size = loaded_size.saturating_add(bytes.len() as i64);
         attachment_bytes.push(bytes);
 
@@ -302,7 +350,7 @@ fn save_draft_blocking(
             });
         }
     };
-    let raw_message = match smtp::render_outbound_with_attachment_bytes(&message, &attachment_bytes)
+    let raw_message = match smtp::render_outbound_with_attachment_bytes(&message, attachment_bytes)
     {
         Ok(raw_message) => raw_message,
         Err(error) => {
@@ -409,6 +457,7 @@ fn send_message_blocking(
         task_progress.set(store, 16, "校验完成，准备保存发件记录")?;
     }
     let message_id = store.prepare_outbox_send(input)?;
+    let _lease = store.hold_outbox_lease(message_id)?;
     let prepared = (|| {
         store.set_message_threading(message_id, threading)?;
         let message = store.get_outbound_message(message_id)?;
@@ -423,21 +472,29 @@ fn send_message_blocking(
             60,
         )?;
         ensure_outbox_task_not_cancelled(store, task_id)?;
+        // 先保存同一批已验证字节的受管副本。磁盘失败时尚未开始 SMTP，
+        // 成功发送后也不会留下被临时清理删除的“已下载”附件。
+        store.persist_sent_attachment_bytes(&message, &attachment_bytes)?;
+        ensure_outbox_task_not_cancelled(store, task_id)?;
         if let Some(progress) = task_progress {
-            progress.set(store, 60, "正在向发送服务器提交邮件")?;
+            progress.set(
+                store,
+                60,
+                "正在构建并向服务器提交邮件；此阶段进度由服务器确认",
+            )?;
         }
         let raw_message = smtp::send_outbound_with_attachment_bytes(
             &account,
             &message,
             &secret,
-            &attachment_bytes,
+            attachment_bytes,
         )?;
         Ok((message, account, secret, raw_message))
     })();
     let (message, account, secret, raw_message) = match prepared {
         Ok(prepared) => prepared,
         Err(error) => {
-            record_outbox_failure(store, message_id, &error)?;
+            record_direct_send_failure(store, message_id, &error)?;
             return Err(error);
         }
     };
@@ -492,72 +549,90 @@ fn send_message_blocking(
     Ok(message_id)
 }
 #[tauri::command]
-pub fn queue_outbox_message(
+pub async fn queue_outbox_message(
     store: State<'_, MailStore>,
     input: DraftInput,
     threading: Option<MessageThreadingInput>,
 ) -> MailResult<OutboxItem> {
-    let started_at = std::time::Instant::now();
-    command_info(format!(
-        "[better-email][send] queue start account_id={} to={} send_at={} attachments={}",
-        input.account_id,
-        mask_recipient_list(&input.to),
-        if input.send_at.trim().is_empty() {
-            "now"
-        } else {
-            "scheduled"
-        },
-        input.attachments.len(),
-    ));
-    validate_outbound_attachment_inputs(&store, &input.attachments)?;
-    let item = store.queue_outbox_message(input)?;
-    store.set_message_threading(item.message_id, threading)?;
-    let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
-    command_info(format!(
-        "[better-email][send] queue ok outbox_id={} message_id={} status={} duration_ms={}",
-        item.id,
-        item.message_id,
-        item.status,
-        started_at.elapsed().as_millis(),
-    ));
-    Ok(item)
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let started_at = std::time::Instant::now();
+        command_info(format!(
+            "[better-email][send] queue start account_id={} to={} send_at={} attachments={}",
+            input.account_id,
+            mask_recipient_list(&input.to),
+            if input.send_at.trim().is_empty() {
+                "now"
+            } else {
+                "scheduled"
+            },
+            input.attachments.len(),
+        ));
+        validate_outbound_attachment_inputs(&store, &input.attachments)?;
+        let item = store.queue_outbox_message(input)?;
+        store.set_message_threading(item.message_id, threading)?;
+        let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
+        command_info(format!(
+            "[better-email][send] queue ok outbox_id={} message_id={} status={} duration_ms={}",
+            item.id,
+            item.message_id,
+            item.status,
+            started_at.elapsed().as_millis(),
+        ));
+        Ok(item)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn resolve_outbox_outcome(
+pub async fn resolve_outbox_outcome(
     store: State<'_, MailStore>,
     outbox_id: i64,
     delivered: bool,
 ) -> MailResult<OutboxItem> {
-    store.resolve_outbox_outcome(outbox_id, delivered)
+    let store = store.inner().clone();
+    super::executor::database(move || store.resolve_outbox_outcome(outbox_id, delivered)).await
 }
 
 #[tauri::command]
-pub fn cancel_outbox_item(store: State<'_, MailStore>, outbox_id: i64) -> MailResult<OutboxItem> {
-    let item = store.cancel_outbox_item(outbox_id)?;
-    let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
-    Ok(item)
+pub async fn cancel_outbox_item(
+    store: State<'_, MailStore>,
+    outbox_id: i64,
+) -> MailResult<OutboxItem> {
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let item = store.cancel_outbox_item(outbox_id)?;
+        let _ = store.prune_temp_attachments(TEMP_ATTACHMENT_LIFECYCLE_TTL);
+        Ok(item)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn list_outbox(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
-    store.list_outbox()
+pub async fn list_outbox(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_outbox()).await
 }
 
 #[tauri::command]
-pub fn flush_outbox_dry_run(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
-    store.flush_outbox_dry_run()
+pub async fn flush_outbox_dry_run(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.flush_outbox_dry_run()).await
 }
 
 #[tauri::command]
-pub fn release_due_outbox_items(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
-    command_info("[better-email][send] release due outbox start");
-    let outbox = store.release_due_outbox_items()?;
-    command_info(format!(
-        "[better-email][send] release due outbox done outbox_items={}",
-        outbox.len(),
-    ));
-    Ok(outbox)
+pub async fn release_due_outbox_items(store: State<'_, MailStore>) -> MailResult<Vec<OutboxItem>> {
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        command_info("[better-email][send] release due outbox start");
+        let outbox = store.release_due_outbox_items()?;
+        command_info(format!(
+            "[better-email][send] release due outbox done outbox_items={}",
+            outbox.len(),
+        ));
+        Ok(outbox)
+    })
+    .await
 }
 
 fn archive_sent_message(
@@ -570,6 +645,7 @@ fn archive_sent_message(
     if !store.claim_outbox_archive(message.id)? {
         return Ok(());
     }
+    let _lease = store.hold_outbox_lease(message.id)?;
     archive_claimed_sent_message(store, account, secret, message, raw_message)
 }
 
@@ -609,6 +685,7 @@ fn retry_pending_remote_archives(store: &MailStore) -> MailResult<()> {
         if !store.claim_outbox_archive(message.id)? {
             continue;
         }
+        let _lease = store.hold_outbox_lease(message.id)?;
         let account = store.get_account_by_id(Some(message.account_id))?;
         let secret = match store.get_account_secret(&account) {
             Ok(secret) => secret,
@@ -631,8 +708,15 @@ fn retry_pending_remote_archives(store: &MailStore) -> MailResult<()> {
                 continue;
             }
         };
+        if let Err(error) = store.persist_sent_attachment_bytes(&message, &attachment_bytes) {
+            store.mark_outbox_remote_archive_failed(
+                message.id,
+                &format!("SMTP 已发送；保存本地附件副本失败，稍后仅重试留档：{error}"),
+            )?;
+            continue;
+        }
         let raw_message =
-            match smtp::render_outbound_with_attachment_bytes(&message, &attachment_bytes) {
+            match smtp::render_outbound_with_attachment_bytes(&message, attachment_bytes) {
                 Ok(raw_message) => raw_message,
                 Err(error) => {
                     store.mark_outbox_remote_archive_failed(
@@ -677,6 +761,7 @@ fn flush_outbox_smtp_blocking(
         if !store.claim_outbox_message(candidate.id)? {
             continue;
         }
+        let _lease = store.hold_outbox_lease(candidate.id)?;
         let start = 5 + index as i64 * 80 / total;
         let end = 5 + (index as i64 + 1) * 80 / total;
         let result = (|| {
@@ -698,13 +783,15 @@ fn flush_outbox_smtp_blocking(
                 start + (end - start) / 2,
             )?;
             ensure_outbox_task_not_cancelled(store, task_id)?;
+            store.persist_sent_attachment_bytes(&message, &bytes)?;
+            ensure_outbox_task_not_cancelled(store, task_id)?;
             let transport = match transports.entry(account.id) {
                 std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
                 std::collections::hash_map::Entry::Vacant(entry) => {
                     entry.insert(smtp::authenticated_transport(&account, &secret)?)
                 }
             };
-            smtp::send_outbound_with_transport(transport, &message, &bytes)?;
+            let raw_message = smtp::send_outbound_with_transport(transport, &message, bytes)?;
             store
                 .mark_outbox_smtp_sent_pending_archive(
                     message.id,
@@ -721,6 +808,10 @@ fn flush_outbox_smtp_blocking(
                     message.id
                 ));
             }
+            // 使用服务器实际接受的同一份 MIME 留档；不要丢弃后再读附件重建。
+            finish_accepted_send(message.id, || {
+                archive_sent_message(store, &account, &secret, &message, &raw_message)
+            });
             Ok(())
         })();
         let text = match result {
@@ -789,6 +880,84 @@ mod tests {
         });
         assert_eq!(id, 43);
         assert_eq!(calls, 1);
+    }
+
+    #[test]
+    fn direct_send_failure_never_also_schedules_a_background_resend() {
+        let store = MailStore::open_at(unique_test_database_path()).unwrap();
+        create_test_account(&store);
+        let id = store.prepare_outbox_send(draft_input(Vec::new())).unwrap();
+        super::record_direct_send_failure(
+            &store,
+            id,
+            &crate::db::MailError::Smtp("451 try later".into()),
+        )
+        .unwrap();
+        let outbox = store.list_outbox().unwrap();
+        let failed = outbox.iter().find(|item| item.message_id == id).unwrap();
+        assert_eq!(failed.status, "failed");
+        assert!(failed.next_attempt_at.is_empty());
+        assert!(store
+            .pending_outbox_messages_due_at("2099-01-01T00:00:00Z")
+            .unwrap()
+            .is_empty());
+        // 编辑器再次直发时，只有新请求处于 sending；失败的旧请求不会自行重发。
+        let second = store.prepare_outbox_send(draft_input(Vec::new())).unwrap();
+        assert_ne!(id, second);
+        let outbox = store.list_outbox().unwrap();
+        assert_eq!(
+            outbox
+                .iter()
+                .filter(|item| item.status == "sending")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn queued_send_can_retry_but_unknown_delivery_requires_confirmation() {
+        let store = MailStore::open_at(unique_test_database_path()).unwrap();
+        create_test_account(&store);
+        let id = store.prepare_outbox_send(draft_input(Vec::new())).unwrap();
+        super::record_outbox_failure(
+            &store,
+            id,
+            &crate::db::MailError::Smtp("451 try later".into()),
+        )
+        .unwrap();
+        assert_eq!(store.list_outbox().unwrap()[0].status, "retry");
+        assert_eq!(
+            store
+                .pending_outbox_messages_due_at("2099-01-01T00:00:00Z")
+                .unwrap()
+                .len(),
+            1
+        );
+
+        let mut second = draft_input(Vec::new());
+        second.subject = "unknown result".into();
+        let unknown_id = store.prepare_outbox_send(second).unwrap();
+        super::record_direct_send_failure(
+            &store,
+            unknown_id,
+            &crate::db::MailError::SmtpOutcomeUnknown("ack lost".into()),
+        )
+        .unwrap();
+        assert_eq!(
+            store
+                .list_outbox()
+                .unwrap()
+                .iter()
+                .find(|item| item.message_id == unknown_id)
+                .unwrap()
+                .status,
+            "send_unknown"
+        );
+        assert!(store
+            .pending_outbox_messages_due_at("2099-01-01T00:00:00Z")
+            .unwrap()
+            .iter()
+            .all(|message| message.id != unknown_id));
     }
 
     fn unique_test_database_path() -> std::path::PathBuf {

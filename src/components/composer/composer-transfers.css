@@ -1,0 +1,85 @@
+.composer-transfer-status {
+  container: composer-transfers / inline-size;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-height: min(20em, 34vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px 20px;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.composer-transfer-summary { margin: 0 0 4px; }
+.composer-transfer-summary strong { color: var(--ui-text); font-weight: 600; }
+.composer-transfer-list { list-style: none; padding: 0; margin: 0; }
+.composer-transfer-list > li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 4px 8px;
+  padding: 8px 0;
+  min-width: 0;
+  scroll-margin-block: 8px;
+}
+.composer-transfer-list > li + li { border-top: 1px solid var(--ui-border); }
+.composer-transfer-status:focus-visible,
+.composer-transfer-list > li:focus-visible { outline: var(--ui-focus-outline); outline-offset: -2px; }
+.composer-transfer-list > li > svg,
+.composer-delivery-issue > svg { flex: 0 0 auto; margin-top: 3px; }
+.composer-transfer-list > li[data-import-state="failed"] > svg,
+.composer-delivery-issue > svg { color: var(--ui-danger); }
+.composer-transfer-copy { min-width: 0; }
+.composer-transfer-filename { display: block; color: var(--ui-text); overflow-wrap: anywhere; }
+.composer-transfer-copy small { display: block; font-size: inherit; overflow-wrap: anywhere; }
+.composer-transfer-copy progress { display: block; width: 100%; max-width: 260px; height: 4px; margin-top: 5px; accent-color: var(--ui-accent); }
+.composer-transfer-actions { display: flex; align-items: center; gap: 4px; }
+.composer-transfer-status button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: var(--ui-control-height);
+  min-width: var(--ui-control-height);
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  white-space: nowrap;
+}
+.composer-transfer-status button:hover:not(:disabled) { background: var(--ui-control-hover); color: var(--ui-text); }
+.composer-transfer-status button:active:not(:disabled) { background: var(--ui-control-pressed); }
+.composer-transfer-status button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.composer-transfer-status button:disabled { opacity: .45; cursor: default; }
+.composer-delivery-issue { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: start; gap: 4px 8px; }
+.composer-delivery-issue > div { min-width: 0; overflow-wrap: anywhere; }
+.composer-delivery-issue strong { color: var(--ui-text); font-weight: 600; }
+.composer-delivery-issue p { margin: 2px 0 0; }
+.composer-transfer-list + .composer-delivery-issue { margin-top: 8px; }
+.composer-delivery-issue[data-send-outcome="uncertain"] > svg { color: var(--ui-warning); }
+@container composer-transfers (max-width: 520px) {
+  .composer-transfer-list > li,
+  .composer-delivery-issue { grid-template-columns: 16px minmax(0, 1fr); }
+  .composer-transfer-actions,
+  .composer-delivery-issue > button { grid-column: 2; justify-self: start; }
+}
+.composer-send-progress.is-indeterminate .composer-send-progress-fill {
+  width: 32%;
+  animation: composer-server-progress 1.4s ease-in-out infinite;
+}
+@keyframes composer-server-progress {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(340%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer-send-progress.is-indeterminate .composer-send-progress-fill {
+    animation: none;
+    transform: translateX(100%);
+  }
+}
+@media (max-width: 767px), (pointer: coarse) {
+  .composer-transfer-status { padding-inline: 16px; }
+  .composer-transfer-status button { min-width: 44px; min-height: 44px; }
+}

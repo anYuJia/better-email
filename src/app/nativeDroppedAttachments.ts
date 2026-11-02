@@ -1,6 +1,7 @@
 import type { OutboundAttachmentInput } from './types';
 import { invoke, localFileAssetUrl } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
+import { validateAttachmentImportFile } from './attachmentImports';
 
 export type NativeDroppedAttachmentImportResult = {
   attachments: OutboundAttachmentInput[];
@@ -53,6 +54,7 @@ export async function importNativeDroppedAttachmentPaths(
       }
       const blob = await response.blob();
       const filename = filenameFromNativePath(path);
+      validateAttachmentImportFile(filename, blob.size);
       const base64Data = await readBlobAsBase64(blob);
       const savedPath = await invoke<string>(IPC.SaveTempAttachment, {
         filename,

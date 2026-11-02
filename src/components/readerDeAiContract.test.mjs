@@ -20,6 +20,7 @@ function rulesOnly(css) {
 
 const readerCss = rulesOnly(readCss('src/styles/reader.css'));
 const darkModeCss = rulesOnly(readCss('src/styles/dark-mode.css'));
+const productCss = rulesOnly(readCss('src/styles/product.css'));
 const emailShadowTs = readTs('src/components/reader/EmailShadowView.tsx');
 const plainMessageTs = readTs('src/components/reader/PlainMessageBody.tsx');
 const readerLabelMenuTs = readTs('src/components/reader/ReaderLabelMenu.tsx');
@@ -41,9 +42,17 @@ function parseRules(css) {
   while ((match = pattern.exec(css)) !== null) {
     const selectorGroup = match[1].trim();
     const body = match[2];
-    // Expand comma-separated selectors
-    for (const sel of selectorGroup.split(',')) {
-      rules.push({ selector: sel.trim(), body });
+    // Split selector lists, but preserve commas inside :is() / :where().
+    let depth = 0;
+    let start = 0;
+    for (let index = 0; index <= selectorGroup.length; index += 1) {
+      const char = selectorGroup[index];
+      if (char === '(' || char === '[') depth += 1;
+      if (char === ')' || char === ']') depth -= 1;
+      if (index === selectorGroup.length || (char === ',' && depth === 0)) {
+        rules.push({ selector: selectorGroup.slice(start, index).trim(), body });
+        start = index + 1;
+      }
     }
   }
   return rules;
@@ -79,7 +88,7 @@ function getCoreReaderCss() {
  *  2. No persistent glass / blur on reader workspace surfaces.
  *  3. No !important crutches.
  *  4. No hardcoded hex in core reader regions (overlay is exempt).
- *  5. Subject is a heading, not a hero (18-20px, 600, not 28+ / 800).
+ *  5. Subject follows spec §46: 22-24px / 650, with a 22px mobile heading.
  *  6. Body typography is for reading (14-15px, line-height 1.55-1.65).
  *  7. Attachments are compact rows, not big cards.
  *  8. Quick reply is a quiet inline entry, not a large input card.
@@ -179,21 +188,21 @@ describe('reader empty state contract', () => {
 });
 
 describe('reader de-AI contract — subject is a heading, not a hero', () => {
-  it('subject h1 font-size is 18-20px (not hero-sized)', () => {
-    const rules = findRules(readerCss, '.reader-header h1');
-    expect(rules.length).toBeGreaterThan(0);
-    const fs = extractDecl(rules[0].body, 'font-size');
-    expect(fs).not.toBeNull();
-    expect(fs).toBeGreaterThanOrEqual(18);
-    expect(fs).toBeLessThanOrEqual(20);
+  it('subject h1 is bounded to 22-24px on desktop and 22px on mobile', () => {
+    const heading = parseRules(readerCss).find((r) => r.selector === '.reader-header h1');
+    expect(heading).toBeDefined();
+    expect(heading.body).toMatch(/font-size:\s*clamp\(22px,\s*[^,]+,\s*24px\)/);
+    const mobileHeadings = parseRules(productCss).filter((r) =>
+      r.selector === '.app-shell.is-mobile-app .reader-header h1',
+    );
+    expect(mobileHeadings.length).toBeGreaterThan(0);
+    expect(extractDecl(mobileHeadings.at(-1).body, 'font-size')).toBe(22);
   });
 
-  it('subject h1 font-weight is <= 600 (not 700-800)', () => {
-    const rules = findRules(readerCss, '.reader-header h1');
-    expect(rules.length).toBeGreaterThan(0);
-    const m = rules[0].body.match(/font-weight:\s*(\d+)/);
-    expect(m).not.toBeNull();
-    expect(parseInt(m[1], 10)).toBeLessThanOrEqual(600);
+  it('subject h1 uses the approved 650 weight', () => {
+    const heading = parseRules(readerCss).find((r) => r.selector === '.reader-header h1');
+    expect(heading).toBeDefined();
+    expect(extractDecl(heading.body, 'font-weight')).toBe(650);
   });
 
   it('subject h1 line-height is <= 1.4 (not loose hero spacing)', () => {
@@ -226,12 +235,17 @@ describe('reader de-AI contract — body typography is for reading', () => {
 });
 
 describe('reader de-AI contract — attachments are compact rows, not big cards', () => {
-  it('attachment-item min-height is <= 48px', () => {
-    const rules = findRules(readerCss, '.attachments .attachment-item');
-    expect(rules.length).toBeGreaterThan(0);
-    const h = extractDecl(rules[0].body, 'min-height');
-    expect(h).not.toBeNull();
-    expect(h).toBeLessThanOrEqual(48);
+  it('attachments use 56px flat rows with separators and 32px desktop actions', () => {
+    const row = parseRules(readerCss).find((r) => r.selector === '.attachments .attachment-item');
+    expect(row).toBeDefined();
+    expect(extractDecl(row.body, 'min-height')).toBe(56);
+    expect(row.body).toMatch(/border-top:\s*1px\s+solid\s+var\(--ui-border\)/);
+    expect(row.body).toMatch(/border-radius:\s*0\s*;/);
+    expect(row.body).toMatch(/background:\s*transparent\s*;/);
+    expect(row.body).toMatch(/box-shadow:\s*none\s*;/);
+    const actions = parseRules(readerCss).find((r) => r.selector === '.attachment-actions button');
+    expect(actions).toBeDefined();
+    expect(extractDecl(actions.body, 'min-height')).toBe(32);
   });
 
   it('attachment-item has no floating box-shadow', () => {
@@ -252,22 +266,19 @@ describe('reader de-AI contract — attachments are compact rows, not big cards'
 });
 
 describe('reader de-AI contract — quick reply is a quiet inline entry', () => {
-  it('quick-reply has box-shadow: none', () => {
-    const rules = findRules(readerCss, '.quick-reply');
-    expect(rules.length).toBeGreaterThan(0);
-    const hasNone = rules.some((r) =>
-      r.body.match(/box-shadow:\s*var\(--ui-box-shadow-none\)/),
-    );
-    expect(hasNone).toBe(true);
+  it('quick-reply base has no elevation while preserving its focus ring', () => {
+    const entry = parseRules(readerCss).find((r) => r.selector === '.quick-reply');
+    const focus = parseRules(readerCss).find((r) => r.selector === '.quick-reply:focus-within');
+    expect(entry).toBeDefined();
+    expect(entry.body).toMatch(/box-shadow:\s*none\s*;/);
+    expect(focus).toBeDefined();
+    expect(focus.body).toMatch(/box-shadow:\s*var\(--ui-focus-ring\)/);
   });
 
-  it('quick-reply uses the raised surface token', () => {
-    const rules = findRules(readerCss, '.quick-reply');
-    expect(rules.length).toBeGreaterThan(0);
-    const hasRaisedSurface = rules.some((r) =>
-      r.body.match(/background:\s*var\(--ui-surface\)/),
-    );
-    expect(hasRaisedSurface).toBe(true);
+  it('quick-reply shares the reading paper surface', () => {
+    const entry = parseRules(readerCss).find((r) => r.selector === '.quick-reply');
+    expect(entry).toBeDefined();
+    expect(entry.body).toMatch(/background:\s*var\(--ui-reader\)/);
   });
 
   it('quick-reply has a subtle full border', () => {
@@ -336,26 +347,29 @@ describe('reader de-AI contract — toolbar is icon-first controls, not a glass 
     expect(hasTransparent).toBe(true);
   });
 
-  it('reader-actions has box-shadow: none', () => {
-    const rules = findRules(readerCss, '.reader-actions');
-    expect(rules.length).toBeGreaterThan(0);
-    const hasNone = rules.some((r) =>
-      r.body.match(/box-shadow:\s*var\(--ui-box-shadow-none\)/),
-    );
-    expect(hasNone).toBe(true);
+  it('reader-actions itself has no elevation', () => {
+    const toolbar = parseRules(readerCss).find((r) => r.selector === '.reader-actions');
+    expect(toolbar).toBeDefined();
+    expect(toolbar.body).toMatch(/box-shadow:\s*none\s*;/);
   });
 
-  it('reader-actions buttons expose a 40px accessible pointer target', () => {
-    // Also check .reader-actions .reader-more-menu summary, .reader-actions select
-    const allRules = findRules(readerCss, '.reader-actions');
-    const buttonRules = allRules.filter((r) =>
-      r.selector.includes('button') || r.selector.includes('summary') || r.selector.includes('select'),
+  it('reader-actions exposes 36px desktop controls and at least 44px mobile targets', () => {
+    const desktop = parseRules(readerCss).find((r) =>
+      r.selector.startsWith('.reader-actions :is(')
+      && r.selector.includes('.reader-action-group > button')
+      && !r.selector.includes(':hover'),
     );
-    expect(buttonRules.length).toBeGreaterThan(0);
-    const h = extractDecl(buttonRules[0].body, 'height');
-    expect(h).not.toBeNull();
-    expect(h).toBeGreaterThanOrEqual(40);
-    expect(h).toBeLessThanOrEqual(40);
+    expect(desktop).toBeDefined();
+    expect(extractDecl(desktop.body, 'min-height')).toBe(36);
+    expect(extractDecl(desktop.body, 'min-width')).toBe(36);
+    const mobile = parseRules(productCss).filter((r) =>
+      r.selector.startsWith('.app-shell.is-mobile-app .reader-actions :is(')
+      && r.selector.includes('.reader-ai-trigger')
+      && r.selector.includes('button'),
+    ).at(-1);
+    expect(mobile).toBeDefined();
+    expect(extractDecl(mobile.body, 'min-height')).toBeGreaterThanOrEqual(44);
+    expect(extractDecl(mobile.body, 'min-width')).toBeGreaterThanOrEqual(44);
   });
 
   it('reader-actions has no gradient', () => {

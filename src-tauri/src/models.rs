@@ -647,6 +647,9 @@ pub struct RemoteMessageBody {
     pub security_warnings: Vec<String>,
     pub snippet: String,
     pub has_attachments: bool,
+    /// False when only body content was requested; an empty list then must not
+    /// erase attachment metadata already held locally.
+    pub attachments_complete: bool,
     pub attachments: Vec<RemoteAttachmentMetadata>,
 }
 

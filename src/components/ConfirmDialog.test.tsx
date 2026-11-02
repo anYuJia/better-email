@@ -161,7 +161,9 @@ describe('ConfirmDialog Component robust behaviors', () => {
     expect(onCancel).not.toHaveBeenCalled();
 
     // Try Escape key
-    fireEvent.keyDown(document, { key: 'Escape' });
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    document.dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(true);
     expect(onCancel).not.toHaveBeenCalled();
 
     await act(async () => {

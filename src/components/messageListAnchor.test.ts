@@ -20,4 +20,22 @@ describe('message identity scroll anchors', () => {
     const keys = Array.from({length: 50_000}, (_, i) => String(i));
     expect(anchoredScrollTop(rows(keys), layout(keys.length), rows(['new',...keys]), layout(keys.length + 1), 2_800_003)).toBe(2_800_083);
   });
+  it('keeps stable identities sublinear when only row heights change', () => {
+    let keyReads = 0;
+    const previous = Array.from({ length: 50_000 }, (_, index) => ({ key: String(index) }));
+    const next = previous.map((row) => ({ get key() { keyReads += 1; return row.key; } }));
+    const before = layout(previous.length);
+    const after = before.map((row) => ({ top: row.top * 1.2, height: row.height * 1.2 }));
+    expect(anchoredScrollTop(previous, before, next, after, 2_800_003)).toBe(3_360_003);
+    expect(keyReads).toBeLessThan(10);
+  });
+  it('reuses the caller index after an insertion instead of rescanning every row', () => {
+    let keyReads = 0;
+    const previous = rows(Array.from({ length: 50_000 }, (_, index) => String(index)));
+    const next = [{ key: 'new' }, ...previous].map((row) => ({ get key() { keyReads += 1; return row.key; } }));
+    const indexes = new Map(next.map((row, index) => [row.key, index]));
+    keyReads = 0;
+    expect(anchoredScrollTop(previous, layout(previous.length), next, layout(next.length), 2_800_003, indexes)).toBe(2_800_083);
+    expect(keyReads).toBeLessThan(10);
+  });
 });

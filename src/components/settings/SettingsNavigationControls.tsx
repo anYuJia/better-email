@@ -6,11 +6,14 @@ import {
 import {
   memo,
   useEffect,
+  useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
 import { useWheelContainment } from '../../hooks/useWheelContainment';
+import useCompositionGuard from '../../hooks/useCompositionGuard';
 import {
   accountScopedSections,
   getSettingsDetailItems,
@@ -24,6 +27,9 @@ import {
 type SettingsSearchProps = {
   onNavigate: (section: SettingsSectionId) => void;
   accountSectionsEnabled?: boolean;
+  mobile: boolean;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
 };
 
 type SettingsSidebarProps = {
@@ -75,9 +81,17 @@ function exposesAvailableDetails(section: SettingsSectionId) {
 export const SettingsSearch = memo(function SettingsSearch({
   onNavigate,
   accountSectionsEnabled = true,
+  mobile,
+  expanded,
+  onExpandedChange,
 }: SettingsSearchProps) {
   const [query, setQuery] = useState('');
-  const [mobileExpanded, setMobileExpanded] = useState(false);
+  const ime = useCompositionGuard();
+  const resultId = useId();
+  const searchRootRef = useRef<HTMLDivElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
+  const previousExpandedRef = useRef(false);
+  const restoreFocusRef = useRef(true);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchPopoverRef = useRef<HTMLDivElement>(null);
   const normalizedQuery = query.trim().toLowerCase();
@@ -91,54 +105,105 @@ export const SettingsSearch = memo(function SettingsSearch({
     )).slice(0, 10);
   }, [normalizedQuery]);
 
+  useLayoutEffect(() => {
+    if (mobile && expanded) {
+      searchInputRef.current?.focus({ preventScroll: true });
+      searchInputRef.current?.select();
+    } else if (previousExpandedRef.current) {
+      setQuery('');
+      if (restoreFocusRef.current) searchToggleRef.current?.focus({ preventScroll: true });
+      restoreFocusRef.current = true;
+    }
+    previousExpandedRef.current = expanded;
+  }, [expanded, mobile]);
+
+  const closeSearch = (restoreFocus = true) => {
+    restoreFocusRef.current = restoreFocus;
+    setQuery('');
+    onExpandedChange(false);
+  };
+
   useEffect(() => {
     function handleGlobalKeyDown(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+        if (event.defaultPrevented || event.isComposing) return;
         event.preventDefault();
+        if (mobile) onExpandedChange(true);
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
       }
     }
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
+  }, [mobile, onExpandedChange]);
+
+  useEffect(() => {
+    if (!expanded && !normalizedQuery) return undefined;
+    const closeOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !searchRootRef.current?.contains(event.target)) {
+        restoreFocusRef.current = false;
+        setQuery('');
+        onExpandedChange(false);
+      }
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, [expanded, normalizedQuery, onExpandedChange]);
 
   const navigateToSearchResult = (entry: SettingsSearchEntry) => {
     if (requiresAccount(entry.section) && !accountSectionsEnabled) return;
     onNavigate(entry.section);
-    setQuery('');
-    setMobileExpanded(false);
+    closeSearch(false);
     focusSearchTarget(entry);
   };
 
   return (
-    <div className={`settings-header-search${mobileExpanded ? ' is-mobile-expanded' : ''}`} role="search">
-      <button
+    <div
+      ref={searchRootRef}
+      className={`settings-header-search${mobile && expanded ? ' is-mobile-expanded' : ''}`}
+      role="search"
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        if (ime.isComposing(event)) { event.stopPropagation(); return; }
+        if (!expanded && !query) return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeSearch();
+        if (!mobile) searchInputRef.current?.focus();
+      }}
+    >
+      {mobile && !expanded && <button
+        ref={searchToggleRef}
         type="button"
         className="settings-search-toggle"
         aria-label="打开设置搜索"
         title="搜索设置"
         onClick={() => {
-          setMobileExpanded(true);
-          window.requestAnimationFrame(() => {
-            searchInputRef.current?.focus();
-            searchInputRef.current?.select();
-          });
+          onExpandedChange(true);
         }}
       >
-        <Search size={15} aria-hidden="true" />
-      </button>
-      <div className="settings-search-field">
-        <Search size={14} aria-hidden="true" />
+        <Search size={20} strokeWidth={1.75} aria-hidden="true" />
+      </button>}
+      {(!mobile || expanded) && <div className="settings-search-field">
+        <Search size={16} strokeWidth={1.75} aria-hidden="true" />
         <input
           ref={searchInputRef}
           type="search"
           aria-label="搜索设置"
           aria-autocomplete="list"
           aria-expanded={Boolean(normalizedQuery)}
+          aria-controls={normalizedQuery ? resultId : undefined}
           value={query}
           placeholder="搜索设置"
           onInput={(event) => setQuery(event.currentTarget.value)}
+          onCompositionStart={ime.onCompositionStart}
+          onCompositionEnd={ime.onCompositionEnd}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' && !ime.isComposing(event)) {
+              const firstResult = searchPopoverRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)');
+              if (firstResult) { event.preventDefault(); firstResult.focus(); }
+            }
+          }}
         />
         {query ? (
           <button
@@ -150,15 +215,21 @@ export const SettingsSearch = memo(function SettingsSearch({
               searchInputRef.current?.focus();
             }}
           >
-            <X size={13} />
+            <X size={16} strokeWidth={1.75} aria-hidden="true" />
           </button>
         ) : (
           <kbd className="settings-search-shortcut">⌘F</kbd>
         )}
-      </div>
+      </div>}
+      {mobile && expanded && (
+        <button type="button" className="settings-search-cancel" onClick={() => closeSearch()} aria-label="取消设置搜索">
+          取消
+        </button>
+      )}
       {normalizedQuery && (
         <div
           ref={searchPopoverRef}
+          id={resultId}
           className="settings-search-popover"
           aria-label="设置搜索结果"
         >
@@ -237,6 +308,7 @@ export const SettingsSidebar = memo(function SettingsSidebar({
 
   return (
     <nav className="settings-nav" aria-label="设置分类">
+      <h1 className="settings-nav-heading">设置</h1>
       <div className="settings-nav-scroll">
         <div className="settings-nav-list">
           {settingsNavigationGroups.map((group) => (
@@ -290,13 +362,13 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                       onClick={activateParent}
                     >
                       <span className="settings-nav-icon">
-                        <Icon size={15} aria-hidden="true" />
+                        <Icon size={18} aria-hidden="true" />
                       </span>
                       <span className="settings-nav-copy">
                         <span className="settings-nav-label">{item.label}</span>
                       </span>
                       {exposesDetailItems && (
-                        <ChevronRight className="settings-nav-disclosure" size={14} aria-hidden="true" />
+                        <ChevronRight className="settings-nav-disclosure" size={16} aria-hidden="true" />
                       )}
                     </button>
                     {exposesDetailItems && (

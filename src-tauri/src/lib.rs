@@ -4,6 +4,7 @@ mod credentials;
 mod db;
 mod http;
 mod imap_probe;
+mod imap_transport;
 mod logging;
 mod mime;
 mod models;
@@ -955,6 +956,7 @@ pub fn run() {
             commands::list_messages_by_ids,
             commands::list_attachments,
             commands::read_attachment_data_url,
+            commands::prepare_attachment_preview,
             commands::save_image_data_url_as,
             commands::pick_outbound_attachments,
             commands::save_temp_attachment,

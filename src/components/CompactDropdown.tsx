@@ -1,6 +1,7 @@
 import React from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { useDetailsMenu } from '../hooks/useDetailsMenu';
+import { focusMenuItem } from '../app/menuFocus';
 
 export type CompactDropdownOption<Value extends string> = {
   id: Value;
@@ -15,6 +16,7 @@ type CompactDropdownProps<Value extends string> = {
   value: Value;
   options: readonly CompactDropdownOption<Value>[];
   onChange: (value: Value) => void;
+  triggerIcon?: React.ReactNode;
 };
 
 /**
@@ -31,31 +33,35 @@ export default function CompactDropdown<Value extends string>({
   value,
   options,
   onChange,
+  triggerIcon,
 }: CompactDropdownProps<Value>) {
   const menuRef = React.useRef<HTMLDetailsElement>(null);
   const optionRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
+  const openingIndexRef = React.useRef<number | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
   const selectedIndex = Math.max(0, options.findIndex((option) => option.id === value));
   const menu = useDetailsMenu(menuRef, {
     floating: true,
+    initialFocus: () => optionRefs.current[openingIndexRef.current ?? selectedIndex] ?? null,
     align: className.split(/\s+/).includes('sort-menu') ? 'end' : 'start',
   });
 
   const focusOption = React.useCallback((index: number) => {
     const nextIndex = Math.max(0, Math.min(index, options.length - 1));
-    optionRefs.current[nextIndex]?.focus({ preventScroll: true });
+    focusMenuItem(optionRefs.current[nextIndex]);
   }, [options.length]);
 
   const openMenuAt = React.useCallback((index: number) => {
     const details = menuRef.current;
     if (!details) return;
+    openingIndexRef.current = index;
     details.open = true;
     setIsOpen(true);
-    window.requestAnimationFrame(() => focusOption(index));
-  }, [focusOption]);
+  }, []);
 
   const closeMenu = React.useCallback(() => {
     menu.closeMenu();
+    openingIndexRef.current = null;
     setIsOpen(false);
   }, [menu]);
 
@@ -77,12 +83,12 @@ export default function CompactDropdown<Value extends string>({
       event.preventDefault();
       const direction = event.key === 'ArrowDown' ? 1 : -1;
       const nextIndex = (index + direction + options.length) % options.length;
-      window.requestAnimationFrame(() => focusOption(nextIndex));
+      focusOption(nextIndex);
       return;
     }
     if (event.key === 'Home' || event.key === 'End') {
       event.preventDefault();
-      window.requestAnimationFrame(() => focusOption(event.key === 'Home' ? 0 : options.length - 1));
+      focusOption(event.key === 'Home' ? 0 : options.length - 1);
       return;
     }
     if (event.key === 'Enter' || event.key === ' ') {
@@ -96,11 +102,8 @@ export default function CompactDropdown<Value extends string>({
       closeMenu();
       return;
     }
-    if (event.key === 'Tab') {
-      // Let the browser move focus normally, but do not leave a closed-over
-      // menu item in the tab order after the user tabs away.
-      closeMenu();
-    }
+    // The shared menu owns Tab: dismiss without stealing focus, then resume
+    // next to the trigger even when the panel is in the browser top layer.
   };
 
   return (
@@ -111,9 +114,7 @@ export default function CompactDropdown<Value extends string>({
       onToggle={(event) => {
         const nextOpen = event.currentTarget.open;
         setIsOpen(nextOpen);
-        if (nextOpen) {
-          window.requestAnimationFrame(() => focusOption(selectedIndex));
-        }
+        if (!nextOpen) openingIndexRef.current = null;
       }}
     >
       <summary
@@ -122,12 +123,8 @@ export default function CompactDropdown<Value extends string>({
         aria-haspopup="menu"
         aria-expanded={isOpen}
         onKeyDown={handleSummaryKeyDown}
-        onClick={() => {
-          window.requestAnimationFrame(() => {
-            if (menuRef.current?.open) focusOption(selectedIndex);
-          });
-        }}
       >
+        {triggerIcon && <span className="compact-dropdown-trigger-icon" aria-hidden="true">{triggerIcon}</span>}
         <span className="compact-dropdown-label">{label}</span>
         <strong>{currentLabel}</strong>
         <ChevronDown size={14} aria-hidden="true" />

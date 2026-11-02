@@ -33,6 +33,8 @@ describe('ReaderSecurityBanner', () => {
     render(<ReaderSecurityBanner {...input} />);
 
     expect(screen.getByText('远程图片已拦截')).toBeDefined();
+    expect(screen.getByText('图片未自动加载，网页链接也保持隐藏，以减少追踪和误触。').parentElement?.hidden).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '远程图片已拦截' }));
     expect(screen.getByText('图片未自动加载，网页链接也保持隐藏，以减少追踪和误触。')).toBeDefined();
     expect(screen.getByText('更多')).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: '显示图片' }));

@@ -7,6 +7,7 @@ import { resolveLocalDateTimeRange, type LocalDateTimeRange } from '../mailUtils
 type MessageDateRangePickerProps = {
   onConfirm: (range: LocalDateTimeRange) => void;
   disabled?: boolean;
+  iconOnly?: boolean;
 };
 
 type CalendarMonth = { year: number; month: number };
@@ -284,7 +285,7 @@ function CalendarPane({
   );
 }
 
-export default function MessageDateRangePicker({ onConfirm, disabled = false }: MessageDateRangePickerProps) {
+export default function MessageDateRangePicker({ onConfirm, disabled = false, iconOnly = false }: MessageDateRangePickerProps) {
   const today = todayKey();
   const initialDate = parseDateKey(today) ?? new Date();
   const [open, setOpen] = useState(false);
@@ -358,15 +359,16 @@ export default function MessageDateRangePicker({ onConfirm, disabled = false }: 
     <>
       <button
         type="button"
-        className="message-date-range-trigger"
+        className={`message-date-range-trigger${iconOnly ? ' is-icon-only' : ''}`}
         aria-label="按日期范围筛选邮件"
+        title="按日期范围筛选邮件"
         aria-haspopup="dialog"
         aria-expanded={open}
         disabled={disabled}
         onClick={() => { setError(''); setOpen((current) => !current); }}
       >
         <CalendarDays size={14} aria-hidden="true" />
-        <span>日期筛选</span>
+        {!iconOnly && <span>日期筛选</span>}
       </button>
       {open && createPortal((
         <div className="message-date-range-backdrop" ref={backdropRef} onMouseDown={(event) => { if (event.target === event.currentTarget) closePicker(); }}>

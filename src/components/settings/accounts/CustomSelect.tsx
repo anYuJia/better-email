@@ -23,6 +23,8 @@ type CustomSelectProps = {
   className?: string;
   ariaLabel?: string;
   disabled?: boolean;
+  /** Inactive owning surfaces retain their trigger but remove body portals. */
+  active?: boolean;
   disabledValues?: readonly string[];
   dense?: boolean;
   /**
@@ -79,6 +81,7 @@ export function CustomSelect({
   className = '',
   ariaLabel,
   disabled = false,
+  active = true,
   disabledValues = [],
   dense = false,
   portalZIndex = customSelectPortalLayers.default,
@@ -99,7 +102,16 @@ export function CustomSelect({
   const listboxId = useId();
   const typeaheadRef = useRef({ query: '', updatedAt: 0 });
   const closeTimerRef = useRef<number | null>(null);
-  useWheelContainment(menuRef, menuMounted);
+  useWheelContainment(menuRef, active && menuMounted);
+
+  useLayoutEffect(() => {
+    if (active) return;
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    setOpen(false);
+    setMenuVisible(false);
+    finishMenuClose();
+    resetTypeahead();
+  }, [active]);
 
   const isOptionDisabled = (option: Option) => disabledValues.includes(option.value);
   const selectedIndex = options.findIndex((option) => option.value === value);
@@ -146,12 +158,13 @@ export function CustomSelect({
     } else {
       closeTimerRef.current = window.setTimeout(finishMenuClose, MENU_EXIT_MS);
     }
-    if (restoreFocus) {
+    if (restoreFocus && active && !triggerRef.current?.closest('[inert]')) {
       triggerRef.current?.focus();
     }
   }
 
   function prepareMenuOpen() {
+    if (!active || disabled) return;
     if (closeTimerRef.current !== null) {
       window.clearTimeout(closeTimerRef.current);
       closeTimerRef.current = null;
@@ -235,7 +248,7 @@ export function CustomSelect({
   }
 
   function handleKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
-    if (disabled) return;
+    if (disabled || !active) return;
 
     switch (event.key) {
       case 'ArrowDown':
@@ -297,8 +310,11 @@ export function CustomSelect({
     .join('\u0001');
 
   useLayoutEffect(() => {
-    if (!open) return undefined;
-    const measure = () => {
+    if (!open || !active) return undefined;
+    const measure = (event?: Event) => {
+      // Scrolling options does not move the anchor. Re-measuring here would
+      // change placement and pull the active option back into view each frame.
+      if (event?.type === 'scroll' && event.target instanceof Node && menuRef.current?.contains(event.target)) return;
       const trigger = triggerRef.current;
       if (!trigger) return;
       const rect = trigger.getBoundingClientRect();
@@ -338,13 +354,9 @@ export function CustomSelect({
           bottomTop,
           Math.max(VIEWPORT_GUTTER, viewportHeight - VIEWPORT_GUTTER - maxHeight),
         );
-      setPlacement({
-        top,
-        left,
-        width,
-        maxHeight,
-        opensAbove,
-      });
+      setPlacement((previous) => previous?.top === top && previous.left === left
+        && previous.width === width && previous.maxHeight === maxHeight && previous.opensAbove === opensAbove
+        ? previous : { top, left, width, maxHeight, opensAbove });
     };
     measure();
     window.addEventListener('resize', measure);
@@ -353,10 +365,10 @@ export function CustomSelect({
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
     };
-  }, [dense, open, optionContentSignature]);
+  }, [active, dense, open, optionContentSignature]);
 
   useEffect(() => {
-    if (!open || !menuMounted || !placement) return undefined;
+    if (!active || !open || !menuMounted || !placement) return undefined;
     const show = () => setMenuVisible(true);
     if (typeof window.requestAnimationFrame === 'function') {
       const frame = window.requestAnimationFrame(show);
@@ -364,7 +376,7 @@ export function CustomSelect({
     }
     const timer = window.setTimeout(show, 0);
     return () => window.clearTimeout(timer);
-  }, [menuMounted, open, placement]);
+  }, [active, menuMounted, open, placement]);
 
   useEffect(() => () => {
     if (closeTimerRef.current !== null) {
@@ -379,7 +391,7 @@ export function CustomSelect({
   }, [disabled, open]);
 
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open || !active) return undefined;
     function closeOnOutsidePointer(event: PointerEvent) {
       const target = event.target as Node | null;
       if (
@@ -408,17 +420,17 @@ export function CustomSelect({
       document.removeEventListener('pointerdown', closeOnOutsidePointer, true);
       document.removeEventListener('keydown', closeOnEscape, true);
     };
-  }, [activeIndex, disabledValues, onChange, open, options]);
+  }, [active, activeIndex, disabledValues, onChange, open, options]);
 
   useEffect(() => {
-    if (!open || !placement || activeIndex < 0) return;
+    if (!active || !open || !placement || activeIndex < 0) return;
     const option = document.getElementById(getOptionId(activeIndex));
     if (typeof option?.scrollIntoView === 'function') {
       option.scrollIntoView({ block: 'nearest' });
     }
-  }, [activeIndex, listboxId, open, placement]);
+  }, [active, activeIndex, listboxId, open, placement]);
 
-  const menu = menuMounted
+  const menu = active && menuMounted
     ? createPortal(
         <div
           ref={menuRef}
@@ -492,11 +504,11 @@ export function CustomSelect({
         role="combobox"
         className={`custom-select-summary ${dense ? 'dense' : ''}`.trim()}
         aria-haspopup="listbox"
-        aria-expanded={open}
+        aria-expanded={active && open}
         aria-controls={listboxId}
-        aria-activedescendant={open && activeIndex >= 0 ? getOptionId(activeIndex) : undefined}
+        aria-activedescendant={active && open && activeIndex >= 0 ? getOptionId(activeIndex) : undefined}
         aria-label={ariaLabel}
-        disabled={disabled}
+        disabled={disabled || !active}
         onBlur={() => {
           // Tab commits explicitly in handleKeyDown. Any other focus loss is
           // treated like an outside dismissal and preserves the saved value.

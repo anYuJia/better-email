@@ -1,5 +1,6 @@
 // 前后端 IPC 命令名的单一事实来源。新增命令时：1) 在 src-tauri/src/lib.rs 注册；2) 在此加常量；3) 在 src/mockTauri 提供对应 handler。
 export const IPC = {
+  PrepareAttachmentPreview: 'prepare_attachment_preview',
   AiChatRequest: 'ai_chat_request',
   AiRequest: 'ai_request',
   BenchmarkSyncRequested: 'benchmark_sync_requested',

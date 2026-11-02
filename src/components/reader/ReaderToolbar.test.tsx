@@ -80,11 +80,12 @@ function renderToolbar(
 }
 
 describe('ReaderToolbar common actions', () => {
-  it('keeps reply, star, archive, snooze, and more visible', () => {
+  it('keeps reply, archive, snooze, and more visible with secondary actions in the menu', () => {
     renderToolbar();
 
     expect(screen.getByRole('button', { name: '回复' })).toBeDefined();
-    expect(screen.getByRole('button', { name: '添加星标' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: '添加星标' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '删除' })).toBeNull();
     expect(screen.getByRole('button', { name: '归档' })).toBeDefined();
     expect(screen.getByRole('button', { name: '稍后处理' })).toBeDefined();
     expect(screen.getByTitle('更多操作')).toBeDefined();
@@ -106,7 +107,7 @@ describe('ReaderToolbar common actions', () => {
     fireEvent.click(screen.getByTitle('更多操作'));
 
     expect(screen.queryByRole('menuitem', { name: '回复' })).toBeNull();
-    expect(screen.queryByRole('menuitem', { name: '添加星标' })).toBeNull();
+    expect(screen.getByRole('menuitem', { name: '添加星标' })).toBeDefined();
     expect(screen.queryByRole('menuitem', { name: '归档' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: '稍后处理' })).toBeNull();
   });

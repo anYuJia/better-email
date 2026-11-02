@@ -23,13 +23,24 @@ pub async fn test_connection(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<ConnectionReport> {
-    let account = store.get_account_by_id(account_id)?;
-    protocol::test_endpoints(
-        &account.email,
-        &account.incoming_protocol,
-        &account.imap_host,
-        &account.smtp_host,
-    )
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let network_key = super::executor::database(move || {
+        lookup
+            .get_account_by_id(account_id)
+            .map(|account| account.id)
+    })
+    .await?;
+    super::executor::network(network_key, move || {
+        let account = store.get_account_by_id(account_id)?;
+        protocol::test_endpoints(
+            &account.email,
+            &account.incoming_protocol,
+            &account.imap_host,
+            &account.smtp_host,
+        )
+    })
+    .await
 }
 
 #[tauri::command]
@@ -37,19 +48,30 @@ pub async fn verify_account_credentials(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<CredentialVerificationReport> {
-    let account = store.get_account_by_id(account_id)?;
-    let secret = match store.get_account_secret(&account) {
-        Ok(secret) => secret,
-        Err(error) => return Ok(credential_error_report(&account, error.to_string())),
-    };
-    let incoming_result = verify_incoming_credentials(&account, &secret);
-    let smtp_result =
-        smtp::verify_credentials(&account, &secret).map_err(|error| error.to_string());
-    Ok(credential_verification_report(
-        &account,
-        incoming_result,
-        smtp_result,
-    ))
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let network_key = super::executor::database(move || {
+        lookup
+            .get_account_by_id(account_id)
+            .map(|account| account.id)
+    })
+    .await?;
+    super::executor::network(network_key, move || {
+        let account = store.get_account_by_id(account_id)?;
+        let secret = match store.get_account_secret(&account) {
+            Ok(secret) => secret,
+            Err(error) => return Ok(credential_error_report(&account, error.to_string())),
+        };
+        let incoming_result = verify_incoming_credentials(&account, &secret);
+        let smtp_result =
+            smtp::verify_credentials(&account, &secret).map_err(|error| error.to_string());
+        Ok(credential_verification_report(
+            &account,
+            incoming_result,
+            smtp_result,
+        ))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -57,26 +79,37 @@ pub async fn verify_account_credentials_with_secret(
     store: State<'_, MailStore>,
     input: CredentialVerificationInput,
 ) -> MailResult<CredentialVerificationReport> {
-    let account = store.get_account_by_id(input.account_id)?;
-    let raw_secret = input.secret.trim();
-    if raw_secret.is_empty() {
-        return Ok(credential_error_report(
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let network_key = super::executor::database(move || {
+        lookup
+            .get_account_by_id(input.account_id)
+            .map(|account| account.id)
+    })
+    .await?;
+    super::executor::network(network_key, move || {
+        let account = store.get_account_by_id(input.account_id)?;
+        let raw_secret = input.secret.trim();
+        if raw_secret.is_empty() {
+            return Ok(credential_error_report(
+                &account,
+                "请输入授权码或密码后再验证。".to_string(),
+            ));
+        }
+        let secret = match credentials::account_secret_from_raw(&account.auth_type, raw_secret) {
+            Ok(secret) => secret,
+            Err(error) => return Ok(credential_error_report(&account, error)),
+        };
+        let incoming_result = verify_incoming_credentials(&account, &secret);
+        let smtp_result =
+            smtp::verify_credentials(&account, &secret).map_err(|error| error.to_string());
+        Ok(credential_verification_report(
             &account,
-            "请输入授权码或密码后再验证。".to_string(),
-        ));
-    }
-    let secret = match credentials::account_secret_from_raw(&account.auth_type, raw_secret) {
-        Ok(secret) => secret,
-        Err(error) => return Ok(credential_error_report(&account, error)),
-    };
-    let incoming_result = verify_incoming_credentials(&account, &secret);
-    let smtp_result =
-        smtp::verify_credentials(&account, &secret).map_err(|error| error.to_string());
-    Ok(credential_verification_report(
-        &account,
-        incoming_result,
-        smtp_result,
-    ))
+            incoming_result,
+            smtp_result,
+        ))
+    })
+    .await
 }
 
 fn incoming_protocol_name(account: &Account) -> &'static str {
@@ -193,51 +226,69 @@ pub async fn discover_imap_folders(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<ImapProbeReport> {
-    let account = store.get_account_by_id(account_id)?;
-    let secret = match store.get_account_secret(&account) {
-        Ok(secret) => secret,
-        Err(error) => return Ok(imap_probe::failed_report(&account.email, error.to_string())),
-    };
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let network_key = super::executor::database(move || {
+        lookup
+            .get_account_by_id(account_id)
+            .map(|account| account.id)
+    })
+    .await?;
+    super::executor::network(network_key, move || {
+        let account = store.get_account_by_id(account_id)?;
+        let secret = match store.get_account_secret(&account) {
+            Ok(secret) => secret,
+            Err(error) => return Ok(imap_probe::failed_report(&account.email, error.to_string())),
+        };
 
-    match imap_probe::discover_folders(&account, &secret) {
-        Ok(report) => {
-            if report.status == "ok" {
-                store.save_imap_mailboxes_for_account(Some(account.id), &report.folders)?;
+        match imap_probe::discover_folders(&account, &secret) {
+            Ok(report) => {
+                if report.status == "ok" {
+                    store.save_imap_mailboxes_for_account(Some(account.id), &report.folders)?;
+                }
+                Ok(report)
             }
-            Ok(report)
+            Err(error) => Ok(imap_probe::failed_report(&account.email, error.to_string())),
         }
-        Err(error) => Ok(imap_probe::failed_report(&account.email, error.to_string())),
-    }
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn list_imap_mailboxes(store: State<'_, MailStore>) -> MailResult<Vec<ImapMailboxState>> {
-    store.list_imap_mailboxes()
+pub async fn list_imap_mailboxes(store: State<'_, MailStore>) -> MailResult<Vec<ImapMailboxState>> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_imap_mailboxes()).await
 }
 
 #[tauri::command]
-pub fn map_imap_mailbox(
+pub async fn map_imap_mailbox(
     store: State<'_, MailStore>,
     mailbox_id: i64,
     folder_id: Option<i64>,
 ) -> MailResult<ImapMailboxState> {
-    store.map_imap_mailbox(mailbox_id, folder_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.map_imap_mailbox(mailbox_id, folder_id)).await
 }
 
 #[tauri::command]
-pub fn run_sync_dry_run(
+pub async fn run_sync_dry_run(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<SyncRun> {
-    store.run_sync_dry_run(account_id)
+    let store = store.inner().clone();
+    super::executor::database(move || store.run_sync_dry_run(account_id)).await
 }
 
 #[tauri::command]
-pub fn get_sync_schedule_plan(
+pub async fn get_sync_schedule_plan(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<SyncSchedulePlan> {
-    let plan = store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)?;
+    let plan_store = store.inner().clone();
+    let plan = super::executor::database(move || {
+        plan_store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)
+    })
+    .await?;
     command_info(format!(
         "[better-email][sync] plan account_id={account_id:?} total_accounts={} batch_accounts={} delayed_accounts={}",
         plan.total_accounts,
@@ -253,11 +304,16 @@ pub async fn sync_imap_headers(
     account_id: Option<i64>,
     task_id: Option<i64>,
 ) -> MailResult<SyncRun> {
+    let store = store.inner().clone();
     let command_started_at = std::time::Instant::now();
     command_info(format!(
         "[better-email][sync] command start account_id={account_id:?} task_id={task_id:?}"
     ));
-    let plan = store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)?;
+    let plan_store = store.clone();
+    let plan = super::executor::database(move || {
+        plan_store.header_sync_schedule_plan(account_id, MAX_UNIFIED_SYNC_ACCOUNTS_PER_BATCH)
+    })
+    .await?;
     let accounts = plan.batch_accounts.clone();
     command_info(format!(
         "[better-email][sync] command plan account_id={account_id:?} total_accounts={} batch_accounts={} delayed_accounts={}",
@@ -268,9 +324,15 @@ pub async fn sync_imap_headers(
     if let Some(account_id) = account_id {
         // 明确绑定账号的同步：直接按该账号执行，绝不依赖计划批次里的「第一个账号」，
         // 保证任务始终同步任务自身的 account_id。
-        let account = store.get_account_by_id(Some(account_id))?;
+        let lookup = store.clone();
+        let account =
+            super::executor::database(move || lookup.get_account_by_id(Some(account_id))).await?;
         let task_progress = SyncTaskProgress::for_account(task_id, 0, 1);
-        let result = sync_headers_for_account(&store, &account, false, task_progress);
+        let worker_store = store.clone();
+        let result = super::executor::network(account.id, move || {
+            sync_headers_for_account(&worker_store, &account, false, task_progress)
+        })
+        .await;
         match &result {
             Ok(run) => command_info(format!(
                 "[better-email][sync] command done account_id={account_id:?} status={} scanned_folders={} imported_messages={} duration_ms={}",
@@ -298,19 +360,26 @@ pub async fn sync_imap_headers(
 
     for (index, account) in accounts.iter().enumerate() {
         let task_progress = SyncTaskProgress::for_account(task_id, index, accounts.len());
-        if let Some(task_progress) = task_progress {
-            task_progress.update(
-                &store,
-                0,
-                &format!(
-                    "正在同步第 {} / {} 个账号：{}",
-                    index + 1,
-                    accounts.len(),
-                    account.email
-                ),
-            )?;
-        }
-        match sync_headers_for_account(&store, account, false, task_progress) {
+        let worker_store = store.clone();
+        let worker_account = account.clone();
+        let account_count = accounts.len();
+        let result = super::executor::network(account.id, move || {
+            if let Some(task_progress) = task_progress {
+                task_progress.update(
+                    &worker_store,
+                    0,
+                    &format!(
+                        "正在同步第 {} / {} 个账号：{}",
+                        index + 1,
+                        account_count,
+                        worker_account.email
+                    ),
+                )?;
+            }
+            sync_headers_for_account(&worker_store, &worker_account, false, task_progress)
+        })
+        .await;
+        match result {
             Ok(run) => {
                 scanned_folders += run.scanned_folders;
                 imported_messages += run.imported_messages;
@@ -385,16 +454,20 @@ pub async fn sync_imap_headers(
         )
     };
 
-    let result = store.record_sync_run(
-        &started_at,
-        &finished_at,
-        status,
-        scanned_folders,
-        imported_messages,
-        new_messages,
-        &new_message_ids,
-        &message,
-    );
+    let record_store = store.clone();
+    let result = super::executor::database(move || {
+        record_store.record_sync_run(
+            &started_at,
+            &finished_at,
+            status,
+            scanned_folders,
+            imported_messages,
+            new_messages,
+            &new_message_ids,
+            &message,
+        )
+    })
+    .await;
     match &result {
         Ok(run) => command_info(format!(
             "[better-email][sync] command done account_id={account_id:?} status={} scanned_folders={} imported_messages={} synced_accounts={} failures={} warnings={} duration_ms={} message={}",
@@ -420,8 +493,19 @@ pub async fn sync_imap_history(
     store: State<'_, MailStore>,
     account_id: Option<i64>,
 ) -> MailResult<SyncRun> {
-    let account = store.get_account_by_id(account_id)?;
-    sync_headers_for_account(&store, &account, true, None)
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let network_key = super::executor::database(move || {
+        lookup
+            .get_account_by_id(account_id)
+            .map(|account| account.id)
+    })
+    .await?;
+    super::executor::network(network_key, move || {
+        let account = store.get_account_by_id(account_id)?;
+        sync_headers_for_account(&store, &account, true, None)
+    })
+    .await
 }
 
 fn sync_headers_for_account(
@@ -1111,6 +1195,15 @@ pub async fn fetch_message_body(
     store: State<'_, MailStore>,
     message_id: i64,
 ) -> MailResult<Message> {
+    let store = store.inner().clone();
+    let lookup = store.clone();
+    let network_key = super::executor::database(move || {
+        lookup
+            .get_message_account(message_id)
+            .map(|account| account.id)
+    })
+    .await?;
+    super::executor::network(network_key, move || {
     command_info(format!(
         "[better-email][body] fetch command start message_id={message_id}"
     ));
@@ -1134,7 +1227,12 @@ pub async fn fetch_message_body(
         ));
     }
     let body = imap_probe::fetch_message_body(&account, &secret, &remote_mailbox, remote_uid)?;
-    let updated = store.update_message_body(message_id, &body)?;
+    let updated = store.update_message_body_from_remote(message_id, &body, &crate::db::MessageRemoteRef {
+        account_id: account.id,
+        remote_mailbox: remote_mailbox.clone(),
+        remote_uid,
+        message_id_header: String::new(),
+    })?;
     command_info(format!(
         "[better-email][body] fetch command ok message_id={} account_id={} mailbox={} uid={} body_chars={} html_chars={} attachments={}",
         message_id,
@@ -1146,11 +1244,14 @@ pub async fn fetch_message_body(
         body.attachments.len()
     ));
     Ok(updated)
+
+    }).await
 }
 
 #[tauri::command]
-pub fn list_sync_runs(store: State<'_, MailStore>) -> MailResult<Vec<SyncRun>> {
-    store.list_sync_runs()
+pub async fn list_sync_runs(store: State<'_, MailStore>) -> MailResult<Vec<SyncRun>> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.list_sync_runs()).await
 }
 
 #[cfg(test)]

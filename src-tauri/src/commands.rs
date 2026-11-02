@@ -12,6 +12,7 @@ mod benchmark;
 mod common;
 mod composer_recovery;
 mod contacts_rules;
+mod executor;
 mod messages;
 mod oauth;
 mod outbox;

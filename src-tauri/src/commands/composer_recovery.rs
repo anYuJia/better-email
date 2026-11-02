@@ -3,8 +3,9 @@ use crate::models::DraftInput;
 use tauri::State;
 
 #[tauri::command]
-pub fn load_composer_recovery(store: State<'_, MailStore>) -> MailResult<serde_json::Value> {
-    store.load_composer_recovery()
+pub async fn load_composer_recovery(store: State<'_, MailStore>) -> MailResult<serde_json::Value> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.load_composer_recovery()).await
 }
 
 #[tauri::command]
@@ -33,10 +34,17 @@ pub async fn save_composer_recovery(
 }
 
 #[tauri::command]
-pub fn clear_composer_recovery(store: State<'_, MailStore>, revision: i64) -> MailResult<bool> {
-    let cleared = store.write_composer_recovery(revision, "null")?;
-    if cleared {
-        let _ = store.prune_temp_attachments(std::time::Duration::ZERO);
-    }
-    Ok(cleared)
+pub async fn clear_composer_recovery(
+    store: State<'_, MailStore>,
+    revision: i64,
+) -> MailResult<bool> {
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        let cleared = store.write_composer_recovery(revision, "null")?;
+        if cleared {
+            let _ = store.prune_temp_attachments(std::time::Duration::ZERO);
+        }
+        Ok(cleared)
+    })
+    .await
 }

@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties } from 'react';
-import { Tag } from 'lucide-react';
+import { Pencil, Plus, Tag, Trash2 } from 'lucide-react';
 import type { Label } from '../../app/types';
 import { logError } from '../../app/logger';
 import { useDetailsMenu } from '../../hooks/useDetailsMenu';
@@ -40,9 +40,10 @@ export default function ReaderLabelMenu({
   }
 
   async function handleUpdateLabel(id: number) {
-    if (!editingLabelName.trim() || !onUpdateLabel) return;
+    const currentLabel = labels.find((label) => label.id === id);
+    if (!editingLabelName.trim() || !onUpdateLabel || !currentLabel) return;
     try {
-      await onUpdateLabel(id, editingLabelName.trim(), newLabelColor);
+      await onUpdateLabel(id, editingLabelName.trim(), currentLabel.color);
       setEditingLabelId(null);
     } catch (e) {
       logError(e);
@@ -73,11 +74,12 @@ export default function ReaderLabelMenu({
           <div className="label-menu-add-section">
             <input
               type="text"
+              aria-label="新标签名称"
               placeholder="新建标签..."
               value={newLabelName}
               onChange={(e) => setNewLabelName(e.target.value)}
               onKeyDown={async (e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                   e.preventDefault();
                   await handleCreateLabel();
                 }
@@ -113,7 +115,7 @@ export default function ReaderLabelMenu({
                 title="新建标签"
                 onClick={handleCreateLabel}
               >
-                +
+                <Plus size={15} aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -132,10 +134,11 @@ export default function ReaderLabelMenu({
                       <div className="label-edit-inline">
                         <input
                           type="text"
+                          aria-label={`修改标签 ${label.name} 的名称`}
                           value={editingLabelName}
                           onChange={(e) => setEditingLabelName(e.target.value)}
                           onKeyDown={async (e) => {
-                            if (e.key === 'Enter') {
+                            if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                               e.preventDefault();
                               await handleUpdateLabel(label.id);
                             }
@@ -160,21 +163,21 @@ export default function ReaderLabelMenu({
                           <button
                             type="button"
                             className="action-edit"
-                            aria-label="编辑名称"
-                            title="编辑名称"
+                            aria-label={`编辑标签 ${label.name}`}
+                            title={`编辑标签 ${label.name}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               setEditingLabelId(label.id);
                               setEditingLabelName(label.name);
                             }}
                           >
-                            ✎
+                            <Pencil size={15} aria-hidden="true" />
                           </button>
                           <button
                             type="button"
                             className="action-delete"
-                            aria-label="删除标签"
-                            title="删除标签"
+                            aria-label={`删除标签 ${label.name}`}
+                            title={`删除标签 ${label.name}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (onDeleteLabel) {
@@ -182,7 +185,7 @@ export default function ReaderLabelMenu({
                               }
                             }}
                           >
-                            ✕
+                            <Trash2 size={15} aria-hidden="true" />
                           </button>
                         </div>
                       </>

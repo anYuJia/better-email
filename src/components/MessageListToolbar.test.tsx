@@ -4,6 +4,7 @@ import type { MessageSummary } from '../app/types';
 import GlobalSearch from './GlobalSearch';
 import MessageBulkToolbar from './MessageBulkToolbar';
 import MessageListToolbar from './MessageListToolbar';
+import MessageSelectionControls from './MessageSelectionControls';
 
 afterEach(cleanup);
 
@@ -55,7 +56,9 @@ function renderSearch() {
 }
 
 function renderToolbar(selectedMessageIds: number[] = []) {
-  return render(
+  const onToggleAllVisible = vi.fn();
+  const onSelectMessageDateRange = vi.fn();
+  const view = render(
     <MessageListToolbar
       filter="all"
       listMode="messages"
@@ -75,8 +78,20 @@ function renderToolbar(selectedMessageIds: number[] = []) {
       onRequestSnooze={vi.fn()}
       onMoveBulkToFolder={vi.fn()}
       onToggleBulkLabel={vi.fn()}
+      selectionControls={(
+        <MessageSelectionControls
+          compact
+          messages={[message]}
+          selectedMessageIds={selectedMessageIds}
+          hasMoreMessages
+          onToggleAllVisible={onToggleAllVisible}
+          onToggleMessageSelection={vi.fn()}
+          onSelectMessageDateRange={onSelectMessageDateRange}
+        />
+      )}
     />,
   );
+  return { ...view, onToggleAllVisible, onSelectMessageDateRange };
 }
 
 describe('GlobalSearch search combobox', () => {
@@ -114,6 +129,31 @@ describe('GlobalSearch search combobox', () => {
 });
 
 describe('Inbox toolbar selection mode', () => {
+  it('keeps all-selection and the date dialog in the existing toolbar before bulk selection', () => {
+    const view = renderToolbar();
+    const controlRow = view.container.querySelector('.list-control-row');
+    const selectAll = screen.getByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' });
+    const dateButton = screen.getByRole('button', { name: '按日期范围筛选邮件' });
+    expect(controlRow?.contains(selectAll)).toBe(true);
+    expect(controlRow?.contains(dateButton)).toBe(true);
+    expect(view.container.querySelector('.message-selection-strip')).toBeNull();
+    expect(screen.queryByRole('button', { name: '对选中的邮件执行：归档' })).toBeNull();
+    fireEvent.click(selectAll);
+    expect(view.onToggleAllVisible).toHaveBeenCalledWith(true);
+
+    act(() => dateButton.focus());
+    fireEvent.click(dateButton);
+    expect(screen.getByRole('dialog', { name: '按日期范围筛选邮件' })).toBeDefined();
+    fireEvent.change(screen.getByLabelText('开始日期'), { target: { value: '2026-08-01' } });
+    fireEvent.change(screen.getByLabelText('结束日期'), { target: { value: '2026-08-09' } });
+    fireEvent.click(screen.getByRole('button', { name: '确定' }));
+    expect(view.onSelectMessageDateRange).toHaveBeenCalledWith(expect.objectContaining({
+      startDate: '2026-08-01', endDate: '2026-08-09',
+    }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(dateButton);
+  });
+
   it('keeps tabs separate from the labeled filter and sort triggers', () => {
     const onFilterChange = vi.fn();
     const onSortChange = vi.fn();
@@ -162,7 +202,7 @@ describe('Inbox toolbar selection mode', () => {
     const row = view.container.querySelector('.list-control-row');
 
     expect(strip?.getAttribute('data-toolbar-mode')).toBe('normal');
-    expect(strip?.getAttribute('data-toolbar-height')).toBe('52');
+    expect(strip?.getAttribute('data-toolbar-height')).toBe('84');
     expect(row?.querySelector('.list-control-actions')).not.toBeNull();
     expect(row?.querySelector('.bulk-toolbar')).toBeNull();
 
@@ -192,7 +232,7 @@ describe('Inbox toolbar selection mode', () => {
     const selectedStrip = view.container.querySelector('.list-control-strip');
     expect(selectedStrip).toBe(strip);
     expect(selectedStrip?.getAttribute('data-toolbar-mode')).toBe('selection');
-    expect(selectedStrip?.getAttribute('data-toolbar-height')).toBe('52');
+    expect(selectedStrip?.getAttribute('data-toolbar-height')).toBe('84');
     expect(view.container.querySelector('.list-control-row')?.querySelector('.bulk-toolbar')).not.toBeNull();
     expect(view.container.querySelector('.list-control-row')?.querySelector('.list-control-actions')).toBeNull();
     expect(screen.getByRole('button', { name: '对选中的邮件执行：归档' })).toBeDefined();

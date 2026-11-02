@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { MoreHorizontal, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { useId, useRef, useState } from 'react';
+import { ChevronDown, MoreHorizontal, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { readerSecurityCopy } from '../../app/readerSecurityCopy';
 import { useDetailsMenu } from '../../hooks/useDetailsMenu';
 
@@ -37,6 +37,8 @@ export default function ReaderSecurityBanner({
 }: ReaderSecurityBannerProps) {
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenu = useDetailsMenu(moreMenuRef, { floating: true });
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const notesId = useId();
 
   if (
     warnings.length === 0
@@ -94,8 +96,14 @@ export default function ReaderSecurityBanner({
         <SecurityIcon size={16} strokeWidth={1.8} />
       </span>
       <div className="reader-warning-content">
-        <strong>{title}</strong>
-        <div className="reader-warning-messages">
+        {isCaution ? <strong>{title}</strong> : <button
+          type="button"
+          className="reader-security-disclosure"
+          aria-expanded={detailsExpanded}
+          aria-controls={notesId}
+          onClick={() => setDetailsExpanded((current) => !current)}
+        >{title}<ChevronDown size={14} aria-hidden="true" /></button>}
+        <div id={notesId} className="reader-warning-messages" hidden={!isCaution && !detailsExpanded}>
           {notes.map((note) => <p key={note}>{note}</p>)}
         </div>
       </div>

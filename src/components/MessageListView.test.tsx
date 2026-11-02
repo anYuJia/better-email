@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { MessageSummary } from '../app/types';
 import MessageListView from './MessageListView';
+import * as scrollAnchors from './messageListAnchor';
+import type { ComponentProps } from 'react';
 import {
   GROUP_HEADER_HEIGHT,
   LIST_FOOTER_HEIGHT,
@@ -36,6 +38,252 @@ const message: MessageSummary = {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe('MessageListView virtual geometry', () => {
+  function resizeEntry(target: HTMLElement): ResizeObserverEntry {
+    return {
+      target,
+      contentRect: target.getBoundingClientRect(),
+      borderBoxSize: [],
+      contentBoxSize: [],
+      devicePixelContentBoxSize: [],
+    };
+  }
+
+  function propsFor(messages: MessageSummary[]): ComponentProps<typeof MessageListView> {
+    return {
+      messages, groups: [{ id: 'today', label: '今天', messages }], query: '', filter: 'all',
+      selectedId: 22, hasMoreMessages: false, listStateKey: 'geometry', initialScrollTop: 0,
+      selectedMessageIds: [], draggingMessageIds: [], onScrollTopChange: vi.fn(),
+      onSelectMessage: vi.fn(), onToggleMessageSelection: vi.fn(), onToggleAllVisible: vi.fn(),
+      onOpenMessageMenu: vi.fn(), onCloseMessageMenu: vi.fn(), onSetDraggingMessageIds: vi.fn(),
+      onClearSearchAndFilter: vi.fn(), onRefresh: vi.fn(async () => undefined),
+      onLoadMore: vi.fn(async () => []),
+    };
+  }
+
+  function mockGeometry(height: () => number, visible: () => boolean = () => true) {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('message-list') && visible() ? 300 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('message-list') && visible() ? 400 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const measuredHeight = !visible() ? 0 : this.classList.contains('message-card') ? height()
+        : this.classList.contains('message-date-header') ? GROUP_HEADER_HEIGHT : 0;
+      return { x: 0, y: 0, top: 0, left: 0, right: 400, bottom: measuredHeight, width: 400, height: measuredHeight, toJSON() {} };
+    });
+  }
+
+  it('shows the account label while preserving the full source address and falling back for unnamed accounts', () => {
+    const second = { ...message, id: 2, account_id: 2, account_email: 'personal@example.org' };
+    const input = propsFor([message, second]);
+    const view = render(<MessageListView {...input} showAccountSource accountSourceLabels={new Map([[1, '工作邮箱'], [2, '  ']])} />);
+    const sources = view.container.querySelectorAll('.message-account-source');
+    expect(sources[0].textContent).toBe('工作邮箱');
+    expect(sources[0].getAttribute('title')).toBe('来源邮箱：test@example.com');
+    expect(sources[1].textContent).toBe('personal@example.org');
+    expect(screen.getByRole('button', { name: /查看邮件：.*来源邮箱：test@example.com/ })).toBeDefined();
+
+    view.rerender(<MessageListView {...input} showAccountSource={false} accountSourceLabels={new Map([[1, '工作邮箱']])} />);
+    expect(view.container.querySelector('.message-account-source')).toBeNull();
+  });
+
+  it('does not rebuild folder geometry when newly mounted rows match the estimate, and preserves a focused anchor on prepend', () => {
+    vi.useFakeTimers();
+    mockGeometry(() => MESSAGE_ROW_HEIGHT);
+    const anchor = vi.spyOn(scrollAnchors, 'anchoredScrollTop');
+    const messages = Array.from({ length: 1000 }, (_, index) => ({ ...message, id: index + 1, subject: `Mail ${index + 1}` }));
+    const props = propsFor(messages);
+    const view = render(<MessageListView {...props} />);
+    const list = screen.getByRole('list', { name: '邮件列表' });
+    anchor.mockClear();
+    fireEvent.scroll(list, { target: { scrollTop: 1500 } });
+    act(() => vi.advanceTimersByTime(20));
+    expect(anchor).not.toHaveBeenCalled();
+    expect(view.container.querySelectorAll('.message-list-item').length).toBeLessThan(30);
+    expect(list.scrollTop).toBe(1500);
+    const focusedRow = screen.getByRole('button', { name: /，Mail 22。/ });
+    focusedRow.focus();
+    const nextMessages = [{ ...message, id: 1001, subject: 'New arrival' }, ...messages];
+    view.rerender(<MessageListView {...props} messages={nextMessages} groups={[{ id: 'today', label: '今天', messages: nextMessages }]} />);
+    expect(list.scrollTop).toBe(1500 + MESSAGE_ROW_HEIGHT);
+    expect(document.activeElement).toBe(focusedRow);
+  });
+
+  it('measures only entering rows while scrolling and only notified rows after a resize', () => {
+    vi.useFakeTimers();
+    mockGeometry(() => MESSAGE_ROW_HEIGHT);
+    const observers: Array<{ callback: ResizeObserverCallback; observe: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn> }> = [];
+    vi.stubGlobal('ResizeObserver', class {
+      observe = vi.fn();
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+      constructor(public callback: ResizeObserverCallback) { observers.push(this); }
+    });
+    const messages = Array.from({ length: 1000 }, (_, index) => ({ ...message, id: index + 1 }));
+    const props = propsFor(messages);
+    const view = render(<MessageListView {...props} />);
+    const rowsBefore = new Set(view.container.querySelectorAll('.message-list-item, .message-date-header'));
+    const reads = vi.mocked(HTMLElement.prototype.getBoundingClientRect);
+    reads.mockClear();
+    fireEvent.scroll(screen.getByRole('list', { name: '邮件列表' }), { target: { scrollTop: MESSAGE_ROW_HEIGHT } });
+    act(() => vi.advanceTimersByTime(20));
+    const entering = Array.from(view.container.querySelectorAll('.message-list-item, .message-date-header'))
+      .filter((node) => !rowsBefore.has(node));
+    expect(entering.length).toBeGreaterThan(0);
+    expect(reads).toHaveBeenCalledTimes(entering.length);
+    expect(observers).toHaveLength(2);
+    expect(observers.every((observer) => observer.disconnect.mock.calls.length === 0)).toBe(true);
+
+    const rowObserver = observers.find((observer) => observer.observe.mock.calls.some(([target]) => target.classList.contains('message-card')))!;
+    const changedRow = view.container.querySelector('.message-card') as HTMLElement;
+    const notification = resizeEntry(changedRow);
+    reads.mockClear();
+    act(() => rowObserver.callback([notification], {} as ResizeObserver));
+    expect(reads).toHaveBeenCalledTimes(1);
+    reads.mockClear();
+    view.rerender(<MessageListView {...props} selectedId={2} selectedMessageIds={[2]} />);
+    expect(reads).not.toHaveBeenCalled();
+    fireEvent.scroll(screen.getByRole('list', { name: '邮件列表' }), { target: { scrollTop: 1500 } });
+    act(() => vi.advanceTimersByTime(20));
+    expect(changedRow.isConnected).toBe(false);
+    reads.mockClear();
+    act(() => rowObserver.callback([notification], {} as ResizeObserver));
+    expect(reads).not.toHaveBeenCalled();
+    view.unmount();
+    expect(observers.every((observer) => observer.disconnect.mock.calls.length === 1)).toBe(true);
+    act(() => rowObserver.callback([notification], {} as ResizeObserver));
+    expect(reads).not.toHaveBeenCalled();
+  });
+
+  it('remeasures retained row nodes when a mailbox view reset invalidates their height cache', () => {
+    vi.stubGlobal('ResizeObserver', class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    });
+    mockGeometry(() => 93);
+    const props = propsFor([message, { ...message, id: 2 }]);
+    const view = render(<MessageListView {...props} />);
+    const row = view.container.querySelector('.message-list-item') as HTMLElement;
+    expect(row.style.height).toBe('93px');
+    view.rerender(<MessageListView {...props} listStateKey="same-rows-new-view" />);
+    expect(view.container.querySelector('.message-list-item')).toBe(row);
+    expect(row.style.height).toBe('93px');
+  });
+
+  it('preserves measured geometry while hidden and remeasures when the retained inbox returns', () => {
+    let visible = true;
+    let rowHeight = 84;
+    let notify: ResizeObserverCallback = () => undefined;
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(private callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        if (target.classList.contains('message-list')) notify = this.callback;
+      }
+      unobserve() {}
+      disconnect() {}
+    });
+    mockGeometry(() => rowHeight, () => visible);
+    const messages = Array.from({ length: 20 }, (_, index) => ({ ...message, id: index + 1 }));
+    const view = render(<MessageListView {...propsFor(messages)} />);
+    const list = screen.getByRole('list', { name: '邮件列表' });
+    const wrapper = view.container.querySelector('.message-list-viewport-wrapper') as HTMLElement;
+    const beforeHide = wrapper.style.height;
+    visible = false;
+    act(() => notify([resizeEntry(list)], {} as ResizeObserver));
+    expect(wrapper.style.height).toBe(beforeHide);
+    visible = true;
+    rowHeight = 96;
+    act(() => notify([resizeEntry(list)], {} as ResizeObserver));
+    expect((view.container.querySelector('.message-list-item') as HTMLElement).style.height).toBe('96px');
+    expect(list.scrollTop).toBe(0);
+  });
+
+  it('preserves the anchor when new mail arrives while the inbox has no scroll box', () => {
+    vi.useFakeTimers();
+    let visible = true;
+    let notify: ResizeObserverCallback = () => undefined;
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(private callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        if (target.classList.contains('message-list')) notify = this.callback;
+      }
+      unobserve() {}
+      disconnect() {}
+    });
+    mockGeometry(() => MESSAGE_ROW_HEIGHT, () => visible);
+    const messages = Array.from({ length: 100 }, (_, index) => ({ ...message, id: index + 1 }));
+    const props = propsFor(messages);
+    const view = render(<MessageListView {...props} />);
+    const list = screen.getByRole('list', { name: '邮件列表' });
+    fireEvent.scroll(list, { target: { scrollTop: 1500 } });
+    act(() => vi.advanceTimersByTime(20));
+    visible = false;
+    act(() => notify([resizeEntry(list)], {} as ResizeObserver));
+    fireEvent.scroll(list, { target: { scrollTop: 0 } });
+    const next = [{ ...message, id: 101 }, ...messages];
+    view.rerender(<MessageListView {...props} messages={next} groups={[{ id: 'today', label: '今天', messages: next }]} />);
+    visible = true;
+    act(() => notify([resizeEntry(list)], {} as ResizeObserver));
+    expect(list.scrollTop).toBe(1500 + MESSAGE_ROW_HEIGHT);
+  });
+
+  it.each([false, true])('remeasures row content after text grows without resizing the viewport (mobile=%s)', (mobile) => {
+    let rowHeight = mobile ? 80 : MESSAGE_ROW_HEIGHT;
+    let notifyRows: ResizeObserverCallback = () => undefined;
+    vi.stubGlobal('ResizeObserver', class {
+      private callback: ResizeObserverCallback;
+      constructor(callback: ResizeObserverCallback) { this.callback = callback; }
+      observe(target: Element) {
+        if (target.classList.contains('message-card')) notifyRows = this.callback;
+      }
+      unobserve() {}
+      disconnect() {}
+    });
+    mockGeometry(() => rowHeight);
+    const view = render(<MessageListView {...propsFor([message, { ...message, id: 2 }])} mobile={mobile} />);
+    rowHeight = 118.25;
+    act(() => notifyRows(Array.from(view.container.querySelectorAll<HTMLElement>('.message-card'), resizeEntry), {} as ResizeObserver));
+    const rows = view.container.querySelectorAll<HTMLElement>('.message-list-item');
+    expect(rows[0].style.height).toBe('119px');
+    expect(rows[1].style.transform).toBe(`translateY(${GROUP_HEADER_HEIGHT + 119}px)`);
+  });
+
+  it('keeps the visible desktop anchor and keyboard focus while scaled text increases row heights', () => {
+    vi.useFakeTimers();
+    let rowHeight = MESSAGE_ROW_HEIGHT;
+    let notifyRows: ResizeObserverCallback = () => undefined;
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(private callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        if (target.classList.contains('message-card')) notifyRows = this.callback;
+      }
+      unobserve() {}
+      disconnect() {}
+    });
+    mockGeometry(() => rowHeight);
+    const messages = Array.from({ length: 100 }, (_, index) => ({ ...message, id: index + 1, subject: `Mail ${index + 1}` }));
+    render(<MessageListView {...propsFor(messages)} mobile={false} />);
+    const list = screen.getByRole('list', { name: '邮件列表' });
+    fireEvent.scroll(list, { target: { scrollTop: 1500 } });
+    act(() => vi.advanceTimersByTime(20));
+    const focusedRow = screen.getByRole('button', { name: /，Mail 22。/ });
+    focusedRow.focus();
+    const row = focusedRow.closest('.message-list-item') as HTMLElement;
+    const position = () => Number(row.style.transform.match(/translateY\(([-\d.]+)px\)/)?.[1]) - list.scrollTop;
+    const before = position();
+    rowHeight = 93;
+    act(() => notifyRows(Array.from(list.querySelectorAll<HTMLElement>('.message-card'), resizeEntry), {} as ResizeObserver));
+    expect(row.style.height).toBe('93px');
+    expect(position()).toBe(before);
+    expect(document.activeElement).toBe(focusedRow);
+  });
 });
 
 describe('MessageListView theme-safe separators', () => {
@@ -155,7 +403,7 @@ describe('MessageListView theme-safe separators', () => {
     expect(list.scrollTop).toBe(136);
   });
 
-  it('exposes list and date-group selection controls with mixed states', () => {
+  it('exposes mobile selection and date-group controls with mixed states', () => {
     const second = { ...message, id: 2, remote_uid: 2 };
     const third = { ...message, id: 3, remote_uid: 3 };
     const onToggleAllVisible = vi.fn();
@@ -163,6 +411,7 @@ describe('MessageListView theme-safe separators', () => {
     const onSelectMessageDateRange = vi.fn();
     const { rerender } = render(
       <MessageListView
+        mobile
         groups={[
           { id: 'today', label: '今天', messages: [message, second] },
           { id: 'yesterday', label: '昨天', messages: [third] },
@@ -174,7 +423,7 @@ describe('MessageListView theme-safe separators', () => {
         hasMoreMessages={false}
         listStateKey="selection-controls"
         initialScrollTop={0}
-        selectedMessageIds={[]}
+        selectedMessageIds={[3]}
         draggingMessageIds={[]}
         onScrollTopChange={vi.fn()}
         onSelectMessage={vi.fn()}
@@ -210,6 +459,7 @@ describe('MessageListView theme-safe separators', () => {
 
     rerender(
       <MessageListView
+        mobile
         groups={[
           { id: 'today', label: '今天', messages: [message, second] },
           { id: 'yesterday', label: '昨天', messages: [third] },
@@ -233,6 +483,7 @@ describe('MessageListView theme-safe separators', () => {
     const visible = [message, { ...message, id: 2, remote_uid: 2 }];
     render(
       <MessageListView
+        mobile
         groups={[{ id: 'today', label: '今天', messages: visible }]}
         messages={visible}
         query=""

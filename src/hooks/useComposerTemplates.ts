@@ -7,7 +7,7 @@ import {
   templatesForAccount,
   substituteTemplateVariables,
 } from '../app/templateStore';
-import type { ComposeTemplate, DraftInput } from '../app/types';
+import type { ComposerSaveResult, ComposeTemplate, DraftInput } from '../app/types';
 import { plainTextToRichHtml } from '../components/composer/composerBody';
 
 type ComposerTemplatesOptions = {
@@ -95,16 +95,16 @@ export default function useComposerTemplates({
     setStatus(`已插入模板：${template.name}${hint}`);
   }, [draft, setDraft, setRichComposer, setStatus]);
 
-  const saveDraftAsTemplate = useCallback(() => {
+  const saveDraftAsTemplate = useCallback((): ComposerSaveResult => {
     const name = templateName.trim();
     if (!name) {
-      setStatus('请输入模板名称');
-      return;
+      const message = '请输入模板名称';
+      return { status: 'empty', message };
     }
     const hasContent = draft.subject.trim() || draft.body.trim() || draft.html_body.trim();
     if (!hasContent) {
-      setStatus('请先填写主题或正文后再保存模板');
-      return;
+      const message = '请先填写主题或正文后再保存模板';
+      return { status: 'empty', message };
     }
     const nextTemplate = saveTemplate({
       id: crypto.randomUUID(),
@@ -122,6 +122,7 @@ export default function useComposerTemplates({
     setStoredTemplates(nextTemplate);
     setTemplateName('');
     setStatus(`模板已保存：${name}`);
+    return { status: 'saved' };
   }, [draft, effectiveAccountId, templateName, setStatus]);
 
   const deleteComposeTemplate = useCallback((template: ComposeTemplate) => {

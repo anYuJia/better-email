@@ -22,11 +22,8 @@ pub fn send_outbound(
     secret: &AccountSecret,
 ) -> Result<Vec<u8>, MailError> {
     let email = build_outbound_email(message, None)?;
-    let raw_message = email.formatted();
     let mailer = authenticated_transport(account, secret)?;
-
-    mailer.send(&email).map_err(classify_send_error)?;
-    Ok(raw_message)
+    send_prepared_email(&mailer, email)
 }
 
 /// 使用后端在同一次打开中验证并读取出的附件字节发送邮件。生产命令必须走
@@ -35,7 +32,7 @@ pub fn send_outbound_with_attachment_bytes(
     account: &Account,
     message: &OutboundMessage,
     secret: &AccountSecret,
-    attachment_bytes: &[Vec<u8>],
+    attachment_bytes: Vec<Vec<u8>>,
 ) -> Result<Vec<u8>, MailError> {
     let mailer = authenticated_transport(account, secret)?;
     send_outbound_with_transport(&mailer, message, attachment_bytes)
@@ -44,16 +41,33 @@ pub fn send_outbound_with_attachment_bytes(
 pub(crate) fn send_outbound_with_transport(
     mailer: &SmtpTransport,
     message: &OutboundMessage,
-    attachment_bytes: &[Vec<u8>],
+    attachment_bytes: Vec<Vec<u8>>,
 ) -> Result<Vec<u8>, MailError> {
     let email = build_outbound_email(message, Some(attachment_bytes))?;
+    send_prepared_email(mailer, email)
+}
+
+fn send_prepared_email<T>(mailer: &T, email: Message) -> Result<Vec<u8>, MailError>
+where
+    T: Transport<Error = lettre::transport::smtp::Error>,
+{
     let raw_message = email.formatted();
-    mailer.send(&email).map_err(classify_send_error)?;
+    let envelope = email.envelope().clone();
+    // Transport::send 会再次 formatted()。直接发送同一份 MIME，并在网络等待
+    // 前释放 MIME part 的编码缓冲，避免大附件常驻两份完整序列化邮件。
+    drop(email);
+    mailer
+        .send_raw(&envelope, &raw_message)
+        .map_err(classify_send_error)?;
     Ok(raw_message)
 }
 
 fn classify_send_error(error: lettre::transport::smtp::Error) -> MailError {
-    if error.is_permanent() {
+    if error.status().is_some_and(|code| code.to_string() == "552") {
+        MailError::SmtpPermanent(format!(
+            "服务器拒绝接收邮件，可能超出邮件大小或邮箱容量限制；附件编码后体积会增大，请减少附件或核对服务商限制：{error}"
+        ))
+    } else if error.is_permanent() {
         MailError::SmtpPermanent(format!(
             "发送服务器拒绝了邮件，请检查账号或收件人后再试：{error}"
         ))
@@ -74,7 +88,7 @@ pub fn render_outbound(message: &OutboundMessage) -> Result<Vec<u8>, MailError> 
 /// 使用已验证附件字节构建 MIME，不会重新从附件路径读取。
 pub fn render_outbound_with_attachment_bytes(
     message: &OutboundMessage,
-    attachment_bytes: &[Vec<u8>],
+    attachment_bytes: Vec<Vec<u8>>,
 ) -> Result<Vec<u8>, MailError> {
     Ok(build_outbound_email(message, Some(attachment_bytes))?.formatted())
 }
@@ -88,14 +102,34 @@ pub fn outbound_message_id(message: &OutboundMessage) -> String {
 
 fn build_outbound_email(
     message: &OutboundMessage,
-    attachment_bytes: Option<&[Vec<u8>]>,
+    attachment_bytes: Option<Vec<Vec<u8>>>,
 ) -> Result<Message, MailError> {
-    if let Some(bytes) = attachment_bytes {
+    if let Some(bytes) = attachment_bytes.as_ref() {
         if bytes.len() != message.attachments.len() {
             return Err(MailError::Smtp(
                 "附件验证结果与邮件附件数量不一致，已拒绝发送。".to_string(),
             ));
         }
+        if bytes
+            .iter()
+            .zip(&message.attachments)
+            .any(|(bytes, attachment)| {
+                attachment.size_bytes < 0 || bytes.len() as u64 != attachment.size_bytes as u64
+            })
+        {
+            return Err(MailError::SmtpPermanent(
+                "附件内容长度与验证记录不一致，已拒绝构建邮件。".to_string(),
+            ));
+        }
+    }
+    if message
+        .attachments
+        .iter()
+        .any(|attachment| attachment.filename.trim().is_empty())
+    {
+        return Err(MailError::SmtpPermanent(
+            "附件缺少文件名，已拒绝构建邮件。".to_string(),
+        ));
     }
     let mut builder = Message::builder()
         .from(mailbox(&message.sender_name, &message.sender_email)?)
@@ -164,11 +198,11 @@ pub(crate) fn authenticated_transport(
 fn build_email(
     builder: lettre::message::MessageBuilder,
     message: &OutboundMessage,
-    attachment_bytes: Option<&[Vec<u8>]>,
+    mut attachment_bytes: Option<Vec<Vec<u8>>>,
 ) -> Result<Message, MailError> {
     let html_present = !message.html_body.trim().is_empty();
     let html_uses_cid = html_present && message.html_body.to_ascii_lowercase().contains("cid:");
-    let body_part = build_body_part(message, html_uses_cid, attachment_bytes)?;
+    let body_part = build_body_part(message, html_uses_cid, &mut attachment_bytes)?;
     let regular_attachments = message
         .attachments
         .iter()
@@ -192,7 +226,7 @@ fn build_email(
     for (index, attachment) in regular_attachments {
         multipart = multipart.singlepart(attachment_part(
             attachment,
-            attachment_bytes_for(attachment, attachment_bytes, index)?,
+            attachment_bytes_for(attachment, &mut attachment_bytes, index)?,
         )?);
     }
     builder
@@ -207,7 +241,7 @@ fn is_inline_attachment(attachment: &Attachment, html_uses_cid: bool) -> bool {
 fn build_body_part(
     message: &OutboundMessage,
     html_uses_cid: bool,
-    attachment_bytes: Option<&[Vec<u8>]>,
+    attachment_bytes: &mut Option<Vec<Vec<u8>>>,
 ) -> Result<MultiPart, MailError> {
     let alternative = if message.html_body.trim().is_empty() {
         MultiPart::alternative().singlepart(SinglePart::plain(message.body.clone()))
@@ -259,11 +293,11 @@ fn attachment_part(attachment: &Attachment, bytes: Vec<u8>) -> Result<SinglePart
 
 fn attachment_bytes_for(
     attachment: &Attachment,
-    provided: Option<&[Vec<u8>]>,
+    provided: &mut Option<Vec<Vec<u8>>>,
     index: usize,
 ) -> Result<Vec<u8>, MailError> {
     match provided {
-        Some(bytes) => bytes.get(index).cloned().ok_or_else(|| {
+        Some(bytes) => bytes.get_mut(index).map(std::mem::take).ok_or_else(|| {
             MailError::Smtp("附件验证结果与邮件附件数量不一致，已拒绝发送。".to_string())
         }),
         None => read_attachment_bytes(attachment),
@@ -372,6 +406,111 @@ fn parse_smtp_endpoint(configured: &str) -> Result<(String, u16), MailError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Default)]
+    struct CapturingTransport(std::cell::RefCell<Vec<u8>>);
+
+    impl Transport for CapturingTransport {
+        type Ok = ();
+        type Error = lettre::transport::smtp::Error;
+
+        fn send(&self, _message: &Message) -> Result<(), Self::Error> {
+            panic!("不得再次调用会重新序列化整封邮件的 Transport::send");
+        }
+
+        fn send_raw(
+            &self,
+            _envelope: &lettre::address::Envelope,
+            raw: &[u8],
+        ) -> Result<(), Self::Error> {
+            self.0.replace(raw.to_vec());
+            Ok(())
+        }
+    }
+
+    fn binary_attachment_message(payload: &[u8]) -> OutboundMessage {
+        OutboundMessage {
+            id: 90,
+            account_id: 1,
+            sender_name: "Sender".into(),
+            sender_email: "sender@example.com".into(),
+            reply_to: String::new(),
+            recipients: "recipient@example.com".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "Binary MIME integrity".into(),
+            body: "Body".into(),
+            html_body: String::new(),
+            in_reply_to_header: String::new(),
+            references_header: String::new(),
+            attachments: vec![Attachment {
+                id: 1,
+                message_id: 90,
+                filename: "合同附件.bin".into(),
+                mime_type: "application/octet-stream".into(),
+                size_bytes: payload.len() as i64,
+                is_downloaded: true,
+                local_path: "/must-not-be-read".into(),
+                content_id: String::new(),
+                is_inline: false,
+            }],
+        }
+    }
+
+    #[test]
+    fn sends_and_archives_identical_mime_with_complete_binary_attachment() {
+        let payload = (0..(2 * 1024 * 1024 + 17))
+            .map(|index| (index % 256) as u8)
+            .collect::<Vec<_>>();
+        let message = binary_attachment_message(&payload);
+        let email = build_outbound_email(&message, Some(vec![payload.clone()])).unwrap();
+        let transport = CapturingTransport::default();
+        let archived = send_prepared_email(&transport, email).unwrap();
+        assert_eq!(
+            archived,
+            *transport.0.borrow(),
+            "发送与留档使用同一份原始 MIME"
+        );
+        let parsed = mail_parser::MessageParser::default()
+            .parse(&archived)
+            .unwrap();
+        let attachments = parsed.attachments().collect::<Vec<_>>();
+        assert_eq!(attachments.len(), 1);
+        assert_eq!(attachments[0].contents(), payload);
+    }
+
+    #[test]
+    fn refuses_missing_truncated_or_nameless_attachment_before_transport() {
+        let mut message = binary_attachment_message(b"complete");
+        assert!(build_outbound_email(&message, Some(Vec::new())).is_err());
+        assert!(build_outbound_email(&message, Some(vec![b"short".to_vec()])).is_err());
+        message.attachments[0].filename.clear();
+        assert!(build_outbound_email(&message, Some(vec![b"complete".to_vec()])).is_err());
+    }
+
+    #[test]
+    fn owned_attachment_bytes_preserve_regular_and_inline_parts_in_any_order() {
+        let mut message = binary_attachment_message(b"regular");
+        message.html_body = "<p>Body<img src=\"cid:inline-image\"></p>".into();
+        let mut inline = message.attachments[0].clone();
+        inline.id = 2;
+        inline.filename = "image.png".into();
+        inline.mime_type = "image/png".into();
+        inline.size_bytes = 6;
+        inline.is_inline = true;
+        inline.content_id = "inline-image".into();
+        message.attachments.push(inline);
+        let raw = render_outbound_with_attachment_bytes(
+            &message,
+            vec![b"regular".to_vec(), b"inline".to_vec()],
+        )
+        .unwrap();
+        let parsed = mail_parser::MessageParser::default().parse(&raw).unwrap();
+        let attachments = parsed.attachments().collect::<Vec<_>>();
+        assert_eq!(attachments.len(), 2);
+        assert!(attachments.iter().any(|part| part.contents() == b"regular"));
+        assert!(attachments.iter().any(|part| part.contents() == b"inline"));
+    }
 
     #[test]
     fn splits_recipient_lists() {
@@ -815,7 +954,7 @@ mod delivery_outcome_tests {
             references_header: String::new(),
             attachments: Vec::new(),
         };
-        let result = send_outbound_with_transport(&transport, &message, &[]);
+        let result = send_outbound_with_transport(&transport, &message, Vec::new());
         drop(transport);
         server.join().unwrap();
         result
@@ -844,5 +983,13 @@ mod delivery_outcome_tests {
             send_to_local_test_server(Some("550 rejected\r\n")),
             Err(MailError::SmtpPermanent(_))
         ));
+    }
+
+    #[test]
+    fn server_size_or_quota_rejection_explains_encoding_and_does_not_auto_retry() {
+        let error =
+            send_to_local_test_server(Some("552 message exceeds size limit\r\n")).unwrap_err();
+        assert!(matches!(error, MailError::SmtpPermanent(_)));
+        assert!(error.to_string().contains("附件编码后体积会增大"));
     }
 }

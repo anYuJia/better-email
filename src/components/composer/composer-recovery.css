@@ -1,3 +1,24 @@
+/* Local recovery status keeps a stable slot in the composer header. */
+.composer-autosave-status {
+  min-width: 0;
+  flex: 1;
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--ui-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.composer-autosave-status > svg {
+  flex: 0 0 auto;
+  color: var(--ui-success);
+}
+
 
 .composer-autosave-status[data-save-state="error"] {
   flex-wrap: wrap;

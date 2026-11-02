@@ -30,6 +30,11 @@ import type {
 } from '../app/types';
 import { IPC } from '../ipc/commands';
 
+export type MessageDetailLoadState =
+  | { status: 'idle' }
+  | { status: 'loading'; messageId: number }
+  | { status: 'error'; messageId: number; error: string };
+
 export type UseMailboxSelectionControllerOptions = {
   messages: MessageSummary[];
   threadMessages: MessageSummary[];
@@ -84,6 +89,8 @@ export default function useMailboxSelectionController({
   }, []);
   const [readerSelectionRevision, setReaderSelectionRevision] = useState(0);
   const [selectedDetail, setSelectedDetail] = useState<Message | null>(null);
+  const [detailLoadState, setDetailLoadState] = useState<MessageDetailLoadState>({ status: 'idle' });
+  const [detailRetryRevision, setDetailRetryRevision] = useState(0);
   const messageDetailCacheRef = useRef(new MessageDetailLRU(5));
   const selectedIdRef = useRef<number | null>(null);
   const selectedDetailRef = useRef<Message | null>(null);
@@ -130,6 +137,7 @@ export default function useMailboxSelectionController({
     const contextChanged = detailContextKeyRef.current !== mailboxContextKey;
     detailContextKeyRef.current = mailboxContextKey;
     if (!readerSelectedId) {
+      setDetailLoadState({ status: 'idle' });
       setSelectedDetail(null);
       return;
     }
@@ -140,42 +148,52 @@ export default function useMailboxSelectionController({
     } else {
       const cached = messageDetailCacheRef.current.get(readerSelectedId);
       if (cached) {
+        setDetailLoadState({ status: 'idle' });
         setSelectedDetail(cached);
         return;
       }
       // 无 cache 时立即清空旧详情，避免 reader 显示上一封邮件
       setSelectedDetail(null);
     }
+    setDetailLoadState({ status: 'loading', messageId: readerSelectedId });
     let cancelled = false;
     invoke<Message>(IPC.GetMessageDetail, { messageId: readerSelectedId })
       .then((detail) => {
         if (cancelled) return;
+        if (!detail || detail.id !== readerSelectedId) throw new Error('邮件详情不可用，请重试');
         messageDetailCacheRef.current.set(readerSelectedId, detail);
         setSelectedDetail(detail);
+        setDetailLoadState({ status: 'idle' });
       })
       .catch((error) => {
         if (cancelled) return;
         logError('Failed to load message detail:', error);
+        setDetailLoadState({
+          status: 'error', messageId: readerSelectedId,
+          error: error instanceof Error ? error.message : String(error),
+        });
       });
     return () => {
       cancelled = true;
     };
-  }, [readerSelectedId, mailboxContextKey]);
+  }, [readerSelectedId, mailboxContextKey, detailRetryRevision]);
 
-  // 冻结展示：切换到新邮件而详情尚未就绪时，reader 继续显示上一封已展示的
-  // 邮件，避免切换时闪烁空状态；新详情就绪后整体原子切换。与 useDeferredValue
-  // 或旧的严格空值方案不同，这里不会渲染任何过期或不一致的内容。
-  const displayedDetailRef = useRef<Message | null>(null);
+  const retrySelectedDetail = useCallback(() => {
+    if (selectedIdRef.current == null) return;
+    messageDetailCacheRef.current.delete(selectedIdRef.current);
+    setDetailLoadState({ status: 'loading', messageId: selectedIdRef.current });
+    setDetailRetryRevision((current) => current + 1);
+  }, []);
 
-  useEffect(() => {
-    if (selectedDetail?.id === selectedId) {
-      displayedDetailRef.current = selectedDetail;
-    }
-  }, [selectedDetail, selectedId]);
-
+  // Never expose another message's content while actions already target the new
+  // selection. The reader renders an explicit loading/error surface instead.
   const readerSelectedDetail = selectedDetail?.id === selectedId
-    ? selectedDetail
-    : (selectedId == null ? null : displayedDetailRef.current);
+    && detailContextKeyRef.current === mailboxContextKey ? selectedDetail : null;
+  const visibleDetailLoadState: MessageDetailLoadState = selectedId == null || readerSelectedDetail
+    ? { status: 'idle' }
+    : detailLoadState.status !== 'idle' && detailLoadState.messageId === selectedId
+      ? detailLoadState
+      : { status: 'loading', messageId: selectedId };
   const readerDisplayedId = readerSelectedDetail?.id ?? null;
   const selected = useMemo(
     () =>
@@ -237,6 +255,8 @@ export default function useMailboxSelectionController({
     setSelectedId,
     readerSelectedId,
     readerSelectedDetail,
+    detailLoadState: visibleDetailLoadState,
+    retrySelectedDetail,
     readerDisplayedId,
     readerSelectionRevision,
     selected,

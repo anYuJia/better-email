@@ -32,6 +32,39 @@ const message: Message = {
 };
 
 describe('useComposeFromMessage quick-reply handoff', () => {
+  it.each(['reply', 'replyAll'] as const)('uses the resolver for an implicit %s and lets an explicit empty body override it', async (mode) => {
+    const openComposer = vi.fn();
+    const resolveReplyPrefill = vi.fn(() => '已有快速回复');
+    const { result } = renderHook(() => useComposeFromMessage({
+      account: null, openComposer, resolveReplyPrefill, setStatus: vi.fn(),
+    }));
+    await act(async () => { await result.current.composeFromMessage(message, mode); });
+    expect(openComposer.mock.calls[0][0].body).toMatch(/^已有快速回复\n\n/);
+    expect(resolveReplyPrefill).toHaveBeenCalledWith(message);
+    resolveReplyPrefill.mockClear();
+    await act(async () => { await result.current.composeFromMessage(message, mode, ''); });
+    expect(openComposer.mock.calls[1][0].body).not.toContain('已有快速回复');
+    expect(resolveReplyPrefill).not.toHaveBeenCalled();
+    await act(async () => { await result.current.composeFromMessage(message, mode, '显式内容'); });
+    expect(openComposer.mock.calls[2][0].body).toMatch(/^显式内容\n\n/);
+    expect(resolveReplyPrefill).not.toHaveBeenCalled();
+  });
+
+  it('never resolves or includes reply text in a forward', async () => {
+    const openComposer = vi.fn();
+    const resolveReplyPrefill = vi.fn(() => '不应转发的快速回复');
+    const { result } = renderHook(() => useComposeFromMessage({
+      account: null, openComposer, resolveReplyPrefill, setStatus: vi.fn(),
+    }));
+    await act(async () => { await result.current.composeFromMessage(message, 'forward'); });
+    await act(async () => { await result.current.composeFromMessage(message, 'forward', '也不应带入'); });
+    expect(resolveReplyPrefill).not.toHaveBeenCalled();
+    for (const [draft] of openComposer.mock.calls) {
+      expect(draft.body).not.toContain('不应');
+      expect(draft.body).toContain('> Original body');
+    }
+  });
+
   it('places the existing quick reply before the quoted message and explains that the source remains', async () => {
     const openComposer = vi.fn();
     const setStatus = vi.fn();
@@ -49,6 +82,6 @@ describe('useComposeFromMessage quick-reply handoff', () => {
     expect(draft.body).toMatch(/^转到写信窗口\n\n/);
     expect(draft.body).toContain('> Original body');
     expect(openComposer.mock.calls[0]?.[1]).toEqual({ replaceExisting: true });
-    expect(setStatus).toHaveBeenLastCalledWith('已将快速回复带入写信窗口，原快速回复仍保留');
+    expect(setStatus).toHaveBeenLastCalledWith('已在写信窗口继续回复');
   });
 });

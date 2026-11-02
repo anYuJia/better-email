@@ -249,10 +249,10 @@
   white-space: nowrap;
   box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
-  transition: var(--ui-transition-fast-color-background-border-shadow);
+  transition: var(--ui-transition-control);
 }
 
-.dialog-button:active:not(:disabled) {
+.dialog-button:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 12%, transparent);
 }
 
@@ -267,7 +267,7 @@
   background: var(--ui-accent-hover);
 }
 
-.dialog-button-primary:active:not(:disabled) {
+.dialog-button-primary:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
   border-color: var(--ui-accent-pressed);
   background: var(--ui-accent-pressed);
 }
@@ -284,7 +284,7 @@
   background: var(--ui-surface-muted);
 }
 
-.dialog-button-secondary:active:not(:disabled) {
+.dialog-button-secondary:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
   background: var(--ui-control-hover);
 }
 
@@ -300,13 +300,28 @@
   background: var(--ui-danger-hover);
 }
 
-.dialog-button-danger:active:not(:disabled) {
+.dialog-button-danger:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
   border-color: var(--ui-danger-hover);
   background: var(--ui-danger-hover);
 }
 
-/* Composer close confirmation is a three-way decision. Keep save and discard
- * visually distinct while the neutral action remains secondary. */
+/* A destructive alternative stays legible without competing with the main
+ * action. Filled danger remains available for a destructive confirmation. */
+.dialog-button-danger-secondary {
+  color: var(--ui-danger);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface);
+}
+
+.dialog-button-danger-secondary:hover:not(:disabled),
+.dialog-button-danger-secondary:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
+  color: var(--ui-danger-hover);
+  border-color: var(--ui-danger);
+  background: var(--ui-danger-bg);
+}
+
+/* Composer close confirmation is a three-way decision with one primary save
+ * action, a neutral safe action, and a quieter destructive alternative. */
 .composer-close-dialog-backdrop {
   background: oklch(0.13 0.012 var(--primitive-hue-neutral) / 0.38);
 }

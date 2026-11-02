@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import type React from 'react';
-import { File, FileArchive, FileImage, FileSpreadsheet, FileText, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, File, FileArchive, FileImage, FileSpreadsheet, FileText, X } from 'lucide-react';
 import type { Contact, DraftInput, OutboundAttachmentInput } from '../../app/types';
 import { formatBytes } from '../../mailUtils';
-import { AttachmentIcon, attachmentIconAsset } from '../attachmentIcon';
 import { buildContactSearchEntries } from './contactSuggestions';
 import RecipientField from './RecipientField';
 import {
@@ -38,6 +37,9 @@ function insertTabInTextControl(target: HTMLInputElement | HTMLTextAreaElement) 
 }
 
 type ComposerPrimaryFieldsProps = {
+  mobile?: boolean;
+  active?: boolean;
+  flushPendingRef?: React.MutableRefObject<(() => void) | null>;
   draft: DraftInput;
   contacts: Contact[];
   richComposer: boolean;
@@ -92,21 +94,24 @@ function attachmentIconMeta(filename: string, mimeType: string) {
   const lowerMime = mimeType.toLowerCase();
   const extension = lowerName.split('.').pop()?.replace(/[^a-z0-9]/g, '').slice(0, 4) || 'file';
   if (lowerMime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|heic)$/i.test(lowerName)) {
-    return { icon: <FileImage size={25} />, label: extension, tone: 'image' };
+    return { icon: <FileImage size={20} />, label: extension, tone: 'image' };
   }
   if (/\.(xlsx?|csv|numbers)$/i.test(lowerName)) {
-    return { icon: <FileSpreadsheet size={25} />, label: extension, tone: 'sheet' };
+    return { icon: <FileSpreadsheet size={20} />, label: extension, tone: 'sheet' };
   }
   if (/\.(zip|rar|7z|tar|gz)$/i.test(lowerName)) {
-    return { icon: <FileArchive size={25} />, label: extension, tone: 'archive' };
+    return { icon: <FileArchive size={20} />, label: extension, tone: 'archive' };
   }
   if (lowerMime.startsWith('text/') || /\.(pdf|txt|md|docx?|pages)$/i.test(lowerName)) {
-    return { icon: <FileText size={25} />, label: extension, tone: lowerName.endsWith('.pdf') ? 'pdf' : 'text' };
+    return { icon: <FileText size={20} />, label: extension, tone: lowerName.endsWith('.pdf') ? 'pdf' : 'text' };
   }
-  return { icon: <File size={25} />, label: extension, tone: 'file' };
+  return { icon: <File size={20} />, label: extension, tone: 'file' };
 }
 
 export default function ComposerPrimaryFields({
+  mobile = false,
+  active = true,
+  flushPendingRef,
   draft,
   contacts,
   richComposer,
@@ -129,12 +134,21 @@ export default function ComposerPrimaryFields({
   onInlineImagesAdded,
 }: ComposerPrimaryFieldsProps) {
   const richBodyRef = useRef<HTMLDivElement>(null);
+  const attachmentsRef = useRef<HTMLElement>(null);
+  const removalFocusRef = useRef<{ index: number; composer: Element | null; trigger: HTMLElement } | null>(null);
+  const renderedHtmlRef = useRef<string | null>(null);
   const hydratedInlineSrcRef = useRef<Map<string, string>>(new Map());
   const contactSearchEntries = useMemo(
     () => buildContactSearchEntries(contacts),
     [contacts],
   );
   const richBodySyncFrameRef = useRef<number | null>(null);
+  const richBodySyncGenerationRef = useRef(0);
+  const cancelPendingRichBodySync = useCallback(() => {
+    richBodySyncGenerationRef.current += 1;
+    if (richBodySyncFrameRef.current !== null) cancelAnimationFrame(richBodySyncFrameRef.current);
+    richBodySyncFrameRef.current = null;
+  }, []);
   const syncedBodyRef = useRef({
     body: '',
     html: '',
@@ -147,6 +161,16 @@ export default function ComposerPrimaryFields({
     () => draft.attachments.filter((attachment) => !attachment.is_inline),
     [draft.attachments],
   );
+  useLayoutEffect(() => {
+    const pending = removalFocusRef.current;
+    if (!pending) return;
+    removalFocusRef.current = null;
+    if (pending.trigger.isConnected || (document.activeElement !== document.body && document.activeElement !== pending.trigger)) return;
+    const actions = attachmentsRef.current?.querySelectorAll<HTMLButtonElement>('button');
+    const target = actions?.[Math.min(pending.index, actions.length - 1)]
+      ?? pending.composer?.querySelector<HTMLButtonElement>('[aria-label="添加附件"]');
+    target?.focus({ preventScroll: true });
+  }, [regularAttachments]);
   const blockedRecipientEmails = useMemo(() => ({
     to: [...canonicalRecipientEmails(draft.cc, draft.bcc)],
     cc: [...canonicalRecipientEmails(draft.to, draft.bcc)],
@@ -154,20 +178,28 @@ export default function ComposerPrimaryFields({
   }), [draft.bcc, draft.cc, draft.to]);
 
   useEffect(() => {
-    if (!richComposer) return;
+    if (!richComposer) {
+      renderedHtmlRef.current = null;
+      return;
+    }
+    if (!active) return;
     const editor = richBodyRef.current;
     if (!editor) return;
     if (document.activeElement === editor) return;
     const nextHtml = draft.html_body || plainTextToRichHtml(editableBody);
+    // A hidden/restored editor already owns this source, including hydrated CID
+    // images. Rewriting it would reset selection and the native undo history.
+    if (renderedHtmlRef.current === nextHtml) return;
     if (editor.innerHTML !== nextHtml) {
       editor.innerHTML = nextHtml;
     }
     autoLinkEditorText(editor, { force: true });
     syncRichTextEmptyState(editor);
-  }, [draft.html_body, editableBody, richComposer]);
+    renderedHtmlRef.current = nextHtml;
+  }, [active, draft.html_body, editableBody, richComposer]);
 
   useEffect(() => {
-    if (!richComposer) return;
+    if (!richComposer || !active) return;
     const editor = richBodyRef.current;
     if (!editor) return;
     const images = editor.querySelectorAll('img[src^="cid:"]');
@@ -193,28 +225,29 @@ export default function ComposerPrimaryFields({
     return () => {
       cancelled = true;
     };
-  }, [richComposer, draft.html_body, draft.attachments]);
+  }, [active, richComposer, draft.html_body, draft.attachments]);
 
   const syncRichBodyFromEditor = useCallback((nextTextContent?: string, nextHtml?: string) => {
     const editor = richBodyRef.current;
     if (!editor) return;
     const hydrated = hydratedInlineSrcRef.current;
-    const hydratedImages: Array<{ img: HTMLImageElement; cid: string }> = [];
+    let html = nextHtml ?? editor.innerHTML;
     if (hydrated.size > 0) {
-      editor.querySelectorAll<HTMLImageElement>('img[src]').forEach((img) => {
-        const src = img.getAttribute('src') ?? '';
-        for (const [cid, assetUrl] of hydrated) {
-          if (src === assetUrl) {
-            hydratedImages.push({ img, cid });
-            img.setAttribute('src', `cid:${cid}`);
-            break;
-          }
-        }
-      });
+      const sourceToCid = new Map(Array.from(hydrated, ([cid, source]) => [source, cid]));
+      if (Array.from(editor.querySelectorAll('img[src]')).some((image) => sourceToCid.has(image.getAttribute('src') ?? ''))) {
+        // Persist CID references without touching live images. Even a temporary
+        // src rewrite can reload previews and disturb the browser's undo stack.
+        const copy = editor.cloneNode(true) as HTMLElement;
+        copy.querySelectorAll('img[src]').forEach((image) => {
+          const cid = sourceToCid.get(image.getAttribute('src') ?? '');
+          if (cid) image.setAttribute('src', `cid:${cid}`);
+        });
+        html = copy.innerHTML;
+      }
     }
-    const html = nextHtml ?? editor.innerHTML;
     const empty = syncRichTextEmptyState(editor);
     const persistedHtml = empty ? '' : html;
+    renderedHtmlRef.current = persistedHtml;
     const normalizedText = (nextTextContent ?? editor.textContent ?? '').replace(/[\u200b\ufeff]/g, '');
     const nextBody = joinEditableBody(normalizedText, originalQuote);
     if (
@@ -227,10 +260,6 @@ export default function ComposerPrimaryFields({
       body: nextBody,
       html: persistedHtml,
     };
-    for (const { img, cid } of hydratedImages) {
-      const assetUrl = hydrated.get(cid);
-      if (assetUrl) img.setAttribute('src', assetUrl);
-    }
     onPatchDraft({
       html_body: persistedHtml,
       body: nextBody,
@@ -238,14 +267,37 @@ export default function ComposerPrimaryFields({
   }, [onPatchDraft, originalQuote]);
 
   const scheduleSyncRichBodyFromEditor = useCallback((nextTextContent?: string, nextHtml?: string) => {
-    if (richBodySyncFrameRef.current !== null) {
-      cancelAnimationFrame(richBodySyncFrameRef.current);
-    }
+    if (!active) return;
+    cancelPendingRichBodySync();
+    const generation = richBodySyncGenerationRef.current;
     richBodySyncFrameRef.current = requestAnimationFrame(() => {
+      if (generation !== richBodySyncGenerationRef.current) return;
       richBodySyncFrameRef.current = null;
       syncRichBodyFromEditor(nextTextContent, nextHtml);
     });
-  }, [syncRichBodyFromEditor]);
+  }, [active, cancelPendingRichBodySync, syncRichBodyFromEditor]);
+
+  const flushRichBody = useCallback(() => {
+    cancelPendingRichBodySync();
+    if (!active || !richComposer) return;
+    const editor = richBodyRef.current;
+    if (!editor) return;
+    cleanupEditorTypingFormatMarkers(editor);
+    if (editor.dataset.skipAutoLink !== 'true') autoLinkEditorText(editor, { force: true });
+    syncRichBodyFromEditor(editor.textContent ?? '', editor.innerHTML);
+  }, [active, richComposer, cancelPendingRichBodySync, syncRichBodyFromEditor]);
+
+  useLayoutEffect(() => {
+    if (!flushPendingRef) return;
+    flushPendingRef.current = flushRichBody;
+    return () => { if (flushPendingRef.current === flushRichBody) flushPendingRef.current = null; };
+  }, [flushPendingRef, flushRichBody]);
+
+  // A supplied replacement draft or a deactivated editor invalidates any old
+  // frame. Normal keystrokes remain batched until a frame or an action boundary.
+  useLayoutEffect(() => cancelPendingRichBodySync, [
+    active, draft.account_id, draft.draft_id, draft.body, draft.html_body, richComposer, cancelPendingRichBodySync,
+  ]);
 
   function insertHtmlAtCaret(html: string) {
     const editor = richBodyRef.current;
@@ -275,11 +327,24 @@ export default function ComposerPrimaryFields({
     if (!files || files.length === 0) return;
     const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
     const otherFiles = Array.from(files).filter((file) => !file.type.startsWith('image/'));
+    // Register both kinds in the current composer session before awaiting any
+    // image import. Otherwise a late completion can start files in a new draft.
+    if (otherFiles.length > 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      const syntheticEvent = {
+        clipboardData: { files: otherFiles as unknown as FileList },
+        preventDefault: () => {},
+        stopPropagation: () => {},
+      } as unknown as React.ClipboardEvent<HTMLTextAreaElement>;
+      onAttachmentPaste(syntheticEvent);
+    }
     if (imageFiles.length > 0) {
       event.preventDefault();
       event.stopPropagation();
       try {
         const attachments = await buildInlineImageAttachments(imageFiles);
+        if (attachments.length === 0) return;
         insertHtmlAtCaret(
           attachments
             .map((attachment) => (
@@ -291,18 +356,6 @@ export default function ComposerPrimaryFields({
       } catch (error) {
         logError(error);
       }
-    }
-    if (otherFiles.length > 0) {
-      event.preventDefault();
-      event.stopPropagation();
-      const syntheticEvent = {
-        clipboardData: {
-          files: otherFiles as unknown as FileList,
-        },
-        preventDefault: () => {},
-        stopPropagation: () => {},
-      } as unknown as React.ClipboardEvent<HTMLTextAreaElement>;
-      onAttachmentPaste(syntheticEvent);
     }
   }
 
@@ -347,20 +400,7 @@ export default function ComposerPrimaryFields({
     scheduleSyncRichBodyFromEditor(editor.textContent ?? '', editor.innerHTML);
   }
 
-  function handleRichBodyBlur(event: React.FocusEvent<HTMLDivElement>) {
-    const editor = event.currentTarget;
-    cleanupEditorTypingFormatMarkers(editor);
-    if (editor.dataset.skipAutoLink !== 'true') {
-      autoLinkEditorText(editor, { force: true });
-    }
-    syncRichBodyFromEditor(editor.textContent ?? '', editor.innerHTML);
-  }
-
-  useEffect(() => () => {
-    if (richBodySyncFrameRef.current !== null) {
-      cancelAnimationFrame(richBodySyncFrameRef.current);
-    }
-  }, []);
+  useEffect(() => cancelPendingRichBodySync, [cancelPendingRichBodySync]);
 
   return (
     <div className="composer-primary-fields">
@@ -373,7 +413,22 @@ export default function ComposerPrimaryFields({
         onChange={(value) => onPatchDraft({ to: value })}
         onFocus={() => onRecipientFieldFocus?.('to')}
         actions={(
-          <>
+          mobile ? <button
+            type="button"
+            className="composer-recipient-details-toggle"
+            aria-label={ccOpen || bccOpen ? '收起抄送和密送' : '展开抄送和密送'}
+            title="抄送和密送"
+            aria-expanded={ccOpen || bccOpen}
+            onClick={() => {
+              const nextOpen = !(ccOpen || bccOpen);
+              if (ccOpen !== nextOpen) onToggleCc?.();
+              if (bccOpen !== nextOpen) onToggleBcc?.();
+            }}
+          >
+            {ccOpen || bccOpen
+              ? <ChevronUp size={20} strokeWidth={1.75} aria-hidden="true" />
+              : <ChevronDown size={20} strokeWidth={1.75} aria-hidden="true" />}
+          </button> : <>
             <button
               type="button"
               className={ccOpen ? 'is-active' : ''}
@@ -470,7 +525,7 @@ export default function ComposerPrimaryFields({
             onKeyDownCapture={handleRichBodyKeyDown}
             onInput={handleRichBodyInput}
             onCompositionEnd={handleRichBodyCompositionEnd}
-            onBlur={handleRichBodyBlur}
+            onBlur={flushRichBody}
             onPaste={handleRichBodyPaste}
             onDrop={onAttachmentDrop}
             onDragEnter={onAttachmentDragEnter}
@@ -514,32 +569,26 @@ export default function ComposerPrimaryFields({
           />
         )}
         {regularAttachments.length > 0 && (
-          <section className="composer-body-attachments composer-attachment-list" aria-label="附件">
-            {regularAttachments.map((attachment) => {
+          <section ref={attachmentsRef} className="composer-body-attachments composer-attachment-list" aria-label="附件">
+            {regularAttachments.map((attachment, visibleIndex) => {
               const iconMeta = attachmentIconMeta(attachment.filename, attachment.mime_type);
-              const customIcon = attachmentIconAsset(attachment.filename, attachment.mime_type);
               const attachmentIndex = draft.attachments.indexOf(attachment);
               return (
                 <article className={`composer-attachment-tile attachment-${iconMeta.tone}`} key={`${attachment.filename}-${attachmentIndex}`}>
-                  <span className={`composer-attachment-filemark${customIcon ? ' composer-attachment-filemark-has-asset' : ''}`} aria-hidden="true">
-                    {customIcon ? (
-                      <AttachmentIcon filename={attachment.filename} mimeType={attachment.mime_type} />
-                    ) : (
-                      <>
-                        <span className="composer-attachment-filemark-fold" />
-                        <span className="composer-attachment-filemark-icon">
-                          {iconMeta.icon}
-                        </span>
-                        <span className="composer-attachment-filemark-label">{iconMeta.label}</span>
-                      </>
-                    )}
+                  <span className="composer-attachment-filemark" aria-hidden="true">
+                    {iconMeta.icon}
                   </span>
                   <span className="composer-attachment-tile-copy">
                     <strong title={attachment.filename}>{attachment.filename}</strong>
-                    <small>{formatBytes(attachment.size_bytes)}</small>
+                    <small>{formatBytes(attachment.size_bytes)} · {iconMeta.label.toUpperCase()}</small>
                   </span>
-                  <button type="button" aria-label={`移除 ${attachment.filename}`} onClick={() => onRemoveAttachment(attachmentIndex)}>
-                    <X size={14} />
+                  <button type="button" aria-label={`移除 ${attachment.filename}`} title={`移除 ${attachment.filename}`} onClick={(event) => {
+                    if (document.activeElement === event.currentTarget) removalFocusRef.current = {
+                      index: visibleIndex, composer: event.currentTarget.closest('.composer'), trigger: event.currentTarget,
+                    };
+                    onRemoveAttachment(attachmentIndex);
+                  }}>
+                    <X size={16} aria-hidden="true" />
                   </button>
                 </article>
               );

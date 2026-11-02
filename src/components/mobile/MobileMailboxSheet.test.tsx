@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import type { Account, Folder } from '../../app/types';
 import MobileMailboxSheet from './MobileMailboxSheet';
@@ -61,6 +61,8 @@ describe('MobileMailboxSheet', () => {
       'mobile-mailbox-title',
     );
     expect(document.querySelectorAll('.mobile-mailbox-list')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: /所有账号/ }).getAttribute('aria-current')).toBe('true');
+    expect(screen.getByRole('button', { name: /收件箱/ }).getAttribute('aria-current')).toBe('page');
   });
 
   it('changes account scope without changing the default sender account', () => {
@@ -84,5 +86,30 @@ describe('MobileMailboxSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onCompose).toHaveBeenCalledTimes(1);
     expect(onClose.mock.invocationCallOrder[0]).toBeLessThan(onCompose.mock.invocationCallOrder[0]);
+  });
+
+  it('moves and traps focus in the drawer, handles Escape, and restores the trigger', () => {
+    const trigger = document.createElement('button');
+    document.body.append(trigger);
+    trigger.focus();
+    const onClose = vi.fn();
+    const view = renderSheet({ onClose });
+    const dialog = screen.getByRole('dialog', { name: '邮箱' });
+    const close = screen.getByRole('button', { name: '关闭邮箱导航' });
+    expect(document.activeElement).toBe(close);
+    expect(trigger.hasAttribute('inert')).toBe(true);
+    const buttons = within(dialog).getAllByRole('button');
+    const last = buttons[buttons.length - 1];
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(document.activeElement).toBe(close);
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledOnce();
+    view.unmount();
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.hasAttribute('inert')).toBe(false);
+    trigger.remove();
   });
 });

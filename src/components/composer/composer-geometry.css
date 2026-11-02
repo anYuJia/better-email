@@ -1,0 +1,37 @@
+/* Floating window movement and resize affordance. Native and mobile windows
+ * retain their platform layout and never receive these controls. */
+.composer-backdrop.is-floating > .composer {
+  position: relative;
+}
+
+.composer-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text-tertiary);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.composer-resize-handle::after {
+  content: '';
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 6px;
+  height: 6px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+}
+
+.composer-resize-handle:hover,
+.composer-resize-handle:focus-visible { color: var(--ui-accent); }
+
+.composer[data-geometry-active] { user-select: none; }
+.composer .composer-editor-header { touch-action: none; }
+

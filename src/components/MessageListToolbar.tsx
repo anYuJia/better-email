@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu } from 'lucide-react';
+import { ArrowDownWideNarrow, Menu, SlidersHorizontal } from 'lucide-react';
 import { filters, listSortOptions } from '../app/appConfig';
 import type {
   FilterMode,
@@ -33,6 +33,7 @@ type MessageListToolbarProps = {
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
   onOpenNavigation?: () => void;
+  selectionControls?: React.ReactNode;
 };
 
 function sortTriggerLabel(sort: ListSort): string {
@@ -63,6 +64,7 @@ function MessageListToolbar({
   onMoveBulkToFolder,
   onToggleBulkLabel,
   onOpenNavigation,
+  selectionControls,
 }: MessageListToolbarProps) {
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
   const isSelectionMode = listMode === 'messages' && selectedMessageIds.length > 0;
@@ -71,16 +73,10 @@ function MessageListToolbar({
     <header
       className="list-control-strip"
       aria-label="邮件列表控制"
-      data-toolbar-height="52"
+      data-toolbar-height="84"
       data-toolbar-mode={isSelectionMode ? 'selection' : 'normal'}
     >
       <div className="list-summary-row">
-        <div className="list-summary">
-          <strong>{currentViewLabel}</strong>
-          <span>{listMode === 'messages' ? visibleListSummary : messageListSummary}</span>
-        </div>
-      </div>
-      <div className={`list-control-row${isSelectionMode ? ' is-selection-mode' : ''}`}>
         {onOpenNavigation && (
           <button
             type="button"
@@ -89,9 +85,17 @@ function MessageListToolbar({
             aria-label="打开邮箱和文件夹导航"
             onClick={onOpenNavigation}
           >
-            <Menu size={18} aria-hidden="true" />
+            <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         )}
+        <div className="list-summary">
+          <strong title={currentViewLabel}>{currentViewLabel}</strong>
+          {filter !== 'all' && <span className="list-active-filter">{activeFilterLabel}</span>}
+          <span>{listMode === 'messages' ? visibleListSummary : messageListSummary}</span>
+        </div>
+      </div>
+      <div className={`list-control-row${isSelectionMode ? ' is-selection-mode' : ''}`}>
+        {listMode === 'messages' && selectionControls}
         {isSelectionMode ? (
           <MessageBulkToolbar
             inline
@@ -132,7 +136,8 @@ function MessageListToolbar({
             </div>
             <div className="list-control-menus" role="group" aria-label="邮件筛选和排序">
               <CompactDropdown
-                className="filter-menu"
+                className={`filter-menu${filter !== 'all' ? ' is-filtered' : ''}`}
+                triggerIcon={<SlidersHorizontal size={16} strokeWidth={1.75} />}
                 label="筛选"
                 currentLabel={activeFilterLabel}
                 ariaLabel={`筛选邮件，当前：${activeFilterLabel}`}
@@ -142,6 +147,7 @@ function MessageListToolbar({
               />
               <CompactDropdown
                 className="sort-menu"
+                triggerIcon={<ArrowDownWideNarrow size={16} strokeWidth={1.75} />}
                 label="排序"
                 currentLabel={sortTriggerLabel(listSort)}
                 ariaLabel={`邮件排序，当前：${sortTriggerLabel(listSort)}`}

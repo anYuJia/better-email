@@ -21,6 +21,7 @@
     "core:window:allow-set-position",
     "dialog:default",
     "notification:default",
+    "process:default",
     "updater:default"
   ]
 }

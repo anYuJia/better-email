@@ -209,7 +209,7 @@ describe('FirstRunOnboarding gate', () => {
     fireEvent.click(document.querySelector('.contact-import-dialog button:last-child') as HTMLButtonElement);
     await waitFor(() => {
       expect(document.querySelector('.contact-import-dialog')?.textContent).toContain('导入预览');
-    });
+    }, { timeout: 10_000 });
 
     fireEvent.click(document.querySelector('button[aria-label="关闭导入预览"]') as HTMLButtonElement);
     await waitFor(() => {

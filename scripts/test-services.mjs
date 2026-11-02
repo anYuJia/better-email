@@ -13,16 +13,27 @@ const checks = [
       'vitest',
       'run',
       'src/app/aiService.test.ts',
+      'src/app/aiServiceConfig.test.ts',
+      'src/app/translation.test.ts',
+      'src/hooks/useAiService.test.ts',
+      'src/hooks/useMessageTranslation.test.ts',
       'src/components/settings/AiServiceSettings.test.tsx',
       'src/mockTauri/aiHandlers.test.ts',
       'src/mockTauri/miscHandlers.test.ts',
       'src/ipc/ipcContract.test.ts',
+      'src/ipc/rustIpcContract.test.ts',
+      'src/tauriBridge.contract.test.ts',
     ],
   },
   {
     label: 'Rust MCP/AI HTTP 协议与安全边界',
     command: 'cargo',
     args: ['test', '--manifest-path', 'src-tauri/Cargo.toml', 'ai::tests'],
+  },
+  {
+    label: 'Rust AI 设置、密钥绑定与请求授权边界',
+    command: 'cargo',
+    args: ['test', '--manifest-path', 'src-tauri/Cargo.toml', 'commands::ai::tests'],
   },
 ];
 

@@ -10,7 +10,7 @@ describe('ContactSyncLoadingDialog', () => {
 
     expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true');
     expect(screen.getByText('正在同步最近联系人')).not.toBeNull();
-    expect(screen.getByText('正在从已发送邮件中扫描同步最近联系人，加入最近联系人列表')).not.toBeNull();
+    expect(screen.getByText('正在从所有邮件中扫描联系人，保存姓名、邮箱和别名')).not.toBeNull();
   });
 
   it('does not render while scanning is inactive', () => {

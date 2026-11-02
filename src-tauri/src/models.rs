@@ -541,6 +541,8 @@ pub struct RemoteMessageHeader {
     pub sender_name: String,
     pub sender_email: String,
     pub recipients: String,
+    pub cc: String,
+    pub bcc: String,
     pub snippet: String,
     pub received_at: String,
     pub is_read: bool,
@@ -670,6 +672,7 @@ pub struct SyncRun {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SyncSchedulePlan {
+    pub credential_issues: Vec<CredentialStatus>,
     pub max_accounts_per_batch: i64,
     pub total_accounts: i64,
     pub batch_accounts: Vec<Account>,

@@ -3,6 +3,7 @@ import type { MockCommandHandler } from './types';
 import { logLine } from '../app/logger';
 
 const mockAiSettingsState = {
+  configured: false,
   enabled: false,
   service_type: 'http',
   endpoint: '',
@@ -77,13 +78,12 @@ export const handlers: Record<string, MockCommandHandler> = {
   'save_ai_settings': (args) => {
     const input = args?.input as Record<string, unknown> | undefined;
     if (!input) throw new Error('缺少 AI 设置输入。');
-    const service_type = String(input.service_type ?? 'http').trim();
+    const service_type = String(input.service_type ?? 'http').trim() === 'mcp' ? 'mcp' : 'http';
     const endpoint = String(input.endpoint ?? '').trim();
     const mcp_endpoint = String(input.mcp_endpoint ?? '').trim();
     const endpointChanged = normalizedEndpoint(endpoint)
       !== normalizedEndpoint(mockAiSettingsState.endpoint);
-    const mcpEndpointChanged = normalizedEndpoint(mcp_endpoint)
-      !== normalizedEndpoint(mockAiSettingsState.mcp_endpoint);
+    const mcpEndpointChanged = mcp_endpoint !== mockAiSettingsState.mcp_endpoint.trim();
     const api_key = resolveMockBoundSecretKey(
       String(input.api_key ?? ''),
       input.clear_api_key === true,
@@ -97,6 +97,7 @@ export const handlers: Record<string, MockCommandHandler> = {
       mcpEndpointChanged,
     );
     Object.assign(mockAiSettingsState, {
+      configured: true,
       enabled: Boolean(input.enabled),
       service_type,
       endpoint,

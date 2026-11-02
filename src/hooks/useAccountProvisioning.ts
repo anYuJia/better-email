@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react';
 import { emptyAccountCreateForm } from '../app/appConfig';
 import {
   formatInvokeError,
@@ -89,131 +89,64 @@ export default function useAccountProvisioning({
   loadMeta,
   loadMessages,
 }: AccountProvisioningOptions) {
-  const createNewAccount = useCallback(async (secret?: string, onProgress?: (stage: string) => void) => {
-    if (!newAccountForm.email.trim()) {
-      setStatus('请先填写新账号邮箱地址');
-      accountFlowWarn('create skipped: missing email');
-      return;
-    }
+  const creatingRef = useRef<Promise<Account | void> | null>(null);
+  const createNewAccount = useCallback((secret?: string, onProgress?: (stage: string) => void) => {
+    if (creatingRef.current) return creatingRef.current;
     const trimmedSecret = secret?.trim() ?? '';
-    accountFlowLog('create start', {
-      email: maskEmailForLog(newAccountForm.email),
-      provider: newAccountForm.provider,
-      incomingProtocol: newAccountForm.incoming_protocol,
-      hasSecret: Boolean(trimmedSecret),
-    });
-    try {
-      onProgress?.('正在创建本地邮箱账号...');
-      const created = await invoke<Account>(IPC.CreateAccount, { input: newAccountForm });
-      accountFlowLog('create account stored', {
-        accountId: created.id,
-        email: maskEmailForLog(created.email),
-        isDefault: created.is_default,
-      });
-      let verification: CredentialVerificationReport | null = null;
-      if (trimmedSecret) {
-        onProgress?.('正在保存本机本地凭据...');
-        const credentialResult = await invoke<CredentialStatus>(IPC.StoreAccountSecret, {
-          input: { account_email: created.email, secret: trimmedSecret },
-        });
-        setCredentialStatus(credentialResult);
-        setCredentialVerification(null);
-        accountFlowLog('credential stored', {
-          email: maskEmailForLog(created.email),
-          exists: credentialResult.exists,
-          message: credentialResult.message,
-        });
-        if (!credentialResult.exists) {
-          accountFlowWarn('credential store failed: rolling back account', {
-            accountId: created.id,
-            email: maskEmailForLog(created.email),
-            message: credentialResult.message,
-          });
-          try {
-            await invoke<Account | null>(IPC.DeleteAccount, { accountId: created.id });
-          } catch (rollbackError) {
-            accountFlowWarn('credential rollback failed', {
-              accountId: created.id,
-              email: maskEmailForLog(created.email),
-              error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-            });
-          }
-          throw new Error(credentialResult.message);
-        }
-        onProgress?.('正在连接服务器验证登录凭据...');
-        verification = await invoke<CredentialVerificationReport>(IPC.VerifyAccountCredentialsWithSecret, {
-          input: {
-            account_id: created.id,
-            secret: trimmedSecret,
-          },
-        });
-        setCredentialVerification(verification);
-        accountFlowLog('credential verified after create', {
-          email: maskEmailForLog(created.email),
-          status: verification.status,
-          authenticated: verification.authenticated,
-        });
-        if (!verification.authenticated) {
-          accountFlowWarn('credential verification failed: rolling back account', {
-            accountId: created.id,
-            email: maskEmailForLog(created.email),
-            status: verification.status,
-            message: verification.message,
-          });
-          try {
-            await invoke<Account | null>(IPC.DeleteAccount, { accountId: created.id });
-          } catch (rollbackError) {
-            accountFlowWarn('verification rollback failed', {
-              accountId: created.id,
-              email: maskEmailForLog(created.email),
-              error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-            });
-          }
-          throw new Error(verification.message || '账号登录验证失败，请检查授权码和服务器配置。');
-        }
-      }
-      setAccounts((current) => [...current, created]);
-      setAccountScope(created.id);
-      setAccount(created);
-      setAccountForm(created);
-      setNewAccountForm(emptyAccountCreateForm);
-      setFolderId(null);
-      setMessages([]);
-      setSelectedId(null);
-      setAttachments([]);
-      // 凭据验证已通过：登录遮罩立即结束。
-      // 文件夹发现 / 邮件头同步 / 正文预取 / 元数据与列表刷新全部转入
-      // 绑定该 account_id 的后台任务渐进执行，不再阻塞首次进入应用。
-      accountFlowLog('credential verified, initial sync delegated to background task', {
-        accountId: created.id,
-        email: maskEmailForLog(created.email),
-        protocol: created.incoming_protocol,
-      });
-      onAccountCreated?.(created);
-      onProgress?.('登录验证通过，正在进入应用...');
-      return created;
-    } catch (error) {
-      accountFlowWarn('create failed', {
-        email: maskEmailForLog(newAccountForm.email),
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
+    if (!newAccountForm.email.trim() || !trimmedSecret) {
+      return Promise.reject(new Error('请填写邮箱地址和登录凭据后再登录。'));
     }
+    const run = async () => {
+      let created: Account | null = null;
+      let verified = false;
+      try {
+        onProgress?.('正在加密保存账号与凭据，并检查本机读回结果...');
+        created = await invoke<Account>(IPC.CreateAccount, { input: newAccountForm, secret: trimmedSecret });
+        onProgress?.('正在使用已保存的凭据验证服务器登录...');
+        const verification = await invoke<CredentialVerificationReport>(IPC.VerifyAccountCredentials, {
+          accountId: created.id,
+        });
+        if (!verification.authenticated || verification.account_email !== created.email) {
+          throw new Error(verification.message || '已保存的账号凭据未通过登录验证。');
+        }
+        verified = true;
+        setCredentialVerification(verification);
+        setCredentialStatus({ account_email: created.email, exists: true, status: 'exists', message: '本机凭据已保存，服务器登录验证通过。' });
+        setAccounts((current) => [...current.filter((account) => account.id !== created!.id), created!]);
+        setAccountScope(created.id);
+        setAccount(created);
+        setAccountForm(created);
+        setNewAccountForm(emptyAccountCreateForm);
+        setFolderId(null);
+        setMessages([]);
+        setSelectedId(null);
+        setAttachments([]);
+        try {
+          onAccountCreated?.(created);
+          onProgress?.('登录验证通过，正在进入应用...');
+        } catch {
+          setStatus('登录验证已通过，初始界面刷新未完成，请刷新邮箱；无需重新创建账号。');
+        }
+        return created;
+      } catch (error) {
+        if (created && !verified) {
+          try {
+            await invoke<Account | null>(IPC.DeleteAccount, { accountId: created.id });
+          } catch {
+            throw new Error(`${formatInvokeError(error)}；本次账号回滚未完成。账号仍保留，请在“登录与安全”修复，不要重复创建。`);
+          }
+        }
+        accountFlowWarn('create failed', { email: maskEmailForLog(newAccountForm.email), stage: created ? 'verify_saved' : 'atomic_save' });
+        throw error;
+      }
+    };
+    const pending = run().finally(() => { creatingRef.current = null; });
+    creatingRef.current = pending;
+    return pending;
   }, [
-    newAccountForm,
-    onAccountCreated,
-    setAccount,
-    setAccountForm,
-    setAccountScope,
-    setAccounts,
-    setAttachments,
-    setCredentialStatus,
-    setCredentialVerification,
-    setFolderId,
-    setMessages,
-    setNewAccountForm,
-    setSelectedId,
-    setStatus,
+    newAccountForm, onAccountCreated, setAccount, setAccountForm, setAccountScope, setAccounts,
+    setAttachments, setCredentialStatus, setCredentialVerification, setFolderId, setMessages,
+    setNewAccountForm, setSelectedId, setStatus,
   ]);
 
   const removeCurrentAccount = useCallback(async (deleteSecret: boolean) => {

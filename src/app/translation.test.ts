@@ -4,6 +4,8 @@ import {
   countChineseChars,
   extractPlainText,
   languageLabel,
+  prepareTranslationSource,
+  sanitizeTranslatedHtml,
   stripMessageNoise,
 } from './translation';
 
@@ -99,5 +101,68 @@ describe('translation language detection', () => {
     const cleaned = stripMessageNoise('Hello\n\nBest regards,\nJohn\n--\nSent from Better Email');
     expect(cleaned).toContain('Hello');
     expect(cleaned).not.toContain('Sent from');
+  });
+
+  it('protects HTML structure, links, images and proper nouns during translation', () => {
+    const source = prepareTranslationSource(
+      '',
+      '<p>Welcome to TRAE</p><a href="https://example.com/docs">OpenAI</a><img src="cid:logo@example.com">',
+    );
+
+    expect(source.format).toBe('html');
+    expect(source.content).not.toContain('<p>');
+    expect(source.content).not.toContain('https://example.com/docs');
+    expect(source.content).not.toContain('TRAE');
+    expect(source.content).not.toContain('OpenAI');
+
+    const restored = source.restore(source.content.replace('Welcome to', '欢迎来到'));
+    expect(restored).toContain('<p>欢迎来到 TRAE</p>');
+    expect(restored).toContain('<a href="https://example.com/docs">OpenAI</a>');
+    expect(restored).toContain('<img src="cid:logo@example.com">');
+  });
+
+  it('keeps plain-text URLs, addresses and variables exact', () => {
+    const source = prepareTranslationSource(
+      'Please visit https://example.com and email support@example.com. Use {{contact.name}}.',
+      '',
+    );
+    const restored = source.restore(source.content.replace('Please visit', '请访问'));
+
+    expect(restored).toContain('https://example.com');
+    expect(restored).toContain('support@example.com');
+    expect(restored).toContain('{{contact.name}}');
+  });
+
+  it('removes active elements from translated HTML before rendering', () => {
+    const safe = sanitizeTranslatedHtml('<p onclick="alert(1)">你好</p><script>alert(1)</script>');
+    expect(safe).toContain('<p>你好</p>');
+    expect(safe).not.toContain('onclick');
+    expect(safe).not.toContain('<script>');
+  });
+
+  it('strips remote visual resources introduced by an AI translation', () => {
+    const safe = sanitizeTranslatedHtml(
+      '<p style="background:url(https://tracker.example/pixel)">你好</p>'
+      + '<img src="https://tracker.example/pixel.png" srcset="https://tracker.example/a.png 1x">'
+      + '<img src="cid:logo@example.com">',
+    );
+    expect(safe).not.toContain('tracker.example');
+    expect(safe).not.toContain('background:url');
+    expect(safe).toContain('cid:logo@example.com');
+  });
+
+  it('blocks AI-injected remote resources before restoring original sanitized mail tags', () => {
+    const source = prepareTranslationSource(
+      '',
+      '<p>Hello</p><img src="https://original.example/pixel.png">',
+    );
+    const safeModelOutput = sanitizeTranslatedHtml(
+      `${source.content}<img src="https://evil.example/pixel.png"><script>bad()</script>`,
+    );
+    const restored = source.restore(safeModelOutput);
+
+    expect(restored).toContain('https://original.example/pixel.png');
+    expect(restored).not.toContain('evil.example');
+    expect(restored).not.toContain('<script>');
   });
 });

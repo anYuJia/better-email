@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import ComposerCloseConfirmDialog from './ComposerCloseConfirmDialog';
 import ComposerWindow from './ComposerWindow';
 import ContactSyncLoadingDialog from './ContactSyncLoadingDialog';
+import MessageToastStack from './MessageToastStack';
 import type {
   Account,
   Contact,
@@ -36,6 +37,7 @@ import {
 import { IPC } from '../ipc/commands';
 import useComposerController from '../hooks/useComposerController';
 import useThemeMode from '../hooks/useThemeMode';
+import useMessageToastQueue from '../hooks/useMessageToastQueue';
 import {
   decideComposerBootOpen,
   shouldRevealComposerWindow,
@@ -63,6 +65,7 @@ export default function StandaloneComposerApp() {
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [status, setStatus] = useState('正在准备写信窗口…');
+  const { toasts: messageToasts, showToast: showMessageToast } = useMessageToastQueue();
   const [contactScanBusy, setContactScanBusy] = useState(false);
   const contactScanBusyRef = useRef(false);
   const [booted, setBooted] = useState(false);
@@ -153,7 +156,7 @@ export default function StandaloneComposerApp() {
     if (contactScanBusyRef.current) return;
     contactScanBusyRef.current = true;
     setContactScanBusy(true);
-    setStatus('正在扫描已发送邮件头并同步最近联系人…');
+    setStatus('正在扫描所有邮件头并同步联系人…');
     try {
       const report = await invoke<RecentContactSyncReport>(IPC.ScanRecentContacts, {
         initialOnly: false,
@@ -178,8 +181,17 @@ export default function StandaloneComposerApp() {
   }, []);
 
   const showToast = useCallback((text: string) => {
+    showMessageToast(text, 'success');
     setStatus(text);
-  }, []);
+  }, [showMessageToast]);
+
+  const lastVisualStatusRef = useRef(status);
+  useEffect(() => {
+    if (lastVisualStatusRef.current === status) return;
+    lastVisualStatusRef.current = status;
+    if (!/(?:^Error:|失败|错误|出错|无法|不能|被拒绝|超时|请先|尚未配置|不存在)/i.test(status)) return;
+    showMessageToast(status.replace(/^Error:\s*/i, ''), 'error');
+  }, [showMessageToast, status]);
 
   const finishNativeClose = useCallback(async () => {
     if (closingRef.current) return;
@@ -240,6 +252,7 @@ export default function StandaloneComposerApp() {
     setSendRiskConfirm,
     crossAccountRisks,
     queueDraft,
+    undoPendingSend,
     composerCloseConfirmOpen,
     setComposerCloseConfirmOpen,
   } = useComposerController({
@@ -603,6 +616,16 @@ export default function StandaloneComposerApp() {
         />
       )}
       <ContactSyncLoadingDialog open={contactScanBusy} />
+      {(messageToasts.length > 0 || pendingSendUndo) && (
+        <MessageToastStack
+          toasts={messageToasts}
+          pendingSendUndo={pendingSendUndo}
+          onUndoSend={() => {
+            undoPendingSend().catch((error) => setStatus(String(error)));
+          }}
+          onDismissSend={() => setPendingSendUndo(null)}
+        />
+      )}
     </main>
   );
 }

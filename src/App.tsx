@@ -1,4 +1,5 @@
-import useOnboardingAccount from './hooks/useOnboardingAccount';
+import AccountLoginRecovery from './components/AccountLoginRecovery';
+import useOnboardingAccount, { usePendingOnboardingAccount } from './hooks/useOnboardingAccount';
 import useMobileVisualViewport from './hooks/useMobileVisualViewport';
 import useMailFeedback from './hooks/useMailFeedback';
 import useStatusFeedback from './hooks/useStatusFeedback';
@@ -24,10 +25,10 @@ import useExitPresence from './hooks/useExitPresence';
 import MobileSettingsRoot from './components/mobile/MobileSettingsRoot';
 import GlobalTooltip from './components/GlobalTooltip';
 import ContactSyncLoadingDialog from './components/ContactSyncLoadingDialog';
+import AppUpdateSurface from './components/AppUpdateSurface';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import type { PendingSendUndo } from './components/UndoSnackbarStack';
-import type { MessageToast } from './components/MessageToastStack';
 import useAppLayout, { APP_LAYOUT_BOUNDS } from './hooks/useAppLayout';
 import { logError } from './app/logger';
 import useAppShortcuts from './hooks/useAppShortcuts';
@@ -43,9 +44,11 @@ import useUndoQueue from './hooks/useUndoQueue';
 import useReaderActions from './hooks/useReaderActions';
 import useAppGlobalEffects from './hooks/useAppGlobalEffects';
 import useAppMetaLoader from './hooks/useAppMetaLoader';
+import useNativePlatform from './hooks/useNativePlatform';
 import useUnreadFocusSync from './hooks/useUnreadFocusSync';
 import useComposerController, { type OpenComposerOptions } from './hooks/useComposerController';
 import useCredentialManagement from './hooks/useCredentialManagement';
+import useMessageToastQueue from './hooks/useMessageToastQueue';
 import useFolderManagement from './hooks/useFolderManagement';
 import useIdentityManagement from './hooks/useIdentityManagement';
 import useLabelManagement from './hooks/useLabelManagement';
@@ -234,9 +237,7 @@ function MailboxApp({
   const [isSettingsOpen, setSettingsOpen] = useState(standaloneSettingsWindow);
   const [isShortcutsOpen, setShortcutsOpen] = useState(false);
   const [narrowView, setNarrowView] = useState<'sidebar' | 'list' | 'reader'>('list');
-  const [nativePlatform, setNativePlatform] = useState<'android' | 'ios' | 'desktop' | 'web'>(
-    () => (mockMode ? 'web' : 'desktop'),
-  );
+  const { nativePlatform, nativePlatformResolved } = useNativePlatform();
   const [isViewportMobile, setIsViewportMobile] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 720px)').matches,
   );
@@ -244,26 +245,17 @@ function MailboxApp({
   useAutoHideScrollbars();
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>(requestedSettingsSection);
   const [status, setStatus] = useState('本地原型已就绪');
-  const [messageToasts, setMessageToasts] = useState<MessageToast[]>([]);
-  const messageToastIdRef = useRef(0);
-  const showMessageToast = useCallback((text: string, tone: MessageToast['tone'] = 'success') => {
-    const id = ++messageToastIdRef.current;
-    setMessageToasts((current) => [...current, { id, text, tone }]);
-    window.setTimeout(() => {
-      setMessageToasts((current) => current.filter((toast) => toast.id !== id));
-    }, tone === 'error' ? 5000 : 3000);
-  }, []);
+  const { toasts: messageToasts, showToast: showMessageToast } = useMessageToastQueue();
   const [composerSendProgress, setComposerSendProgress] = useState<number | null>(null);
   const [composerSendProgressMessage, setComposerSendProgressMessage] = useState<string | null>(null);
   const [composerAttachmentProgress, setComposerAttachmentProgress] = useState<number | null>(null);
   const [initialAccountListLoaded, setInitialAccountListLoaded] = useState(false);
   const [isAccountLoginProvisioning, setAccountLoginProvisioning] = useState(false);
+  const completedOnboardingAccountIdsRef = useRef<Set<number>>(new Set());
   const needsAccountLogin = initialAccountListLoaded && accounts.length === 0;
   const isAccountLoginActive = needsAccountLogin || isAccountLoginProvisioning;
-  // 仅对「新完成登录且尚未完成首次引导」的账号展示引导。
-  const pendingOnboardingAccount = useMemo(
-    () => (account && !account.onboarding_completed ? account : null),
-    [account],
+  const pendingOnboardingAccount = usePendingOnboardingAccount(
+    account, standaloneSettingsWindow, completedOnboardingAccountIdsRef,
   );
   // 登录遮罩或首次引导期间，应用整体进入门禁状态：
   // 快捷键、托盘命令、写邮件、切换账号、设置都不能穿透。
@@ -289,25 +281,6 @@ function MailboxApp({
     void prewarmSettingsWindow().catch(() => undefined);
     return undefined;
   }, [accounts.length, initialAccountListLoaded, standaloneSettingsWindow, useNativeComposerWindow]);
-
-  useEffect(() => {
-    let active = true;
-    invoke<string>(IPC.GetPlatform)
-      .then((platform) => {
-        if (!active) return;
-        if (platform === 'android' || platform === 'ios') {
-          setNativePlatform(platform);
-        } else if (platform === 'macos' || platform === 'windows' || platform === 'linux') {
-          setNativePlatform('desktop');
-        }
-      })
-      .catch(() => {
-        // Browser preview and component tests do not expose the native command.
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -476,6 +449,7 @@ function MailboxApp({
     folderId,
     accountScope,
     mailboxRefreshRef,
+    completedOnboardingAccountIdsRef,
     setAccounts,
     setAccount,
     setAccountForm,
@@ -1375,6 +1349,7 @@ function MailboxApp({
   } = useRuleManagement({ rules, setRules, setStatus, accountId: scopedAccountId });
   const {
     credentialSecret,
+    credentialBusy,
     setCredentialSecret,
     storeAndVerifyCredential,
     deleteCredential,
@@ -1478,7 +1453,14 @@ function MailboxApp({
   });
 
   const { handleOnboardingAccountPatch, completeOnboarding } = useOnboardingAccount({
-    account, accounts, setAccount, setAccountForm, setAccounts, setStatus, mailboxRefreshRef,
+    account,
+    accounts,
+    setAccount,
+    setAccountForm,
+    setAccounts,
+    setStatus,
+    mailboxRefreshRef,
+    completedOnboardingAccountIdsRef,
   });
 
   const handleMoveBulkToFolder = useCallback((folder: Folder) => {
@@ -1680,6 +1662,9 @@ function MailboxApp({
   const messageListContent = (
     <AppErrorBoundary>
       <MessageListPane
+        notice={<AccountLoginRecovery accounts={accounts} accountScope={accountScope}
+          nativeSettings={useNativeSettingsWindow} changeAccountScope={changeAccountScope}
+          selectSettingsAccount={selectSettingsAccount} openSection={openMobileSettingsSection} />}
         mobile={isMobileApp}
         showAccountSource={accountScope === 'all'}
         accountSourceLabels={accountSourceLabels}
@@ -1765,6 +1750,7 @@ function MailboxApp({
         selectedWarnExternalSender={selectedWarnExternalSender}
         selectedInterceptsHttps={selectedInterceptsHttps}
         onOpenHttpsLink={handleOpenHttpsLink}
+        onAiError={(message) => showMessageToast(message, 'error')}
         quickReplyBody={quickReplyBody}
         readerReplyRef={readerReplyRef}
         quickReplyComposerActive={quickReplyComposerActive}
@@ -2139,6 +2125,7 @@ function MailboxApp({
             oauthSessions={oauthSessions}
             authTypeChanged={authTypeChanged}
             authTypeChangeNotice={authTypeChangeNotice}
+            credentialBusy={credentialBusy}
             credentialSecret={credentialSecret}
             credentialStatus={credentialStatus}
             notificationPolicy={notificationPolicy}
@@ -2168,6 +2155,7 @@ function MailboxApp({
             contactEditAliases={contactEditAliases}
             contactTransferBusy={contactTransferBusy}
             setStatus={setStatus}
+            onNotify={showMessageToast}
             onNavigate={isMobileApp ? openMobileSettingsSection : scrollSettingsSection}
             onClose={closeSettingsSurface}
             onTestConnection={() => {
@@ -2324,6 +2312,15 @@ function MailboxApp({
             onDismissSend={() => setPendingSendUndo(null)}
           />
         </Suspense>
+      )}
+      {!isAccountLoginActive && !standaloneSettingsWindow && (
+        <AppUpdateSurface
+          standaloneSettingsWindow={standaloneSettingsWindow}
+          nativePlatform={nativePlatform}
+          nativePlatformResolved={nativePlatformResolved}
+          isMobileApp={isMobileApp}
+          onNotify={showMessageToast}
+        />
       )}
       {!isAccountLoginActive && <GlobalTooltip />}
       <ContactSyncLoadingDialog open={contactScanBusy} />

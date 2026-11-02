@@ -202,7 +202,7 @@ describe('Inbox toolbar selection mode', () => {
     const row = view.container.querySelector('.list-control-row');
 
     expect(strip?.getAttribute('data-toolbar-mode')).toBe('normal');
-    expect(strip?.getAttribute('data-toolbar-height')).toBe('84');
+    expect(strip?.getAttribute('data-toolbar-min-height')).toBe('84');
     expect(row?.querySelector('.list-control-actions')).not.toBeNull();
     expect(row?.querySelector('.bulk-toolbar')).toBeNull();
 
@@ -232,7 +232,7 @@ describe('Inbox toolbar selection mode', () => {
     const selectedStrip = view.container.querySelector('.list-control-strip');
     expect(selectedStrip).toBe(strip);
     expect(selectedStrip?.getAttribute('data-toolbar-mode')).toBe('selection');
-    expect(selectedStrip?.getAttribute('data-toolbar-height')).toBe('84');
+    expect(selectedStrip?.getAttribute('data-toolbar-min-height')).toBe('84');
     expect(view.container.querySelector('.list-control-row')?.querySelector('.bulk-toolbar')).not.toBeNull();
     expect(view.container.querySelector('.list-control-row')?.querySelector('.list-control-actions')).toBeNull();
     expect(screen.getByRole('button', { name: '对选中的邮件执行：归档' })).toBeDefined();

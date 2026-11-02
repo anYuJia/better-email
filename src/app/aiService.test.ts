@@ -1,11 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   aiErrorMessage,
   checkAiConfig,
   generateTemplate,
-  mockAiResult,
+  splitAiInput,
   testAiConnection,
   translateMessage,
+  validateAiEndpointForRequest,
 } from './aiService';
 import { defaultAiServiceConfig } from './aiServiceConfig';
 import type { AiServiceConfig } from './types/ai';
@@ -19,16 +20,8 @@ vi.mock('../tauriBridge', () => ({
 }));
 
 describe('aiService', () => {
-  it('mock translate returns stable deterministic result', async () => {
-    const result = await translateMessage('Hello world', '中文', {
-      ...defaultAiServiceConfig,
-      enabled: true,
-      serviceType: 'mock',
-    });
-    expect(result.operation).toBe('translate');
-    expect(result.service_type).toBe('mock');
-    expect(result.content).toContain('Hello world');
-    expect(result.content).toContain('mock 译文');
+  beforeEach(() => {
+    invokeMock.mockReset();
   });
 
   it('throws clear error when AI service is not configured', async () => {
@@ -44,16 +37,17 @@ describe('aiService', () => {
   });
 
   it('throws clear error when disabled', () => {
-    const error = checkAiConfig({ ...defaultAiServiceConfig, enabled: false, serviceType: 'mock' }, false);
+    const error = checkAiConfig({ ...defaultAiServiceConfig, enabled: false, serviceType: 'http' }, false);
     expect(error?.kind).toBe('disabled');
   });
 
-  it('does not report a disabled mock service as connected', async () => {
-    await expect(testAiConnection({
+  it('does not provide an offline result when AI is not configured', async () => {
+    await expect(translateMessage('hello', '中文', {
       ...defaultAiServiceConfig,
-      enabled: false,
-      serviceType: 'mock',
-    })).resolves.toMatchObject({ ok: false, message: expect.stringContaining('已关闭') });
+      enabled: true,
+      serviceType: 'http',
+      endpoint: '',
+    })).rejects.toMatchObject({ kind: 'not_configured' });
   });
 
   it('uses the MCP endpoint and reports a dedicated disabled error', () => {
@@ -103,11 +97,11 @@ describe('aiService', () => {
     });
   });
 
-  it('tests MCP connections with the MCP endpoint and token', async () => {
+  it('tests MCP connections with the MCP endpoint, token and native capability report', async () => {
     invokeMock.mockResolvedValueOnce({
       ok: true,
       service_type: 'mcp',
-      message: 'MCP 服务连接正常。',
+      message: 'MCP 服务连接正常。已发现 3 个工具；可用能力：翻译、摘要、模板生成。',
       latency_ms: 4,
     });
     const config: AiServiceConfig = {
@@ -120,7 +114,10 @@ describe('aiService', () => {
       privacyAcknowledged: true,
     };
 
-    await expect(testAiConnection(config)).resolves.toMatchObject({ ok: true });
+    await expect(testAiConnection(config)).resolves.toMatchObject({
+      ok: true,
+      message: expect.stringContaining('可用能力'),
+    });
     expect(invokeMock).toHaveBeenCalledWith(IPC.TestAiConnection, expect.objectContaining({
       serviceType: 'mcp',
       endpoint: 'http://127.0.0.1:8080/mcp',
@@ -141,21 +138,96 @@ describe('aiService', () => {
     expect(checkAiConfig(config, false)).toBeNull();
   });
 
-  it('mock generate_template returns template with variables', async () => {
-    const result = await generateTemplate('给新客户发送产品介绍', {
+  it('can test an anonymous MCP connection before AI is enabled and honors token removal', async () => {
+    invokeMock.mockResolvedValueOnce({ ok: true, service_type: 'mcp', message: '连接正常', latency_ms: 1 });
+    await expect(testAiConnection({
       ...defaultAiServiceConfig,
-      enabled: true,
-      serviceType: 'mock',
-    });
-    expect(result.operation).toBe('generate_template');
-    expect(result.content.length).toBeGreaterThan(0);
-    expect(result.content).toContain('{{contact.name}}');
+      serviceType: 'mcp',
+      mcpEndpoint: 'http://127.0.0.1:8080/mcp',
+      clearMcpApiKey: true,
+    })).resolves.toMatchObject({ ok: true });
+    expect(invokeMock).toHaveBeenCalledWith(IPC.TestAiConnection, expect.objectContaining({
+      apiKey: '', clearApiKey: true,
+    }));
   });
 
-  it('mockAiResult builds content per operation', () => {
-    expect(mockAiResult('translate', 'Hi', '', '中文').content).toContain('Hi');
-    expect(mockAiResult('generate_template', '', '催款', '').content).toContain('{{contact.name}}');
-    expect(mockAiResult('summarize', 'long body', '', '').content).toContain('long body');
+  it('hydrates runtime requests from the saved backend provider', async () => {
+    invokeMock
+      .mockResolvedValueOnce({
+        configured: true,
+        enabled: true,
+        service_type: 'http',
+        endpoint: 'https://api.example.com/v1',
+        has_api_key: true,
+        model: 'deepseek-v4-flash',
+        timeout_seconds: 30,
+        privacy_acknowledged: true,
+        mcp_enabled: false,
+        mcp_endpoint: '',
+        has_mcp_api_key: false,
+      })
+      .mockResolvedValueOnce({
+        operation: 'translate',
+        content: '你好',
+        service_type: 'http',
+        truncated: false,
+      });
+
+    await expect(translateMessage('hello', '中文')).resolves.toMatchObject({
+      content: '你好',
+      service_type: 'http',
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(1, IPC.LoadAiSettings);
+    expect(invokeMock).toHaveBeenNthCalledWith(2, IPC.AiRequest, {
+      input: expect.objectContaining({
+        endpoint: 'https://api.example.com/v1',
+        api_key: '',
+        model: 'deepseek-v4-flash',
+        service_type: 'http',
+      }),
+    });
+  });
+
+  it('rejects a non-provider response when the request was routed externally', async () => {
+    invokeMock.mockResolvedValueOnce({
+      operation: 'translate',
+      content: 'fake',
+      service_type: 'legacy',
+      truncated: false,
+    });
+    const config: AiServiceConfig = {
+      ...defaultAiServiceConfig,
+      enabled: true,
+      serviceType: 'http',
+      endpoint: 'https://api.example.com/v1',
+      privacyAcknowledged: true,
+    };
+
+    await expect(translateMessage('hello', '中文', config)).rejects.toMatchObject({
+      kind: 'external',
+      message: expect.stringContaining('非真实服务'),
+    });
+  });
+
+  it('rejects legacy offline text even when an old backend labels it as http', async () => {
+    invokeMock.mockResolvedValueOnce({
+      operation: 'translate',
+      content: '【mock 译文 · 中文】\nhello',
+      service_type: 'http',
+      truncated: false,
+    });
+    const config: AiServiceConfig = {
+      ...defaultAiServiceConfig,
+      enabled: true,
+      serviceType: 'http',
+      endpoint: 'https://api.example.com/v1',
+      privacyAcknowledged: true,
+    };
+
+    await expect(translateMessage('hello', '中文', config)).rejects.toMatchObject({
+      kind: 'external',
+      message: expect.stringContaining('非真实服务'),
+    });
   });
 
   it('maps error kinds to readable messages', () => {
@@ -164,14 +236,104 @@ describe('aiService', () => {
     expect(aiErrorMessage({ kind: 'privacy_not_acknowledged' })).toContain('隐私说明');
     expect(aiErrorMessage({ kind: 'external', message: 'boom' })).toBe('boom');
   });
+
+  it('rejects legacy completions/fragments while allowing query-bearing base endpoints', () => {
+    let legacyError: unknown;
+    try {
+      validateAiEndpointForRequest('https://api.example.com/v1/completions');
+    } catch (error) {
+      legacyError = error;
+    }
+    expect(legacyError).toMatchObject({ kind: 'external', message: expect.stringContaining('/completions') });
+
+    let fragmentError: unknown;
+    try {
+      validateAiEndpointForRequest('https://api.example.com/v1#bad');
+    } catch (error) {
+      fragmentError = error;
+    }
+    expect(fragmentError).toMatchObject({ kind: 'external', message: expect.stringContaining('片段') });
+
+    expect(validateAiEndpointForRequest('https://api.example.com/v1?api-version=1'))
+      .toBe('https://api.example.com/v1?api-version=1');
+    expect(validateAiEndpointForRequest('https://api.example.com/v1/chat/completions'))
+      .toBe('https://api.example.com/v1/chat/completions');
+  });
+
+  it('splits long translation input without cutting protected HTML tokens', () => {
+    const token = '__BETTER_EMAIL_TAG_123__';
+    const source = `${'a'.repeat(19_990)}${token}${'b'.repeat(21_000)}`;
+    const chunks = splitAiInput(source, 20_000);
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.join('')).toBe(source);
+    expect(chunks.some((chunk) => chunk.endsWith('__BETTER_EMAIL_TA'))).toBe(false);
+    expect(chunks.some((chunk) => chunk.startsWith('G_123__'))).toBe(false);
+  });
+
+  it('translates long input in multiple real-provider requests instead of silently truncating', async () => {
+    invokeMock
+      .mockResolvedValueOnce({ operation: 'translate', content: '甲', service_type: 'http', truncated: false })
+      .mockResolvedValueOnce({ operation: 'translate', content: '乙', service_type: 'http', truncated: false });
+    const config: AiServiceConfig = {
+      ...defaultAiServiceConfig,
+      enabled: true,
+      serviceType: 'http',
+      endpoint: 'https://api.example.com/v1',
+      privacyAcknowledged: true,
+    };
+    const source = `${'x'.repeat(19_000)}\n${'y'.repeat(19_000)}`;
+
+    const result = await translateMessage(source, '中文', config);
+
+    expect(result.content).toBe('甲乙');
+    expect(invokeMock).toHaveBeenCalledTimes(2);
+    expect(invokeMock).toHaveBeenNthCalledWith(1, IPC.AiRequest, expect.objectContaining({
+      input: expect.objectContaining({ operation: 'translate' }),
+    }));
+    expect(invokeMock).toHaveBeenNthCalledWith(2, IPC.AiRequest, expect.objectContaining({
+      input: expect.objectContaining({ operation: 'translate' }),
+    }));
+  });
+
+  it('rejects truncated provider output instead of rendering an incomplete result', async () => {
+    invokeMock.mockResolvedValueOnce({
+      operation: 'translate',
+      content: 'partial',
+      service_type: 'http',
+      truncated: true,
+    });
+    const config: AiServiceConfig = {
+      ...defaultAiServiceConfig,
+      enabled: true,
+      serviceType: 'http',
+      endpoint: 'https://api.example.com/v1',
+      privacyAcknowledged: true,
+    };
+    await expect(translateMessage('hello', '中文', config)).rejects.toMatchObject({
+      kind: 'external',
+      message: expect.stringContaining('不完整结果'),
+    });
+  });
 });
 
 describe('template generation chain', () => {
-  it('generateTemplate mock output parses into subject and body', async () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+  });
+
+  it('generateTemplate result parses into subject and body', async () => {
+    invokeMock.mockResolvedValueOnce({
+      operation: 'generate_template',
+      content: '主题：向新客户介绍产品跟进\n\n正文：\n您好 {{contact.name}}',
+      service_type: 'http',
+      truncated: false,
+    });
     const result = await generateTemplate('向新客户介绍产品', {
       ...defaultAiServiceConfig,
       enabled: true,
-      serviceType: 'mock',
+      serviceType: 'http',
+      endpoint: 'https://api.example.com/v1',
+      privacyAcknowledged: true,
     });
     const { parseAiGeneratedTemplate } = await import('./templateStore');
     const parsed = parseAiGeneratedTemplate(result.content);

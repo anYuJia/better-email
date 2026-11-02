@@ -36,6 +36,7 @@ function isAvailableFocusTarget(element: HTMLElement): boolean {
   return true;
 }
 
+
 function getFocusableElements(dialog: HTMLElement): HTMLElement[] {
   return Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
     .filter((element) => (!element.hasAttribute('tabindex') || element.tabIndex >= 0) && isAvailableFocusTarget(element));

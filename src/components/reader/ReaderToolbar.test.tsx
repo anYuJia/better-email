@@ -92,13 +92,17 @@ describe('ReaderToolbar common actions', () => {
     expect(screen.queryByRole('button', { name: '更多回复方式' })).toBeNull();
   });
 
-  it('moves reply-all and forward into the more menu', () => {
-    renderToolbar();
+  it('keeps reply-all and forward available in the more menu', () => {
+    const onComposeFromMessage = vi.fn();
+    renderToolbar(message(), { onComposeFromMessage });
 
     fireEvent.click(screen.getByTitle('更多操作'));
-
     expect(screen.getByRole('menuitem', { name: '回复全部' })).toBeDefined();
-    expect(screen.getByRole('menuitem', { name: '转发' })).toBeDefined();
+    fireEvent.click(screen.getByRole('menuitem', { name: '转发' }));
+    expect(onComposeFromMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: '设计评审' }),
+      'forward',
+    );
   });
 
   it('does not repeat primary toolbar actions in the more menu', () => {
@@ -110,6 +114,18 @@ describe('ReaderToolbar common actions', () => {
     expect(screen.getByRole('menuitem', { name: '添加星标' })).toBeDefined();
     expect(screen.queryByRole('menuitem', { name: '归档' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: '稍后处理' })).toBeNull();
+  });
+
+  it.each([true, false])('toggles completed translation without submitting it again (active: %s)', (translationActive) => {
+    const onToggleTranslation = vi.fn();
+    const onTranslateMessage = vi.fn();
+    renderToolbar(message(), {
+      needsTranslation: true, translationCompleted: true, translationActive,
+      onToggleTranslation, onTranslateMessage,
+    });
+    fireEvent.click(screen.getByRole('button', { name: translationActive ? '显示原文' : '显示译文' }));
+    expect(onToggleTranslation).toHaveBeenCalledOnce();
+    expect(onTranslateMessage).not.toHaveBeenCalled();
   });
 
   it('switches the visible clock action to unsnooze for snoozed mail', () => {

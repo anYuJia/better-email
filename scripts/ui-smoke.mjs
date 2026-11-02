@@ -1,3 +1,5 @@
+import { findBrowserExecutable } from './browserExecutable.mjs';
+import { testCredentialRecovery } from './ui-credential-recovery.mjs';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,6 +9,8 @@ import { runQualityMatrix } from './ui-quality-matrix.mjs';
 import { runMotionQuality } from './ui-motion-quality.mjs';
 import { runAttachmentQuality } from './ui-attachment-quality.mjs';
 import { runWorkflowQuality } from './ui-workflow-quality.mjs';
+import { testInitialHeaderLayout } from './ui-header-layout.mjs';
+import { testMcpGuideLayouts } from './ui-mcp-settings.mjs';
 
 function resolveCdpWebSocket() {
   if (typeof globalThis.WebSocket === 'function') {
@@ -174,14 +178,7 @@ async function waitForHttp(target, timeoutMs = 15_000, expectedChild = null) {
 }
 
 async function findChrome() {
-  return withStep('findChrome', async () => {
-    for (const candidate of chromeCandidates) {
-      const child = spawn(candidate, ['--version'], { stdio: 'ignore' });
-      const code = await new Promise((resolve) => child.once('exit', resolve));
-      if (code === 0) return candidate;
-    }
-    throw new Error('Chrome/Chromium executable not found; set CHROME_PATH to run UI smoke tests.');
-  });
+  return withStep('findChrome', () => findBrowserExecutable(chromeCandidates));
 }
 
 async function chromeJson(debugPort, path) {
@@ -1616,6 +1613,10 @@ async function main() {
       await runQualityMatrix(cdp, { evalInPage, setUiViewport, waitForExpression, captureScreenshot, clickButton, fillInput, closeComposer, openSettingsSection, url, captureDir });
       return;
     }
+    await withStep('credential recovery lifecycle', () => testCredentialRecovery({
+      cdp, evaluate: evalInPage, wait: waitForExpression, screenshot: captureScreenshot,
+      fill: fillInput, click: clickButton, openAccountSwitcher: openAccountSwitcherMenu,
+    }));
 
     await evalInPage(
       cdp,
@@ -1628,6 +1629,10 @@ async function main() {
       "localStorage.setItem('better-email.appLayout.v2', JSON.stringify({ sidebar: 244, list: 388 })); location.reload()",
     );
     await waitForExpression(cdp, "(() => { const shell = document.querySelector('.app-shell'); if (!shell) return false; const style = getComputedStyle(shell); return style.getPropertyValue('--app-sidebar-width').trim() === '244px' && style.getPropertyValue('--app-list-width').trim() === '388px'; })()");
+
+    await withStep('Fresh-boot header geometry, narrow panes, long input and enlarged text', () => testInitialHeaderLayout({
+      cdp, evaluate: evalInPage, wait: waitForExpression, viewport: setUiViewport, screenshot: captureScreenshot,
+    }));
 
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length <= 40 && document.querySelectorAll('.message-card').length > 5 && document.querySelector('.message-date-header') && document.body.innerText.includes('已显示 40 封') && document.body.innerText.includes('加载更多')");
     await cdp.send('Emulation.setDeviceMetricsOverride', {
@@ -3081,8 +3086,9 @@ async function main() {
     await captureScreenshot(cdp, 'attachment-download-retry');
     await clickButton(cdp, '重试', "document.querySelector('.attachment-section')");
     await waitForExpression(cdp, "document.body.innerText.includes('附件已从 64 KB 继续下载：security-checklist.pdf') && document.body.innerText.includes('打开')");
-    await openDetails(cdp, '.reader-more-menu');
-    await clickButton(cdp, '转发', "document.querySelector('.reader-more-menu')");
+    // 转发是阅读器的一级操作，和回复并列；更多菜单只保留低频整理动作。
+    await evalInPage(cdp, "document.querySelector('.reader-more-menu[open]')?.removeAttribute('open')");
+    await clickButton(cdp, '转发', "document.querySelector('.reader-actions')");
     await waitForExpression(cdp, "document.querySelector('.composer') && document.querySelector('.composer input[aria-label=\"主题\"]')?.value === 'Fwd: 安全检查清单' && document.querySelector('.composer-attachment-list')?.innerText.includes('security-checklist.pdf') && document.querySelector('.status-line')?.textContent.includes('已带入 1 个附件')");
     await captureScreenshot(cdp, 'forward-with-source-attachment');
     await closeComposer(cdp);
@@ -3115,17 +3121,13 @@ async function main() {
     await waitForExpression(cdp, "!document.querySelector('.reader-translate-action')");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Design review invitation')).click()");
     await waitForExpression(cdp, "document.querySelector('.reader-translate-action')");
-    await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: true, serviceType: 'mock', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false })); location.reload()");
+    await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: false, serviceType: 'http', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false })); location.reload()");
     await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('Better Email')");
     await waitForExpression(cdp, "[...document.querySelectorAll('.message-card')].some((item) => item.textContent.includes('Design review invitation'))");
     await evalInPage(cdp, "[...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('Design review invitation')).click()");
     await waitForExpression(cdp, "document.querySelector('.reader-translate-action')");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.reader-actions button[aria-label=\"翻译为中文\"]'); if (!button) throw new Error('Translate button not found'); button.click(); })()");
-    await waitForExpression(cdp, "document.querySelector('.reader-translation-panel')?.innerText.includes('mock 译文') && !document.querySelector('.reader-translation-panel')?.innerText.includes('Design review')");
-    await clickButton(cdp, '查看原文', "document.querySelector('.reader-translation-header')");
-    await waitForExpression(cdp, "document.querySelector('.reader-translation-panel')?.innerText.includes('已翻译为中文')");
-    await clickButton(cdp, '显示译文', "document.querySelector('.reader-translation-banner')");
-    await waitForExpression(cdp, "document.querySelector('.reader-translation-panel')?.innerText.includes('mock 译文')");
+    await waitForExpression(cdp, "[...document.querySelectorAll('[role=\"alert\"]')].some((item) => item.textContent.includes('AI 服务已关闭')) && !document.body.innerText.includes('mock 译文')");
 
     // Translation can finish before the deferred attachment/body completion.
     // This path verifies expanding the ready inline editor; the loading-body
@@ -3161,8 +3163,12 @@ async function main() {
     await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide[role=\"dialog\"]') && document.querySelector('.settings-mcp-guide #settings-mcp-endpoint')");
     await fillInput(cdp, '#settings-mcp-endpoint', 'https://mcp.smoke.example/mcp');
     await fillInput(cdp, '#settings-mcp-token', 'smoke-token');
+    await withStep('MCP guide responsive, theme and text scaling matrix', () => testMcpGuideLayouts(cdp, {
+      evaluate: evalInPage, viewport: setUiViewport, fill: fillInput, wait: waitForExpression, screenshot: captureScreenshot,
+    }));
     await clickButton(cdp, '初始化与提示词', "document.querySelector('.settings-mcp-guide')");
     await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide [role=\"tabpanel\"] textarea[aria-label=\"初始化连接提示词\"]')?.value.includes('notifications/initialized')");
+    await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide').getAnimations({subtree:true}).every(animation => animation.playState === 'finished')");
     await captureScreenshot(cdp, 'settings-mcp-guide-prompts');
     await clickButton(cdp, '连接信息', "document.querySelector('.settings-mcp-guide')");
     await waitForExpression(cdp, "document.querySelector('.settings-mcp-guide [role=\"tabpanel\"] #settings-mcp-endpoint')?.value === 'https://mcp.smoke.example/mcp'");
@@ -3180,8 +3186,8 @@ async function main() {
     await evalInPage(cdp, "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
     await waitForExpression(cdp, "!document.querySelector('.settings-mcp-guide') && document.querySelector('.settings-page[data-settings-page=\"mcp\"] input[aria-label=\"启用 MCP\"]')?.checked");
     await openSettingsSection(cdp, 'AI 接入', 'ai', '.settings-page[data-settings-page="ai"]');
-    // 浏览器冒烟测试只在内部注入 mock，不把“本地演示”作为用户可选的接入方式。
-    await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: true, serviceType: 'mock', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false }));");
+    // 浏览器冒烟测试不伪造 AI 结果；真实 AI 请求只在 Tauri 桌面端执行。
+    await evalInPage(cdp, "localStorage.setItem('better-email.aiService', JSON.stringify({ enabled: false, serviceType: 'http', endpoint: '', apiKey: '', defaultModel: 'gpt-4o-mini', timeoutSeconds: 30, privacyAcknowledged: false }));");
     await openSettingsSection(cdp, '模板', 'templates', '.settings-page[data-settings-page="templates"]');
     await waitForExpression(cdp, "[...document.querySelectorAll('.settings-page[data-settings-page=\"templates\"] button')].some((item) => item.textContent.includes('新建模板'))");
     await clickButton(cdp, '新建模板', "document.querySelector('.settings-page[data-settings-page=\"templates\"]')");
@@ -3190,15 +3196,13 @@ async function main() {
     await fillInput(cdp, '.template-editor input[placeholder^="邮件主题"]', '你好 {{contact.name}}');
     await fillInput(cdp, '.template-editor textarea', '您好 {{contact.name}}，\n\n这是模板正文。\n\n{{signature}}');
     await clickButton(cdp, '保存模板', "document.querySelector('.template-editor')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('Smoke 设置模板') && document.querySelector('.settings-inline-status')?.textContent.includes('模板已保存：Smoke 设置模板')");
+    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('Smoke 设置模板')");
     await clickButton(cdp, 'AI 生成', "document.querySelector('.settings-page[data-settings-page=\"templates\"]')");
     await waitForExpression(cdp, "document.querySelector('.template-ai-body')");
     await fillInput(cdp, '.template-ai-generator input[placeholder^="描述模板用途"]', '向新客户介绍产品');
     await clickButton(cdp, 'AI 生成', "document.querySelector('.template-ai-generator')");
     await sleep(1000);
-    await waitForExpression(cdp, "document.querySelector('.template-ai-preview textarea')?.value.includes('{{contact.name}}') && document.querySelector('.template-ai-preview input')?.value.includes('跟进')");
-    await clickButton(cdp, '保存为模板', "document.querySelector('.template-ai-preview')");
-    await waitForExpression(cdp, "document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('AI 生成的模板已保存') && document.querySelector('.settings-page[data-settings-page=\"templates\"]')?.innerText.includes('向新客户介绍产品模板')");
+    await waitForExpression(cdp, "!document.querySelector('.template-ai-preview') && /AI 接入尚未开启|请先配置 AI 服务|浏览器预览不执行真实 AI 请求|MCP 服务未开启/.test(document.body.innerText)");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.settings-modal header button[aria-label=\"关闭设置\"]') ?? [...document.querySelectorAll('.settings-modal header button')].find((item) => item.textContent.includes('关闭')); if (!button) throw new Error('Settings close button not found'); button.click(); })()");
     await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
 

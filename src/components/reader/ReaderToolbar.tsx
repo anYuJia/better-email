@@ -172,6 +172,12 @@ function ReaderToolbar({
     'restore',
     'copy-message-info',
   ].includes(item.id));
+  const canToggleTranslation = translationCompleted;
+  const translationActionLabel = translationActive
+    ? '显示原文'
+    : translationCompleted
+      ? '显示译文'
+      : '翻译邮件';
   const extraItems: ContextMenuItem[] = [
     {
       id: 'export-eml',
@@ -198,11 +204,11 @@ function ReaderToolbar({
                 }]
               : []),
           ...(!isDraft && needsTranslation
-            ? [{
+              ? [{
                 id: 'menu-translate',
-                label: translationActive ? '显示原文' : '翻译邮件',
+                label: translationActionLabel,
                 icon: <Languages size={16} />,
-                onSelect: translationCompleted ? onToggleTranslation : onTranslateMessage,
+                onSelect: canToggleTranslation ? onToggleTranslation : onTranslateMessage,
               }]
             : []),
         ]
@@ -277,7 +283,7 @@ function ReaderToolbar({
           </div>
         ) : canReply ? (
           <div className="reader-action-group reader-response-actions" role="group" aria-label="回复操作">
-            <button className="primary-action" title="回复" onClick={onReply ?? (() => onComposeFromMessage(selected, 'reply'))}>
+            <button type="button" className="primary-action" title="回复" onClick={onReply ?? (() => onComposeFromMessage(selected, 'reply'))}>
               <Reply size={16} />
               <span>回复</span>
             </button>
@@ -293,14 +299,6 @@ function ReaderToolbar({
               <Archive size={16} />
             </button>
           )}
-          {isMobileViewport && <button
-            className="icon-only-action reader-delete-action"
-            title={isTrash ? '彻底删除' : '删除'}
-            aria-label={isTrash ? '彻底删除' : '删除'}
-            onClick={isTrash ? onPermanentlyDelete : onMoveTrash}
-          >
-            <Trash2 size={16} />
-          </button>}
           {selected.folder_role === 'snoozed' ? (
             <button
               className="icon-only-action reader-snooze-action"
@@ -326,8 +324,8 @@ function ReaderToolbar({
             type="button"
             className={`reader-translate-action${translationActive ? ' active' : ''}`}
             title="检测到外语邮件，点击翻译为中文"
-            aria-label={translationActive ? '显示原文' : '翻译为中文'}
-            onClick={translationCompleted ? onToggleTranslation : onTranslateMessage}
+            aria-label={translationActionLabel === '翻译邮件' ? '翻译为中文' : translationActionLabel}
+            onClick={canToggleTranslation ? onToggleTranslation : onTranslateMessage}
             disabled={translationLoading}
           >
             {translationLoading ? (
@@ -335,7 +333,7 @@ function ReaderToolbar({
             ) : (
               <Languages size={16} />
             )}
-            <span>{translationActive ? '显示原文' : '翻译为中文'}</span>
+            <span>{translationActive ? '显示原文' : translationCompleted ? '显示译文' : '翻译为中文'}</span>
           </button>
         )}
         {!isDraft && (

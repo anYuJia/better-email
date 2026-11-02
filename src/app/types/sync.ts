@@ -1,4 +1,4 @@
-import type { Account } from './account';
+import type { Account, CredentialStatus } from './account';
 
 export type BackgroundTaskKind = 'sync' | 'outbox-dry-run' | 'outbox-smtp';
 /** done 即成功（succeeded）语义，与历史状态保持一致。 */
@@ -68,6 +68,7 @@ export type SyncRun = {
 
 
 export type SyncSchedulePlan = {
+  credential_issues?: CredentialStatus[];
   max_accounts_per_batch: number;
   total_accounts: number;
   batch_accounts: Account[];

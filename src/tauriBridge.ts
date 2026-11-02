@@ -38,10 +38,22 @@ export type DesktopFileDropEvent =
 export type DesktopFileDropHandler = (event: DesktopFileDropEvent) => void;
 
 const hasTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-export const mockMode =
-  import.meta.env.VITE_BETTER_EMAIL_UI_MOCK === '1'
-  || import.meta.env.VITE_SWIFTMAIL_UI_MOCK === '1'
-  || !hasTauriRuntime;
+const explicitMockMode =
+  import.meta.env.MODE === 'test'
+  || import.meta.env.VITE_BETTER_EMAIL_UI_MOCK === '1';
+
+/**
+ * Mock mode is test-only / explicitly opted in. A missing native runtime must
+ * never silently turn a production or ordinary browser build into a fake mail
+ * backend, because that makes broken native wiring look healthy.
+ */
+export const mockMode = explicitMockMode;
+
+if (typeof window !== 'undefined' && !mockMode && !hasTauriRuntime) {
+  throw new Error(
+    'Better Email native runtime unavailable. Start the Tauri application, or set VITE_BETTER_EMAIL_UI_MOCK=1 only for explicit UI test runs.',
+  );
+}
 
 type MockBridgeModule = typeof import('./tauriBridge.mock');
 type ProdBridgeModule = typeof import('./tauriBridge.prod');

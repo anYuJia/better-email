@@ -39,8 +39,8 @@ details[data-floating-menu="true"] > :is([data-floating-menu-panel="true"], div)
   bottom: auto;
   margin: 0;
   z-index: 2500;
-  width: var(--floating-menu-width, max-content);
-  min-width: 140px;
+  width: var(--floating-menu-width, min(var(--ui-menu-width), calc(100vw - 16px)));
+  min-width: min(140px, calc(100vw - 16px));
   height: max-content;
   max-width: calc(100vw - 16px);
   max-height: min(460px, var(--floating-menu-max-height, calc(100dvh - 16px)));

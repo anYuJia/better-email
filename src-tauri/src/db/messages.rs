@@ -689,59 +689,16 @@ impl MailStore {
                     body.attachments_complete
                 ],
             )?;
-            // 正文重拉前先读取既有附件，以便按稳定身份匹配新旧附件并保留
-            // 已下载状态（is_downloaded/local_path），避免重拉正文把已下载
-            // 附件重置为未下载、产生孤儿文件。
+            // Only a complete MIME/BODYSTRUCTURE response owns attachment
+            // metadata. Body-only responses retain the existing sent/downloaded
+            // records; complete responses also mark remote backfill complete.
             if body.attachments_complete {
-                let old_attachments = attachment_rows_for_conn(conn, message_id)?;
-                let mut old_by_content_id = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
-                let mut old_by_filename = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
-                for old in old_attachments {
-                    let target = if old.content_id.trim().is_empty() {
-                        &mut old_by_filename
-                    } else {
-                        &mut old_by_content_id
-                    };
-                    target
-                        .entry(if old.content_id.trim().is_empty() {
-                            old.filename.clone()
-                        } else {
-                            old.content_id.clone()
-                        })
-                        .or_default()
-                        .push_back(old);
-                }
-                conn.execute(
-                    "DELETE FROM attachments WHERE message_id = ?1",
-                    params![message_id],
+                replace_message_attachments_for_conn(
+                    conn,
+                    message_id,
+                    &body.attachments,
+                    body.has_attachments,
                 )?;
-                for attachment in &body.attachments {
-                    let matched = match_old_attachment(
-                        attachment,
-                        &mut old_by_content_id,
-                        &mut old_by_filename,
-                    );
-                    let (is_downloaded, local_path, size_bytes, content_sha256) =
-                        preserve_attachment_download_state(&matched, attachment);
-                    conn.execute(
-                        "INSERT INTO attachments(
-                        message_id, filename, mime_type, size_bytes, is_downloaded,
-                        local_path, content_sha256, content_id, is_inline
-                     )
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                        params![
-                            message_id,
-                            attachment.filename,
-                            attachment.mime_type,
-                            size_bytes,
-                            bool_to_int(is_downloaded),
-                            local_path,
-                            content_sha256,
-                            attachment.content_id,
-                            bool_to_int(attachment.is_inline)
-                        ],
-                    )?;
-                }
             }
             let message = message_for_conn(conn, message_id)?;
             transaction.commit()?;
@@ -754,6 +711,20 @@ impl MailStore {
         } else {
             Ok(message)
         }
+    }
+    /// Backfill attachment metadata without overwriting an already cached body.
+    pub fn update_message_attachments(
+        &self,
+        message_id: i64,
+        attachments: &[crate::models::RemoteAttachmentMetadata],
+    ) -> MailResult<Message> {
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            replace_message_attachments_for_conn(&transaction, message_id, attachments, false)?;
+            let message = message_for_conn(&transaction, message_id)?;
+            transaction.commit()?;
+            Ok(message)
+        })
     }
     pub fn list_messages_missing_body(
         &self,
@@ -821,6 +792,34 @@ impl MailStore {
                 }
             }
             Ok(combined)
+        })
+    }
+    pub fn list_messages_missing_attachment_metadata(
+        &self,
+        account_id: i64,
+        remote_mailbox: &str,
+        limit: i64,
+    ) -> MailResult<Vec<(i64, i64)>> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "
+                SELECT id, remote_uid
+                FROM messages
+                WHERE account_id = ?1
+                  AND remote_mailbox = ?2
+                  AND remote_uid > 0
+                  AND body <> ''
+                  AND attachment_metadata_synced = 0
+                ORDER BY id ASC
+                LIMIT ?3
+                ",
+            )?;
+            let rows = stmt
+                .query_map(params![account_id, remote_mailbox, limit.max(1)], |row| {
+                    Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(rows)
         })
     }
     pub fn list_remote_uids_for_mailbox(
@@ -909,6 +908,10 @@ impl MailStore {
                 )?;
                 attachment_rows.push((conn.last_insert_rowid(), attachment));
             }
+            conn.execute(
+                "UPDATE messages SET attachment_metadata_synced = 1 WHERE id = ?1",
+                params![message_id],
+            )?;
             upsert_contact(
                 conn,
                 account.id,
@@ -972,6 +975,7 @@ impl MailStore {
                         security_warnings = ?5,
                         received_at = ?6,
                         has_attachments = ?7,
+                        attachment_metadata_synced = 1,
                         thread_key = ?8,
                         message_id_header = ?9,
                         in_reply_to_header = ?10,
@@ -1006,10 +1010,11 @@ impl MailStore {
                         account_id, folder_id, sender_name, sender_email, recipients, cc, bcc,
                         subject, snippet, body, sanitized_html, security_warnings, received_at,
                         is_read, is_starred, has_attachments, thread_key, remote_mailbox,
-                        remote_uid, message_id_header, in_reply_to_header, references_header
+                        remote_uid, message_id_header, in_reply_to_header, references_header,
+                        attachment_metadata_synced
                     )
                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
-                            0, 0, ?14, ?15, 'POP3/INBOX', ?16, ?17, ?18, ?19)
+                            0, 0, ?14, ?15, 'POP3/INBOX', ?16, ?17, ?18, ?19, 1)
                     ",
                     params![
                         account_id,
@@ -1785,6 +1790,72 @@ pub(super) fn attachment_rows_for_conn(
     Ok(rows)
 }
 
+fn replace_message_attachments_for_conn(
+    conn: &Connection,
+    message_id: i64,
+    attachments: &[crate::models::RemoteAttachmentMetadata],
+    has_attachments: bool,
+) -> MailResult<()> {
+    // 先读取既有附件，以便按稳定身份匹配新旧附件并保留已下载状态，
+    // 避免重拉正文或补元数据把已下载附件重置、产生孤儿文件。
+    let old_attachments = attachment_rows_for_conn(conn, message_id)?;
+    let mut old_by_content_id = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
+    let mut old_by_filename = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
+    for old in old_attachments {
+        let target = if old.content_id.trim().is_empty() {
+            &mut old_by_filename
+        } else {
+            &mut old_by_content_id
+        };
+        target
+            .entry(if old.content_id.trim().is_empty() {
+                old.filename.clone()
+            } else {
+                old.content_id.clone()
+            })
+            .or_default()
+            .push_back(old);
+    }
+    conn.execute(
+        "UPDATE messages
+         SET has_attachments = ?2, attachment_metadata_synced = 1
+         WHERE id = ?1",
+        params![
+            message_id,
+            bool_to_int(has_attachments || !attachments.is_empty())
+        ],
+    )?;
+    conn.execute(
+        "DELETE FROM attachments WHERE message_id = ?1",
+        params![message_id],
+    )?;
+    for attachment in attachments {
+        let matched =
+            match_old_attachment(attachment, &mut old_by_content_id, &mut old_by_filename);
+        let (is_downloaded, local_path, size_bytes, content_sha256) =
+            preserve_attachment_download_state(&matched, attachment);
+        conn.execute(
+            "INSERT INTO attachments(
+                message_id, filename, mime_type, size_bytes, is_downloaded,
+                local_path, content_sha256, content_id, is_inline
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                message_id,
+                attachment.filename,
+                attachment.mime_type,
+                size_bytes,
+                bool_to_int(is_downloaded),
+                local_path,
+                content_sha256,
+                attachment.content_id,
+                bool_to_int(attachment.is_inline)
+            ],
+        )?;
+    }
+    Ok(())
+}
+
 pub(super) fn has_pending_remote_write_for_conn(
     conn: &Connection,
     message_id: i64,
@@ -2461,6 +2532,30 @@ mod attachment_metadata_tests {
     #[test]
     fn body_only_sync_preserves_attachment_rows_until_complete_metadata_arrives() {
         let (_dir, store, id) = fixture();
+        // The remote backfill flag must agree with the local completeness
+        // contract: a body-only response cannot claim the inventory is synced.
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE messages SET attachment_metadata_synced=0 WHERE id=?1",
+                    [id],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        store.update_message_body(id, &body(false)).unwrap();
+        let metadata_synced = || {
+            store
+                .with_conn(|conn| {
+                    Ok(conn.query_row(
+                        "SELECT attachment_metadata_synced FROM messages WHERE id=?1",
+                        [id],
+                        |row| row.get::<_, bool>(0),
+                    )?)
+                })
+                .unwrap()
+        };
+        assert!(!metadata_synced());
         let initial = RemoteMessageBody {
             has_attachments: true,
             attachments: vec![crate::models::RemoteAttachmentMetadata {
@@ -2473,6 +2568,7 @@ mod attachment_metadata_tests {
             ..body(true)
         };
         store.update_message_body(id, &initial).unwrap();
+        assert!(metadata_synced());
         let before = store.list_attachments(id).unwrap();
         let incomplete = store.update_message_body(id, &body(false)).unwrap();
         assert!(incomplete.has_attachments);

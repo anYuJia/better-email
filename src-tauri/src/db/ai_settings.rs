@@ -1,15 +1,30 @@
 use super::*;
 
 impl MailStore {
+    pub fn has_ai_settings(&self) -> MailResult<bool> {
+        self.with_conn(|conn| {
+            let exists = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM ai_settings WHERE id = 1)",
+                [],
+                |row| row.get::<_, i64>(0),
+            )?;
+            Ok(exists != 0)
+        })
+    }
+
     pub fn save_ai_settings(&self, record: &AiSettingsRecord) -> MailResult<()> {
-        let mut record = record.clone();
-        // 应用层加密 API key / MCP key，数据库文件单独被读取时是密文。
-        record.api_key = crate::secret_crypto::encrypt_secret(&self.data_dir, &record.api_key)
-            .map_err(MailError::Io)?;
-        record.mcp_api_key =
-            crate::secret_crypto::encrypt_secret(&self.data_dir, &record.mcp_api_key)
-                .map_err(MailError::Io)?;
-        self.with_conn(|conn| store_ai_settings_for_conn(conn, &record))
+        self.with_conn(|conn| {
+            let transaction = rusqlite::Transaction::new_unchecked(
+                conn,
+                rusqlite::TransactionBehavior::Immediate,
+            )?;
+            let mut record = record.clone();
+            record.api_key = self.encrypt_local_secret(&transaction, &record.api_key)?;
+            record.mcp_api_key = self.encrypt_local_secret(&transaction, &record.mcp_api_key)?;
+            store_ai_settings_for_conn(&transaction, &record)?;
+            transaction.commit()?;
+            Ok(())
+        })
     }
 
     pub fn load_ai_settings(&self) -> MailResult<AiSettingsRecord> {
@@ -118,7 +133,7 @@ pub fn load_ai_settings_for_conn(conn: &Connection) -> MailResult<AiSettingsReco
     else {
         return Ok(AiSettingsRecord {
             enabled: false,
-            service_type: "mock".to_string(),
+            service_type: "http".to_string(),
             endpoint: String::new(),
             api_key: String::new(),
             model: String::new(),
@@ -128,6 +143,14 @@ pub fn load_ai_settings_for_conn(conn: &Connection) -> MailResult<AiSettingsReco
             mcp_endpoint: String::new(),
             mcp_api_key: String::new(),
         });
+    };
+    // Normalize values written by older versions. The persisted connector
+    // model now has only HTTP and MCP; legacy/unknown values are HTTP so they
+    // cannot re-enable an offline AI provider.
+    let service_type = if service_type == "mcp" {
+        "mcp".to_string()
+    } else {
+        "http".to_string()
     };
     Ok(AiSettingsRecord {
         enabled: enabled != 0,

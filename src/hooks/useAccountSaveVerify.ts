@@ -51,6 +51,14 @@ export default function useAccountSaveVerify({
   const [saveAndVerifyRunning, setSaveAndVerifyRunning] = useState(false);
   const [accountSettingsSaving, setAccountSettingsSaving] = useState(false);
   const saveAndVerifyRunId = useRef(0);
+  const scopeRef = useRef(accountForm?.id);
+  const operationRef = useRef<symbol | null>(null);
+  if (scopeRef.current !== accountForm?.id) {
+    scopeRef.current = accountForm?.id;
+    saveAndVerifyRunId.current += 1;
+    operationRef.current = null;
+  }
+  useEffect(() => () => { saveAndVerifyRunId.current += 1; operationRef.current = null; }, []);
 
   const resetSaveAndVerifyReport = useCallback(() => {
     setSaveAndVerifyReport(emptySaveAndVerifyReport());
@@ -59,6 +67,7 @@ export default function useAccountSaveVerify({
   useEffect(() => {
     saveAndVerifyRunId.current += 1;
     setSaveAndVerifyRunning(false);
+    setAccountSettingsSaving(false);
     resetSaveAndVerifyReport();
     setConnectionReport(null);
     setCredentialVerification(null);
@@ -75,11 +84,11 @@ export default function useAccountSaveVerify({
     }
   }, [authTypeChanged, setCredentialVerification]);
 
-  const applySavedAccount = useCallback((updated: Account) => {
+  const applySavedAccount = useCallback((updated: Account, draft: Account) => {
     setAccount((current) => (
-      current === null || current.id === updated.id ? updated : current
+      current?.id === updated.id ? updated : current
     ));
-    setAccountForm(updated);
+    setAccountForm((current) => current === draft ? updated : current);
     setAccounts((current) => current.map((item) => (item.id === updated.id ? updated : item)));
   }, [setAccount, setAccountForm, setAccounts]);
 
@@ -88,22 +97,27 @@ export default function useAccountSaveVerify({
       accountId: draft.id,
       input: draft,
     });
-    applySavedAccount(updated);
+    if (updated.id !== draft.id) throw new Error('账号保存结果与请求不匹配');
+    applySavedAccount(updated, draft);
     return updated;
   }, [applySavedAccount]);
 
   const saveSettings = useCallback(async (): Promise<Account | null> => {
-    if (!accountForm || accountSettingsSaving || saveAndVerifyRunning) return null;
+    if (!accountForm || operationRef.current || accountSettingsSaving || saveAndVerifyRunning) return null;
+    const operation = Symbol();
+    operationRef.current = operation;
+    const runId = saveAndVerifyRunId.current;
     setAccountSettingsSaving(true);
     try {
       const updated = await persistAccountSettings(accountForm);
-      setStatus('账号和同步设置已保存');
+      if (saveAndVerifyRunId.current === runId) setStatus('账号和同步设置已保存');
       return updated;
     } catch (error) {
+      if (saveAndVerifyRunId.current !== runId) return null;
       setStatus(`账号设置保存失败：${String(error)}`);
       throw error;
     } finally {
-      setAccountSettingsSaving(false);
+      if (operationRef.current === operation) { operationRef.current = null; setAccountSettingsSaving(false); }
     }
   }, [
     accountForm,
@@ -114,7 +128,9 @@ export default function useAccountSaveVerify({
   ]);
 
   const saveAndVerify = useCallback(async (): Promise<SaveAndVerifyReport | null> => {
-    if (!accountForm || saveAndVerifyRunning || accountSettingsSaving) return null;
+    if (!accountForm || operationRef.current || saveAndVerifyRunning || accountSettingsSaving) return null;
+    const operation = Symbol();
+    operationRef.current = operation;
     const draft = accountForm;
     const runId = ++saveAndVerifyRunId.current;
     const authChangedBeforeSave = authTypeChanged;
@@ -177,7 +193,7 @@ export default function useAccountSaveVerify({
       }
 
       activeStage = 'credential';
-      publish('credential', 'running', '正在检查系统凭据');
+      publish('credential', 'running', '正在检查本机凭据');
       const credential = await invoke<CredentialStatus>(IPC.CheckAccountSecret, {
         accountEmail: updated.email,
       });
@@ -199,14 +215,14 @@ export default function useAccountSaveVerify({
         publish(
           'credential',
           'needs_auth',
-          draft.auth_type === 'oauth2' ? '尚未保存 OAuth2 Token' : '尚未保存客户端授权码',
+          draft.auth_type === 'oauth2' ? '尚未保存 OAuth2 Token' : credential.message,
         );
         publish('incoming', 'needs_auth', '等待保存凭据');
         publish('smtp', 'needs_auth', '等待保存凭据');
         setStatus(report.summary);
         return report;
       }
-      publish('credential', 'success', '系统凭据已保存');
+      publish('credential', 'success', '本机凭据已保存');
 
       activeStage = 'incoming';
       publish('incoming', 'running', '正在验证收信登录');
@@ -234,7 +250,7 @@ export default function useAccountSaveVerify({
         smtpCheck?.authenticated ? '发信认证成功' : '发信认证失败',
         smtpCheck?.message,
       );
-      if (verification.status !== 'credential_error') {
+      if (!['credential_error', 'verification_stale'].includes(verification.status)) {
         updateProviderVerification(
           updated.provider,
           credentialVerificationPatch(verification, updated.auth_type),
@@ -245,9 +261,10 @@ export default function useAccountSaveVerify({
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       publish(activeStage, 'error', '操作失败', message);
-      setStatus(`保存并验证失败：${message}`);
+      if (saveAndVerifyRunId.current === runId) setStatus(`保存并验证失败：${message}`);
       return report;
     } finally {
+      if (operationRef.current === operation) operationRef.current = null;
       if (saveAndVerifyRunId.current === runId) {
         setSaveAndVerifyRunning(false);
       }

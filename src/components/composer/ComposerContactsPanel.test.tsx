@@ -263,7 +263,7 @@ describe('ComposerContactsPanel', () => {
     );
 
     const button = screen.getByRole('button', { name: '扫描同步最近联系人' });
-    expect(button.getAttribute('title')).toBe('通过扫描已发送邮件头，获取联系人的姓名(若设置了别名)、邮箱地址等');
+    expect(button.getAttribute('title')).toBe('扫描所有邮件头，收集联系人姓名、邮箱和别名');
     fireEvent.click(button);
     await waitFor(() => expect(onScanRecentContacts).toHaveBeenCalledTimes(1));
   });

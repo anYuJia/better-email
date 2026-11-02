@@ -109,7 +109,7 @@ function ThreadReaderList({
     {
       id: 'thread-forward',
       label: '转发最新邮件',
-      icon: <Forward size={15} />,
+      icon: <Forward size={16} />,
       disabled: !activeThreadSelected,
       onSelect: () => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'forward'),
     },
@@ -126,6 +126,7 @@ function ThreadReaderList({
         <div className="reader-actions">
           <div className="reader-action-group reader-response-actions" role="group" aria-label="回复操作">
             <button
+              type="button"
               className="primary-action"
               title="回复最新邮件"
               onClick={() => activeThreadSelected && onComposeFromMessage(activeThreadSelected, 'reply')}

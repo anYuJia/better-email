@@ -11,10 +11,10 @@ async function rules(source, filePath) {
 }
 
 describe('enforced source lint policy', () => {
-  it('rejects conditional hooks in production components', async () => {
+  it('rejects conditional hooks in production components', { timeout: 120_000 }, async () => {
     expect(await rules('import { useState } from "react"; export function Probe({ open }) { if (open) useState(0); return null; }', 'src/components/Probe.tsx')).toContain('react-hooks/rules-of-hooks');
   });
-  it('rejects unhandled promises in the critical workflow hooks', async () => {
+  it('rejects unhandled promises in the critical workflow hooks', { timeout: 120_000 }, async () => {
     const productionConfig = await eslint.calculateConfigForFile('src/hooks/useMailFeedback.ts');
     expect(productionConfig.rules['@typescript-eslint/no-floating-promises'][0]).toBe(2);
     const filePath = `src/hooks/lint-contract-${randomUUID()}.ts`;

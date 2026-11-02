@@ -1,6 +1,5 @@
 import {
   Check,
-  CheckCircle2,
   Copy,
   KeyRound,
   Link2,
@@ -9,13 +8,15 @@ import {
   Save,
   ShieldAlert,
   X,
-  XCircle,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import type { AiServiceConfig } from '../../app/types/ai';
 import { copyTextToClipboard } from '../../app/clipboard';
+import { secretDraftLabel } from '../../app/aiServiceConfig';
+import type { MessageToast } from '../MessageToastStack';
 import useAiService from '../../hooks/useAiService';
+import AiSettingsLoadNotice from './AiSettingsLoadNotice';
 import useModalAccessibility from '../../hooks/useModalAccessibility';
 import {
   SettingsBadge,
@@ -47,15 +48,12 @@ type McpConnectionGuideProps = {
   testing: boolean;
   saving: boolean;
   saveError: string | null;
-  testResult: {
-    ok: boolean;
-    message: string;
-    latencyMs?: number;
-  } | null;
+  testResult: { ok: boolean; message: string } | null;
   patchConfig: (patch: Partial<AiServiceConfig>) => void;
   onTestConnection: () => void;
   onSave: () => void;
   onClose: () => void;
+  onNotify?: (message: string, tone?: MessageToast['tone']) => void;
 };
 
 function McpConnectionGuide({
@@ -70,10 +68,10 @@ function McpConnectionGuide({
   onTestConnection,
   onSave,
   onClose,
+  onNotify,
 }: McpConnectionGuideProps) {
   const [activeTab, setActiveTab] = useState<McpGuideTab>('connection');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [copyError, setCopyError] = useState(false);
   const dialogRef = useRef<HTMLElement | null>(null);
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -85,8 +83,8 @@ function McpConnectionGuide({
   const connectionInfo = useMemo(() => [
     'MCP 连接信息',
     `服务端点：${endpoint || '待填写'}`,
-    `访问 Token：${token || (providerHasApiKey ? '（已保存，未回显）' : '（待填写）')}`,
-    '连接方式：MCP Streamable HTTP / SSE',
+    `访问 Token：${token ? '（已输入，复制时不包含）' : (providerHasApiKey ? '（已保存，未回显）' : '（未配置）')}`,
+    '连接方式：MCP Streamable HTTP（支持 SSE 响应）',
   ].join('\n'), [endpoint, providerHasApiKey, token]);
   const initializationPrompt = useMemo(() => (
     endpoint
@@ -99,6 +97,7 @@ function McpConnectionGuide({
     backdropRef,
     initialFocusRef: closeButtonRef,
     onEscape: onClose,
+    escapeDisabled: saving,
   });
 
   useEffect(() => () => {
@@ -109,7 +108,6 @@ function McpConnectionGuide({
     try {
       await copyTextToClipboard(value);
       setCopiedKey(key);
-      setCopyError(false);
       if (copyTimerRef.current !== null) window.clearTimeout(copyTimerRef.current);
       copyTimerRef.current = window.setTimeout(() => {
         copyTimerRef.current = null;
@@ -117,7 +115,7 @@ function McpConnectionGuide({
       }, 1800);
     } catch {
       setCopiedKey(null);
-      setCopyError(true);
+      onNotify?.('复制失败，请手动选择文本复制。', 'error');
     }
   };
 
@@ -130,6 +128,11 @@ function McpConnectionGuide({
   };
 
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      selectTab(event.key === 'Home' ? 'connection' : 'prompts', true);
+      return;
+    }
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowDown'
       && event.key !== 'ArrowLeft' && event.key !== 'ArrowUp') return;
     event.preventDefault();
@@ -152,12 +155,13 @@ function McpConnectionGuide({
         aria-modal="true"
         aria-labelledby="settings-mcp-guide-title"
         tabIndex={-1}
+        aria-busy={saving}
       >
         <header className="settings-mcp-guide-header">
           <span className="settings-mcp-guide-mark" aria-hidden="true"><PlugZap size={18} /></span>
           <span className="settings-mcp-guide-heading">
             <strong id="settings-mcp-guide-title">连接 MCP 服务</strong>
-            <small>填入服务信息，复制初始化提示词，完成一次配置。</small>
+            <small>填入服务信息，测试连接后保存。</small>
           </span>
           <button
             ref={closeButtonRef}
@@ -165,6 +169,7 @@ function McpConnectionGuide({
             className="settings-mcp-guide-close"
             aria-label="关闭 MCP 连接向导"
             title="关闭"
+            disabled={saving}
             onClick={onClose}
           >
             <X size={17} aria-hidden="true" />
@@ -203,6 +208,7 @@ function McpConnectionGuide({
         </div>
 
         <div className="settings-mcp-guide-content">
+          {saveError && <SettingsNotice tone="danger" title="保存失败"><p>{saveError}</p></SettingsNotice>}
           {activeTab === 'connection' ? (
             <div
               className="settings-mcp-guide-panel"
@@ -223,7 +229,7 @@ function McpConnectionGuide({
               <SettingsField
                 label="MCP 服务端点"
                 htmlFor="settings-mcp-endpoint"
-                hint="支持服务商提供的 Streamable HTTP 或 SSE 地址。"
+                hint="填写 Streamable HTTP 端点；暂不支持旧版 HTTP+SSE 或 stdio。"
               >
                 <input
                   id="settings-mcp-endpoint"
@@ -232,6 +238,7 @@ function McpConnectionGuide({
                   value={config.mcpEndpoint ?? ''}
                   placeholder="https://example.com/mcp"
                   autoComplete="url"
+                  disabled={saving}
                   onChange={(event) => patchConfig({ mcpEndpoint: event.target.value })}
                 />
               </SettingsField>
@@ -239,7 +246,7 @@ function McpConnectionGuide({
               <SettingsField
                 label="访问 Token"
                 htmlFor="settings-mcp-token"
-                hint="Token 只保存在 Better Email 的本地设置中，不会写入复制的提示词。"
+                hint="按需填写；无认证的本地服务可留空。Token 保存在本地，不会写入提示词。"
               >
                 <div className="settings-mcp-token-row">
                   <input
@@ -249,12 +256,14 @@ function McpConnectionGuide({
                     value={config.mcpApiKey ?? ''}
                     placeholder={providerHasApiKey ? '已保存，留空保持不变' : '粘贴服务商提供的 Token'}
                     autoComplete="off"
+                    disabled={saving}
                     onChange={(event) => patchConfig({ mcpApiKey: event.target.value })}
                   />
                   {providerHasApiKey && !token ? (
                     <SettingsButton
                       size="sm"
                       variant="ghost"
+                      disabled={saving}
                       onClick={() => patchConfig({ clearMcpApiKey: true, hasMcpApiKey: false })}
                     >
                       清除 Token
@@ -262,7 +271,7 @@ function McpConnectionGuide({
                   ) : (
                     <span className="settings-mcp-token-state">
                       <KeyRound size={12} aria-hidden="true" />
-                      {providerHasApiKey ? '已保存' : '未保存'}
+                      {secretDraftLabel(providerHasApiKey, token, config.clearMcpApiKey === true)}
                     </span>
                   )}
                 </div>
@@ -276,6 +285,7 @@ function McpConnectionGuide({
                 label="允许向此服务发送邮件内容"
                 description="连接测试只验证服务，不代表邮件内容已经发送。"
                 checked={config.privacyAcknowledged}
+                disabled={saving}
                 onChange={(checked) => patchConfig({ privacyAcknowledged: checked })}
               />
 
@@ -295,33 +305,24 @@ function McpConnectionGuide({
                   </SettingsButton>
                 </div>
                 <pre>{connectionInfo}</pre>
-                <small>出于安全原因，已保存的 Token 不会回显；需要复制完整信息时请重新输入 Token。</small>
+                <small>连接摘要不包含 Token；请在接收客户端单独填写凭据。</small>
               </div>
 
               <div className="st-actions settings-mcp-guide-actions">
                 <SettingsButton
                   onClick={onTestConnection}
-                  disabled={testing || !endpoint || !config.enabled}
+                  disabled={testing || saving || !endpoint}
                   icon={testing ? <LoaderCircle className="settings-action-spinner" size={14} /> : <PlugZap size={14} />}
                 >
                   {testing ? '测试中…' : '测试连接'}
                 </SettingsButton>
-                {!config.enabled && (
-                  <span className="settings-mcp-action-hint">请先在“AI 接入”中启用 AI 功能。</span>
-                )}
               </div>
-
               {testResult && (
-                <div className={`settings-ai-test-result${testResult.ok ? ' ok' : ' fail'}`} role={testResult.ok ? 'status' : 'alert'}>
-                  {testResult.ok ? <CheckCircle2 size={15} /> : <XCircle size={15} />}
-                  <span>{testResult.message}</span>
-                  {typeof testResult.latencyMs === 'number' && testResult.latencyMs > 0 && (
-                    <em>{testResult.latencyMs} ms</em>
-                  )}
-                </div>
+                <SettingsNotice tone={testResult.ok ? 'success' : 'danger'} title={testResult.ok ? '连接正常' : '连接失败'}>
+                  <p>{testResult.message}</p>
+                </SettingsNotice>
               )}
 
-              {saveError && <p className="settings-ai-save-error" role="alert">{saveError}</p>}
             </div>
           ) : (
             <div
@@ -377,9 +378,6 @@ function McpConnectionGuide({
                 })}
               </div>
 
-              {copyError && (
-                <p className="settings-mcp-copy-error" role="alert">复制失败，请手动选择文本复制。</p>
-              )}
             </div>
           )}
         </div>
@@ -387,7 +385,7 @@ function McpConnectionGuide({
         <footer className="settings-mcp-guide-footer">
           <span>{openedFromEnable ? '保存后 MCP 才会正式启用。' : '修改只在保存后生效。'}</span>
           <div>
-            <SettingsButton onClick={onClose}>取消</SettingsButton>
+            <SettingsButton onClick={onClose} disabled={saving}>取消</SettingsButton>
             <SettingsButton
               variant="primary"
               aria-label={openedFromEnable ? '保存并启用' : '保存设置'}
@@ -412,23 +410,48 @@ function getMcpStatus(
   if (!enabled) return { tone: 'neutral', label: '未启用' };
   if (!endpoint) return { tone: 'warning', label: '待配置' };
   if (testResult?.ok) return { tone: 'success', label: '连接正常' };
+  if (testResult) return { tone: 'warning', label: '连接失败' };
   return { tone: 'info', label: '待测试' };
 }
 
-export default function McpSettings() {
+type McpSettingsProps = {
+  onNotify?: (message: string, tone?: MessageToast['tone']) => void;
+};
+
+export default function McpSettings({ onNotify }: McpSettingsProps = {}) {
   const {
     config,
     patchConfig,
     testing,
     saving,
-    saveError,
     testResult,
+    saveError,
+    secretsLoaded,
+    loadError,
+    reloadConfig,
     saveConfig,
     runTestConnection,
-  } = useAiService({ setStatus: () => undefined, serviceType: 'mcp' });
+  } = useAiService({ onNotify, serviceType: 'mcp' });
   const [guideOpen, setGuideOpen] = useState(false);
   const [openedFromEnable, setOpenedFromEnable] = useState(false);
   const guideSnapshotRef = useRef<AiServiceConfig | null>(null);
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const guideWasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (guideOpen) {
+      guideWasOpenRef.current = true;
+      return;
+    }
+    if (!guideWasOpenRef.current) return;
+    guideWasOpenRef.current = false;
+    const frame = window.requestAnimationFrame(() => {
+      if (document.activeElement === document.body) {
+        pageRef.current?.querySelector<HTMLInputElement>('input[aria-label="启用 MCP"]')?.focus();
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [guideOpen]);
 
   const connectorEnabled = config.mcpEnabled === true;
   const endpoint = config.mcpEndpoint?.trim() ?? '';
@@ -446,6 +469,7 @@ export default function McpSettings() {
       setOpenedFromEnable(false);
       setGuideOpen(false);
       patchConfig({ mcpEnabled: false });
+      saveConfig({ mcpEnabled: false }, { persistedOnly: true }).catch(() => patchConfig({ mcpEnabled: connectorEnabled }));
       return;
     }
 
@@ -454,6 +478,7 @@ export default function McpSettings() {
   };
 
   const closeGuide = () => {
+    if (saving) return;
     if (guideSnapshotRef.current) patchConfig(guideSnapshotRef.current);
     guideSnapshotRef.current = null;
     setOpenedFromEnable(false);
@@ -471,7 +496,8 @@ export default function McpSettings() {
   };
 
   return (
-    <div className="settings-mcp-page-stack">
+    <div className="settings-mcp-page-stack" ref={pageRef}>
+      <AiSettingsLoadNotice loaded={secretsLoaded} error={loadError} onRetry={reloadConfig} />
       <SettingsSection
         title="连接状态"
         description="连接外部 MCP 服务，为 AI 功能提供工具能力。"
@@ -483,6 +509,7 @@ export default function McpSettings() {
           description="开启后立即打开连接向导，填入服务商提供的地址和 Token。"
           ariaLabel="启用 MCP"
           checked={connectorEnabled}
+          disabled={saving || !secretsLoaded}
           onChange={handleMcpEnabledChange}
         />
         {connectorEnabled && !config.enabled && (
@@ -504,7 +531,7 @@ export default function McpSettings() {
               <strong>{endpoint || '尚未配置 MCP 服务端点'}</strong>
               <small>{endpoint ? '外部 MCP 服务端点' : '开启连接向导后填写服务商提供的地址'}</small>
             </span>
-            <SettingsButton size="sm" variant="ghost" onClick={() => openGuide(false)}>
+            <SettingsButton size="sm" variant="ghost" disabled={saving || !secretsLoaded} onClick={() => openGuide(false)}>
               查看连接信息
             </SettingsButton>
           </div>
@@ -515,7 +542,7 @@ export default function McpSettings() {
               <strong>配置 MCP 服务端点</strong>
               <small>开启 MCP 后会直接弹出连接信息、Token 输入和初始化提示词。</small>
             </span>
-            <SettingsButton size="sm" variant="ghost" onClick={() => handleMcpEnabledChange(true)}>
+            <SettingsButton size="sm" variant="ghost" disabled={saving || !secretsLoaded} onClick={() => handleMcpEnabledChange(true)}>
               开始配置
             </SettingsButton>
           </div>
@@ -535,6 +562,7 @@ export default function McpSettings() {
           onTestConnection={runTestConnection}
           onSave={saveAndCloseGuide}
           onClose={closeGuide}
+          onNotify={onNotify}
         />
       )}
     </div>

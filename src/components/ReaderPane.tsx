@@ -80,6 +80,7 @@ export type ReaderPaneProps = {
   selectedWarnExternalSender: boolean;
   selectedInterceptsHttps: boolean;
   onOpenHttpsLink: (href: string) => void;
+  onAiError?: (message: string) => void;
   quickReplyBody: string;
   readerReplyRef?: MutableRefObject<ReaderReplyTarget | null>;
   quickReplyComposerActive?: boolean;
@@ -167,6 +168,7 @@ function ReaderPane({
   selectedWarnExternalSender,
   selectedInterceptsHttps,
   onOpenHttpsLink,
+  onAiError,
   quickReplyBody,
   readerReplyRef,
   quickReplyComposerActive,
@@ -417,7 +419,7 @@ function ReaderPane({
     translationState,
     translate: translateMessage,
     toggleTranslation,
-  } = useMessageTranslation(requiresExplicitRender ? null : selected, {});
+  } = useMessageTranslation(requiresExplicitRender ? null : selected, { sourceHtml: readerHtml, onError: onAiError });
 
   if (activeThread && threadMessages.length > 0) {
     return (
@@ -617,6 +619,12 @@ function ReaderPane({
           onAllowRemoteImagesOnce={onAllowRemoteImagesOnce}
           onOpenLink={onOpenHttpsLink}
           onComposeNew={onComposeNew}
+          translation={translationState.status === 'success' && translationState.showTranslation
+            ? {
+              format: translationState.format,
+              content: translationState.translation,
+            }
+            : null}
           bodyFetchStatus={activeBodyFetchState?.status ?? null}
           bodyFetchError={activeBodyFetchState?.error ?? null}
           onRetryBodyFetch={() => onFetchBody(false)}
@@ -625,7 +633,6 @@ function ReaderPane({
         <ReaderTranslationPanel
           state={translationState}
           needsTranslation={needsTranslation}
-          onTranslate={translateMessage}
           onToggle={toggleTranslation}
         />
 

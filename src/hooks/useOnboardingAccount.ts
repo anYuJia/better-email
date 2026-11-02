@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useMemo, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type { Account } from '../app/types';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
@@ -11,9 +11,31 @@ type Options = {
   setAccounts: Dispatch<SetStateAction<Account[]>>;
   setStatus: Dispatch<SetStateAction<string>>;
   mailboxRefreshRef: MutableRefObject<number>;
+  completedOnboardingAccountIdsRef: MutableRefObject<Set<number>>;
 };
 
-export default function useOnboardingAccount({ account, accounts, setAccount, setAccountForm, setAccounts, setStatus, mailboxRefreshRef }: Options) {
+export function usePendingOnboardingAccount(
+  account: Account | null,
+  standaloneSettingsWindow: boolean,
+  completedIds: MutableRefObject<Set<number>>,
+) {
+  return useMemo(() => (
+    // A secondary settings window must not mount initial onboarding again.
+    !standaloneSettingsWindow && account && !account.onboarding_completed
+      && !completedIds.current.has(account.id) ? account : null
+  ), [account, completedIds, standaloneSettingsWindow]);
+}
+
+export default function useOnboardingAccount({
+  account,
+  accounts,
+  setAccount,
+  setAccountForm,
+  setAccounts,
+  setStatus,
+  mailboxRefreshRef,
+  completedOnboardingAccountIdsRef,
+}: Options) {
   const apply = useCallback((updated: Account) => {
     setAccount(updated);
     setAccountForm(updated);
@@ -27,8 +49,10 @@ export default function useOnboardingAccount({ account, accounts, setAccount, se
   }, [account, accounts, apply]);
   const completeOnboarding = useCallback(async (accountId: number) => {
     mailboxRefreshRef.current += 1;
-    apply(await invoke<Account>(IPC.SetAccountOnboardingCompleted, { accountId, completed: true }));
+    const updated = await invoke<Account>(IPC.SetAccountOnboardingCompleted, { accountId, completed: true });
+    completedOnboardingAccountIdsRef.current.add(accountId);
+    apply(updated);
     setStatus('首次引导已完成，可随时在设置页调整');
-  }, [apply, mailboxRefreshRef, setStatus]);
+  }, [apply, completedOnboardingAccountIdsRef, mailboxRefreshRef, setStatus]);
   return { handleOnboardingAccountPatch, completeOnboarding };
 }

@@ -11,6 +11,7 @@ const standaloneSource = readFileSync(
   'utf8',
 );
 const appSource = readFileSync(join(repoRoot, 'src/App.tsx'), 'utf8');
+const onboardingSource = readFileSync(join(repoRoot, 'src/hooks/useOnboardingAccount.ts'), 'utf8');
 const navigationSource = readFileSync(
   join(repoRoot, 'src/hooks/useMailboxNavigation.ts'),
   'utf8',
@@ -57,6 +58,8 @@ describe('standalone settings native-window lifecycle contract', () => {
     expect(rootSource).toContain('<StandaloneSettingsApp />');
     expect(appSource).toContain('{standaloneSettingsWindow ? null : isMobileApp ? (');
     expect(appSource).toContain('standalone={standaloneSettingsWindow}');
+    expect(appSource).toMatch(/const pendingOnboardingAccount = usePendingOnboardingAccount\(\s*account, standaloneSettingsWindow,/);
+    expect(onboardingSource).toMatch(/export function usePendingOnboardingAccount[\s\S]*?!standaloneSettingsWindow && account/);
   });
 
   it('defaults every settings entry point to the general page', () => {

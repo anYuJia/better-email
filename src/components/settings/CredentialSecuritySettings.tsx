@@ -21,6 +21,7 @@ import {
 
 type CredentialSecuritySettingsProps = {
   account: Account;
+  credentialBusy?: boolean;
   credentialSecret: string;
   credentialStatus: CredentialStatus | null;
   authTypeChangeNotice?: string | null;
@@ -32,6 +33,7 @@ type CredentialSecuritySettingsProps = {
 
 export default function CredentialSecuritySettings({
   account,
+  credentialBusy = false,
   credentialSecret,
   credentialStatus,
   authTypeChangeNotice,
@@ -87,10 +89,15 @@ export default function CredentialSecuritySettings({
         </p>
       )}
 
+      {activeCredentialStatus && !activeCredentialStatus.exists && (
+        <p className="settings-auth-change-notice" role="status">{activeCredentialStatus.message}</p>
+      )}
+
       <SettingsField label={guidance.credentialLabel} hint={guidance.verificationHint}>
         <div className="credential-input-shell">
           <input
             aria-label={guidance.credentialLabel}
+            disabled={credentialBusy}
             autoCapitalize="none"
             autoComplete="new-password"
             placeholder={guidance.placeholder}
@@ -136,7 +143,7 @@ export default function CredentialSecuritySettings({
       <div className="st-actions">
         <SettingsButton
           variant="danger-secondary"
-          disabled={activeCredentialStatus?.exists === false}
+          disabled={credentialBusy || !activeCredentialStatus || ['not_found', 'deleted'].includes(activeCredentialStatus.status)}
           icon={<Trash2 size={14} />}
           onClick={onDeleteCredential}
         >
@@ -144,11 +151,13 @@ export default function CredentialSecuritySettings({
         </SettingsButton>
         <SettingsButton
           variant="primary"
+          disabled={credentialBusy}
+          aria-busy={credentialBusy}
           title={hasSecret ? '保存到本地数据库后立即验证 IMAP 与 SMTP 登录' : '验证已保存的 IMAP 与 SMTP 凭据'}
           icon={<BadgeCheck size={14} />}
           onClick={hasSecret ? onStoreAndVerifyCredential : onVerifyCredential}
         >
-          {hasSecret ? '保存并验证' : '验证登录'}
+          {credentialBusy ? '正在保存并验证…' : hasSecret ? '保存并验证' : '验证登录'}
         </SettingsButton>
       </div>
     </SettingsSection>

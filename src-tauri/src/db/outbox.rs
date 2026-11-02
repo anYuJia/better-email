@@ -502,25 +502,27 @@ impl MailStore {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
             let conn = &transaction;
-            conn.execute(
+            let affected = conn.execute(
                 "
                 UPDATE outbox_queue
                 SET status = 'sent',
                     last_error = '',
                     next_attempt_at = ''
-                WHERE message_id = ?1
+                WHERE message_id = ?1 AND status IN ('sent_remote_pending', 'archiving')
                 ",
                 params![message_id],
             )?;
-            conn.execute(
-                "
+            if affected == 1 {
+                conn.execute(
+                    "
                 UPDATE messages
                 SET remote_mailbox = ?1,
                     remote_uid = ?2
                 WHERE id = ?3
                 ",
-                params![remote_mailbox.trim(), remote_uid.max(0), message_id],
-            )?;
+                    params![remote_mailbox.trim(), remote_uid.max(0), message_id],
+                )?;
+            }
             transaction.commit()?;
             Ok(())
         })
@@ -538,9 +540,13 @@ impl MailStore {
                 SET status = 'sent_remote_pending',
                     last_error = ?1,
                     next_attempt_at = ?2
-                WHERE message_id = ?3
+                WHERE message_id = ?3 AND status IN ('sent_remote_pending', 'archiving')
                 ",
-                params![error.trim(), next_attempt_at, message_id],
+                params![
+                    error.trim().chars().take(500).collect::<String>(),
+                    next_attempt_at,
+                    message_id
+                ],
             )?;
             Ok(())
         })
@@ -592,17 +598,12 @@ impl MailStore {
     }
     pub fn flush_outbox_dry_run(&self) -> MailResult<Vec<OutboxItem>> {
         self.with_conn(|conn| {
-            let now = Utc::now().to_rfc3339();
-            conn.execute(
-                "
-                UPDATE outbox_queue
-                SET status = 'sent_dry_run', attempts = attempts + 1, last_error = '', next_attempt_at = ''
-                WHERE status IN ('queued', 'retry', 'scheduled')
-                  AND (next_attempt_at = '' OR next_attempt_at <= ?1)
-                ",
-                params![now],
+            let transaction = rusqlite::Transaction::new_unchecked(
+                conn,
+                rusqlite::TransactionBehavior::Immediate,
             )?;
-            conn.execute(
+            let now = Utc::now().to_rfc3339();
+            transaction.execute(
                 "
                 UPDATE messages
                 SET folder_id = (
@@ -611,23 +612,25 @@ impl MailStore {
                     WHERE f.account_id = messages.account_id AND f.role = 'sent'
                     LIMIT 1
                 )
-                WHERE id IN (SELECT message_id FROM outbox_queue WHERE status = 'sent_dry_run')
+                WHERE id IN (
+                    SELECT message_id FROM outbox_queue
+                    WHERE status IN ('queued', 'retry', 'scheduled')
+                      AND (next_attempt_at = '' OR julianday(next_attempt_at) <= julianday(?1))
+                )
                 ",
-                [],
+                params![now],
             )?;
-            let mut stmt = conn.prepare(
+            transaction.execute(
                 "
-                SELECT q.id, q.message_id, m.recipients, m.subject, q.status, q.attempts,
-                       q.last_error, q.queued_at, q.next_attempt_at
-                FROM outbox_queue q
-                JOIN messages m ON m.id = q.message_id
-                ORDER BY q.queued_at DESC
-                LIMIT 50
+                UPDATE outbox_queue
+                SET status = 'sent_dry_run', attempts = attempts + 1, last_error = '', next_attempt_at = ''
+                WHERE status IN ('queued', 'retry', 'scheduled')
+                  AND (next_attempt_at = '' OR julianday(next_attempt_at) <= julianday(?1))
                 ",
+                params![now],
             )?;
-            let items = stmt
-                .query_map([], map_outbox_item)?
-                .collect::<Result<Vec<_>, _>>()?;
+            let items = list_outbox_for_conn(&transaction)?;
+            transaction.commit()?;
             Ok(items)
         })
     }
@@ -1096,6 +1099,99 @@ mod claim_tests {
             .count();
         assert_eq!(claimed, 1);
         assert!(store.pending_outbox_messages().unwrap().is_empty());
+    }
+
+    #[test]
+    fn concurrent_workers_claim_high_volume_retry_items_only_once() {
+        // 压力路径：多个发送 worker 同时处理一批已进入 retry 的邮件时，
+        // 每个 message 只能被一个 worker 抢到，避免重复投递。
+        const MESSAGE_COUNT: usize = 128;
+        const WORKER_COUNT: usize = 16;
+        let (dir, store) = fixture();
+        let other = MailStore::open_at_with_seed(dir.path().join("test.sqlite3"), true).unwrap();
+        let message_ids = (0..MESSAGE_COUNT)
+            .map(|index| {
+                let mut input = draft();
+                input.subject = format!("Retry pressure {index}");
+                let item = store.queue_outbox_message(input).unwrap();
+                store
+                    .mark_outbox_failed(item.message_id, "simulated temporary SMTP failure")
+                    .unwrap();
+                item.message_id
+            })
+            .collect::<Vec<_>>();
+        // 让这一轮 retry 立即到期，模拟调度器在重试窗口到达后的批量唤醒。
+        store
+            .with_conn(|conn| {
+                conn.execute(
+                    "UPDATE outbox_queue SET next_attempt_at = '' WHERE status = 'retry'",
+                    [],
+                )?;
+                Ok(())
+            })
+            .unwrap();
+
+        let barrier = Arc::new(Barrier::new(WORKER_COUNT));
+        let workers = (0..WORKER_COUNT)
+            .map(|index| {
+                let worker_store = if index % 2 == 0 {
+                    store.clone()
+                } else {
+                    other.clone()
+                };
+                let ids = message_ids.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    ids.into_iter()
+                        .filter(|message_id| {
+                            worker_store.claim_outbox_message(*message_id).unwrap()
+                        })
+                        .collect::<Vec<_>>()
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut claimed_ids = workers
+            .into_iter()
+            .flat_map(|worker| worker.join().expect("worker joined"))
+            .collect::<Vec<_>>();
+        claimed_ids.sort_unstable();
+        let mut expected_ids = message_ids.clone();
+        expected_ids.sort_unstable();
+        assert_eq!(claimed_ids, expected_ids);
+        assert!(store.pending_outbox_messages().unwrap().is_empty());
+    }
+
+    #[test]
+    fn repeated_transient_failures_advance_retry_attempts_without_duplicate_rows() {
+        let (_dir, store) = fixture();
+        let item = store.queue_outbox_message(draft()).unwrap();
+
+        for expected_attempts in 1..=8 {
+            store
+                .mark_outbox_failed(item.message_id, "simulated temporary SMTP failure")
+                .unwrap();
+            let current = store
+                .list_outbox()
+                .unwrap()
+                .into_iter()
+                .find(|candidate| candidate.id == item.id)
+                .expect("retry row remains visible");
+            assert_eq!(current.status, "retry");
+            assert_eq!(current.attempts, expected_attempts);
+            assert!(!current.next_attempt_at.is_empty());
+        }
+
+        let row_count: i64 = store
+            .with_conn(|conn| {
+                Ok(conn.query_row(
+                    "SELECT COUNT(*) FROM outbox_queue WHERE message_id = ?1",
+                    params![item.message_id],
+                    |row| row.get(0),
+                )?)
+            })
+            .unwrap();
+        assert_eq!(row_count, 1, "重试只更新原队列记录，不应产生重复发件记录");
     }
 
     #[test]
@@ -1641,3 +1737,7 @@ mod sent_attachment_tests {
         assert_eq!(after, before);
     }
 }
+
+#[cfg(test)]
+#[path = "outbox_lifecycle_tests.rs"]
+mod lifecycle_tests;

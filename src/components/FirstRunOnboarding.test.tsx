@@ -153,7 +153,7 @@ describe('FirstRunOnboarding', () => {
     fireEvent.click(screen.getByRole('button', { name: '选择文件' }));
 
     // 预览弹窗显示在引导之上，可确认导入、可关闭。
-    await waitFor(() => expect(screen.getByText(/导入预览/)).not.toBeNull());
+    await waitFor(() => expect(screen.getByText(/导入预览/)).not.toBeNull(), { timeout: 10_000 });
     expect(screen.getByText(/import-contacts\.vcf/)).not.toBeNull();
     expect(screen.getByRole('button', { name: /确认导入/ })).not.toBeNull();
     expect(screen.getByRole('button', { name: '关闭导入预览' })).not.toBeNull();

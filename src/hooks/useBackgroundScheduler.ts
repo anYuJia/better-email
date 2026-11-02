@@ -1,5 +1,5 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
-import type { Account, OutboxItem } from '../app/types';
+import type { Account, OutboxItem, CredentialStatus } from '../app/types';
 import type { PendingSendUndo } from '../components/UndoSnackbarStack';
 import { syncIntervalMs } from '../mailUtils';
 import {
@@ -10,7 +10,8 @@ import {
   syncModeStatus,
 } from '../app/backgroundTaskFlow';
 import { syncRetryDelayMs } from '../app/syncRetryPolicy';
-import { isPermissionGranted } from '../tauriBridge';
+import { isPermissionGranted, invoke } from '../tauriBridge';
+import { IPC } from '../ipc/commands';
 
 type BackgroundSchedulerOptions = {
   enabled?: boolean;
@@ -145,10 +146,18 @@ export default function useBackgroundScheduler({
         failureAttempt,
       });
       try {
+        const health = await invoke<CredentialStatus[]>(IPC.ListAccountCredentialStatuses);
+        if (cancelled) return;
+        if (!health.some((item) => item.exists)) {
+          setBackgroundSyncStatus('后台同步已暂停：请在“登录与安全”修复本机凭据');
+          scheduleNext(intervalMs);
+          return;
+        }
         await enqueueBackgroundTaskRef.current('sync', 'timer');
         failureAttempt = 0;
         if (!cancelled) scheduleNext(intervalMs);
       } catch (error) {
+        if (cancelled) return;
         failureAttempt += 1;
         const retryDelayMs = syncRetryDelayMs(failureAttempt, intervalMs);
         fetchTimerWarn('enqueue failed; retry scheduled', {

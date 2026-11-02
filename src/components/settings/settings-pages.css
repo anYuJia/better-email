@@ -32,15 +32,6 @@
   gap: 14px;
 }
 
-.settings-modal .settings-page-content .settings-inline-status {
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: var(--st-radius-md);
-  color: var(--st-text-secondary);
-  background: var(--st-info-soft);
-  font-size: var(--st-font-size-secondary);
-}
-
 /* --- About application --- */
 .settings-modal .settings-about-stack {
   display: grid;
@@ -116,17 +107,10 @@
   text-underline-offset: 2px;
 }
 
-.settings-modal .settings-about-update-status {
-  margin: 0;
-  color: var(--st-text-secondary);
-  font-size: var(--st-font-size-secondary);
-  line-height: 1.5;
-}
-
 .settings-modal .settings-about-update-result {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--st-border);
@@ -138,6 +122,13 @@
   display: grid;
   gap: 2px;
   min-width: 0;
+}
+
+.settings-modal .settings-about-update-result > .settings-about-update-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .settings-modal .settings-about-update-result strong {
@@ -158,11 +149,64 @@
   white-space: nowrap;
 }
 
+.settings-modal .settings-about-update-notes,
+.settings-modal .settings-about-update-progress,
+.settings-modal .settings-about-update-error {
+  grid-column: 1 / -1;
+}
+
+.settings-modal .settings-about-update-notes {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.settings-modal .settings-about-update-progress {
+  display: grid;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.settings-modal .settings-about-update-progress-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--st-text-secondary);
+  font-size: var(--st-font-size-aux);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-modal .settings-about-update-progress progress {
+  display: block;
+  width: 100%;
+  height: 5px;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  accent-color: var(--st-accent);
+}
+
+.settings-modal .settings-about-update-error {
+  margin: 0;
+  color: var(--st-danger);
+  font-size: var(--st-font-size-secondary);
+  line-height: 1.45;
+}
+
 
 @media (max-width: 640px) {
   .settings-modal .settings-about-update-result {
     align-items: flex-start;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-modal .settings-about-update-actions {
+    justify-content: flex-start;
   }
 }
 
@@ -2739,7 +2783,16 @@
 /* 层级契约见 styles/2026/workspace-hierarchy.css：
  * 联系人导入 portal 必须显示在设置（200）与首次引导（2500）之上。 */
 .contact-import-backdrop {
+  position: fixed;
+  inset: 0;
   z-index: 2600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: oklch(0.1 0.01 var(--primitive-hue-neutral) / 0.35);
 }
 
 /* 导入失败/解析失败/空文件/格式错误/超过大小限制等错误的可见反馈与重试入口。 */
@@ -3472,36 +3525,6 @@
   white-space: nowrap;
 }
 
-.settings-modal .settings-ai-test-result {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--st-border);
-  border-radius: var(--st-radius-md);
-  color: var(--st-text-secondary);
-  background: var(--st-surface-subtle);
-  font-size: var(--st-font-size-secondary);
-}
-
-.settings-modal .settings-ai-test-result.ok {
-  border-color: var(--st-success);
-  color: var(--st-success);
-  background: var(--st-success-soft);
-}
-
-.settings-modal .settings-ai-test-result.fail {
-  border-color: var(--st-danger);
-  color: var(--st-danger);
-  background: var(--st-danger-soft);
-}
-
-.settings-modal .settings-ai-test-result em {
-  margin-left: auto;
-  font-style: normal;
-  font-weight: 500;
-}
-
 /* --- MCP connection page and setup guide --- */
 .settings-modal .settings-mcp-page-stack {
   width: 100%;
@@ -3637,8 +3660,8 @@
 }
 
 .settings-modal .settings-mcp-guide-close {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
@@ -3920,12 +3943,6 @@
   flex: 0 0 auto;
   display: flex;
   gap: 8px;
-}
-
-.settings-modal .settings-mcp-copy-error {
-  margin: 0;
-  color: var(--st-danger);
-  font-size: var(--st-font-size-aux);
 }
 
 @keyframes settings-mcp-guide-enter {

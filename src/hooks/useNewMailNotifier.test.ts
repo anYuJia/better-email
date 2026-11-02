@@ -16,7 +16,7 @@ vi.mock('../tauriBridge', () => ({
   invoke: (command: string, args?: unknown) => invoke(command, args),
 }));
 
-function newMessage(id: number, subject: string, accountId = 1): MessageSummary {
+function newMessage(id: number, subject: string, accountId = 1, snippet = ''): MessageSummary {
   return {
     id,
     account_id: accountId,
@@ -27,7 +27,7 @@ function newMessage(id: number, subject: string, accountId = 1): MessageSummary 
     sender_email: `s${id}@example.com`,
     recipients: 'me@example.com',
     subject,
-    snippet: '',
+    snippet,
     cc: '',
     bcc: '',
     security_warnings: [],
@@ -112,6 +112,26 @@ describe('useNewMailNotifier', () => {
     const body = sendNotification.mock.calls[0][0].body as string;
     expect(body).toContain('本次新邮件');
     expect(body).not.toContain('旧的归档邮件');
+  });
+
+  it('sends the sender and content preview for one incoming message', async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === 'list_messages_by_ids') {
+        return Promise.resolve([newMessage(100, 'Review', 1, '项目已经完成，详情见附件。')]);
+      }
+      if (command === 'list_muted_thread_keys') return Promise.resolve([]);
+      return Promise.reject(new Error(`unexpected ${command}`));
+    });
+    const { result } = renderNotifier();
+
+    await act(async () => {
+      await result.current.notifyNewMail(run({ new_messages: 1, imported_messages: 1 }));
+    });
+
+    expect(sendNotification).toHaveBeenCalledWith({
+      title: 'Better Email',
+      body: 'Sender 100 · 项目已经完成，详情见附件。',
+    });
   });
 
   it('does not notify for history backfill with no new messages', async () => {

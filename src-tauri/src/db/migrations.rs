@@ -78,6 +78,7 @@ impl MailStore {
                     is_read INTEGER NOT NULL DEFAULT 0,
                     is_starred INTEGER NOT NULL DEFAULT 0,
                     has_attachments INTEGER NOT NULL DEFAULT 0,
+                    attachment_metadata_synced INTEGER NOT NULL DEFAULT 0,
                     snoozed_until TEXT NOT NULL DEFAULT '',
                     thread_key TEXT NOT NULL DEFAULT '',
                     remote_mailbox TEXT NOT NULL DEFAULT '',
@@ -173,6 +174,7 @@ impl MailStore {
                 CREATE TABLE IF NOT EXISTS contact_sync_state (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     initial_scan_completed INTEGER NOT NULL DEFAULT 0,
+                    all_mail_scan_completed INTEGER NOT NULL DEFAULT 0,
                     last_scanned_at TEXT NOT NULL DEFAULT ''
                 );
 
@@ -227,7 +229,7 @@ impl MailStore {
                 CREATE TABLE IF NOT EXISTS ai_settings (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     enabled INTEGER NOT NULL DEFAULT 0,
-                    service_type TEXT NOT NULL DEFAULT 'mock',
+                    service_type TEXT NOT NULL DEFAULT 'http',
                     endpoint TEXT NOT NULL DEFAULT '',
                     api_key TEXT NOT NULL DEFAULT '',
                     model TEXT NOT NULL DEFAULT '',
@@ -426,6 +428,12 @@ impl MailStore {
             add_column_if_missing(
                 conn,
                 "messages",
+                "attachment_metadata_synced",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            add_column_if_missing(
+                conn,
+                "messages",
                 "sanitized_html",
                 "TEXT NOT NULL DEFAULT ''",
             )?;
@@ -523,6 +531,12 @@ impl MailStore {
             add_column_if_missing(conn, "contacts", "vip", "INTEGER NOT NULL DEFAULT 0")?;
             add_column_if_missing(
                 conn,
+                "contact_sync_state",
+                "all_mail_scan_completed",
+                "INTEGER NOT NULL DEFAULT 0",
+            )?;
+            add_column_if_missing(
+                conn,
                 "mail_rules",
                 "account_id",
                 "INTEGER REFERENCES accounts(id) ON DELETE CASCADE",
@@ -604,6 +618,12 @@ impl MailStore {
                 BEFORE DELETE ON outbox_queue WHEN OLD.status = 'sending'
                 BEGIN SELECT RAISE(ABORT, '邮件正在发送，请等待结果后再删除'); END;
                 CREATE INDEX IF NOT EXISTS idx_background_tasks_status_created ON background_tasks(status, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_background_tasks_active_scope
+                    ON background_tasks(kind, COALESCE(account_id, 0), created_at, id)
+                    WHERE status IN ('queued', 'running');
+                CREATE INDEX IF NOT EXISTS idx_background_tasks_terminal_history
+                    ON background_tasks(created_at DESC, id DESC)
+                    WHERE status NOT IN ('queued', 'running');
                 CREATE INDEX IF NOT EXISTS idx_imap_mailboxes_account ON imap_mailboxes(account_id, local_role);
                 CREATE INDEX IF NOT EXISTS idx_oauth_sessions_account_status ON oauth_sessions(account_id, status, created_at DESC);
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_remote_uid

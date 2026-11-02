@@ -71,4 +71,46 @@ describe('ReaderBodyContent remote body states', () => {
     expect(document.body.textContent).toContain('unique-plain-tail');
   });
 
+  it('renders the translated body in place of the original body', () => {
+    renderBody({
+      hasRenderableHtml: true,
+      readerHtml: '<p>Original body</p>',
+      translation: { format: 'html', content: '<p>译文正文</p><a href="https://example.com">链接</a>' },
+    });
+
+    expect(screen.getByTestId('full-html').textContent).toContain('译文正文');
+    expect(screen.getByTestId('full-html').textContent).not.toContain('Original body');
+  });
+
+  it('renders plain translation instead of the original HTML and keeps empty translations on the source', () => {
+    const view = renderBody({
+      hasRenderableHtml: true,
+      readerHtml: '<p>Original body</p>',
+      translation: { format: 'plain', content: '纯文本译文' },
+    });
+    expect(screen.queryByTestId('full-html')).toBeNull();
+    expect(screen.getByText('纯文本译文')).toBeDefined();
+    view.unmount();
+    renderBody({
+      hasRenderableHtml: true,
+      readerHtml: '<p>Original body</p>',
+      translation: { format: 'plain', content: ' ' },
+    });
+    expect(screen.getByTestId('full-html').textContent).toContain('Original body');
+  });
+
+  it('keeps source expansion approval but requires approval for a newly oversized translation', () => {
+    const html = `<p>${'正文'.repeat(130_000)}</p>`;
+    const view = renderBody({ hasRenderableHtml: true, readerHtml: html, largeBodyApproved: true });
+    expect(screen.getByTestId('full-html').textContent).toBe(html);
+    view.unmount();
+    renderBody({
+      hasRenderableHtml: true, readerHtml: html, largeBodyApproved: true,
+      translation: { format: 'html', content: `${html}<p>译文末尾</p>` },
+    });
+    expect(screen.queryByTestId('full-html')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '加载完整邮件' }));
+    expect(screen.getByTestId('full-html').textContent).toContain('译文末尾');
+  });
+
 });

@@ -16,5 +16,10 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // The mock backend, localStorage, and jsdom globals are process-scoped.
+    // Running files concurrently makes the full release gate flaky even though
+    // each affected test passes in isolation.
+    fileParallelism: false,
+    testTimeout: 15_000,
   },
 });

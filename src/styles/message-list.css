@@ -1442,9 +1442,11 @@
 .message-account-source {
   position: relative;
   z-index: 2;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 96px;
+  /* Keep the account identity readable in the list. The preview yields
+     first, while a long address still clips with its full value in title. */
+  max-width: min(180px, calc(100% - 64px));
   margin: 1px 0 0 auto;
   padding: 0;
   color: var(--ui-text-tertiary);
@@ -2030,7 +2032,9 @@
   box-sizing: border-box;
   flex: 0 0 auto;
   width: 100%;
+  height: auto;
   min-height: 84px;
+  max-height: none;
   padding: 6px 14px;
   display: flex;
   flex-direction: column;
@@ -2112,6 +2116,7 @@
   min-width: 0;
   min-height: 34px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -2135,7 +2140,7 @@
   padding: 2px;
   border-radius: var(--ui-radius-control);
   background: var(--ui-surface-muted);
-  font-size: 13px;
+  font-size: var(--ui-font-size-secondary);
 }
 
 .app-shell .list-control-tab-indicator {
@@ -2158,7 +2163,11 @@
 }
 
 .app-shell .list-control-menus {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-inline-start: auto;
 }
 
 .app-shell .list-control-tabs > button {
@@ -2168,14 +2177,15 @@
   width: var(--list-tab-indicator-width);
   min-width: var(--list-tab-indicator-width);
   min-height: 32px;
-  height: 32px;
-  padding-inline: 8px;
+  height: auto;
+  padding: 4px 8px;
+  line-height: var(--ui-line-height-tight);
   border: 0;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 13px;
+  font-size: inherit;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -2211,7 +2221,7 @@
 
 .compact-dropdown > summary {
   min-height: 32px;
-  height: 32px;
+  height: auto;
   max-width: 100%;
   padding: 0 8px;
   display: inline-flex;
@@ -2386,7 +2396,8 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 32px;
-  height: 32px;
+  height: auto;
+  flex-wrap: wrap;
   padding: 0;
   display: flex;
   align-items: center;
@@ -2456,6 +2467,38 @@
   }
 }
 
+/* A manually resized list can be narrow even in a wide window. Keep the
+ * mailbox controls stable according to the pane that owns them, not the
+ * viewport that happens to surround them. */
+@container message-list (max-width: 400px) {
+  .app-shell .list-control-actions {
+    /* Normal text fits one row; enlarged text may wrap the mode and menu
+       groups as a unit so each control keeps its readable label. */
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+
+  .app-shell .list-control-menus {
+    flex-wrap: nowrap;
+    gap: 1px;
+  }
+
+  .app-shell .list-control-tabs {
+    --list-tab-gap: 2px;
+    --list-tab-indicator-width: max(44px, calc(2em + 16px));
+  }
+
+  .app-shell .list-control-tabs > button {
+    padding-inline: 2px;
+  }
+
+  .compact-dropdown > summary {
+    padding-inline: 2px;
+    gap: 2px;
+    font-size: var(--ui-font-size-aux);
+  }
+}
+
 @media (max-width: 1040px) {
   .list-summary-row > .narrow-navigation-button {
     display: grid;
@@ -2472,10 +2515,10 @@
   }
 
   .app-shell .list-control-strip {
-    flex: 0 0 96px;
-    height: 96px;
+    flex: 0 0 auto;
+    height: auto;
     min-height: 96px;
-    max-height: 96px;
+    max-height: none;
     padding: 13px 12px 10px;
     flex-direction: column;
     align-items: stretch;
@@ -2922,3 +2965,24 @@
 .message-list-refresh-error button { min-height: var(--ui-control-height-touch); }
 
 .message-list { overflow-anchor: none; }
+
+.account-login-recovery {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--ui-font-size-secondary);
+  line-height: 1.5;
+  max-height: 40%;
+  overflow: auto;
+}
+
+.account-login-recovery > svg { flex-shrink: 0; margin-top: 2px; }
+.account-login-recovery > div { min-width: 0; flex: 1; }
+.account-login-recovery p { margin: 4px 0 0; }
+.account-login-recovery-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.account-login-recovery-row span { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
+.account-login-recovery-row b { display: block; }
+.account-login-recovery-row button { flex: 0 0 auto; min-height: 44px; padding: 8px 12px; }

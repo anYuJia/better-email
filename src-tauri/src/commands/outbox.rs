@@ -57,6 +57,7 @@ static ACTIVE_OUTBOX_WORKERS: AtomicUsize = AtomicUsize::new(0);
 struct OutboxWorkerGuard;
 
 impl OutboxWorkerGuard {
+    #[allow(deprecated)]
     fn acquire() -> MailResult<Self> {
         ACTIVE_OUTBOX_WORKERS
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {

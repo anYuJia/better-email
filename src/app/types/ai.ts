@@ -1,4 +1,4 @@
-export type AiServiceType = 'mcp' | 'http' | 'mock';
+export type AiServiceType = 'mcp' | 'http';
 
 export type AiServiceConfig = {
   enabled: boolean;

@@ -32,6 +32,7 @@ import {
 export type { BulkMessageAction, MessageContextAction } from './messageContextMenu';
 
 export type MessageListPaneProps = {
+  notice?: React.ReactNode;
   mobile?: boolean;
   showAccountSource?: boolean;
   accountSourceLabels?: ReadonlyMap<number, string>;
@@ -88,6 +89,7 @@ export type MessageListPaneProps = {
 };
 
 function MessageListPane({
+  notice,
   mobile = false,
   showAccountSource = false,
   accountSourceLabels,
@@ -328,6 +330,7 @@ function MessageListPane({
           )}
         />
       )}
+      {notice}
       {listMode === 'threads' ? (
         <ThreadListView
           threads={threads}

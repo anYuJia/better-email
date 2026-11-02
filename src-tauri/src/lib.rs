@@ -833,6 +833,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .on_page_load(move |webview, payload| {
             record_page_load(&page_load_startup, webview.label(), payload.event());
@@ -1024,6 +1025,7 @@ pub fn run() {
             commands::list_sync_runs,
             commands::store_account_secret,
             commands::check_account_secret,
+            commands::list_account_credential_statuses,
             commands::delete_account_secret,
             commands::start_oauth2_pkce,
             commands::list_oauth_sessions,

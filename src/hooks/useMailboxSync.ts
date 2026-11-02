@@ -170,7 +170,10 @@ export default function useMailboxSync({
       setStatus(run.message);
 
       const count = run.imported_messages;
-      setRefreshNotice(count > 0 ? `成功获取 ${count} 封` : '已是最新');
+      setRefreshNotice(run.status.endsWith('_failed') ? '同步失败，请检查账号登录状态'
+        : run.status.includes('partial') ? '部分邮件未同步，请查看同步结果'
+          : run.status.endsWith('_limited') ? '本批次同步完成，其余账号等待下一轮'
+            : count > 0 ? `成功获取 ${count} 封` : '已是最新');
       refreshNoticeTimeoutRef.current = window.setTimeout(() => {
         setRefreshNotice(null);
       }, 4000);

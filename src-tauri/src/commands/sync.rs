@@ -49,6 +49,7 @@ pub async fn verify_account_credentials(
     account_id: Option<i64>,
 ) -> MailResult<CredentialVerificationReport> {
     let store = store.inner().clone();
+    let guard = VerificationWorkerGuard::acquire()?;
     let lookup = store.clone();
     let network_key = super::executor::database(move || {
         lookup
@@ -57,21 +58,81 @@ pub async fn verify_account_credentials(
     })
     .await?;
     super::executor::network(network_key, move || {
+        let _guard = guard;
         let account = store.get_account_by_id(account_id)?;
-        let secret = match store.get_account_secret(&account) {
-            Ok(secret) => secret,
-            Err(error) => return Ok(credential_error_report(&account, error.to_string())),
-        };
-        let incoming_result = verify_incoming_credentials(&account, &secret);
-        let smtp_result =
-            smtp::verify_credentials(&account, &secret).map_err(|error| error.to_string());
-        Ok(credential_verification_report(
-            &account,
-            incoming_result,
-            smtp_result,
-        ))
+        verify_saved_credentials(&store, &account, |account, secret| {
+            (
+                verify_incoming_credentials(account, secret),
+                smtp::verify_credentials(account, secret).map_err(|error| error.to_string()),
+            )
+        })
     })
     .await
+}
+
+static ACTIVE_VERIFICATION_WORKERS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+struct VerificationWorkerGuard;
+impl VerificationWorkerGuard {
+    #[allow(deprecated)]
+    fn acquire() -> MailResult<Self> {
+        use std::sync::atomic::Ordering;
+        ACTIVE_VERIFICATION_WORKERS
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |count| {
+                (count < 4).then_some(count + 1)
+            })
+            .map_err(|_| crate::db::MailError::Imap("登录验证任务繁忙，请稍后重试。".into()))?;
+        Ok(Self)
+    }
+}
+impl Drop for VerificationWorkerGuard {
+    fn drop(&mut self) {
+        ACTIVE_VERIFICATION_WORKERS.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+    }
+}
+
+fn same_secret(left: &AccountSecret, right: &AccountSecret) -> bool {
+    match (left, right) {
+        (AccountSecret::Password(left), AccountSecret::Password(right)) => left == right,
+        (AccountSecret::OAuth2(left), AccountSecret::OAuth2(right)) => {
+            matches!((serde_json::to_value(left), serde_json::to_value(right)), (Ok(left), Ok(right)) if left == right)
+        }
+        _ => false,
+    }
+}
+
+fn verify_saved_credentials(
+    store: &MailStore,
+    account: &Account,
+    verify: impl FnOnce(&Account, &AccountSecret) -> (Result<(), String>, Result<(), String>),
+) -> MailResult<CredentialVerificationReport> {
+    let secret = match store.get_account_secret(account) {
+        Ok(secret) => secret,
+        Err(error) => return Ok(credential_error_report(account, error.to_string())),
+    };
+    let (incoming, smtp) = verify(account, &secret);
+    let unchanged = store
+        .get_account_by_id(Some(account.id))
+        .is_ok_and(|current| {
+            current.imap_host == account.imap_host
+                && current.smtp_host == account.smtp_host
+                && current.incoming_protocol == account.incoming_protocol
+                && current.auth_type == account.auth_type
+        })
+        && store
+            .get_account_secret_raw(account)
+            .ok()
+            .and_then(|raw| credentials::account_secret_from_raw(&account.auth_type, &raw).ok())
+            .is_some_and(|current| same_secret(&secret, &current));
+    if !unchanged {
+        let message = "登录验证期间账号配置或凭据已改变，本次结果已作废，请重新验证。".to_string();
+        let mut report =
+            credential_verification_report(account, Err(message.clone()), Err(message.clone()));
+        report.status = "verification_stale".into();
+        report.message = message;
+        return Ok(report);
+    }
+    Ok(credential_verification_report(account, incoming, smtp))
 }
 
 #[tauri::command]
@@ -355,7 +416,11 @@ pub async fn sync_imap_headers(
     let mut new_messages = 0;
     let mut new_message_ids = Vec::new();
     let mut synced_accounts = 0;
-    let mut failures = Vec::new();
+    let mut failures: Vec<String> = plan
+        .credential_issues
+        .iter()
+        .map(|issue| format!("{}: {}", issue.account_email, issue.message))
+        .collect();
     let mut warnings = Vec::new();
 
     for (index, account) in accounts.iter().enumerate() {
@@ -636,6 +701,8 @@ fn sync_imap_headers_for_account(
     let mut completed_history_folders = 0;
     let mut fetched_bodies = 0;
     let mut body_failures = 0;
+    let mut attachment_metadata_synced = 0;
+    let mut attachment_metadata_failures = 0;
     let mut auto_downloaded_attachments = 0;
     let mut auto_download_failures = 0;
     for (folder_index, mailbox) in mailboxes.iter().enumerate() {
@@ -711,6 +778,8 @@ fn sync_imap_headers_for_account(
                             Ok(stats) => {
                                 fetched_bodies += stats.fetched;
                                 body_failures += stats.failures;
+                                attachment_metadata_synced += stats.attachment_metadata_synced;
+                                attachment_metadata_failures += stats.attachment_metadata_failures;
                                 auto_downloaded_attachments += stats.auto_downloaded;
                                 auto_download_failures += stats.auto_download_failures;
                             }
@@ -803,6 +872,8 @@ fn sync_imap_headers_for_account(
 
     let body_note = if fetched_bodies > 0
         || body_failures > 0
+        || attachment_metadata_synced > 0
+        || attachment_metadata_failures > 0
         || auto_downloaded_attachments > 0
         || auto_download_failures > 0
     {
@@ -811,6 +882,13 @@ fn sync_imap_headers_for_account(
             let mut part = format!("获取正文 {fetched_bodies} 封");
             if body_failures > 0 {
                 part.push_str(&format!("，{body_failures} 封失败"));
+            }
+            parts.push(part);
+        }
+        if attachment_metadata_synced > 0 || attachment_metadata_failures > 0 {
+            let mut part = format!("补齐附件信息 {attachment_metadata_synced} 封");
+            if attachment_metadata_failures > 0 {
+                part.push_str(&format!("，{attachment_metadata_failures} 封失败"));
             }
             parts.push(part);
         }
@@ -968,16 +1046,21 @@ impl SyncTaskProgress {
 struct MailboxBodySyncStats {
     fetched: usize,
     failures: usize,
+    attachment_metadata_synced: usize,
+    attachment_metadata_failures: usize,
     auto_downloaded: usize,
     auto_download_failures: usize,
 }
 
 fn should_fetch_attachment_metadata(
-    remote_uid: i64,
-    previous_highest_uid: i64,
-    fetch_history_attachments: bool,
+    _remote_uid: i64,
+    _previous_highest_uid: i64,
+    _fetch_history_attachments: bool,
 ) -> bool {
-    fetch_history_attachments || (previous_highest_uid > 0 && remote_uid > previous_highest_uid)
+    // BODYSTRUCTURE is already fetched while hydrating a message body and is
+    // only metadata. Always retaining it makes historical and newly received
+    // messages behave identically; attachment bytes remain on-demand.
+    true
 }
 
 /// 同步单个邮箱的缺失正文（按 LIMIT 分批拉取）。入参较多是同步进度与
@@ -999,48 +1082,52 @@ fn sync_mailbox_bodies(
     let mut stats = MailboxBodySyncStats {
         fetched: 0,
         failures: 0,
+        attachment_metadata_synced: 0,
+        attachment_metadata_failures: 0,
         auto_downloaded: 0,
         auto_download_failures: 0,
     };
     let pending =
         store.list_messages_missing_body(account.id, remote_name, BODY_SYNC_LIMIT_PER_MAILBOX)?;
-    if pending.is_empty() {
-        return Ok(stats);
-    }
-    let attachment_metadata_uids = pending
-        .iter()
-        .filter_map(|(_, uid)| {
-            should_fetch_attachment_metadata(*uid, previous_highest_uid, fetch_history_attachments)
-                .then_some(*uid)
-        })
-        .collect::<BTreeSet<_>>();
-    let uid_to_message_id = pending
-        .into_iter()
-        .map(|(message_id, uid)| (uid, message_id))
-        .collect::<BTreeMap<i64, i64>>();
-    let uids = uid_to_message_id.keys().copied().collect::<Vec<_>>();
-    let total_messages = uids.len();
-    let total_batches = total_messages.div_ceil(BODY_SYNC_BATCH_SIZE);
-    for (batch_index, batch_uids) in uids.chunks(BODY_SYNC_BATCH_SIZE).enumerate() {
-        ensure_not_cancelled(store)?;
-        let batch_uid_to_message_id = batch_uids
+    if !pending.is_empty() {
+        let attachment_metadata_uids = pending
             .iter()
-            .filter_map(|uid| {
-                uid_to_message_id
-                    .get(uid)
-                    .map(|message_id| (*uid, *message_id))
+            .filter_map(|(_, uid)| {
+                should_fetch_attachment_metadata(
+                    *uid,
+                    previous_highest_uid,
+                    fetch_history_attachments,
+                )
+                .then_some(*uid)
             })
+            .collect::<BTreeSet<_>>();
+        let uid_to_message_id = pending
+            .into_iter()
+            .map(|(message_id, uid)| (uid, message_id))
             .collect::<BTreeMap<i64, i64>>();
-        let bodies = match imap_probe::fetch_message_bodies(
-            account,
-            secret,
-            remote_name,
-            batch_uids,
-            &attachment_metadata_uids,
-        ) {
-            Ok(bodies) => bodies,
-            Err(error) => {
-                crate::logging::log_line(format!(
+        let uids = uid_to_message_id.keys().copied().collect::<Vec<_>>();
+        let total_messages = uids.len();
+        let total_batches = total_messages.div_ceil(BODY_SYNC_BATCH_SIZE);
+        for (batch_index, batch_uids) in uids.chunks(BODY_SYNC_BATCH_SIZE).enumerate() {
+            ensure_not_cancelled(store)?;
+            let batch_uid_to_message_id = batch_uids
+                .iter()
+                .filter_map(|uid| {
+                    uid_to_message_id
+                        .get(uid)
+                        .map(|message_id| (*uid, *message_id))
+                })
+                .collect::<BTreeMap<i64, i64>>();
+            let bodies = match imap_probe::fetch_message_bodies(
+                account,
+                secret,
+                remote_name,
+                batch_uids,
+                &attachment_metadata_uids,
+            ) {
+                Ok(bodies) => bodies,
+                Err(error) => {
+                    crate::logging::log_line(format!(
                     "[better-email][sync] body batch fetch failed account_id={} mailbox={} batch={}/{} pending={} error={error}",
                     account.id,
                     remote_name,
@@ -1048,75 +1135,166 @@ fn sync_mailbox_bodies(
                     total_batches,
                     batch_uids.len()
                 ));
-                stats.failures += batch_uids.len();
-                update_body_sync_progress(
-                    store,
-                    task_progress,
-                    account,
-                    remote_name,
-                    folder_index,
-                    total_folders,
-                    stats.fetched + stats.failures,
-                    total_messages,
-                    batch_index + 1,
-                    total_batches,
-                )?;
-                continue;
-            }
-        };
-        let mut fetched_message_ids = Vec::new();
-        let mut received_uids = BTreeSet::new();
-        for (uid, body) in bodies {
-            ensure_not_cancelled(store)?;
-            received_uids.insert(uid);
-            let Some(&message_id) = batch_uid_to_message_id.get(&uid) else {
-                continue;
-            };
-            match store.update_message_body(message_id, &body) {
-                Ok(_) => {
-                    stats.fetched += 1;
-                    fetched_message_ids.push(message_id);
+                    stats.failures += batch_uids.len();
+                    update_body_sync_progress(
+                        store,
+                        task_progress,
+                        account,
+                        remote_name,
+                        folder_index,
+                        total_folders,
+                        stats.fetched + stats.failures,
+                        total_messages,
+                        batch_index + 1,
+                        total_batches,
+                    )?;
+                    continue;
                 }
-                Err(error) => {
-                    crate::logging::log_line(format!(
+            };
+            let mut fetched_message_ids = Vec::new();
+            let mut received_uids = BTreeSet::new();
+            for (uid, body) in bodies {
+                ensure_not_cancelled(store)?;
+                received_uids.insert(uid);
+                let Some(&message_id) = batch_uid_to_message_id.get(&uid) else {
+                    continue;
+                };
+                match store.update_message_body(message_id, &body) {
+                    Ok(_) => {
+                        stats.fetched += 1;
+                        fetched_message_ids.push(message_id);
+                    }
+                    Err(error) => {
+                        crate::logging::log_line(format!(
                         "[better-email][sync] body update failed account_id={} mailbox={} uid={} message_id={} error={error}",
                         account.id,
                         remote_name,
                         uid,
                         message_id
                     ));
-                    stats.failures += 1;
+                        stats.failures += 1;
+                    }
                 }
             }
+            stats.failures += batch_uids
+                .iter()
+                .filter(|uid| !received_uids.contains(uid))
+                .count();
+            ensure_not_cancelled(store)?;
+            if account.auto_download_attachments {
+                for (uid, message_id) in &batch_uid_to_message_id {
+                    ensure_not_cancelled(store)?;
+                    if !fetched_message_ids.contains(message_id) || pre_existing_uids.contains(uid)
+                    {
+                        continue;
+                    }
+                    let outcome = auto_download_attachments_for_message(store, *message_id);
+                    stats.auto_downloaded += outcome.downloaded;
+                    stats.auto_download_failures += outcome.failures;
+                }
+            }
+            update_body_sync_progress(
+                store,
+                task_progress,
+                account,
+                remote_name,
+                folder_index,
+                total_folders,
+                stats.fetched + stats.failures,
+                total_messages,
+                batch_index + 1,
+                total_batches,
+            )?;
         }
-        stats.failures += batch_uids
-            .iter()
-            .filter(|uid| !received_uids.contains(uid))
-            .count();
-        ensure_not_cancelled(store)?;
-        if account.auto_download_attachments {
-            for (uid, message_id) in &batch_uid_to_message_id {
-                ensure_not_cancelled(store)?;
-                if !fetched_message_ids.contains(message_id) || pre_existing_uids.contains(uid) {
+    }
+
+    // 升级旧版本时，正文可能已经缓存，但历史同步曾跳过 BODYSTRUCTURE。
+    // 只拉结构并更新附件表，避免再次下载或覆盖正文。
+    let attachment_metadata_pending = store.list_messages_missing_attachment_metadata(
+        account.id,
+        remote_name,
+        BODY_SYNC_LIMIT_PER_MAILBOX,
+    )?;
+    if !attachment_metadata_pending.is_empty() {
+        let uid_to_message_id = attachment_metadata_pending
+            .into_iter()
+            .map(|(message_id, uid)| (uid, message_id))
+            .collect::<BTreeMap<i64, i64>>();
+        let uids = uid_to_message_id.keys().copied().collect::<Vec<_>>();
+        let total_messages = uids.len();
+        let total_batches = total_messages.div_ceil(BODY_SYNC_BATCH_SIZE);
+        for (batch_index, batch_uids) in uids.chunks(BODY_SYNC_BATCH_SIZE).enumerate() {
+            ensure_not_cancelled(store)?;
+            let metadata = match imap_probe::fetch_attachment_metadata(
+                account,
+                secret,
+                remote_name,
+                batch_uids,
+            ) {
+                Ok(metadata) => metadata,
+                Err(error) => {
+                    crate::logging::log_line(format!(
+                        "[better-email][sync] attachment metadata batch fetch failed account_id={} mailbox={} batch={}/{} pending={} error={error}",
+                        account.id,
+                        remote_name,
+                        batch_index + 1,
+                        total_batches,
+                        batch_uids.len()
+                    ));
+                    stats.attachment_metadata_failures += batch_uids.len();
+                    update_attachment_metadata_progress(
+                        store,
+                        task_progress,
+                        account,
+                        remote_name,
+                        folder_index,
+                        total_folders,
+                        stats.attachment_metadata_synced + stats.attachment_metadata_failures,
+                        total_messages,
+                        batch_index + 1,
+                        total_batches,
+                    )?;
                     continue;
                 }
-                let outcome = auto_download_attachments_for_message(store, *message_id);
-                stats.auto_downloaded += outcome.downloaded;
-                stats.auto_download_failures += outcome.failures;
+            };
+            let mut received_uids = BTreeSet::new();
+            for (uid, attachments) in metadata {
+                ensure_not_cancelled(store)?;
+                received_uids.insert(uid);
+                let Some(&message_id) = uid_to_message_id.get(&uid) else {
+                    continue;
+                };
+                match store.update_message_attachments(message_id, &attachments) {
+                    Ok(_) => stats.attachment_metadata_synced += 1,
+                    Err(error) => {
+                        crate::logging::log_line(format!(
+                            "[better-email][sync] attachment metadata update failed account_id={} mailbox={} uid={} message_id={} error={error}",
+                            account.id,
+                            remote_name,
+                            uid,
+                            message_id
+                        ));
+                        stats.attachment_metadata_failures += 1;
+                    }
+                }
             }
+            stats.attachment_metadata_failures += batch_uids
+                .iter()
+                .filter(|uid| !received_uids.contains(uid))
+                .count();
+            update_attachment_metadata_progress(
+                store,
+                task_progress,
+                account,
+                remote_name,
+                folder_index,
+                total_folders,
+                stats.attachment_metadata_synced + stats.attachment_metadata_failures,
+                total_messages,
+                batch_index + 1,
+                total_batches,
+            )?;
         }
-        update_body_sync_progress(
-            store,
-            task_progress,
-            account,
-            remote_name,
-            folder_index,
-            total_folders,
-            stats.fetched + stats.failures,
-            total_messages,
-            batch_index + 1,
-            total_batches,
-        )?;
     }
     Ok(stats)
 }
@@ -1148,6 +1326,43 @@ fn update_body_sync_progress(
         ),
         &format!(
             "{}：正在获取 {} 正文，已处理 {}/{}（第 {}/{} 批）",
+            account.email,
+            remote_name,
+            processed_messages.min(total_messages),
+            total_messages,
+            batch_index,
+            total_batches
+        ),
+    )
+}
+
+/// 上报历史邮件附件元数据回填进度，不重复下载正文。
+#[allow(clippy::too_many_arguments)]
+fn update_attachment_metadata_progress(
+    store: &MailStore,
+    task_progress: Option<SyncTaskProgress>,
+    account: &Account,
+    remote_name: &str,
+    folder_index: usize,
+    total_folders: usize,
+    processed_messages: usize,
+    total_messages: usize,
+    batch_index: usize,
+    total_batches: usize,
+) -> MailResult<()> {
+    let Some(task_progress) = task_progress else {
+        return Ok(());
+    };
+    task_progress.update(
+        store,
+        folder_progress_percent(
+            folder_index,
+            total_folders,
+            processed_messages,
+            total_messages,
+        ),
+        &format!(
+            "{}：正在补齐 {} 附件信息，已处理 {}/{}（第 {}/{} 批）",
             account.email,
             remote_name,
             processed_messages.min(total_messages),
@@ -1308,6 +1523,44 @@ mod tests {
     }
 
     #[test]
+    fn verification_rejects_credentials_changed_while_network_is_in_flight() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = crate::db::MailStore::open_at(dir.path().join("mail.sqlite3")).unwrap();
+        let input =
+            serde_json::from_value(serde_json::to_value(sample_account()).unwrap()).unwrap();
+        let account = store.create_account_with_secret(input, "original").unwrap();
+        let report = super::verify_saved_credentials(&store, &account, |_, _| {
+            store.store_account_secret(&account.email, "newer").unwrap();
+            (Ok(()), Ok(()))
+        })
+        .unwrap();
+        assert!(!report.authenticated);
+        assert_eq!(report.status, "verification_stale");
+        assert_eq!(store.get_account_secret_raw(&account).unwrap(), "newer");
+    }
+
+    #[test]
+    fn verification_reads_the_saved_credential_and_does_not_connect_when_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = crate::db::MailStore::open_at(dir.path().join("mail.sqlite3")).unwrap();
+        let input =
+            serde_json::from_value(serde_json::to_value(sample_account()).unwrap()).unwrap();
+        let account = store.create_account_with_secret(input, "saved").unwrap();
+        let good = super::verify_saved_credentials(&store, &account, |_, secret| {
+            assert!(matches!(secret, crate::credentials::AccountSecret::Password(value) if value == "saved"));
+            (Ok(()), Ok(()))
+        }).unwrap();
+        assert!(good.authenticated);
+        store.delete_account_secret(&account.email).unwrap();
+        let missing = super::verify_saved_credentials(&store, &account, |_, _| {
+            panic!("must not connect without saved credentials")
+        })
+        .unwrap();
+        assert_eq!(missing.status, "credential_error");
+        assert!(!missing.authenticated);
+    }
+
+    #[test]
     fn credential_verification_report_tracks_success_and_partial_failure() {
         let account = sample_account();
         let success = credential_verification_report(&account, Ok(()), Ok(()));
@@ -1371,9 +1624,9 @@ mod tests {
     }
 
     #[test]
-    fn history_attachment_metadata_requires_explicit_opt_in() {
-        assert!(!should_fetch_attachment_metadata(44, 0, false));
-        assert!(!should_fetch_attachment_metadata(44, 100, false));
+    fn attachment_metadata_is_available_for_historical_and_new_messages() {
+        assert!(should_fetch_attachment_metadata(44, 0, false));
+        assert!(should_fetch_attachment_metadata(44, 100, false));
         assert!(should_fetch_attachment_metadata(101, 100, false));
         assert!(should_fetch_attachment_metadata(44, 100, true));
     }

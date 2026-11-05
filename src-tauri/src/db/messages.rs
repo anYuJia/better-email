@@ -305,14 +305,20 @@ impl MailStore {
         remote_mailbox: &str,
         remote_uid: i64,
     ) -> MailResult<()> {
+        self.set_message_remote_ref_with_validity(message_id, remote_mailbox, remote_uid, "")
+    }
+
+    pub fn set_message_remote_ref_with_validity(
+        &self,
+        message_id: i64,
+        remote_mailbox: &str,
+        remote_uid: i64,
+        remote_uid_validity: &str,
+    ) -> MailResult<()> {
         self.with_conn(|conn| {
             conn.execute(
-                "
-                UPDATE messages
-                SET remote_mailbox = ?2, remote_uid = ?3
-                WHERE id = ?1
-                ",
-                params![message_id, remote_mailbox.trim(), remote_uid.max(0)],
+                "UPDATE messages SET remote_mailbox=?2, remote_uid=?3, remote_uid_validity=?4 WHERE id=?1",
+                params![message_id, remote_mailbox.trim(), remote_uid.max(0), remote_uid_validity],
             )?;
             Ok(())
         })
@@ -323,6 +329,7 @@ impl MailStore {
         remote_mailbox: &str,
         remote_uid: i64,
         message_id_header: &str,
+        remote_uid_validity: &str,
     ) -> MailResult<()> {
         self.with_conn(|conn| {
             let (subject, in_reply_to, references): (String, String, String) = conn.query_row(
@@ -342,7 +349,8 @@ impl MailStore {
                 SET remote_mailbox = ?2,
                     remote_uid = ?3,
                     message_id_header = ?4,
-                    thread_key = ?5
+                    thread_key = ?5,
+                    remote_uid_validity = ?6
                 WHERE id = ?1
                 ",
                 params![
@@ -350,7 +358,8 @@ impl MailStore {
                     remote_mailbox.trim(),
                     remote_uid.max(0),
                     message_id_header.trim(),
-                    thread_key
+                    thread_key,
+                    remote_uid_validity
                 ],
             )?;
             Ok(())
@@ -440,7 +449,7 @@ impl MailStore {
                        m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
                        m.received_at, m.is_read, m.is_starred, m.has_attachments,
                        m.snoozed_until, m.remote_mailbox, m.remote_uid,
-                       m.message_id_header, m.in_reply_to_header, m.references_header
+                       m.message_id_header, m.in_reply_to_header, m.references_header, m.remote_body_fetched
                 FROM messages m
                 JOIN accounts a ON a.id = m.account_id
                 JOIN folders f ON f.id = m.folder_id
@@ -666,6 +675,7 @@ impl MailStore {
                 if actual.account_id != expected.account_id
                     || actual.remote_mailbox != expected.remote_mailbox
                     || actual.remote_uid != expected.remote_uid
+                    || actual.remote_uid_validity != expected.remote_uid_validity
                 {
                     return Err(MailError::Cancelled);
                 }
@@ -1261,33 +1271,24 @@ impl MailStore {
             Ok(reference)
         })
     }
-    pub fn empty_trash_for_account(
-        &self,
-        account_id: Option<i64>,
-    ) -> MailResult<(i64, Vec<MessageRemoteRef>)> {
+    pub fn list_trash_message_ids(&self, account_id: Option<i64>) -> MailResult<Vec<i64>> {
         self.with_conn(|conn| {
-            let references = trash_remote_refs_for_conn(conn, account_id)?;
-            let deleted = if let Some(account) = account_id {
-                conn.execute(
-                    "
-                    DELETE FROM messages
-                    WHERE account_id = ?1
-                      AND folder_id IN (
-                        SELECT id FROM folders WHERE account_id = ?1 AND role = 'trash'
-                      )
-                    ",
-                    params![account],
-                )?
-            } else {
-                conn.execute(
-                    "
-                    DELETE FROM messages
-                    WHERE folder_id IN (SELECT id FROM folders WHERE role = 'trash')
-                    ",
-                    [],
-                )?
-            };
-            Ok((deleted as i64, references))
+            let mut stmt = conn.prepare("SELECT m.id FROM messages m JOIN folders f ON f.id=m.folder_id WHERE f.role='trash' AND (?1 IS NULL OR m.account_id=?1) ORDER BY m.id")?;
+            let ids = stmt.query_map([account_id], |row| row.get(0))?.collect::<Result<Vec<_>, _>>()?;
+            Ok(ids)
+        })
+    }
+
+    /// Keep the local row (and attachment ownership) until remote deletion has
+    /// been acknowledged. A concurrent restore/move must never be erased.
+    pub fn delete_trash_message_if_unchanged(
+        &self,
+        id: i64,
+        expected: &MessageRemoteRef,
+    ) -> MailResult<bool> {
+        self.with_conn(|conn| {
+            Ok(conn.execute("DELETE FROM messages WHERE id=?1 AND account_id=?2 AND remote_mailbox=?3 AND remote_uid=?4 AND message_id_header=?5 AND remote_uid_validity=?6 AND folder_id IN (SELECT id FROM folders WHERE role='trash')",
+                params![id, expected.account_id, expected.remote_mailbox, expected.remote_uid, expected.message_id_header, expected.remote_uid_validity])? == 1)
         })
     }
     pub fn snooze_message(&self, message_id: i64, snoozed_until: &str) -> MailResult<Message> {
@@ -1932,7 +1933,7 @@ pub(super) fn message_for_conn(conn: &Connection, message_id: i64) -> MailResult
                m.cc, m.bcc, m.subject, m.snippet, m.body, m.sanitized_html, m.security_warnings,
                m.received_at, m.is_read, m.is_starred, m.has_attachments,
                m.snoozed_until, m.remote_mailbox, m.remote_uid,
-               m.message_id_header, m.in_reply_to_header, m.references_header, m.sanitizer_version
+               m.message_id_header, m.in_reply_to_header, m.references_header, m.sanitizer_version, m.remote_body_fetched
         FROM messages m
         JOIN accounts a ON a.id = m.account_id
         JOIN folders f ON f.id = m.folder_id
@@ -1978,6 +1979,7 @@ pub(super) fn map_message_row_base(row: &Row<'_>) -> rusqlite::Result<Message> {
         snippet: row.get(11)?,
         body: row.get(12)?,
         sanitized_html: row.get(13)?,
+        remote_body_fetched: row.get::<_, i64>("remote_body_fetched")? != 0,
         security_warnings: warning_lines_from_text(row.get(14)?),
         received_at: row.get(15)?,
         is_read: row.get::<_, i64>(16)? != 0,
@@ -2176,7 +2178,7 @@ pub(super) fn message_remote_ref_for_conn(
 ) -> MailResult<MessageRemoteRef> {
     conn.query_row(
         "
-        SELECT account_id, remote_mailbox, remote_uid, message_id_header
+        SELECT account_id, remote_mailbox, remote_uid, message_id_header, remote_uid_validity
         FROM messages
         WHERE id = ?1
         ",
@@ -2187,58 +2189,11 @@ pub(super) fn message_remote_ref_for_conn(
                 remote_mailbox: row.get(1)?,
                 remote_uid: row.get(2)?,
                 message_id_header: row.get(3)?,
+                remote_uid_validity: row.get(4)?,
             })
         },
     )
     .map_err(Into::into)
-}
-pub(super) fn trash_remote_refs_for_conn(
-    conn: &Connection,
-    account_id: Option<i64>,
-) -> MailResult<Vec<MessageRemoteRef>> {
-    if let Some(account_id) = account_id {
-        let mut stmt = conn.prepare(
-            "
-            SELECT m.account_id, m.remote_mailbox, m.remote_uid, m.message_id_header
-            FROM messages m
-            JOIN folders f ON f.id = m.folder_id
-            WHERE m.account_id = ?1 AND f.role = 'trash'
-            ORDER BY m.remote_mailbox ASC, m.remote_uid ASC, m.id ASC
-            ",
-        )?;
-        let rows = stmt
-            .query_map(params![account_id], |row| {
-                Ok(MessageRemoteRef {
-                    account_id: row.get(0)?,
-                    remote_mailbox: row.get(1)?,
-                    remote_uid: row.get(2)?,
-                    message_id_header: row.get(3)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(rows)
-    } else {
-        let mut stmt = conn.prepare(
-            "
-            SELECT m.account_id, m.remote_mailbox, m.remote_uid, m.message_id_header
-            FROM messages m
-            JOIN folders f ON f.id = m.folder_id
-            WHERE f.role = 'trash'
-            ORDER BY m.account_id ASC, m.remote_mailbox ASC, m.remote_uid ASC, m.id ASC
-            ",
-        )?;
-        let rows = stmt
-            .query_map([], |row| {
-                Ok(MessageRemoteRef {
-                    account_id: row.get(0)?,
-                    remote_mailbox: row.get(1)?,
-                    remote_uid: row.get(2)?,
-                    message_id_header: row.get(3)?,
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(rows)
-    }
 }
 pub(super) fn due_snoozed_message_ids(now: &str, rows: Vec<(i64, String)>) -> Vec<i64> {
     let Ok(now) = DateTime::parse_from_rfc3339(now.trim()).map(|value| value.with_timezone(&Utc))
@@ -2427,6 +2382,40 @@ mod completeness_recovery_tests {
         assert!(result.sanitized_html.contains("Newest body"));
         assert!(!result.sanitized_html.contains("Original"));
         assert!(!result.sanitized_html.contains("tracker.png"));
+    }
+
+    #[test]
+    fn empty_remote_body_completion_survives_reopen_and_both_detail_queries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty-body.sqlite3");
+        let store = MailStore::open_at_with_seed(path.clone(), true).unwrap();
+        let id = store
+            .list_messages_for_scope(None, 0, None, None, 1)
+            .unwrap()[0]
+            .id;
+        store.set_message_remote_ref(id, "INBOX", 123).unwrap();
+        let reference = store.get_message_remote_reference(id).unwrap();
+        let body = RemoteMessageBody {
+            body: String::new(),
+            sanitized_html: String::new(),
+            security_warnings: Vec::new(),
+            snippet: String::new(),
+            has_attachments: false,
+            attachments_complete: true,
+            attachments: Vec::new(),
+        };
+        let fetched = store
+            .update_message_body_from_remote(id, &body, &reference)
+            .unwrap();
+        assert!(fetched.remote_body_fetched && fetched.body.is_empty());
+        drop(store);
+        let reopened = MailStore::open_at_with_seed(path, true).unwrap();
+        assert!(reopened.get_message(id).unwrap().remote_body_fetched);
+        assert!(reopened.list_messages_by_ids(&[id]).unwrap()[0].remote_body_fetched);
+        assert_eq!(
+            serde_json::to_value(reopened.get_message(id).unwrap()).unwrap()["remote_body_fetched"],
+            true
+        );
     }
 
     #[test]

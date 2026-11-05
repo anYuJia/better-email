@@ -223,6 +223,7 @@ fn probe_folders_and_headers(
         secret,
         &inbox,
         ImapHeaderFetchOptions {
+            reset_cursor: false,
             uid_validity: "",
             highest_uid: 0,
             lowest_uid: 0,

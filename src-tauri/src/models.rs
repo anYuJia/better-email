@@ -56,6 +56,7 @@ pub struct Message {
     pub snippet: String,
     pub body: String,
     pub sanitized_html: String,
+    pub remote_body_fetched: bool,
     pub security_warnings: Vec<String>,
     pub received_at: String,
     pub is_read: bool,
@@ -591,6 +592,7 @@ pub struct ImapReconcileResult {
 #[derive(Debug, Clone)]
 pub struct MailboxSyncTransactionResult {
     pub reconcile: ImapReconcileResult,
+    pub preserved_local_copies: i64,
     pub imported_messages: i64,
     pub new_messages: i64,
     /// 本次同步真正新增邮件的本地 message id（通知候选来源）。

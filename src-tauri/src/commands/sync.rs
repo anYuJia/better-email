@@ -697,6 +697,7 @@ fn sync_imap_headers_for_account(
     let mut new_message_ids = Vec::new();
     let mut updated_remote_states = 0;
     let mut removed_remote_messages = 0;
+    let mut preserved_local_copies = 0;
     let mut failures = Vec::new();
     let mut completed_history_folders = 0;
     let mut fetched_bodies = 0;
@@ -707,7 +708,8 @@ fn sync_imap_headers_for_account(
     let mut auto_download_failures = 0;
     for (folder_index, mailbox) in mailboxes.iter().enumerate() {
         ensure_not_cancelled(store)?;
-        if history_only && mailbox.history_complete {
+        let reset_cursor = store.mailbox_needs_identity_rebuild(mailbox.id)?;
+        if history_only && mailbox.history_complete && !reset_cursor {
             completed_history_folders += 1;
             continue;
         }
@@ -729,6 +731,7 @@ fn sync_imap_headers_for_account(
             &secret,
             &mailbox.remote_name,
             imap_probe::ImapHeaderFetchOptions {
+                reset_cursor,
                 uid_validity: &mailbox.uid_validity,
                 highest_uid: mailbox.highest_uid,
                 lowest_uid: mailbox.lowest_uid,
@@ -762,6 +765,7 @@ fn sync_imap_headers_for_account(
                         new_message_ids.extend(result.new_message_ids);
                         updated_remote_states += result.reconcile.updated_messages;
                         removed_remote_messages += result.reconcile.removed_messages;
+                        preserved_local_copies += result.preserved_local_copies;
                         match sync_mailbox_bodies(
                             store,
                             account,
@@ -816,7 +820,7 @@ fn sync_imap_headers_for_account(
     ensure_not_cancelled(store)?;
 
     let finished_at = Utc::now().to_rfc3339();
-    let custom_note = if skipped_custom_folders > 0 {
+    let mut custom_note = if skipped_custom_folders > 0 {
         format!(
             " 跳过 {} 个尚未建立本地映射的自定义目录。",
             skipped_custom_folders
@@ -824,6 +828,9 @@ fn sync_imap_headers_for_account(
     } else {
         String::new()
     };
+    if preserved_local_copies > 0 {
+        custom_note.push_str(&format!(" 已保留 {preserved_local_copies} 封旧邮件为本地副本；服务器新邮件是独立记录，删除本地副本不会删除它们。"));
+    }
     if history_only && scanned_folders == 0 && failures.is_empty() {
         let message = format!(
             "{} 的 {} 个已映射文件夹历史邮件已全部回填。{}",
@@ -1430,8 +1437,10 @@ pub async fn fetch_message_body(
         ));
         return store.get_message(message_id);
     }
-    let secret = store.get_account_secret(&account)?;
-    let (remote_mailbox, remote_uid) = store.get_message_remote_ref(message_id)?;
+    let secret = store.get_account_secret(&account).map_err(|error| crate::db::MailError::Imap(format!("[credentials_required] {error}")))?;
+    let reference = store.get_message_remote_reference(message_id)?;
+    let remote_mailbox = &reference.remote_mailbox;
+    let remote_uid = reference.remote_uid;
     if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
         command_info(format!(
             "[better-email][body] fetch command missing remote ref message_id={} account_id={} mailbox={} uid={}",
@@ -1441,13 +1450,8 @@ pub async fn fetch_message_body(
             "该邮件没有远端 UID，无法按需拉取正文。".to_string(),
         ));
     }
-    let body = imap_probe::fetch_message_body(&account, &secret, &remote_mailbox, remote_uid)?;
-    let updated = store.update_message_body_from_remote(message_id, &body, &crate::db::MessageRemoteRef {
-        account_id: account.id,
-        remote_mailbox: remote_mailbox.clone(),
-        remote_uid,
-        message_id_header: String::new(),
-    })?;
+    let body = imap_probe::fetch_message_body(&account, &secret, remote_mailbox, remote_uid)?;
+    let updated = store.update_message_body_from_remote(message_id, &body, &reference)?;
     command_info(format!(
         "[better-email][body] fetch command ok message_id={} account_id={} mailbox={} uid={} body_chars={} html_chars={} attachments={}",
         message_id,

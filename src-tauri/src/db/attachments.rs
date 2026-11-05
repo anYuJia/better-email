@@ -897,7 +897,7 @@ mod tests {
 
         // 远端归档完成：不再被引用，生命周期清理删除。
         store
-            .mark_outbox_remote_archived(message_id, "Sent", 42)
+            .mark_outbox_remote_archived(message_id, "Sent", 42, "100")
             .expect("remote archived");
         let _ = store
             .prune_temp_attachments(std::time::Duration::from_secs(0))

@@ -39,7 +39,9 @@ fn late_archive_failure_cannot_downgrade_confirmed_success() {
     store
         .mark_outbox_smtp_sent_pending_archive(id, "<archived@example.com>")
         .unwrap();
-    store.mark_outbox_remote_archived(id, "Sent", 123).unwrap();
+    store
+        .mark_outbox_remote_archived(id, "Sent", 123, "100")
+        .unwrap();
     store
         .mark_outbox_remote_archive_failed(id, "late worker error")
         .unwrap();
@@ -55,9 +57,11 @@ fn late_archive_success_cannot_replace_confirmed_remote_identity() {
     store
         .mark_outbox_smtp_sent_pending_archive(id, "<archived@example.com>")
         .unwrap();
-    store.mark_outbox_remote_archived(id, "Sent", 123).unwrap();
     store
-        .mark_outbox_remote_archived(id, "Another folder", 999)
+        .mark_outbox_remote_archived(id, "Sent", 123, "100")
+        .unwrap();
+    store
+        .mark_outbox_remote_archived(id, "Another folder", 999, "100")
         .unwrap();
     let message = store.get_message(id).unwrap();
     assert_eq!(message.remote_mailbox, "Sent");
@@ -69,7 +73,7 @@ fn archive_callbacks_cannot_mark_unsent_messages_as_sent() {
     let (_dir, store) = fixture();
     let item = store.queue_outbox_message(draft()).unwrap();
     store
-        .mark_outbox_remote_archived(item.message_id, "Sent", 123)
+        .mark_outbox_remote_archived(item.message_id, "Sent", 123, "100")
         .unwrap();
     store
         .mark_outbox_remote_archive_failed(item.message_id, "late")

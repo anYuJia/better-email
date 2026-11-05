@@ -119,10 +119,8 @@ function ThreadReaderList({
   return (
     <>
       <header className="reader-header">
-        <div className="reader-title-block">
-          <h1>{activeThread.subject || '(无主题)'}</h1>
-          <p>{activeThread.participants} · {threadMessages.length} 封邮件 · 未读 {activeThread.unread_count}</p>
-        </div>
+        <h1 className="reader-title-block">{activeThread.subject || '(无主题)'}</h1>
+        <p>{activeThread.participants} · {threadMessages.length} 封邮件{activeThread.unread_count > 0 ? ` · ${activeThread.unread_count} 封未读` : ''}</p>
         <div className="reader-actions">
           <div className="reader-action-group reader-response-actions" role="group" aria-label="回复操作">
             <button
@@ -142,7 +140,7 @@ function ThreadReaderList({
               aria-label={threadStates.actionState.allStarred ? '取消整个会话星标' : '添加整个会话星标'}
               onClick={() => starEntry && runEntry(starEntry)}
             >
-              <Star size={17} fill={threadStates.actionState.allStarred ? 'currentColor' : 'none'} />
+              <Star size={18} fill={threadStates.actionState.allStarred ? 'currentColor' : 'none'} aria-hidden="true" />
             </button>
             <button
               className="icon-only-action"
@@ -153,7 +151,7 @@ function ThreadReaderList({
                 : '会话中没有可归档的邮件'}
               onClick={() => archiveEntry && runEntry(archiveEntry)}
             >
-              <Archive size={16} />
+              <Archive size={18} aria-hidden="true" />
             </button>
           </div>
           <details
@@ -162,7 +160,7 @@ function ThreadReaderList({
             data-floating-menu="true"
           >
             <summary className="icon-only-summary" title="更多会话操作" aria-label="更多会话操作">
-              <MoreHorizontal size={17} />
+              <MoreHorizontal size={18} aria-hidden="true" />
             </summary>
             <div
               className="context-menu-surface context-menu--anchored reader-more-menu-panel"
@@ -172,8 +170,6 @@ function ThreadReaderList({
                 items={threadMenuItems}
                 onClose={moreMenu.closeMenu}
                 ariaLabel="会话操作"
-                title={activeThread.subject || '(无主题)'}
-                detail={`${threadMessages.length} 封邮件`}
               />
             </div>
           </details>

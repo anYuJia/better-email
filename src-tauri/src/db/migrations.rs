@@ -469,6 +469,9 @@ impl MailStore {
             )?;
             add_column_if_missing(conn, "messages", "remote_mailbox", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(conn, "messages", "remote_uid", "INTEGER NOT NULL DEFAULT 0")?;
+            // Do not infer a message generation from a mailbox name. Legacy
+            // references remain unverified until an authoritative sync.
+            add_column_if_missing(conn, "messages", "remote_uid_validity", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(
                 conn,
                 "messages",

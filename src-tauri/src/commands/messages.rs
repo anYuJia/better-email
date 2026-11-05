@@ -1,5 +1,5 @@
 use super::common::is_pop3_account;
-use crate::db::{MailResult, MailStore, MessageRemoteRef};
+use crate::db::{MailResult, MailStore};
 use crate::imap_probe;
 use crate::models::{
     FolderReadReport, Message, MessageSummary, PendingRemoteWrite, ReleasedSnoozedCount,
@@ -351,10 +351,7 @@ pub async fn delete_message_permanently(
     })
     .await?;
     super::executor::network(account_id, move || {
-        let reference = store.delete_message_permanently(message_id)?;
-        // 草稿/邮件被永久删除后，其临时附件不再被任何草稿/发件箱引用，立即清理。
-        let _ = store.prune_temp_attachments(std::time::Duration::from_secs(0));
-        sync_remote_delete_reference(&store, &reference, "本地已永久删除")
+        super::message_deletion::delete_one(&store, message_id)
     })
     .await
 }
@@ -367,85 +364,9 @@ pub async fn empty_trash(
     let store = store.inner().clone();
     let network_key = account_id.unwrap_or_default();
     super::executor::network(network_key, move || {
-    let (local_deleted_count, references) = store.empty_trash_for_account(account_id)?;
-    // 数据库删除已经提交，引用关系随之消失；立即回收不再被任何草稿/发件状态
-    // 引用的临时附件。远端删除失败不影响本地生命周期状态。
-    let _ = store.prune_temp_attachments(std::time::Duration::from_secs(0));
-    let mut groups = BTreeMap::<(i64, String), Vec<MessageRemoteRef>>::new();
-    let mut remote_skipped_count = 0_i64;
-    for reference in references {
-        if reference.remote_mailbox.trim().is_empty() {
-            remote_skipped_count += 1;
-            continue;
-        }
-        groups
-            .entry((reference.account_id, reference.remote_mailbox.clone()))
-            .or_default()
-            .push(reference);
-    }
-
-    let mut remote_attempted_count = 0_i64;
-    let mut remote_applied_count = 0_i64;
-    let mut remote_failed_count = 0_i64;
-    for ((account_id, remote_mailbox), references) in groups {
-        let group_count = references.len() as i64;
-        let account = match store.get_account_by_id(Some(account_id)) {
-            Ok(account) => account,
-            Err(_) => {
-                remote_skipped_count += group_count;
-                continue;
-            }
-        };
-        let secret = match store.get_account_secret(&account) {
-            Ok(secret) => secret,
-            Err(_) => {
-                remote_skipped_count += group_count;
-                continue;
-            }
-        };
-        remote_attempted_count += group_count;
-        let candidates = references
-            .iter()
-            .map(|reference| imap_probe::RemoteDeleteCandidate {
-                remote_uid: reference.remote_uid,
-                message_id_header: reference.message_id_header.clone(),
-            })
-            .collect::<Vec<_>>();
-        match imap_probe::delete_remote_messages(&account, &secret, &remote_mailbox, &candidates) {
-            Ok(result) => {
-                remote_applied_count += result.deleted_count;
-                remote_skipped_count += result.skipped_count;
-            }
-            Err(_) => remote_failed_count += group_count,
-        }
-    }
-
-    let message = if local_deleted_count == 0 {
-        "废纸篓已经为空。".to_string()
-    } else if remote_failed_count > 0 {
-        format!(
-            "本地已永久删除 {local_deleted_count} 封；远端成功 {remote_applied_count} 封，失败 {remote_failed_count} 封，跳过 {remote_skipped_count} 封。"
-        )
-    } else if remote_attempted_count > 0 {
-        format!(
-            "本地已永久删除 {local_deleted_count} 封；远端成功 {remote_applied_count} 封，跳过 {remote_skipped_count} 封。"
-        )
-    } else {
-        format!(
-            "本地已永久删除 {local_deleted_count} 封；{remote_skipped_count} 封没有可用远端状态。"
-        )
-    };
-
-    Ok(TrashActionReport {
-        local_deleted_count,
-        remote_attempted_count,
-        remote_applied_count,
-        remote_skipped_count,
-        remote_failed_count,
-        message,
+        super::message_deletion::empty_trash(&store, account_id.filter(|id| *id > 0))
     })
-
-    }).await
+    .await
 }
 
 #[tauri::command]
@@ -634,21 +555,26 @@ fn sync_remote_move(
             &secret,
             &reference.remote_mailbox,
             reference.remote_uid,
+            &reference.remote_uid_validity,
             &target_mailbox,
             &reference.message_id_header,
         ) {
             Ok(target_uid) => {
                 let _ = store.clear_pending_remote_write(message_id, "move");
-                store.set_message_remote_ref(
+                store.set_message_remote_ref_with_validity(
                     message_id,
                     &target_mailbox,
-                    target_uid.unwrap_or(0),
+                    target_uid.as_ref().map(|(uid, _)| *uid).unwrap_or(0),
+                    target_uid
+                        .as_ref()
+                        .map(|(_, validity)| validity.as_str())
+                        .unwrap_or(""),
                 )?;
                 Ok(remote_ok_report(if target_uid.is_some() {
                     format!("本地已移动；远端邮件已移动到 {target_mailbox}，UID 已重绑定。")
                 } else {
                     format!(
-                        "本地已移动；远端邮件已移动到 {target_mailbox}，目标 UID 将在下次同步时重绑定。"
+                        "本地已移动；远端邮件已移动到 {target_mailbox}。本地副本已保留，请同步查看服务器记录。"
                     )
                 }))
             }
@@ -663,6 +589,7 @@ fn sync_remote_move(
         None if role == "trash" => {
             let candidates = [imap_probe::RemoteDeleteCandidate {
                 remote_uid: reference.remote_uid,
+                remote_uid_validity: reference.remote_uid_validity.clone(),
                 message_id_header: reference.message_id_header.clone(),
             }];
             match imap_probe::delete_remote_messages(
@@ -687,54 +614,6 @@ fn sync_remote_move(
         }
         None => Ok(remote_skipped_report(format!(
             "本地已移动；未发现角色 {role} 对应的远端文件夹，远端移动已跳过。"
-        ))),
-    }
-}
-
-fn sync_remote_delete_reference(
-    store: &MailStore,
-    reference: &MessageRemoteRef,
-    local_action: &str,
-) -> MailResult<RemoteActionReport> {
-    if reference.remote_mailbox.trim().is_empty()
-        || (reference.remote_uid <= 0 && reference.message_id_header.trim().is_empty())
-    {
-        return Ok(local_only_report(format!(
-            "{local_action}；该邮件没有可用远端状态，跳过远端删除。"
-        )));
-    }
-    let account = store.get_account_by_id(Some(reference.account_id))?;
-    if is_pop3_account(&account) {
-        return Ok(local_only_report(format!(
-            "{local_action}；POP3 不执行远端删除，远端邮件保持不变。"
-        )));
-    }
-    let secret = match store.get_account_secret(&account) {
-        Ok(secret) => secret,
-        Err(error) => {
-            return Ok(remote_skipped_report(format!(
-                "{local_action}；无法读取本地凭据，远端删除已跳过：{error}"
-            )));
-        }
-    };
-    let candidates = [imap_probe::RemoteDeleteCandidate {
-        remote_uid: reference.remote_uid,
-        message_id_header: reference.message_id_header.clone(),
-    }];
-    match imap_probe::delete_remote_messages(
-        &account,
-        &secret,
-        &reference.remote_mailbox,
-        &candidates,
-    ) {
-        Ok(result) if result.deleted_count == 1 => Ok(remote_ok_report(format!(
-            "{local_action}；远端邮件已标记删除并 expunge。"
-        ))),
-        Ok(_) => Ok(remote_skipped_report(format!(
-            "{local_action}；远端邮件无法唯一定位，删除已跳过。"
-        ))),
-        Err(error) => Ok(remote_failed_report(format!(
-            "{local_action}；远端删除失败：{error}"
         ))),
     }
 }

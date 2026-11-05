@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowDownWideNarrow, Menu, SlidersHorizontal } from 'lucide-react';
+import { ArrowDownWideNarrow, ArrowUpWideNarrow, ListFilter, Menu, X } from 'lucide-react';
 import { filters, listSortOptions } from '../app/appConfig';
 import type {
   FilterMode,
@@ -34,6 +34,7 @@ type MessageListToolbarProps = {
   onToggleBulkLabel: (label: Label) => void;
   onOpenNavigation?: () => void;
   selectionControls?: React.ReactNode;
+  onClearSelection?: () => void;
 };
 
 function sortTriggerLabel(sort: ListSort): string {
@@ -65,9 +66,16 @@ function MessageListToolbar({
   onToggleBulkLabel,
   onOpenNavigation,
   selectionControls,
+  onClearSelection,
 }: MessageListToolbarProps) {
+  const controlRowRef = React.useRef<HTMLDivElement>(null);
   const activeFilterLabel = filters.find((item) => item.id === filter)?.label ?? '全部';
+  const SortIcon = listSort === 'oldest' ? ArrowUpWideNarrow : ArrowDownWideNarrow;
   const isSelectionMode = listMode === 'messages' && selectedMessageIds.length > 0;
+  const clearSelection = () => {
+    controlRowRef.current?.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus();
+    onClearSelection?.();
+  };
 
   return (
     <header
@@ -89,12 +97,26 @@ function MessageListToolbar({
           </button>
         )}
         <div className="list-summary">
-          <strong title={currentViewLabel}>{currentViewLabel}</strong>
-          {filter !== 'all' && <span className="list-active-filter">{activeFilterLabel}</span>}
-          <span>{listMode === 'messages' ? visibleListSummary : messageListSummary}</span>
+          <h2 className="list-folder-title" title={currentViewLabel}>{currentViewLabel}</h2>
+          {filter !== 'all' && (isSelectionMode
+            ? <span className="list-active-filter">{activeFilterLabel}</span>
+            : <button
+                type="button"
+                className="list-active-filter list-clear-filter"
+                aria-label={`清除筛选：${activeFilterLabel}`}
+                title={`清除筛选：${activeFilterLabel}`}
+                onClick={() => {
+                  controlRowRef.current?.querySelector<HTMLElement>('.filter-menu > summary')?.focus({ preventScroll: true });
+                  onFilterChange('all');
+                }}
+              >
+                {activeFilterLabel}<X size={14} strokeWidth={1.75} aria-hidden="true" />
+              </button>)}
+          <span className="list-result-count" aria-live="polite">{isSelectionMode ? `已选 ${selectedMessageIds.length} 封`
+            : listMode === 'messages' ? visibleListSummary : messageListSummary}</span>
         </div>
       </div>
-      <div className={`list-control-row${isSelectionMode ? ' is-selection-mode' : ''}`}>
+      <div className={`list-control-row${isSelectionMode ? ' is-selection-mode' : ''}`} ref={controlRowRef}>
         {listMode === 'messages' && selectionControls}
         {isSelectionMode ? (
           <MessageBulkToolbar
@@ -107,6 +129,7 @@ function MessageListToolbar({
             onRequestSnooze={onRequestSnooze}
             onMoveBulkToFolder={onMoveBulkToFolder}
             onToggleBulkLabel={onToggleBulkLabel}
+            onClearSelection={onClearSelection ? clearSelection : undefined}
           />
         ) : (
           <div className="list-control-actions" aria-label="邮件显示模式">
@@ -137,7 +160,7 @@ function MessageListToolbar({
             <div className="list-control-menus" role="group" aria-label="邮件筛选和排序">
               <CompactDropdown
                 className={`filter-menu${filter !== 'all' ? ' is-filtered' : ''}`}
-                triggerIcon={<SlidersHorizontal size={16} strokeWidth={1.75} />}
+                triggerIcon={<ListFilter size={18} strokeWidth={1.75} />}
                 label="筛选"
                 currentLabel={activeFilterLabel}
                 ariaLabel={`筛选邮件，当前：${activeFilterLabel}`}
@@ -146,8 +169,8 @@ function MessageListToolbar({
                 onChange={onFilterChange}
               />
               <CompactDropdown
-                className="sort-menu"
-                triggerIcon={<ArrowDownWideNarrow size={16} strokeWidth={1.75} />}
+                className={`sort-menu${listSort !== 'newest' ? ' is-custom-sort' : ''}`}
+                triggerIcon={<SortIcon size={18} strokeWidth={1.75} />}
                 label="排序"
                 currentLabel={sortTriggerLabel(listSort)}
                 ariaLabel={`邮件排序，当前：${sortTriggerLabel(listSort)}`}

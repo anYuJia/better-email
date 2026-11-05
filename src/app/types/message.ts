@@ -48,6 +48,9 @@ export type Message = {
   snippet: string;
   body: string;
   sanitized_html: string;
+  /** Persisted download completion, including a successfully fetched empty body.
+   * Optional for older IPC/mock clients; current native detail responses always supply it. */
+  remote_body_fetched?: boolean;
   security_warnings: string[];
   received_at: string;
   is_read: boolean;
@@ -64,7 +67,7 @@ export type Message = {
 };
 
 
-export type MessageSummary = Omit<Message, 'body' | 'sanitized_html'>;
+export type MessageSummary = Omit<Message, 'body' | 'sanitized_html' | 'remote_body_fetched'>;
 
 
 export type UndoMessageSnapshot = {

@@ -40,6 +40,8 @@ type FlatListItem =
 
 type MessageListViewProps = {
   mobile?: boolean;
+  selectionMode?: boolean;
+  selectionControlsInToolbar?: boolean;
   showAccountSource?: boolean;
   accountSourceLabels?: ReadonlyMap<number, string>;
   groups: MessageGroup[];
@@ -65,6 +67,7 @@ type MessageListViewProps = {
   onCloseMessageMenu: () => void;
   onSetDraggingMessageIds: (messageIds: number[]) => void;
   onClearSearchAndFilter: () => void;
+  onExpandSearch?: () => void;
   onRefresh: () => Promise<void>;
   onLoadMore: () => Promise<MessageSummary[]>;
   loadMoreStatus?: string | null;
@@ -72,6 +75,8 @@ type MessageListViewProps = {
 
 export default function MessageListView({
   mobile = false,
+  selectionMode = false,
+  selectionControlsInToolbar = false,
   showAccountSource = false,
   accountSourceLabels,
   groups,
@@ -97,10 +102,21 @@ export default function MessageListView({
   onCloseMessageMenu,
   onSetDraggingMessageIds,
   onClearSearchAndFilter,
+  onExpandSearch,
   onRefresh,
   onLoadMore,
   loadMoreStatus,
 }: MessageListViewProps) {
+  const showAccountSourceLabel = useMemo(() => {
+    if (!showAccountSource || hasMoreMessages || messages.length === 0) return showAccountSource;
+    const first = messages[0];
+    const email = first.account_email.trim().toLocaleLowerCase();
+    // Only a complete result can establish a single source. A partial page or
+    // missing identity must not imply that the remaining results share it.
+    return !(Number.isInteger(first.account_id) && first.account_id > 0 && email
+      && messages.every((message) => message.account_id === first.account_id
+        && message.account_email.trim().toLocaleLowerCase() === email));
+  }, [showAccountSource, hasMoreMessages, messages]);
   const listRef = useRef<HTMLDivElement | null>(null);
   const footerRef = useRef<HTMLDivElement | null>(null);
   const restoredViewKeyRef = useRef<string | null>(null);
@@ -119,14 +135,11 @@ export default function MessageListView({
     () => typeof window !== 'undefined' && window.innerWidth <= 720,
   );
   const isMobileViewport = mobile || isNarrowViewport;
-  const [, setScrollTop] = useState(initialScrollTop);
   const [heightCacheVersion, setHeightCacheVersion] = useState(0);
   const [measurementVersion, setMeasurementVersion] = useState(0);
   const [visibilityVersion, setVisibilityVersion] = useState(0);
   const [isScrollbarVisible, setIsScrollbarVisible] = useState(false);
   const [isScrollbarDragging, setIsScrollbarDragging] = useState(false);
-  const [scrollbarThumb, setScrollbarThumb] = useState({ top: 0, height: 0 });
-  scrollbarMetricsRef.current = scrollbarThumb;
   const itemHeightCacheRef = useRef<Map<string, number>>(new Map());
   const itemNodeRefs = useRef<Map<string, HTMLElement | null>>(new Map());
   const [loadMoreFocusRequest, setLoadMoreFocusRequest] = useState<{
@@ -149,7 +162,8 @@ export default function MessageListView({
     const contentLength = listElement.scrollHeight;
     const scrollRange = contentLength - viewportLength;
     if (scrollRange <= 0) {
-      setScrollbarThumb((current) => current.height === 0 ? current : { top: 0, height: 0 });
+      scrollbarMetricsRef.current = { top: 0, height: 0 };
+      if (scrollbarThumbRef.current) scrollbarThumbRef.current.style.height = '0px';
       return;
     }
 
@@ -172,7 +186,12 @@ export default function MessageListView({
       top: SCROLLBAR_INSET_PX + Math.round(thumbTravel * scrollRatio),
       height: Math.round(thumbHeight),
     };
-    setScrollbarThumb((current) => current.top === nextThumb.top && current.height === nextThumb.height ? current : nextThumb);
+    scrollbarMetricsRef.current = nextThumb;
+    const thumb = scrollbarThumbRef.current;
+    if (thumb) {
+      thumb.style.height = `${nextThumb.height}px`;
+      thumb.style.transform = `translateY(${nextThumb.top}px)`;
+    }
   }, []);
 
   const revealScrollbar = useCallback((scrollTop: number) => {
@@ -280,6 +299,7 @@ export default function MessageListView({
     const list: FlatListItem[] = [];
     const indexes = new Map<string, number>();
     for (const group of groups) {
+      if (groups.length > 1) {
       indexes.set(`header-${group.id}`, list.length);
       list.push({
         type: 'header',
@@ -289,6 +309,7 @@ export default function MessageListView({
         count: group.messages.length,
         messageIds: group.messages.map((message) => message.id),
       });
+      }
       for (const msg of group.messages) {
         const key = `message-${group.id}-${msg.id}`;
         indexes.set(key, list.length);
@@ -395,7 +416,6 @@ export default function MessageListView({
     previousLayout.current = { rows: flatItems, layout };
     listElement.scrollTop = requestedScrollTop;
     latestScrollTopRef.current = requestedScrollTop;
-    setScrollTop(requestedScrollTop);
     const nextRange = calculateVisibleRange(layout, requestedScrollTop, viewportHeight);
     setVisibleRange((current) => nextRange.startIdx === current.startIdx && nextRange.endIdx === current.endIdx ? current : nextRange);
     restoredViewKeyRef.current = listStateKey;
@@ -426,8 +446,9 @@ export default function MessageListView({
     updateScrollbarThumb();
 
     if (typeof ResizeObserver !== 'undefined') {
-      const observer = new ResizeObserver((entries) => {
-        for (const entry of entries) {
+      const updateGeometry = () => {
+        if (document.body.classList.contains('pane-resizing')) return;
+        for (const entry of [{ target: listElement }]) {
           const height = entry.target.clientHeight;
           const width = entry.target.clientWidth;
           // Mobile keeps the inbox mounted behind its reader. display:none
@@ -451,9 +472,14 @@ export default function MessageListView({
           }
           updateScrollbarThumb();
         }
-      });
+      };
+      const observer = new ResizeObserver(updateGeometry);
       observer.observe(listElement);
-      return () => observer.disconnect();
+      document.addEventListener('better-email:pane-resize-end', updateGeometry);
+      return () => {
+        observer.disconnect();
+        document.removeEventListener('better-email:pane-resize-end', updateGeometry);
+      };
     }
   }, [updateScrollbarThumb]);
 
@@ -586,7 +612,6 @@ export default function MessageListView({
     const nextScrollTop = Math.max(0, layout[targetItemIndex]?.top ?? 0);
     listElement.scrollTop = nextScrollTop;
     latestScrollTopRef.current = nextScrollTop;
-    setScrollTop(nextScrollTop);
     setVisibleRange(calculateVisibleRange(layout, nextScrollTop, viewportHeight));
   }, [
     flatItems,
@@ -598,6 +623,7 @@ export default function MessageListView({
     visibleItems,
   ]);
 
+  const showFooter = messages.length > 1 || hasMoreMessages || Boolean(loadMoreStatus);
   return (
     <div className="message-list-shell">
       <div
@@ -638,7 +664,7 @@ export default function MessageListView({
       )}
       {messages.length > 0 && (
         <>
-        {isMobileViewport && selectedMessageIds.length > 0 && (
+        {isMobileViewport && !selectionControlsInToolbar && selectedMessageIds.length > 0 && (
           <MessageSelectionControls
             messages={messages}
             selectedMessageIds={selectedMessageIds}
@@ -656,7 +682,7 @@ export default function MessageListView({
           className="message-list-viewport-wrapper"
           style={{
             position: 'relative',
-            height: totalHeight + LIST_FOOTER_HEIGHT,
+            height: totalHeight + (showFooter ? LIST_FOOTER_HEIGHT : 0),
             width: '100%',
           }}
         >
@@ -728,6 +754,7 @@ export default function MessageListView({
                   <MessageListCard
                     mobile={mobile}
                     showAccountSource={showAccountSource}
+                    showAccountSourceLabel={showAccountSourceLabel}
                     accountSourceLabels={accountSourceLabels}
                     message={message}
                     isCurrentMessage={message.id === selectedId}
@@ -735,7 +762,7 @@ export default function MessageListView({
                     isDragging={draggingMessageSet.has(message.id)}
                     isNew={newIds.has(message.id)}
                     claimFocus={loadMoreFocusTarget?.id === message.id}
-                    isSelectionMode={selectedMessageIds.length > 0}
+                    isSelectionMode={selectionMode || selectedMessageIds.length > 0}
                     hasBulkSelection={selectedMessageIds.length > 1}
                     selectedMessageIdsRef={selectedMessageIdsRef}
                     onSelectMessage={onSelectMessage}
@@ -750,7 +777,7 @@ export default function MessageListView({
               );
             }
           })}
-          <div
+          {showFooter && <div
             ref={footerRef}
             className="message-list-footer"
             tabIndex={-1}
@@ -807,7 +834,7 @@ export default function MessageListView({
                 )
               ) : ' · 已到底'}
             </span>
-          </div>
+          </div>}
         </div>
         </>
       )}
@@ -821,11 +848,18 @@ export default function MessageListView({
             {query.trim() || filter !== 'all' ? '没有匹配邮件' : '当前邮箱暂无可显示邮件'}
           </strong>
           <span>
-            {query.trim() || filter !== 'all'
+            {query.trim() && onExpandSearch
+              ? '当前搜索范围内没有匹配邮件，可以扩大范围继续查找。'
+              : query.trim() || filter !== 'all'
               ? '可以清空搜索/筛选，或切回“全部”查看当前邮箱。'
               : '当前账号或统一邮箱范围里，这个文件夹暂时没有邮件。'}
           </span>
           <div className="empty-state-actions">
+            {query.trim() && onExpandSearch && (
+              <button type="button" className="mailbox-expand-search" onClick={onExpandSearch}>
+                在全部账号中搜索
+              </button>
+            )}
             {(query.trim() || filter !== 'all') && (
               <button type="button" onClick={onClearSearchAndFilter}>
                 清空搜索和筛选
@@ -839,14 +873,12 @@ export default function MessageListView({
       )}
       </div>
       <div
-        className={`message-list-scrollbar-thumb${isScrollbarVisible && scrollbarThumb.height > 0 ? ' is-visible' : ''}${isScrollbarDragging ? ' is-dragging' : ''}`}
+        className={`message-list-scrollbar-thumb${isScrollbarVisible ? ' is-visible' : ''}${isScrollbarDragging ? ' is-dragging' : ''}`}
         ref={scrollbarThumbRef}
         aria-hidden="true"
         role="presentation"
         style={{
           width: `${SCROLLBAR_SIZE_PX}px`,
-          height: `${scrollbarThumb.height}px`,
-          transform: `translateY(${scrollbarThumb.top}px)`,
         }}
       />
     </div>

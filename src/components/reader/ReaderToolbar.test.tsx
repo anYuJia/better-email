@@ -140,15 +140,27 @@ describe('ReaderToolbar common actions', () => {
   });
 
   it('uses trash state actions instead of archive, snooze, spam, or ordinary delete', () => {
-    renderToolbar(message({ folder_role: 'trash' }));
+    const onRestoreFromTrash = vi.fn();
+    const onReply = vi.fn();
+    const onPermanentlyDelete = vi.fn();
+    renderToolbar(message({ folder_role: 'trash' }), { onRestoreFromTrash, onReply, onPermanentlyDelete });
 
-    expect(screen.getByRole('button', { name: '恢复到收件箱' })).toBeDefined();
+    const restore = screen.getByRole('button', { name: '恢复到收件箱' });
+    expect(restore.classList.contains('primary-action')).toBe(true);
+    fireEvent.click(restore);
+    expect(onRestoreFromTrash).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: '回复' })).toBeNull();
     expect(screen.queryByRole('button', { name: '归档' })).toBeNull();
     expect(screen.queryByRole('button', { name: '稍后处理' })).toBeNull();
     fireEvent.click(screen.getByTitle('更多操作'));
     expect(screen.getByRole('menuitem', { name: '永久删除' })).toBeDefined();
     expect(screen.queryByRole('menuitem', { name: '移到废纸篓' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: '标为垃圾邮件' })).toBeNull();
+    fireEvent.click(screen.getByRole('menuitem', { name: '回复' }));
+    expect(onReply).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByTitle('更多操作'));
+    fireEvent.click(screen.getByRole('menuitem', { name: '永久删除' }));
+    expect(onPermanentlyDelete).toHaveBeenCalledOnce();
   });
 
   it('does not expose message-state actions that do not apply to drafts or sent mail', () => {

@@ -142,18 +142,8 @@
   opacity: 1;
 }
 
-/* Compact shell (≤1180px): the grid collapses to a fixed three-column
- * layout without draggable gutters. The resizer buttons must not occupy
- * grid cells here — otherwise they steal a content column and push the
- * reader onto a second row. Responsive pane borders keep the planes
- * visibly separated after the gutters are removed. */
-@media (max-width: 1180px) {
-  .app-shell {
-    --app-sidebar-width: 200px;
-    --app-list-width: 320px;
-    grid-template-columns: var(--app-sidebar-width) var(--app-list-width) minmax(0, 1fr);
-  }
-
+/* Drawer and single-surface layouts have no desktop splitter cells. */
+@media (max-width: 1040px) {
   .app-shell .pane-resizer {
     display: none;
   }

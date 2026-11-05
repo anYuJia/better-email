@@ -5,7 +5,7 @@ import { join } from 'node:path';
 // scaling deliberately changes computed font sizes, not viewport screenshots.
 export async function runQualityMatrix(cdp, api) {
   const { evalInPage, setUiViewport, waitForExpression, captureScreenshot, clickButton, fillInput, closeComposer, openSettingsSection, url, captureDir } = api;
-  const cases = [[1440, 900], [1280, 800], [1024, 768], [390, 844], [393, 852], [430, 932]]
+  const cases = [[1440, 900], [1280, 800], [1180, 760], [1024, 768], [390, 844], [393, 852], [430, 932]]
     .flatMap(([w, h]) => ['light', 'dark'].map((theme) => ({ w, h, theme, scale: 1 })));
   for (const [w, h] of [[1440, 900], [390, 844]]) {
     for (const scale of [1.25, 1.5]) cases.push({ w, h, theme: 'light', scale });
@@ -26,6 +26,7 @@ export async function runQualityMatrix(cdp, api) {
         for (const [element, size] of sizes) { element.dataset.qaFontBase = size; element.style.fontSize = parseFloat(size) * ${scale} + 'px'; }
       })()`);
       await waitForExpression(cdp, "document.getAnimations().every((animation) => animation.playState !== 'running' || animation.effect?.getTiming().iterations === Infinity)");
+      if (surface === 'threads') await waitForExpression(cdp, "[...document.querySelectorAll('.thread-list-item')].every(el => el.firstElementChild.getBoundingClientRect().height <= el.getBoundingClientRect().height + 1)");
       const geometry = await evalInPage(cdp, `(() => {
         const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
         const search = rect('.global-search-box input');
@@ -36,7 +37,7 @@ export async function runQualityMatrix(cdp, api) {
         const composeIcon = rect('.mobile-bottom-compose-icon');
         const composeLabel = rect('.mobile-bottom-compose > span:last-child');
         const settings = rect('.settings-shell');
-        const folderTitle = rect('.list-summary strong');
+        const folderTitle = rect('.list-folder-title');
         const readerPane = rect('.reader-panel');
         const recipientInput = rect('.composer-recipient-editor input');
         const recipientDetails = rect('.composer-recipient-details-toggle');
@@ -47,6 +48,21 @@ export async function runQualityMatrix(cdp, api) {
           recipientDetailsTouchTarget: !recipientDetails || (recipientDetails.width >= 44 && recipientDetails.height >= 44),
           searchWidth: search?.width ?? null, editorWidth: editor?.width ?? null,
           rowContentClipped: row && summary ? summary.bottom > row.bottom + 1 : false,
+          threadContentClipped: [...document.querySelectorAll('.thread-preview')].some(el =>
+            el.clientHeight + 1 < parseFloat(getComputedStyle(el).lineHeight)),
+          threadRowsOverlap: [...document.querySelectorAll('.thread-list-item')].some(el =>
+            el.firstElementChild.getBoundingClientRect().height > el.getBoundingClientRect().height + 1),
+          threadUnreadOverlapsSender: [...document.querySelectorAll('.thread-unread-dot')].some(el => {
+            const dot = el.getBoundingClientRect();
+            const sender = el.closest('.thread-card')?.querySelector('.thread-sender')?.getBoundingClientRect();
+            return sender && dot.right > sender.left && dot.left < sender.right
+              && dot.bottom > sender.top && dot.top < sender.bottom;
+          }),
+          selectionTouchTargets: [...document.querySelectorAll('.mobile-selection-toolbar button, .mobile-selection-toolbar summary, .mobile-selection-toolbar .message-selection-all')]
+            .filter(el => el.getBoundingClientRect().width > 0 && getComputedStyle(el).visibility === 'visible')
+            .every(el => { const r = el.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; }),
+          refinementTouchTargets: [...document.querySelectorAll('.mobile-inbox-refinements button')]
+            .every(el => { const r = el.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; }),
           composeActionFits: !compose || compose.width === 0 || (compose.height >= 44
             && compose.left >= 0 && compose.right <= innerWidth && compose.bottom <= innerHeight
             && composeIcon.right <= composeLabel.left
@@ -57,6 +73,9 @@ export async function runQualityMatrix(cdp, api) {
       })()`);
       if (geometry.overflow) throw new Error(`Horizontal overflow: ${label}/${surface}`);
       if (surface === 'inbox' && geometry.rowContentClipped) throw new Error(`Message summary clipped: ${label}`);
+      if (surface === 'threads' && (geometry.threadContentClipped || geometry.threadRowsOverlap || geometry.threadUnreadOverlapsSender)) throw new Error(`Conversation geometry: ${label}: ${JSON.stringify(geometry)}`);
+      if (surface.startsWith('selection') && !geometry.selectionTouchTargets) throw new Error(`Selection touch targets: ${label}`);
+      if (surface === 'search-retained' && !geometry.refinementTouchTargets) throw new Error(`Refinement touch targets: ${label}`);
       if (surface === 'inbox' && mobile && !geometry.composeActionFits) throw new Error(`Mobile compose action layout: ${label}`);
       if (surface.startsWith('settings') && !geometry.settingsFillsViewport) throw new Error(`Settings surface bounds: ${label}`);
       if (surface === 'inbox' && !mobile && geometry.searchWidth !== null && geometry.searchWidth < 160) throw new Error(`Cold search collapsed: ${label}`);
@@ -96,8 +115,53 @@ export async function runQualityMatrix(cdp, api) {
     if (!mobile && (!inboxGeometry.folderTitleVisible || (w > 1180 && inboxGeometry.readerPaneWidth < 559))) {
       throw new Error(`Mailbox context or reading space: ${label}: ${JSON.stringify(inboxGeometry)}`);
     }
+    if (!mobile && w === 1280) {
+      await evalInPage(cdp, "document.querySelector('.filter-menu > summary').click()");
+      await waitForExpression(cdp, "document.querySelector('.filter-menu[open] [role=menu]')");
+      await clickButton(cdp, '附件', "document.querySelector('.filter-menu')");
+      await waitForExpression(cdp, "document.querySelector('.list-clear-filter') && !document.querySelector('.search-clear-button') && document.querySelectorAll('.message-card').length === 1");
+      await check('active-filter');
+      await clickButton(cdp, '清除筛选：附件', "document.querySelector('.list-summary')");
+      await waitForExpression(cdp, "!document.querySelector('.list-clear-filter') && document.querySelectorAll('.message-card').length > 1");
+    }
+    const changeListMode = async (mode) => {
+      if (mobile) {
+        await evalInPage(cdp, "document.querySelector('.mobile-filter-trigger').click()");
+        await waitForExpression(cdp, "document.querySelector('[role=\"menu\"][aria-label=\"邮件筛选和列表模式\"]')");
+        await clickButton(cdp, mode === 'threads' ? '会话列表' : '邮件列表', "document.querySelector('[role=\"menu\"][aria-label=\"邮件筛选和列表模式\"]')");
+      } else await clickButton(cdp, mode === 'threads' ? '会话' : '邮件', "document.querySelector('.list-control-tabs')");
+      await waitForExpression(cdp, mode === 'threads' ? "document.querySelector('.thread-card')" : "document.querySelector('.message-card-main')");
+    };
+    await changeListMode('threads');
+    await check('threads');
+    await changeListMode('messages');
     if (!mobile) await checkLabels();
     if (mobile) {
+      await evalInPage(cdp, "document.querySelector('.mobile-filter-trigger').click()");
+      await waitForExpression(cdp, "document.querySelector('[role=\"menu\"][aria-label=\"邮件筛选和列表模式\"]')");
+      await clickButton(cdp, '选择邮件', "document.querySelector('[role=\"menu\"][aria-label=\"邮件筛选和列表模式\"]')");
+      await waitForExpression(cdp, "document.querySelector('.mobile-selection-toolbar') && document.querySelector('.message-card.is-selection-mode')");
+      await check('selection-empty');
+      await evalInPage(cdp, "document.querySelector('.message-card-main').click()");
+      await waitForExpression(cdp, "document.querySelector('.mobile-selection-toolbar .bulk-toolbar') && !document.querySelector('.mobile-reader-surface')");
+      await check('selection-active');
+      await clickButton(cdp, '退出选择', "document.querySelector('.mobile-inbox-header')");
+      await waitForExpression(cdp, "!document.querySelector('.mobile-selection-toolbar') && !document.querySelector('.message-select input:checked')");
+      await evalInPage(cdp, "document.querySelector('.mobile-filter-trigger').click()");
+      await waitForExpression(cdp, "document.querySelector('[role=\"menu\"][aria-label=\"邮件筛选和列表模式\"]')");
+      await clickButton(cdp, '附件', "document.querySelector('[role=\"menu\"][aria-label=\"邮件筛选和列表模式\"]')");
+      await waitForExpression(cdp, "document.querySelector('.mobile-clear-filter') && document.querySelectorAll('.message-card').length === 1");
+      await clickButton(cdp, '搜索邮件', "document.querySelector('.mobile-inbox-header')");
+      await fillInput(cdp, '.mobile-search-form input', 'Security');
+      await evalInPage(cdp, "document.querySelector('.mobile-search-form').requestSubmit()");
+      await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('已搜索：Security') && document.querySelectorAll('.message-card').length === 1");
+      await clickButton(cdp, '关闭搜索', "document.querySelector('.mobile-inbox-header')");
+      await waitForExpression(cdp, "document.querySelector('.mobile-active-search-query')?.textContent.includes('Security')");
+      await check('search-retained');
+      await clickButton(cdp, '清除当前搜索', "document.querySelector('.mobile-inbox-header')");
+      await waitForExpression(cdp, "!document.querySelector('.mobile-active-search') && document.querySelector('.mobile-clear-filter') && document.querySelectorAll('.message-card').length === 1");
+      await clickButton(cdp, '清除筛选：附件', "document.querySelector('.mobile-inbox-header')");
+      await waitForExpression(cdp, "!document.querySelector('.mobile-inbox-refinements') && document.querySelectorAll('.message-card').length > 1");
       await evalInPage(cdp, "document.querySelector('.message-card-main').click()");
       await waitForExpression(cdp, "document.querySelector('.mobile-screen-layer--reader.is-active .reader h1')");
       await waitForExpression(cdp, "document.querySelector('.quick-reply-entry') && !document.querySelector('.quick-reply textarea')");

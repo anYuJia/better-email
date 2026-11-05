@@ -360,22 +360,22 @@ export default function MessageDateRangePicker({ onConfirm, disabled = false, ic
       <button
         type="button"
         className={`message-date-range-trigger${iconOnly ? ' is-icon-only' : ''}`}
-        aria-label="按日期范围筛选邮件"
-        title="按日期范围筛选邮件"
+        aria-label="按日期选择邮件"
+        title="按日期选择邮件"
         aria-haspopup="dialog"
         aria-expanded={open}
         disabled={disabled}
         onClick={() => { setError(''); setOpen((current) => !current); }}
       >
         <CalendarDays size={14} aria-hidden="true" />
-        {!iconOnly && <span>日期筛选</span>}
+        {!iconOnly && <span>日期选择</span>}
       </button>
       {open && createPortal((
         <div className="message-date-range-backdrop" ref={backdropRef} onMouseDown={(event) => { if (event.target === event.currentTarget) closePicker(); }}>
-          <section className="message-date-range-modal" role="dialog" aria-modal="true" aria-label="按日期范围筛选邮件" ref={dialogRef}>
+          <section className="message-date-range-modal" role="dialog" aria-modal="true" aria-label="按日期选择邮件" ref={dialogRef}>
             <header className="message-date-range-modal-header">
-              <button ref={closeButtonRef} type="button" aria-label="关闭日期筛选" onClick={closePicker}><X size={17} aria-hidden="true" /></button>
-              <h2>按日期范围筛选邮件</h2>
+              <button ref={closeButtonRef} type="button" aria-label="关闭日期选择" onClick={closePicker}><X size={17} aria-hidden="true" /></button>
+              <h2>按日期选择邮件</h2>
               <span aria-hidden="true" />
             </header>
             <div className="message-date-range-presets" role="group" aria-label="快捷日期范围">

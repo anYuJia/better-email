@@ -17,6 +17,8 @@ export const shortcutGroups = [
       { keys: ['A'], label: '回复全部' },
       { keys: ['⇧', 'R'], label: '回复全部（兼容）' },
       { keys: ['F'], label: '转发' },
+      { keys: ['⌘/Ctrl', ']'], label: '增加正文缩进' },
+      { keys: ['⌘/Ctrl', '['], label: '减少正文缩进' },
     ],
   },
   {

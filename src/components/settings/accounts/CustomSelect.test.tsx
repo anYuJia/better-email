@@ -373,7 +373,7 @@ describe('CustomSelect', () => {
     expect(customSelectPortalLayers.accountLogin).toBeGreaterThan(2000);
   });
 
-  it('keeps the visual exit frame mounted after semantic dismissal', () => {
+  it('closes immediately when the host cannot animate an exit', () => {
     vi.useFakeTimers();
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
     render(
@@ -390,7 +390,7 @@ describe('CustomSelect', () => {
     fireEvent.pointerDown(document.body);
 
     expect(screen.queryByRole('listbox')).toBeNull();
-    expect(document.querySelector('.custom-select-dropdown')).not.toBeNull();
+    expect(document.querySelector('.custom-select-dropdown')).toBeNull();
     act(() => vi.advanceTimersByTime(120));
     expect(document.querySelector('.custom-select-dropdown')).toBeNull();
   });

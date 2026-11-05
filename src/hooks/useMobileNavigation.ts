@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { SettingsSectionId } from '../components/settings/settingsNavigation';
+import { mobileSelectionHistoryKey, withoutMobileSelection } from './mobileSelectionHistory';
 
 type Options = {
   isMobileApp: boolean;
@@ -50,6 +51,7 @@ export default function useMobileNavigation({ isMobileApp, isSettingsOpen, activ
       betterEmailSettingsSection: _settingsSection,
       betterEmailSettingsDirection: _settingsDirection,
       betterEmailSearch: _search,
+      betterEmailInboxSelection: _selection,
       ...baseState
     } = window.history.state ?? {};
     if (!firstMobileEntry && historyChangedOnDesktop) {
@@ -101,18 +103,28 @@ export default function useMobileNavigation({ isMobileApp, isSettingsOpen, activ
       betterEmailSettingsDirection: _settingsDirection,
       betterEmailSearch: _search,
       ...baseState
-    } = currentState;
+    } = withoutMobileSelection(currentState);
     if (currentState.betterEmailScreen === nextScreen) {
+      if (currentState[mobileSelectionHistoryKey] && !currentState.betterEmailSearch) {
+        window.history.back();
+        return;
+      }
       if (currentState.betterEmailSearch) {
         window.history.replaceState({ ...baseState, betterEmailScreen: nextScreen }, '');
       }
       return;
     }
-    window.history.pushState({ ...baseState, betterEmailScreen: nextScreen }, '');
+    const nextState = { ...baseState, betterEmailScreen: nextScreen };
+    if (currentState[mobileSelectionHistoryKey]) window.history.replaceState(nextState, '');
+    else window.history.pushState(nextState, '');
   }, [isMobileApp]);
 
   const backMobileScreen = useCallback(() => {
     setMobileSearchOpen(false);
+    if (isMobileApp && window.history.state?.[mobileSelectionHistoryKey]) {
+      window.history.back();
+      return;
+    }
     if (isMobileApp && window.history.state?.betterEmailSearch) {
       window.history.back();
       return;
@@ -126,11 +138,15 @@ export default function useMobileNavigation({ isMobileApp, isSettingsOpen, activ
 
   const openMobileSearch = useCallback(() => {
     setMobileSearchOpen(true);
-    if (!isMobileApp || window.history.state?.betterEmailSearch) return;
-    window.history.pushState(
-      { ...(window.history.state ?? {}), betterEmailSearch: true },
-      '',
-    );
+    if (!isMobileApp) return;
+    if (window.history.state?.betterEmailSearch) {
+      if (window.history.state?.[mobileSelectionHistoryKey]) window.history.back();
+      return;
+    }
+    const state = window.history.state;
+    const nextState = { ...withoutMobileSelection(state), betterEmailSearch: true };
+    if (state?.[mobileSelectionHistoryKey]) window.history.replaceState(nextState, '');
+    else window.history.pushState(nextState, '');
   }, [isMobileApp]);
 
   const closeMobileSearch = useCallback(() => {

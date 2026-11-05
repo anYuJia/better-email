@@ -39,7 +39,7 @@
 /* Keep the workspace planes visibly separated while compact desktop widths
  * hide the draggable gutters. At phone width only one plane is shown, so
  * there is no separator to draw. */
-@media (min-width: 721px) and (max-width: 1180px) {
+@media (min-width: 721px) and (max-width: 1040px) {
   .app-shell > .sidebar,
   .app-shell > .message-list-panel {
     border-right: 1px solid var(--ui-border);
@@ -78,10 +78,10 @@
 
   .app-shell.narrow-view-sidebar > .sidebar {
     position: fixed;
-    inset: 0 auto 0 0;
+    inset: var(--app-titlebar-height) auto 0 0;
     z-index: 90;
     width: min(280px, calc(100vw - 44px));
-    height: 100dvh;
+    height: calc(100dvh - var(--app-titlebar-height));
     max-width: none;
     display: flex;
     padding-inline: 12px;

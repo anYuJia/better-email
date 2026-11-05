@@ -43,6 +43,23 @@ beforeEach(() => { mockInvoke.mockReset(); });
 afterEach(cleanup);
 
 describe('reader action result ownership', () => {
+  it('registers an explicit refresh once when repeated before its request settles', async () => {
+    const body = deferred<Message>();
+    mockInvoke.mockImplementation(async (command) => command === 'fetch_message_body' ? body.promise : []);
+    const view = setup();
+    let firstRequest!: Promise<void>;
+    let repeatedRequest!: Promise<void>;
+    act(() => {
+      firstRequest = view.result.current.fetchSelectedBody();
+      repeatedRequest = view.result.current.fetchSelectedBody();
+    });
+    expect(view.onBodyFetchStart).toHaveBeenCalledExactlyOnceWith(1, 'manual');
+    expect(mockInvoke.mock.calls.filter(([command]) => command === 'fetch_message_body')).toHaveLength(1);
+    await act(async () => { body.resolve({ ...first, body: 'Loaded' }); await Promise.all([firstRequest, repeatedRequest]); });
+    expect(view.bodyFetchInFlightRef.current.size).toBe(0);
+    expect(view.onBodyFetchSuccess).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
   it.each(['openAttachment', 'saveAttachmentAs'] as const)('refreshes a missing local file after %s so download becomes available', async (action) => {
     const missing = { id: 10, message_id: 1, is_downloaded: true, local_path: '/old/temp.pdf' } as Attachment;
     const refreshed = [{ ...missing, is_downloaded: false, local_path: '' }];

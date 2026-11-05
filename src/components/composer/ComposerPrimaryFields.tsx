@@ -23,17 +23,28 @@ import {
   syncRichTextEmptyState,
 } from './richTextCommands';
 
-function insertTabInTextControl(target: HTMLInputElement | HTMLTextAreaElement) {
+function indentPlainText(target: HTMLTextAreaElement, outdent: boolean) {
   const start = target.selectionStart ?? target.value.length;
   const end = target.selectionEnd ?? start;
-  const nextValue = `${target.value.slice(0, start)}	${target.value.slice(end)}`;
-  const nativeSetter = Object.getOwnPropertyDescriptor(
-    target instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
-    'value',
-  )?.set;
+  const lineStart = start === 0 ? 0 : target.value.lastIndexOf('\n', start - 1) + 1;
+  // A selection ending at the next line's beginning does not include that line.
+  const selectedEnd = end > start && target.value[end - 1] === '\n' ? end - 1 : end;
+  const nextBreak = target.value.indexOf('\n', selectedEnd);
+  const lineEnd = nextBreak === -1 ? target.value.length : nextBreak;
+  const lines = target.value.slice(lineStart, lineEnd).split('\n');
+  const changes = lines.map((line) => outdent ? -(line.match(/^(?:\t| {1,4})/)?.[0].length ?? 0) : 1);
+  const replacement = lines.map((line, index) => outdent ? line.slice(-changes[index]) : `\t${line}`).join('\n');
+  const nextValue = target.value.slice(0, lineStart) + replacement + target.value.slice(lineEnd);
+  const nextStart = Math.max(lineStart, start + changes[0]);
+  const nextEnd = Math.max(nextStart, end + changes.reduce((total, change) => total + change, 0));
+  const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
   nativeSetter?.call(target, nextValue);
   target.dispatchEvent(new Event('input', { bubbles: true }));
-  requestAnimationFrame(() => target.setSelectionRange(start + 1, start + 1));
+  requestAnimationFrame(() => {
+    if (target.isConnected && document.activeElement === target && target.value === nextValue) {
+      target.setSelectionRange(nextStart, nextEnd);
+    }
+  });
 }
 
 type ComposerPrimaryFieldsProps = {
@@ -364,15 +375,14 @@ export default function ComposerPrimaryFields({
     const nativeEvent = event.nativeEvent;
     if (nativeEvent.isComposing || nativeEvent.keyCode === 229) return;
 
-    if (event.key === 'Tab') {
-      event.preventDefault();
-      event.stopPropagation();
-      runEditorCommand(editor, 'insertText', '	');
-      return;
-    }
-
     if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
     const key = event.key.toLowerCase();
+    if (!event.shiftKey && (key === '[' || key === ']')) {
+      event.preventDefault();
+      event.stopPropagation();
+      runEditorCommand(editor, key === ']' ? 'indent' : 'outdent');
+      return;
+    }
     if (['a', 'c', 'x', 'v', 'z', 'y', 'b', 'i', 'u'].includes(key)) {
       // Preserve the WebView/native edit command. We only stop app-level shortcuts.
       event.stopPropagation();
@@ -486,12 +496,6 @@ export default function ComposerPrimaryFields({
           onChange={(event) => onPatchDraft({ subject: event.target.value })}
           onKeyDown={(event) => {
             if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
-            if (event.key === 'Tab') {
-              event.preventDefault();
-              event.stopPropagation();
-              insertTabInTextControl(event.currentTarget);
-              return;
-            }
             if ((event.metaKey || event.ctrlKey) && !event.altKey) event.stopPropagation();
           }}
           placeholder="添加主题"
@@ -518,6 +522,7 @@ export default function ComposerPrimaryFields({
             role="textbox"
             aria-multiline="true"
             aria-label="邮件正文（富文本）"
+            aria-keyshortcuts="Meta+] Meta+[ Control+] Control+["
             spellCheck={false}
             autoCorrect="off"
             autoCapitalize="off"
@@ -535,6 +540,7 @@ export default function ComposerPrimaryFields({
         ) : (
           <textarea
             aria-label="邮件正文"
+            aria-keyshortcuts="Meta+] Meta+[ Control+] Control+["
             value={editableBody}
             autoComplete="off"
             autoCorrect="off"
@@ -543,10 +549,11 @@ export default function ComposerPrimaryFields({
             data-gramm="false"
             onKeyDown={(event) => {
               if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
-              if (event.key === 'Tab') {
+              if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey
+                && (event.key === '[' || event.key === ']')) {
                 event.preventDefault();
                 event.stopPropagation();
-                insertTabInTextControl(event.currentTarget);
+                indentPlainText(event.currentTarget, event.key === '[');
                 return;
               }
               if ((event.metaKey || event.ctrlKey) && !event.altKey) event.stopPropagation();

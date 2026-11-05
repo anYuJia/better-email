@@ -44,12 +44,11 @@ function renderTitlebar(
       query=""
       appliedQuery=""
       searchScope="folder"
-      filter="all"
       messages={[]}
       onSearchSubmit={vi.fn()}
       onQueryChange={vi.fn()}
       onSearchScopeChange={vi.fn()}
-      onClearSearchAndFilter={vi.fn()}
+      onClearSearch={vi.fn()}
       onApplySearchShortcut={vi.fn()}
       currentViewLabel={currentViewLabel}
       viewSummary={viewSummary}

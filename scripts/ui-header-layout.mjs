@@ -42,6 +42,8 @@ function readHeaderLayout() {
   const hintStyle = getComputedStyle(hint);
   const hintRect = rect(hint);
   const selectors = ['.list-control-tabs > button', '.filter-menu > summary', '.sort-menu > summary'];
+  if (header.dataset.toolbarMode === 'selection') selectors.push('.bulk-toolbar-inline > button', '.bulk-more-menu > summary');
+  selectors.push('.message-selection-all input');
   return {
     search: rect(search),
     input: rect(input),
@@ -110,6 +112,27 @@ export async function testInitialHeaderLayout({ cdp, evaluate, wait, viewport, s
                 await screenshot(cdp, `header-failed-${width}-${theme}-${scale}-${listWidth}`);
                 throw new Error(`Header ${width}x${height}, list=${listWidth}, text=${scale}, ${theme}: ${error.message}; snapshot=${JSON.stringify(snapshot)}`);
               }
+            }
+            const normalHeight = await evaluate(cdp, "document.querySelector('.list-control-strip').getBoundingClientRect().height");
+            await evaluate(cdp, "document.querySelector('.message-selection-all input').click()");
+            await wait(cdp, "document.querySelector('.list-control-strip')?.dataset.toolbarMode === 'selection'");
+            const selectedSnapshot = await evaluate(cdp, `(${readHeaderLayout.toString()})()`);
+            try {
+              assertHeaderLayout(selectedSnapshot);
+              assert.ok(Math.abs(selectedSnapshot.header.height - normalHeight) <= 1, 'Selecting mail moves the list header');
+              await evaluate(cdp, `(() => {
+                const header = document.querySelector('.list-control-strip');
+                const selected = Number(header.querySelector('.bulk-more-menu > summary').getAttribute('aria-label').match(/已选 ([0-9]+) 封/)?.[1]);
+                const visibleSelected = document.querySelectorAll('.message-select input:checked').length;
+                if (!visibleSelected || selected < visibleSelected || !header.querySelector('.list-summary').textContent.includes('已选 ' + selected + ' 封')) throw new Error('Selected count is missing or incorrect');
+                const exit = header.querySelector('[aria-label="退出选择"]');
+                if (!exit) throw new Error('Selection exit is missing');
+                exit.click();
+              })()`);
+              await wait(cdp, "document.querySelector('.list-control-strip')?.dataset.toolbarMode === 'normal' && document.activeElement?.matches('.message-selection-all input')");
+            } catch (error) {
+              await screenshot(cdp, `header-selection-failed-${width}-${theme}-${scale}-${listWidth}`);
+              throw new Error(`Selection header ${width}x${height}, list=${listWidth}, text=${scale}, ${theme}: ${error.message}`);
             }
             if (listWidth === 320 && scale === 1.5) {
               await screenshot(cdp, `header-${width}-${theme}-150pct-320`);

@@ -13,6 +13,7 @@ import {
   useState,
 } from 'react';
 import { useWheelContainment } from '../../hooks/useWheelContainment';
+import { preloadSettingsSection } from './settingsPageLoaders';
 import useCompositionGuard from '../../hooks/useCompositionGuard';
 import {
   accountScopedSections,
@@ -25,7 +26,7 @@ import {
 } from './settingsNavigation';
 
 type SettingsSearchProps = {
-  onNavigate: (section: SettingsSectionId) => void;
+  onNavigate: (entry: SettingsSearchEntry) => void;
   accountSectionsEnabled?: boolean;
   mobile: boolean;
   expanded: boolean;
@@ -37,37 +38,6 @@ type SettingsSidebarProps = {
   onNavigate: (section: SettingsSectionId) => void;
   accountSectionsEnabled?: boolean;
 };
-
-function focusSearchTarget(entry: SettingsSearchEntry) {
-  window.setTimeout(() => {
-    const target = entry.target
-      ? document.querySelector<HTMLElement>(`[data-settings-section="${entry.target}"]`)
-      : document.querySelector<HTMLElement>(`[data-settings-page="${entry.section}"]`);
-    if (!target) return;
-
-    const disclosures = [
-      ...(target instanceof HTMLDetailsElement ? [target] : []),
-      ...Array.from(target.querySelectorAll<HTMLDetailsElement>('details')),
-    ];
-    let ancestor = target.parentElement;
-    while (ancestor) {
-      if (ancestor instanceof HTMLDetailsElement) disclosures.push(ancestor);
-      ancestor = ancestor.parentElement;
-    }
-    disclosures.forEach((details) => { details.open = true; });
-
-    const prefersReducedMotion = typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    target.scrollIntoView({
-      block: 'center',
-      behavior: prefersReducedMotion ? 'auto' : 'smooth',
-    });
-    target.classList.remove('settings-search-hit');
-    void target.offsetWidth;
-    target.classList.add('settings-search-hit');
-    window.setTimeout(() => target.classList.remove('settings-search-hit'), 650);
-  }, 80);
-}
 
 function requiresAccount(section: SettingsSectionId) {
   return section !== 'accounts' && accountScopedSections.has(section);
@@ -152,9 +122,8 @@ export const SettingsSearch = memo(function SettingsSearch({
 
   const navigateToSearchResult = (entry: SettingsSearchEntry) => {
     if (requiresAccount(entry.section) && !accountSectionsEnabled) return;
-    onNavigate(entry.section);
+    onNavigate(entry);
     closeSearch(false);
-    focusSearchTarget(entry);
   };
 
   return (
@@ -245,6 +214,8 @@ export const SettingsSearch = memo(function SettingsSearch({
                 key={`${entry.section}-${entry.label}`}
                 disabled={disabled}
                 title={disabled ? '请先添加或选择邮箱账号' : undefined}
+                onPointerEnter={() => preloadSettingsSection(entry.section)}
+                onFocus={() => preloadSettingsSection(entry.section)}
                 onClick={() => navigateToSearchResult(entry)}
               >
                 <strong>{entry.label}</strong>
@@ -359,6 +330,8 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                         : exposesDetailItems
                           ? `${showDetailItems ? '收起' : '展开'}${item.label}详细设置`
                           : item.description}
+                      onPointerEnter={() => preloadSettingsSection(item.id)}
+                      onFocus={() => preloadSettingsSection(item.id)}
                       onClick={activateParent}
                     >
                       <span className="settings-nav-icon">
@@ -393,6 +366,8 @@ export const SettingsSidebar = memo(function SettingsSidebar({
                                 disabled={detailDisabled}
                                 tabIndex={showDetailItems ? undefined : -1}
                                 title={detailDisabled ? '请先添加或选择邮箱账号' : detailItem.description}
+                                onPointerEnter={() => preloadSettingsSection(detailItem.id)}
+                                onFocus={() => preloadSettingsSection(detailItem.id)}
                                 onClick={() => onNavigate(detailItem.id)}
                               >
                                 <span className="settings-nav-subitem-label">{detailItem.label}</span>

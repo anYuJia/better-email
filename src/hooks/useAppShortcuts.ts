@@ -18,6 +18,8 @@ type UseAppShortcutsOptions = {
   selectedId: number | null;
   selectedMessages: MessageSummary[];
   selectedMessageIds: number[];
+  /** Explicit touch-selection mode can be active before the first checkbox. */
+  selectionMode?: boolean;
   listMode: ListMode;
   undoAction: UndoAction | null;
   isComposerOpen: boolean;
@@ -89,6 +91,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         selected,
         selectedMessages,
         selectedMessageIds,
+        selectionMode = false,
         listMode,
         undoAction,
         isComposerOpen,
@@ -114,7 +117,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       const editable = isEditableTarget(event.target);
       const inInteractiveOverlay = isInteractiveOverlayTarget(event.target);
       const hasActivePopup = Boolean(document.querySelector(
-        'details[data-menu-managed][open], .message-date-picker-popover, .context-menu, ' +
+        'details[data-menu-managed][open], .message-date-picker-popover, .context-menu:not([aria-hidden="true"]), ' +
         '.custom-select-dropdown.is-open[aria-hidden="false"], .custom-select-summary[aria-expanded="true"]',
       ));
       const commandModifier = event.metaKey || event.ctrlKey;
@@ -147,11 +150,11 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
 
       if (editable || inInteractiveOverlay) return;
 
-      if (key === 'escape' && document.querySelector('.context-menu')) {
+      if (key === 'escape' && document.querySelector('.context-menu:not([aria-hidden="true"])')) {
         return;
       }
 
-      if (key === 'escape' && selectedMessageIds.length > 0) {
+      if (key === 'escape' && (selectionMode || selectedMessageIds.length > 0)) {
         event.preventDefault();
         clearSelection();
         setStatus('已取消邮件选择');

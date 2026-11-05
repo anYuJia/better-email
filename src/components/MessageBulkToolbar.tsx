@@ -1,5 +1,6 @@
 import {
   MoreHorizontal,
+  X,
 } from 'lucide-react';
 import { useRef } from 'react';
 import {
@@ -30,6 +31,7 @@ type MessageBulkToolbarProps = {
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
   inline?: boolean;
+  onClearSelection?: () => void;
 };
 
 export default function MessageBulkToolbar({
@@ -42,13 +44,15 @@ export default function MessageBulkToolbar({
   onMoveBulkToFolder,
   onToggleBulkLabel,
   inline = false,
+  onClearSelection,
 }: MessageBulkToolbarProps) {
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenu = useDetailsMenu(moreMenuRef, { floating: true });
   if (selectedMessageIds.length === 0) return null;
 
   const actionState = buildMessageCollectionActionState(selectedMessages);
-  const primaryActions = primaryMessageCollectionActions(actionState);
+  const actions = primaryMessageCollectionActions(actionState);
+  const primaryActions = inline ? actions.slice(0, 1) : actions;
   const primaryContextItemIds = new Set(primaryActions.map((item) => {
     if (item.action === 'read' || item.action === 'unread') return 'bulk-read-state';
     if (item.action === 'star' || item.action === 'unstar') return 'bulk-star-state';
@@ -86,7 +90,7 @@ export default function MessageBulkToolbar({
           title={actionTitle(item)}
           onClick={() => runAction(item)}
         >
-          {item.label}
+          {inline && item.action === 'restore' ? '恢复' : item.label}
         </button>
       ))}
       <details
@@ -98,8 +102,8 @@ export default function MessageBulkToolbar({
           role="button"
           aria-label={`更多批量操作，已选 ${selectedMessageIds.length} 封`}
         >
-          <MoreHorizontal size={15} aria-hidden="true" />
-          <span aria-live="polite">已选 {selectedMessageIds.length} 封</span>
+          <MoreHorizontal size={16} strokeWidth={1.75} aria-hidden="true" />
+          {!inline && <span aria-live="polite">已选 {selectedMessageIds.length} 封</span>}
         </summary>
         <div
           className="context-menu-surface context-menu--anchored"
@@ -114,6 +118,10 @@ export default function MessageBulkToolbar({
           />
         </div>
       </details>
+      {onClearSelection && <button type="button" className="bulk-exit-selection"
+        aria-label="退出选择" title="退出选择" onClick={onClearSelection}>
+        <X size={16} strokeWidth={1.75} aria-hidden="true" />
+      </button>}
     </div>
   );
 }

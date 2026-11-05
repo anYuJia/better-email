@@ -60,7 +60,7 @@ describe('app shell de-AI contract', () => {
   });
 
   it('keeps compact desktop pane separators visible after gutters are hidden', () => {
-    expect(responsiveCss).toMatch(/@media\s*\(min-width:\s*721px\)\s*and\s*\(max-width:\s*1180px\)/);
+    expect(responsiveCss).toMatch(/@media\s*\(min-width:\s*721px\)\s*and\s*\(max-width:\s*1040px\)/);
     expect(responsiveCss).toMatch(
       /\.app-shell > \.sidebar,\s*\.app-shell > \.message-list-panel\s*\{[^}]*border-right:\s*1px solid var\(--ui-border\)/,
     );
@@ -73,6 +73,8 @@ describe('sidebar de-AI contract', () => {
     expect(block).not.toBeNull();
     expect(block[1]).not.toMatch(/gradient/);
     expect(block[1]).not.toMatch(/999px/);
+    expect(block[1]).toMatch(/align-self:\s*flex-start/);
+    expect(block[1]).toMatch(/width:\s*max-content/);
   });
 
   it('folder rows stay flat: no pill radius, no floating shadow, no scale', () => {
@@ -94,10 +96,10 @@ describe('sidebar de-AI contract', () => {
     expect(block[1]).not.toMatch(/box-shadow:\s*var\(--ui-shadow/);
   });
 
-  it('selected state combines a neutral surface, stronger text and an accent icon', () => {
+  it('selected state combines a muted accent surface, stronger text and an accent icon', () => {
     const selected = sidebarCss.match(/\.folder\.active,\s*\.folder\.active:hover\s*\{([^}]*)\}/);
     expect(selected).not.toBeNull();
-    expect(selected[1]).toMatch(/background:\s*var\(--ui-surface\)/);
+    expect(selected[1]).toMatch(/background:\s*var\(--quiet-row-selected\)/);
     expect(selected[1]).toMatch(/color:\s*var\(--ui-text\)/);
     expect(sidebarCss).toMatch(/\.folder\.active \.folder-main\s*\{[^}]*font-weight:\s*600/);
     expect(sidebarCss).toMatch(/\.folder\.active \.folder-name > svg\s*\{[^}]*color:\s*var\(--ui-text-accent\)/);

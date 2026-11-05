@@ -5,11 +5,11 @@
  */
 
 /* --- Page stacks --- */
-.settings-modal .settings-page-content > .settings-experience-stack,
-.settings-modal .settings-page-content > .settings-sync-stack,
-.settings-modal .settings-page-content > .settings-security-stack,
-.settings-modal .settings-page-content > .settings-data-safety,
-.settings-modal .settings-page-content > .settings-connection-shell,
+.settings-modal .settings-ready-content > .settings-experience-stack,
+.settings-modal .settings-ready-content > .settings-sync-stack,
+.settings-modal .settings-ready-content > .settings-security-stack,
+.settings-modal .settings-ready-content > .settings-data-safety,
+.settings-modal .settings-ready-content > .settings-connection-shell,
 .settings-modal .settings-page-content .settings-provider-stack {
   width: 100%;
   min-width: 0;

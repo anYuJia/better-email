@@ -228,14 +228,6 @@
     position: relative;
   }
 
-  .settings-page-motion-forward {
-    animation: settings-mobile-page-forward var(--ui-motion-normal) var(--ui-ease-standard) backwards;
-  }
-
-  .settings-page-motion-backward {
-    animation: settings-mobile-page-backward var(--ui-motion-normal) var(--ui-ease-standard) backwards;
-  }
-
   .settings-shell.settings-modal,
   .settings-workspace.is-closing .settings-shell.settings-modal {
     animation: none;
@@ -339,16 +331,6 @@
     left: 8px;
     width: auto;
   }
-}
-
-@keyframes settings-mobile-page-forward {
-  from { opacity: 0.84; left: 12px; }
-  to { opacity: 1; left: 0; }
-}
-
-@keyframes settings-mobile-page-backward {
-  from { opacity: 0.84; left: -12px; }
-  to { opacity: 1; left: 0; }
 }
 
 @media (max-width: 420px) {

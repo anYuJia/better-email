@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import EmailReaderSkeleton from './EmailReaderSkeleton';
+import { EmailBodySkeleton } from './EmailReaderSkeleton';
+import { readableBodyError, readerBodyErrorKind } from '../hooks/readerBodyState';
 import EmailShadowView from './reader/EmailShadowView';
 import PlainMessageBody, { EmptyMessageBody } from './reader/PlainMessageBody';
 import type { MessageTranslationFormat } from '../hooks/useMessageTranslation';
@@ -29,6 +30,9 @@ type ReaderBodyContentProps = {
   bodyFetchStatus?: 'loading' | 'error' | null;
   bodyFetchError?: string | null;
   onRetryBodyFetch?: () => void | Promise<void>;
+  bodyErrorKind?: 'credentials' | 'network' | 'invalid-content';
+  onRepairCredentials?: () => void;
+  onExportMessage?: () => void;
   largeBodyApproved?: boolean;
 };
 
@@ -49,6 +53,9 @@ export default function ReaderBodyContent({
   bodyFetchStatus = null,
   bodyFetchError = null,
   onRetryBodyFetch,
+  bodyErrorKind,
+  onRepairCredentials,
+  onExportMessage,
   largeBodyApproved = false,
 }: ReaderBodyContentProps) {
   const [expandedBody, setExpandedBody] = useState<string | null>(null);
@@ -68,15 +75,19 @@ export default function ReaderBodyContent({
   // While the next message's body is being prepared, show the loading skeleton
   // instead of stale content from the previously rendered message.
   if (bodyFetchStatus === 'loading') {
-    return <EmailReaderSkeleton />;
+    return <EmailBodySkeleton />;
   }
   if (bodyFetchStatus === 'error') {
+    const kind = bodyErrorKind ?? readerBodyErrorKind(bodyFetchError ?? '');
+    const needsLogin = kind === 'credentials';
     return (
       <EmptyMessageBody
         role="alert"
-        title="无法加载邮件正文"
-        detail={`${bodyFetchError || '与邮件服务器的连接失败'}。请检查网络或账号连接后重试。`}
-        action={onRetryBodyFetch ? (
+        title={needsLogin ? '登录恢复后即可加载正文' : kind === 'invalid-content' ? '无法解析邮件正文' : '无法加载邮件正文'}
+        detail={kind === 'invalid-content' ? bodyFetchError ?? undefined : needsLogin
+          ? '这封邮件的正文尚未下载。请修复此账号的登录，已缓存的邮件和附件不受影响。'
+          : `${readableBodyError(bodyFetchError || '与邮件服务器的连接失败')}。请检查连接后重试。`}
+        action={needsLogin && onRepairCredentials ? <button type="button" className="reader-warning-primary-action" onClick={onRepairCredentials}>修复此账号登录</button> : onRetryBodyFetch ? (
           <button
             type="button"
             className="reader-warning-primary-action"
@@ -86,12 +97,13 @@ export default function ReaderBodyContent({
           >
             重试拉取正文
           </button>
-        ) : undefined}
+        ) : kind === 'invalid-content' && onExportMessage
+          ? <button type="button" className="reader-warning-primary-action" onClick={onExportMessage}>导出邮件副本</button> : undefined}
       />
     );
   }
   if (!isBodyRenderReady) {
-    return showPlaceholder ? <EmailReaderSkeleton /> : null;
+    return showPlaceholder ? <EmailBodySkeleton /> : <EmptyMessageBody title="正在准备邮件正文" />;
   }
   if (requiresExplicitRender) {
     return (

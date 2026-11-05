@@ -6,6 +6,21 @@ use super::messages::{bool_to_int, has_pending_remote_write_for_conn, thread_key
 use super::*;
 
 impl MailStore {
+    /// A legacy/incomplete identity cannot share the old incremental cursor:
+    /// rebuild headers so preserved local copies gain separate verified peers.
+    pub fn mailbox_needs_identity_rebuild(&self, mailbox_id: i64) -> MailResult<bool> {
+        self.with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM messages m JOIN imap_mailboxes b
+             ON b.account_id=m.account_id AND b.remote_name=m.remote_mailbox
+             WHERE b.id=?1 AND (m.remote_uid<=0 OR m.remote_uid_validity=''
+               OR m.remote_uid_validity<>b.uid_validity))",
+                [mailbox_id],
+                |row| row.get(0),
+            )?)
+        })
+    }
+
     pub fn run_sync_dry_run(&self, account_id: Option<i64>) -> MailResult<SyncRun> {
         self.with_conn(|conn| {
             let account = account_for_conn(conn, account_id)?;
@@ -301,6 +316,17 @@ impl MailStore {
     ) -> MailResult<MailboxSyncTransactionResult> {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
+            let account_id = transaction.query_row(
+                "SELECT account_id FROM imap_mailboxes WHERE id=?1",
+                [mailbox_id],
+                |row| row.get(0),
+            )?;
+            let preserved_local_copies = detach_unverified_uid_generation(
+                &transaction,
+                account_id,
+                &batch.remote_name,
+                &batch.uid_validity,
+            )?;
             let reconcile =
                 reconcile_imap_flag_snapshot_for_conn(&transaction, mailbox_id, snapshot)?;
             let (imported_messages, new_messages, new_message_ids) =
@@ -308,6 +334,7 @@ impl MailStore {
             transaction.commit()?;
             Ok(MailboxSyncTransactionResult {
                 reconcile,
+                preserved_local_copies,
                 imported_messages,
                 new_messages,
                 new_message_ids,
@@ -444,6 +471,23 @@ pub(super) fn list_imap_mailboxes_for_conn(
         .collect::<Result<Vec<_>, _>>()?;
     Ok(rows)
 }
+// Run before both flag reconciliation and header import. Old cache is a
+// local-only copy, never eligible for UID/Message-ID rebinding in a new epoch.
+fn detach_unverified_uid_generation(
+    conn: &Connection,
+    account_id: i64,
+    mailbox: &str,
+    validity: &str,
+) -> MailResult<i64> {
+    let count = conn.execute(
+        "UPDATE messages SET remote_mailbox='', remote_uid=0, remote_uid_validity=''
+         WHERE account_id=?1 AND remote_mailbox=?2
+           AND (remote_uid<=0 OR remote_uid_validity='' OR remote_uid_validity<>?3)",
+        params![account_id, mailbox, validity],
+    )?;
+    Ok(count as i64)
+}
+
 pub(super) fn import_imap_headers_for_conn(
     conn: &Connection,
     mailbox_id: i64,
@@ -485,17 +529,7 @@ pub(super) fn import_imap_headers_for_conn(
         .unwrap_or(0)
     };
 
-    if batch.cursor_reset {
-        conn.execute(
-            "
-            DELETE FROM messages
-            WHERE account_id = ?1
-              AND remote_mailbox = ?2
-              AND remote_uid > 0
-            ",
-            params![account_id, batch.remote_name],
-        )?;
-    }
+    detach_unverified_uid_generation(conn, account_id, &batch.remote_name, &batch.uid_validity)?;
 
     for header in &batch.headers {
         let thread_key = thread_key_for_message(
@@ -504,47 +538,22 @@ pub(super) fn import_imap_headers_for_conn(
             &header.in_reply_to,
             &header.references,
         );
-        let mut message_id: Option<i64> = None;
-        if !header.message_id.trim().is_empty() {
-            // 本地已有同 Message-ID 但尚未绑定远端 UID 的消息：补绑远端引用。
-            message_id = conn
-                .query_row(
-                    "
-                    SELECT id
-                    FROM messages
-                    WHERE account_id = ?1
-                      AND remote_mailbox = ?2
-                      AND remote_uid = 0
-                      AND message_id_header = ?3
-                    ORDER BY id ASC
-                    LIMIT 1
-                    ",
-                    params![account_id, batch.remote_name, header.message_id],
-                    |row| row.get(0),
-                )
-                .optional()?;
-            if let Some(message_id) = message_id {
-                conn.execute(
-                    "UPDATE messages SET remote_mailbox = ?1, remote_uid = ?2 WHERE id = ?3",
-                    params![batch.remote_name, header.remote_uid, message_id],
-                )?;
-            }
-        }
-        if message_id.is_none() {
-            message_id = conn
-                .query_row(
-                    "
-                    SELECT id
-                    FROM messages
-                    WHERE account_id = ?1
-                      AND remote_mailbox = ?2
-                      AND remote_uid = ?3
-                    ",
-                    params![account_id, batch.remote_name, header.remote_uid],
-                    |row| row.get(0),
-                )
-                .optional()?;
-        }
+        // Message-ID alone is not a unique server identity (duplicates may
+        // also be outside this header page). Only a verified UID in this epoch
+        // may reuse cached body/attachments from the same row.
+        let message_id: Option<i64> = conn
+            .query_row(
+                "SELECT id FROM messages WHERE account_id=?1 AND remote_mailbox=?2
+             AND remote_uid=?3 AND remote_uid_validity=?4",
+                params![
+                    account_id,
+                    batch.remote_name,
+                    header.remote_uid,
+                    batch.uid_validity
+                ],
+                |row| row.get(0),
+            )
+            .optional()?;
         if let Some(message_id) = message_id {
             // 本地乐观修改写回远端失败时存在待处理意图：该字段保持本地值，
             // 直到写回成功（待处理记录清除）才恢复远端权威。其他客户端在
@@ -620,9 +629,9 @@ pub(super) fn import_imap_headers_for_conn(
                 account_id, folder_id, sender_name, sender_email, recipients, cc, bcc, subject,
                 snippet, body, received_at, is_read, is_starred, has_attachments,
                 thread_key, remote_mailbox, remote_uid, message_id_header,
-                in_reply_to_header, references_header
+                in_reply_to_header, references_header, remote_uid_validity
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, '', ?10, ?11, ?12, 0, ?13, ?14, ?15, ?16, ?17, ?18)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, '', ?10, ?11, ?12, 0, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
             ",
             params![
                 account_id,
@@ -642,7 +651,8 @@ pub(super) fn import_imap_headers_for_conn(
                 header.remote_uid,
                 header.message_id,
                 header.in_reply_to,
-                header.references
+                header.references,
+                batch.uid_validity
             ],
         )?;
         if changed > 0 {
@@ -854,3 +864,7 @@ pub(super) fn infer_local_role(remote_name: &str, attributes: &[String]) -> Stri
     }
     .to_string()
 }
+
+#[cfg(test)]
+#[path = "uid_validity_tests.rs"]
+mod uid_validity_tests;

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { searchScopeOptions } from '../app/appConfig';
-import type { FilterMode, MessageSummary, SearchScope } from '../app/types';
+import type { MessageSummary, SearchScope } from '../app/types';
 import {
   buildMessageSearchEntries,
   buildMessageSearchSuggestions,
@@ -15,13 +15,12 @@ export type GlobalSearchProps = {
   query: string;
   appliedQuery: string;
   searchScope: SearchScope;
-  filter: FilterMode;
   messages: MessageSummary[];
   shortcutLabel: string;
   onSearchSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
   onQueryChange: (value: string) => void;
   onSearchScopeChange: (scope: SearchScope) => void;
-  onClearSearchAndFilter: () => void;
+  onClearSearch: () => void;
   onApplySearchShortcut: (query: string) => void;
 };
 
@@ -30,13 +29,12 @@ export default function GlobalSearch({
   query,
   appliedQuery,
   searchScope,
-  filter,
   messages,
   shortcutLabel,
   onSearchSubmit,
   onQueryChange,
   onSearchScopeChange,
-  onClearSearchAndFilter,
+  onClearSearch,
   onApplySearchShortcut,
 }: GlobalSearchProps) {
   const ime = useCompositionGuard();
@@ -53,7 +51,6 @@ export default function GlobalSearch({
   const searchSuggestionListId = React.useId();
   const searchScopeMenuRef = React.useRef<HTMLDetailsElement>(null);
   const searchSuggestionPanelRef = React.useRef<HTMLDivElement>(null);
-  const keyboardNavigationRef = React.useRef(false);
   const searchScopeMenu = useDetailsMenu(searchScopeMenuRef, { floating: true });
   const deferredQuery = React.useDeferredValue(query);
   const activeSearchScope = searchScopeOptions.find((item) => item.id === searchScope)
@@ -74,7 +71,7 @@ export default function GlobalSearch({
     : null;
 
   React.useLayoutEffect(() => {
-    if (!activeSearchSuggestion || !keyboardNavigationRef.current) return;
+    if (!activeSearchSuggestion) return;
     const panel = searchSuggestionPanelRef.current;
     const option = panel?.querySelector<HTMLElement>('[aria-selected="true"]');
     if (!panel || !option) return;
@@ -141,7 +138,6 @@ export default function GlobalSearch({
           if (!showSearchSuggestions) return;
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault();
-            keyboardNavigationRef.current = true;
             const direction = event.key === 'ArrowDown' ? 1 : -1;
             setActiveSearchSuggestionIndex((current) => {
               if (current < 0) return direction > 0 ? 0 : searchSuggestions.length - 1;
@@ -149,9 +145,8 @@ export default function GlobalSearch({
             });
             return;
           }
-          if ((event.key === 'Home' || event.key === 'End') && activeSearchSuggestion && keyboardNavigationRef.current) {
+          if ((event.key === 'Home' || event.key === 'End') && activeSearchSuggestion) {
             event.preventDefault();
-            keyboardNavigationRef.current = true;
             setActiveSearchSuggestionIndex(event.key === 'Home' ? 0 : searchSuggestions.length - 1);
             return;
           }
@@ -175,16 +170,16 @@ export default function GlobalSearch({
         aria-activedescendant={activeSearchSuggestion
           ? `${searchSuggestionListId}-${activeSearchSuggestion.id}`
           : undefined}
-        placeholder="搜索主题、发件人、正文"
+        placeholder="搜索邮件"
       />
-      {(query.trim() || appliedQuery.trim() || filter !== 'all') && (
+      {(query.trim() || appliedQuery.trim()) && (
         <button
           type="button"
           className="search-clear-button"
-          title="清空搜索和筛选"
-          aria-label="清空搜索和筛选"
+          title="清空搜索"
+          aria-label="清空搜索"
           onClick={() => {
-            onClearSearchAndFilter();
+            onClearSearch();
             inputRef.current?.focus({ preventScroll: true });
           }}
         >
@@ -245,10 +240,6 @@ export default function GlobalSearch({
               aria-selected={index === activeSearchSuggestionIndex}
               tabIndex={-1}
               onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => {
-                keyboardNavigationRef.current = false;
-                setActiveSearchSuggestionIndex(index);
-              }}
               onClick={() => applySuggestedSearch(item.query)}
             >
               <span>

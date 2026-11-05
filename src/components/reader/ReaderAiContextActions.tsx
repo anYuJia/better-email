@@ -137,7 +137,7 @@ export default function ReaderAiContextActions({
           aria-haspopup="menu"
           title="AI 邮件工具"
         >
-          <Sparkles size={16} aria-hidden="true" />
+          <Sparkles size={18} aria-hidden="true" />
           <span>AI</span>
         </summary>
         <div

@@ -7,6 +7,7 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (relative) => readFileSync(join(repoRoot, relative), 'utf8');
 const entryCss = read('src/ui-2026.css');
 const finalCss = read('src/styles/product.css');
+const shellCss = read('src/styles/mobile-shell-contract.css');
 const inboxHeader = read('src/components/mobile/MobileInboxHeader.tsx');
 const layoutTs = read('src/components/messageListLayout.ts');
 
@@ -25,7 +26,7 @@ describe('final mobile polish contract', () => {
 
   it('keeps the mobile mail list dense without shrinking below a large touch row', () => {
     expect(layoutTs).toMatch(/MOBILE_MESSAGE_ROW_HEIGHT\s*=\s*80/);
-    expect(finalCss).toMatch(/\.mobile-message-list-panel \.message-leading\s*\{[\s\S]*?display:\s*none;/);
+    expect(shellCss).toMatch(/\.mobile-message-list-panel \.message-leading\s*\{[^}]*display:\s*block;/);
   });
 
   it('reduces reader, settings and composer feature-showcase chrome', () => {

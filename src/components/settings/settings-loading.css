@@ -1,0 +1,38 @@
+.settings-loading-surface {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog, 10000);
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+.settings-loading-surface > header {
+  min-height: 54px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--ui-border);
+}
+.settings-loading-surface > header > button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  background: transparent;
+  color: var(--ui-text-secondary);
+}
+.settings-loading-surface > header > button:hover { background: var(--ui-control-hover); }
+.settings-loading-surface > header > button:focus-visible { outline: var(--ui-focus-outline); }
+.settings-loading-surface > div {
+  padding: 32px;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-secondary);
+}
+@media (max-width: 720px) {
+  .settings-loading-surface { padding-top: env(safe-area-inset-top); }
+  .settings-loading-surface > header > button { width: 44px; height: 44px; }
+}

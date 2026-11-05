@@ -43,7 +43,6 @@ export default function CompactDropdown<Value extends string>({
   const menu = useDetailsMenu(menuRef, {
     floating: true,
     initialFocus: () => optionRefs.current[openingIndexRef.current ?? selectedIndex] ?? null,
-    align: className.split(/\s+/).includes('sort-menu') ? 'end' : 'start',
   });
 
   const focusOption = React.useCallback((index: number) => {
@@ -93,7 +92,7 @@ export default function CompactDropdown<Value extends string>({
     }
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      onChange(options[index].id);
+      if (options[index].id !== value) onChange(options[index].id);
       closeMenu();
       return;
     }
@@ -148,7 +147,7 @@ export default function CompactDropdown<Value extends string>({
               }}
               onKeyDown={(event) => handleOptionKeyDown(event, index)}
               onClick={() => {
-                onChange(option.id);
+                if (!selected) onChange(option.id);
                 closeMenu();
               }}
             >

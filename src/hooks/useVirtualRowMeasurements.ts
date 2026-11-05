@@ -40,12 +40,25 @@ export default function useVirtualRowMeasurements({
   useLayoutEffect(() => {
     if (typeof ResizeObserver === 'undefined') return;
     let active = true;
+    const pending = new Set<Element>();
+    let frame: number | null = null;
+    const flush = () => {
+      frame = null;
+      if (!active || document.body.classList.contains('pane-resizing')) return;
+      measure(pending);
+      pending.clear();
+    };
     const observer = new ResizeObserver((entries) => {
-      if (active) measure(entries.map((entry) => entry.target));
+      for (const entry of entries) pending.add(entry.target);
+      if (active && frame === null) frame = requestAnimationFrame(flush);
     });
+    document.addEventListener('better-email:pane-resize-end', flush);
     observerRef.current = observer;
     return () => {
       active = false;
+      if (frame !== null) cancelAnimationFrame(frame);
+      document.removeEventListener('better-email:pane-resize-end', flush);
+      pending.clear();
       observer.disconnect();
       observerRef.current = null;
       observed.current.clear();

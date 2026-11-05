@@ -498,6 +498,7 @@ impl MailStore {
         message_id: i64,
         remote_mailbox: &str,
         remote_uid: i64,
+        remote_uid_validity: &str,
     ) -> MailResult<()> {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
@@ -517,10 +518,16 @@ impl MailStore {
                     "
                 UPDATE messages
                 SET remote_mailbox = ?1,
-                    remote_uid = ?2
+                    remote_uid = ?2,
+                    remote_uid_validity = ?4
                 WHERE id = ?3
                 ",
-                    params![remote_mailbox.trim(), remote_uid.max(0), message_id],
+                    params![
+                        remote_mailbox.trim(),
+                        remote_uid.max(0),
+                        message_id,
+                        remote_uid_validity
+                    ],
                 )?;
             }
             transaction.commit()?;
@@ -1295,7 +1302,7 @@ mod claim_tests {
         );
         assert!(store.claim_outbox_archive(message_id).unwrap());
         store
-            .mark_outbox_remote_archived(message_id, "Sent", 123)
+            .mark_outbox_remote_archived(message_id, "Sent", 123, "100")
             .unwrap();
         assert!(store.pending_outbox_messages().unwrap().is_empty());
         assert!(store.pending_remote_archive_messages().unwrap().is_empty());
@@ -1469,7 +1476,7 @@ mod sent_attachment_tests {
             .mark_outbox_smtp_sent_pending_archive(original.id, "<sent@test.local>")
             .unwrap();
         store
-            .mark_outbox_remote_archived(original.id, "Sent", 42)
+            .mark_outbox_remote_archived(original.id, "Sent", 42, "100")
             .unwrap();
         store
             .prune_temp_attachments(std::time::Duration::ZERO)
@@ -1509,7 +1516,7 @@ mod sent_attachment_tests {
             "an unresolved archive must retain its MIME source even with a remote UID"
         );
         store
-            .mark_outbox_remote_archived(original.id, "Sent", 42)
+            .mark_outbox_remote_archived(original.id, "Sent", 42, "100")
             .unwrap();
         let lease = store.hold_outbox_lease(original.id).unwrap();
         let in_progress = store
@@ -1556,7 +1563,7 @@ mod sent_attachment_tests {
             bytes[0]
         );
         store
-            .mark_outbox_remote_archived(original.id, "Sent", 42)
+            .mark_outbox_remote_archived(original.id, "Sent", 42, "100")
             .unwrap();
         assert_eq!(
             crate::commands::read_verified_outbound_attachment(&store, &attachment).unwrap(),

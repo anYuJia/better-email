@@ -57,10 +57,6 @@
     box-shadow: none;
   }
 
-  .app-shell.is-mobile-app .mobile-message-list-panel :is(.message-card, .thread-card):not(:last-child) {
-    border-bottom-color: var(--ui-border);
-  }
-
   .app-shell.is-mobile-app .mobile-message-list-panel :is(.sender, .thread-sender) {
     font-weight: 500;
     font-size: 16px;
@@ -598,25 +594,6 @@
     grid-template-columns: minmax(120px, 1fr) var(--global-search-width) minmax(120px, 1fr);
   }
 
-  .app-titlebar .global-search-box {
-    height: 36px;
-    min-height: 36px;
-    border-color: transparent;
-    border-radius: 8px;
-    background: var(--ui-surface-muted);
-  }
-
-  .app-titlebar .global-search-box:hover {
-    border-color: transparent;
-    background: var(--ui-control-hover);
-  }
-
-  .app-titlebar .global-search-box:focus-within {
-    border-color: var(--ui-accent);
-    background: var(--ui-surface);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-accent) 14%, transparent);
-  }
-
   .app-titlebar .titlebar-sync-status {
     max-width: 96px;
     color: var(--ui-text-tertiary);
@@ -765,16 +742,6 @@
     font-size: 11px;
     cursor: pointer;
     white-space: nowrap;
-  }
-
-  /* The mobile list should feel like Mail, not a contact-card feed. */
-  .app-shell.is-mobile-app .mobile-message-list-panel .message-card {
-    min-height: 0;
-    padding: 10px 52px 10px 20px;
-  }
-
-  .app-shell.is-mobile-app .mobile-message-list-panel .message-leading {
-    display: none;
   }
 
   .app-shell.is-mobile-app .mobile-message-list-panel .message-unread-dot {

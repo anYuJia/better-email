@@ -1,8 +1,6 @@
 import { lazy, memo, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import {
   ArrowLeft,
-  Mail,
-  MailPlus,
 } from 'lucide-react';
 import type {
   AccountScope,
@@ -31,16 +29,19 @@ import AttachmentList from './reader/AttachmentList';
 import ReaderLabelMenu from './reader/ReaderLabelMenu';
 import ReaderSecurityBanner from './reader/ReaderSecurityBanner';
 import ReaderToolbar from './reader/ReaderToolbar';
+import SenderIdentity from './reader/SenderIdentity';
 import ReaderTranslationPanel from './reader/ReaderTranslationPanel';
 import useMessageTranslation from '../hooks/useMessageTranslation';
 import type { ReaderReplyTarget } from '../hooks/useComposerController';
 import type { ReaderBodyFetchState } from '../hooks/useReaderBodyLoading';
-import EmailReaderSkeleton from './EmailReaderSkeleton';
+import EmailReaderSkeleton, { EmailBodySkeleton } from './EmailReaderSkeleton';
 import DeferredSurface from './DeferredSurface';
 import ReaderDeliveryStatus from './reader/ReaderDeliveryStatus';
 import { EmptyMessageBody } from './reader/PlainMessageBody';
 import { MAX_AUTO_RENDER_BODY_LENGTH } from '../app/messageBodyPolicy';
 import type { MessageDetailLoadState } from '../hooks/useMailboxSelectionController';
+import type { ThreadLoadState } from '../hooks/useMailboxNavigation';
+import ThreadReaderPlaceholder from './reader/ThreadReaderPlaceholder';
 
 const ImagePreviewOverlay = lazy(() => import('./reader/ImagePreviewOverlay'));
 const ThreadReaderList = lazy(() => import('./reader/ThreadReaderList'));
@@ -60,9 +61,15 @@ export type ReaderPaneProps = {
   deliveryStatus?: OutboxItem;
   onResolveDelivery?: (outboxId: number, delivered: boolean) => Promise<void>;
   activeThread: ThreadSummary | null;
+  threadLoadState?: ThreadLoadState;
+  onRetryThread?: () => void;
   threadMessages: MessageSummary[];
   activeThreadSelected: Message | null;
   selected: Message | null;
+  mailboxPending?: boolean;
+  mailboxError?: string | null;
+  selectedSummary?: MessageSummary | null;
+  onRepairCredentials?: (accountId: number) => void;
   selectedId: number | null;
   activeSelectedId: number | null;
   detailLoadState?: MessageDetailLoadState;
@@ -127,7 +134,6 @@ export type ReaderPaneProps = {
   onQuickReplyChange: (value: string) => void;
   onSendQuickReply: (message: Message) => void;
   onBackToList?: () => void;
-  hasNoSearchResults?: boolean;
   scrollPositions?: Map<string, number>;
 };
 
@@ -147,9 +153,15 @@ function ReaderPane({
   deliveryStatus,
   onResolveDelivery,
   activeThread,
+  threadLoadState = null,
+  onRetryThread,
   threadMessages,
   activeThreadSelected,
-  selected,
+  selected: providedSelected,
+  mailboxPending = false,
+  mailboxError = null,
+  selectedSummary,
+  onRepairCredentials,
   selectedId,
   activeSelectedId,
   detailLoadState = { status: 'idle' },
@@ -214,9 +226,11 @@ function ReaderPane({
   onQuickReplyChange,
   onSendQuickReply,
   onBackToList,
-  hasNoSearchResults = false,
   scrollPositions,
 }: ReaderPaneProps) {
+  const currentThreadLoadState = threadLoadState?.threadKey === activeThread?.thread_key ? threadLoadState : null;
+  const threadUnavailable = Boolean(activeThread && (currentThreadLoadState || threadMessages.length === 0));
+  const selected = mailboxPending || threadUnavailable ? null : providedSelected;
   const [linksRevealed, setLinksRevealed] = useState(false);
   const quickReplyRef = useRef<QuickReplyHandle>(null);
   const [expandedBody, setExpandedBody] = useState<{ id: number; source: string } | null>(null);
@@ -226,7 +240,10 @@ function ReaderPane({
   const requiresExplicitRender = Boolean(selected
     && Math.max(selected.body.length, selected.sanitized_html.length) > MAX_AUTO_RENDER_BODY_LENGTH
     && !isBodyExpanded);
-  const activeBodyFetchState = bodyFetchState?.messageId === selected?.id ? bodyFetchState : null;
+  const invalidBody = useMemo(() => !requiresExplicitRender && Boolean(selected && isMessageBodyCorrupted(selected.body)), [requiresExplicitRender, selected?.body]);
+  const activeBodyFetchState: ReaderBodyFetchState | null = bodyFetchState?.messageId === selected?.id ? bodyFetchState
+    : selected && invalidBody
+      ? { messageId: selected.id, status: 'error', errorKind: 'invalid-content', error: '已保存的正文格式无法解析。邮件和附件仍保留在本机。' } : null;
   const isActiveMessage = Boolean(selected && selected.id === activeSelectedId);
   const canCompleteReading = isActiveMessage && !activeThread && activeBodyFetchState == null;
   useEffect(() => setExpandedBody(null), [selected?.id]);
@@ -400,7 +417,7 @@ function ReaderPane({
     activeThread ? threadReaderRef : readerRef,
     activeThread ? `thread:${accountScope}:${activeThread.thread_key}`
       : selected ? `${selected.account_id}:${selected.id}` : null,
-    activeThread ? threadMessages.length > 0
+    activeThread ? !threadUnavailable
       : isBodyRenderReady && attachmentsLoaded && activeBodyFetchState == null,
     scrollPositions,
   );
@@ -421,12 +438,21 @@ function ReaderPane({
     toggleTranslation,
   } = useMessageTranslation(requiresExplicitRender ? null : selected, { sourceHtml: readerHtml, onError: onAiError });
 
-  if (activeThread && threadMessages.length > 0) {
+  if (mailboxPending) {
+    return <section className="reader-panel" aria-busy={!mailboxError}><NarrowReaderNavigation onBack={onBackToList} /><article className="reader">
+      {mailboxError ? <EmptyMessageBody title="邮件列表加载失败" detail="请在邮件列表中重试，已缓存的邮件仍保留。" /> : <EmailBodySkeleton />}
+    </article></section>;
+  }
+  if (activeThread) {
     return (
-      <section className="reader-panel" ref={threadReaderRef}>
+      <section className="reader-panel" ref={threadReaderRef} tabIndex={-1} aria-busy={currentThreadLoadState?.status === 'loading'}>
         <NarrowReaderNavigation onBack={onBackToList} />
         <article className="reader thread-reader">
-          <Suspense fallback={<EmailReaderSkeleton />}>
+          {threadUnavailable ? <ThreadReaderPlaceholder thread={activeThread}
+            state={currentThreadLoadState?.status ?? 'empty'} onRetry={onRetryThread && (() => {
+              threadReaderRef.current?.focus({ preventScroll: true });
+              onRetryThread();
+            })} /> : <Suspense fallback={<ThreadReaderPlaceholder thread={activeThread} />}>
             <ThreadReaderList
               activeThread={activeThread}
               threadMessages={threadMessages}
@@ -442,7 +468,7 @@ function ReaderPane({
               onToggleThreadLabel={onToggleThreadLabel}
               onToggleThreadMute={onToggleThreadMute}
             />
-          </Suspense>
+          </Suspense>}
         </article>
       </section>
     );
@@ -450,6 +476,24 @@ function ReaderPane({
 
   if (!selected) {
     const detailFailed = detailLoadState.status === 'error' && detailLoadState.messageId === activeSelectedId;
+    const summary = selectedSummary?.id === activeSelectedId ? selectedSummary : null;
+    if (summary) {
+      return <section className="reader-panel">
+        <NarrowReaderNavigation onBack={onBackToList} />
+        <article className="reader">
+          <header className="reader-header">
+            <h1 className="reader-title-block">{summary.subject || '(无主题)'}</h1>
+            <SenderIdentity message={summary} onComposeNew={onComposeNew} />
+            <div className="reader-actions-placeholder" aria-hidden="true" />
+            <div className="reader-context-row">
+              <div className="reader-meta"><time dateTime={summary.received_at}>{formatDate(summary.received_at)}</time></div>
+            </div>
+          </header>
+          {detailFailed ? <EmptyMessageBody role="alert" title="无法加载这封邮件" detail="邮件仍保留在列表中，请重试。"
+            action={<button type="button" className="reader-warning-primary-action" onClick={onRetryDetail}>重新加载邮件</button>} /> : <EmailBodySkeleton />}
+        </article>
+      </section>;
+    }
     return (
       <section className="reader-panel">
         <NarrowReaderNavigation onBack={onBackToList} />
@@ -460,23 +504,7 @@ function ReaderPane({
             detail="邮件列表仍可使用。请重试，或选择另一封邮件。"
             action={<button type="button" className="reader-warning-primary-action" onClick={onRetryDetail}>重新加载邮件</button>}
           /></article> : <div className="empty-reader">
-          {hasNoSearchResults ? (
-            <div className="empty-reader-quiet" aria-live="polite">
-              <span>无可阅读的搜索结果</span>
-            </div>
-          ) : (
-            <div className="empty-reader-card">
-              <div className="empty-state-mark" aria-hidden="true">
-                <Mail size={22} />
-              </div>
-              <strong>选择一封邮件开始阅读</strong>
-              <span>从左侧列表选择一封邮件，内容会显示在这里。</span>
-              <button type="button" className="empty-reader-compose" onClick={() => onComposeNew()}>
-                <MailPlus size={15} />
-                新邮件
-              </button>
-            </div>
-          )}
+          <div className="empty-reader-quiet" aria-live="polite"><span>未选择邮件</span></div>
         </div>}
       </section>
     );
@@ -534,7 +562,7 @@ function ReaderPane({
           onEmptyTrash={onEmptyTrash}
           onMoveToFolder={onMoveToFolder}
           metadata={(
-            <div className="reader-context-row">
+            <>
               <div className="reader-meta">
                 <time dateTime={selected.received_at}>{formatDate(selected.received_at)}</time>
                 {accountScope === 'all' && <span className="reader-account-source" title={`所属账号：${selected.account_email}`}>{selected.account_email}</span>}
@@ -548,7 +576,7 @@ function ReaderPane({
                 onUpdateLabel={onUpdateLabel}
                 onDeleteLabel={onDeleteLabel}
               />
-            </div>
+            </>
           )}
         />
 
@@ -627,7 +655,10 @@ function ReaderPane({
             : null}
           bodyFetchStatus={activeBodyFetchState?.status ?? null}
           bodyFetchError={activeBodyFetchState?.error ?? null}
-          onRetryBodyFetch={() => onFetchBody(false)}
+          bodyErrorKind={activeBodyFetchState?.errorKind}
+          onRepairCredentials={onRepairCredentials ? () => onRepairCredentials(selected.account_id) : undefined}
+          onExportMessage={onExportMessage}
+          onRetryBodyFetch={selected.remote_uid > 0 ? () => onFetchBody(false) : undefined}
         />}
 
         <ReaderTranslationPanel
@@ -694,17 +725,16 @@ function ReaderPane({
           copyPreviewImageSource={copyPreviewImageSource}
         />
       )}
-      {attachmentContextMenu && (
-        <ContextMenu
-          x={attachmentContextMenu.x}
-          y={attachmentContextMenu.y}
-          title={attachmentContextMenu.attachment.filename}
-          detail={`${attachmentContextMenu.attachment.mime_type || '未知类型'} · ${formatBytes(attachmentContextMenu.attachment.size_bytes)}`}
-          items={attachmentMenuItems(attachmentContextMenu.attachment)}
-          onClose={() => setAttachmentContextMenu(null)}
-          ariaLabel="附件操作"
-        />
-      )}
+      <ContextMenu menu={attachmentContextMenu ? {
+        targetKey: attachmentContextMenu.attachment.id,
+        x: attachmentContextMenu.x,
+        y: attachmentContextMenu.y,
+        title: attachmentContextMenu.attachment.filename,
+        detail: `${attachmentContextMenu.attachment.mime_type || '未知类型'} · ${formatBytes(attachmentContextMenu.attachment.size_bytes)}`,
+        items: attachmentMenuItems(attachmentContextMenu.attachment),
+        onClose: () => setAttachmentContextMenu(null),
+        ariaLabel: '附件操作',
+      } : null} />
     </section>
   );
 }

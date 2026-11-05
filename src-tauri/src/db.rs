@@ -114,6 +114,7 @@ pub struct MessageRemoteRef {
     pub account_id: i64,
     pub remote_mailbox: String,
     pub remote_uid: i64,
+    pub remote_uid_validity: String,
     pub message_id_header: String,
 }
 
@@ -1333,9 +1334,14 @@ mod tests {
         assert!(store.list_attachments(first.id).unwrap().is_empty());
 
         store.move_message_to_role(second.id, "trash").unwrap();
-        let (deleted, references) = store.empty_trash_for_account(Some(account_id)).unwrap();
-        assert!(deleted >= 1);
-        assert!(!references.is_empty());
+        let ids = store.list_trash_message_ids(Some(account_id)).unwrap();
+        assert!(!ids.is_empty());
+        for id in ids {
+            let reference = store.get_message_remote_reference(id).unwrap();
+            assert!(store
+                .delete_trash_message_if_unchanged(id, &reference)
+                .unwrap());
+        }
         assert!(store
             .list_messages_for_scope(None, trash.id, None, None, 20)
             .unwrap()
@@ -1622,7 +1628,7 @@ mod tests {
         assert!(rendered.contains("Remote draft"));
 
         store
-            .set_message_remote_identity(draft_id, "Drafts", 73, &message_id_header)
+            .set_message_remote_identity(draft_id, "Drafts", 73, &message_id_header, "100")
             .unwrap();
         let reference = store.get_message_remote_reference(draft_id).unwrap();
         assert_eq!(reference.remote_mailbox, "Drafts");
@@ -3274,7 +3280,7 @@ mod tests {
     }
 
     #[test]
-    fn imap_uidvalidity_reset_replaces_stale_remote_uid_rows() {
+    fn imap_uidvalidity_reset_preserves_old_local_rows_without_remote_identity() {
         let store = test_store();
         let mailbox = store
             .save_imap_mailboxes(&[ImapFolderProbe {
@@ -3341,12 +3347,12 @@ mod tests {
                 ))
             })
             .unwrap();
-        assert_eq!(old_count, 0);
+        assert_eq!(old_count, 1);
         assert_eq!(new_count, 1);
     }
 
     #[test]
-    fn imap_header_sync_rebinds_pending_moved_message_uid() {
+    fn imap_header_sync_preserves_unknown_uid_copy_instead_of_rebinding_by_message_id() {
         let store = test_store();
         let mailbox = store
             .save_imap_mailboxes(&[ImapFolderProbe {
@@ -3417,11 +3423,18 @@ mod tests {
                 .import_imap_headers_batch(mailbox.id, &rebound_batch)
                 .unwrap()
                 .0,
-            0
+            1
         );
         let rebound = store.get_message(message.id).unwrap();
-        assert_eq!(rebound.remote_mailbox, "Archive");
-        assert_eq!(rebound.remote_uid, 91);
+        assert!(rebound.remote_mailbox.is_empty());
+        assert_eq!(rebound.remote_uid, 0);
+        let fresh = store
+            .list_messages_for_scope(None, archive.id, None, None, 10)
+            .unwrap()
+            .into_iter()
+            .find(|message| message.remote_uid == 91)
+            .unwrap();
+        assert_ne!(fresh.id, message.id);
     }
 
     #[test]
@@ -4603,6 +4616,9 @@ mod tests {
                 Ok(conn.last_insert_rowid())
             })
             .unwrap();
+        store
+            .set_message_remote_ref_with_validity(message_id, remote_name, uid, "1")
+            .unwrap();
         (mailbox.id, message_id)
     }
 
@@ -4682,6 +4698,9 @@ mod tests {
         let store = test_store();
         let (mailbox_id, message_id) =
             seed_custom_mailbox_message(&store, "Projects/Gamma", 7, "Atomic commit");
+        store
+            .set_message_remote_ref_with_validity(message_id, "Projects/Gamma", 7, "42")
+            .unwrap();
         // 先建立自定义文件夹并映射，让 import 走通。
         let custom_folder = store
             .create_custom_folder(
@@ -5550,7 +5569,7 @@ mod tests {
             .any(|message| message.id == item.message_id));
 
         store
-            .mark_outbox_remote_archived(item.message_id, "Sent", 42)
+            .mark_outbox_remote_archived(item.message_id, "Sent", 42, "100")
             .unwrap();
         let sent_item = store
             .list_outbox()
@@ -5686,7 +5705,7 @@ mod tests {
             )
             .unwrap();
         store
-            .mark_outbox_remote_archived(item.message_id, "Sent", 4201)
+            .mark_outbox_remote_archived(item.message_id, "Sent", 4201, "100")
             .unwrap();
         store
             .with_conn(|conn| {

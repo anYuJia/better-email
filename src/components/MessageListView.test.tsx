@@ -43,6 +43,21 @@ afterEach(() => {
 });
 
 describe('MessageListView virtual geometry', () => {
+  it('lets touch selection start empty, toggles rows without opening the reader, and resumes reading after exit', () => {
+    const input = propsFor([message]);
+    const view = render(<MessageListView {...input} mobile selectionMode selectionControlsInToolbar />);
+    fireEvent.click(screen.getByRole('button', { name: /选择邮件：Sender/ }));
+    expect(input.onToggleMessageSelection).toHaveBeenCalledWith(message.id, true);
+    expect(input.onSelectMessage).not.toHaveBeenCalled();
+    expect(document.querySelector('.message-card')?.classList.contains('is-selection-mode')).toBe(true);
+    expect(screen.queryByRole('button', { name: /打开邮件操作/ })).toBeNull();
+    view.rerender(<MessageListView {...input} mobile selectionMode selectedMessageIds={[message.id]} />);
+    fireEvent.click(screen.getByRole('button', { name: /选择邮件：Sender/ }));
+    expect(input.onToggleMessageSelection).toHaveBeenLastCalledWith(message.id, false);
+    view.rerender(<MessageListView {...input} mobile />);
+    fireEvent.click(screen.getByRole('button', { name: /查看邮件：Sender/ }));
+    expect(input.onSelectMessage).toHaveBeenCalledWith(message.id);
+  });
   function resizeEntry(target: HTMLElement): ResizeObserverEntry {
     return {
       target,
@@ -91,6 +106,32 @@ describe('MessageListView virtual geometry', () => {
 
     view.rerender(<MessageListView {...input} showAccountSource={false} accountSourceLabels={new Map([[1, '工作邮箱']])} />);
     expect(view.container.querySelector('.message-account-source')).toBeNull();
+  });
+
+  it('omits repeated source labels only for a complete single-account result, retaining accessible identity', () => {
+    const sameSource = [message, { ...message, id: 2 }];
+    const view = render(<MessageListView {...propsFor(sameSource)} showAccountSource hasMoreMessages />);
+    expect(view.container.querySelectorAll('.message-account-source')).toHaveLength(2);
+
+    view.rerender(<MessageListView {...propsFor(sameSource)} showAccountSource hasMoreMessages={false} />);
+    expect(view.container.querySelector('.message-account-source')).toBeNull();
+    expect(screen.getAllByRole('button', { name: /查看邮件：.*来源邮箱：test@example.com/ })).toHaveLength(2);
+
+    const mixed = [...sameSource, { ...message, id: 3, account_id: 2, account_email: 'other@example.org' }];
+    view.rerender(<MessageListView {...propsFor(mixed)} showAccountSource hasMoreMessages={false} />);
+    expect(view.container.querySelectorAll('.message-account-source')).toHaveLength(3);
+
+    view.rerender(<MessageListView {...propsFor(sameSource)} showAccountSource hasMoreMessages />);
+    expect(view.container.querySelectorAll('.message-account-source')).toHaveLength(2);
+  });
+
+  it('keeps source labels when result ownership is incomplete or inconsistent', () => {
+    const missingOwner = [{ ...message, account_id: 0 }];
+    const view = render(<MessageListView {...propsFor(missingOwner)} showAccountSource />);
+    expect(view.container.querySelector('.message-account-source')?.textContent).toBe('test@example.com');
+    const inconsistent = [message, { ...message, id: 2, account_email: 'another@example.org' }];
+    view.rerender(<MessageListView {...propsFor(inconsistent)} showAccountSource />);
+    expect(view.container.querySelectorAll('.message-account-source')).toHaveLength(2);
   });
 
   it('does not rebuild folder geometry when newly mounted rows match the estimate, and preserves a focused anchor on prepend', () => {
@@ -145,6 +186,7 @@ describe('MessageListView virtual geometry', () => {
     const notification = resizeEntry(changedRow);
     reads.mockClear();
     act(() => rowObserver.callback([notification], {} as ResizeObserver));
+    act(() => vi.advanceTimersByTime(20));
     expect(reads).toHaveBeenCalledTimes(1);
     reads.mockClear();
     view.rerender(<MessageListView {...props} selectedId={2} selectedMessageIds={[2]} />);
@@ -154,10 +196,12 @@ describe('MessageListView virtual geometry', () => {
     expect(changedRow.isConnected).toBe(false);
     reads.mockClear();
     act(() => rowObserver.callback([notification], {} as ResizeObserver));
+    act(() => vi.advanceTimersByTime(20));
     expect(reads).not.toHaveBeenCalled();
     view.unmount();
     expect(observers.every((observer) => observer.disconnect.mock.calls.length === 1)).toBe(true);
     act(() => rowObserver.callback([notification], {} as ResizeObserver));
+    act(() => vi.advanceTimersByTime(20));
     expect(reads).not.toHaveBeenCalled();
   });
 
@@ -235,6 +279,7 @@ describe('MessageListView virtual geometry', () => {
   });
 
   it.each([false, true])('remeasures row content after text grows without resizing the viewport (mobile=%s)', (mobile) => {
+    vi.useFakeTimers();
     let rowHeight = mobile ? 80 : MESSAGE_ROW_HEIGHT;
     let notifyRows: ResizeObserverCallback = () => undefined;
     vi.stubGlobal('ResizeObserver', class {
@@ -250,9 +295,10 @@ describe('MessageListView virtual geometry', () => {
     const view = render(<MessageListView {...propsFor([message, { ...message, id: 2 }])} mobile={mobile} />);
     rowHeight = 118.25;
     act(() => notifyRows(Array.from(view.container.querySelectorAll<HTMLElement>('.message-card'), resizeEntry), {} as ResizeObserver));
+    act(() => vi.advanceTimersByTime(20));
     const rows = view.container.querySelectorAll<HTMLElement>('.message-list-item');
     expect(rows[0].style.height).toBe('119px');
-    expect(rows[1].style.transform).toBe(`translateY(${GROUP_HEADER_HEIGHT + 119}px)`);
+    expect(rows[1].style.transform).toBe('translateY(119px)');
   });
 
   it('keeps the visible desktop anchor and keyboard focus while scaled text increases row heights', () => {
@@ -273,13 +319,14 @@ describe('MessageListView virtual geometry', () => {
     const list = screen.getByRole('list', { name: '邮件列表' });
     fireEvent.scroll(list, { target: { scrollTop: 1500 } });
     act(() => vi.advanceTimersByTime(20));
-    const focusedRow = screen.getByRole('button', { name: /，Mail 22。/ });
+    const focusedRow = screen.getByRole('button', { name: /，Mail 23。/ });
     focusedRow.focus();
     const row = focusedRow.closest('.message-list-item') as HTMLElement;
     const position = () => Number(row.style.transform.match(/translateY\(([-\d.]+)px\)/)?.[1]) - list.scrollTop;
     const before = position();
     rowHeight = 93;
     act(() => notifyRows(Array.from(list.querySelectorAll<HTMLElement>('.message-card'), resizeEntry), {} as ResizeObserver));
+    act(() => vi.advanceTimersByTime(20));
     expect(row.style.height).toBe('93px');
     expect(position()).toBe(before);
     expect(document.activeElement).toBe(focusedRow);
@@ -444,7 +491,7 @@ describe('MessageListView theme-safe separators', () => {
     expect(onToggleAllVisible).toHaveBeenCalledWith(true);
     fireEvent.click(screen.getByRole('checkbox', { name: '选择今天邮件' }));
     expect(onToggleMessageGroup).toHaveBeenCalledWith('today', [1, 2], true);
-    fireEvent.click(screen.getByRole('button', { name: '按日期范围筛选邮件' }));
+    fireEvent.click(screen.getByRole('button', { name: '按日期选择邮件' }));
     fireEvent.change(screen.getByLabelText('开始日期'), { target: { value: '2026-08-01' } });
     fireEvent.change(screen.getByLabelText('结束日期'), { target: { value: '2026-08-09' } });
     fireEvent.change(screen.getByLabelText('开始时间'), { target: { value: '00:00:00' } });

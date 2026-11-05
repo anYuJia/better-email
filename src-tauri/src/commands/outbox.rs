@@ -318,6 +318,7 @@ fn save_draft_blocking(
             };
             let candidates = [imap_probe::RemoteDeleteCandidate {
                 remote_uid: previous.remote_uid,
+                remote_uid_validity: previous.remote_uid_validity.clone(),
                 message_id_header: previous.message_id_header.clone(),
             }];
             if let Err(error) = imap_probe::delete_remote_messages(
@@ -384,6 +385,7 @@ fn save_draft_blocking(
                 &remote_mailbox,
                 result.remote_uid,
                 &message_id_header,
+                &result.remote_uid_validity,
             )?;
             Ok(DraftSaveReport {
                 draft_id,
@@ -671,9 +673,12 @@ fn archive_claimed_sent_message(
         &message_id_header,
         raw_message,
     ) {
-        Ok(result) => {
-            store.mark_outbox_remote_archived(message.id, &remote_name, result.remote_uid)
-        }
+        Ok(result) => store.mark_outbox_remote_archived(
+            message.id,
+            &remote_name,
+            result.remote_uid,
+            &result.remote_uid_validity,
+        ),
         Err(error) => store.mark_outbox_remote_archive_failed(
             message.id,
             &format!("SMTP 已发送；远端已发送留档失败：{error}"),

@@ -154,6 +154,99 @@
     gap: 2px;
   }
 
+  .mobile-inbox-refinements {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    gap: 8px;
+    border-top: 1px solid var(--ui-border);
+  }
+
+  .mobile-active-search {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-clear-filter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ui-radius-control);
+    color: var(--ui-text-accent);
+    background: var(--ui-accent-soft);
+    font-size: var(--ui-font-size-secondary);
+    white-space: nowrap;
+    transition: var(--ui-transition-control);
+  }
+
+  .mobile-clear-filter:hover { background: var(--ui-control-hover); }
+  .mobile-clear-filter:active { background: var(--ui-control-pressed); }
+
+  .mobile-active-search-query {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px;
+    border: 0;
+    border-radius: var(--ui-radius-control);
+    background: transparent;
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-font-size-secondary);
+    text-align: left;
+  }
+
+  .mobile-active-search-query span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-active-search-query svg { flex-shrink: 0; }
+
+  .mobile-selection-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 4px 12px;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .app-shell.is-mobile-app .mobile-selection-toolbar :is(.message-selection-all, button, summary) {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .mobile-selection-toolbar .bulk-toolbar-inline {
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .mobile-selection-hint {
+    flex: 1;
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-font-size-meta);
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-card.is-selection-mode .message-leading { opacity: 0; }
+  .app-shell.is-mobile-app .message-card.is-selection-mode .message-select {
+    width: 52px;
+    height: 100%;
+    min-height: 44px;
+  }
+  .app-shell.is-mobile-app .message-card.is-selection-mode { padding-right: 16px; }
+
   .mobile-inbox-filter-row {
     min-height: 45px;
     display: flex;
@@ -285,7 +378,10 @@
   .mobile-app-surface .message-card,
   .mobile-app-surface .thread-card {
     min-height: 76px;
-    padding-inline: 14px;
+  }
+
+  .mobile-app-surface .thread-card {
+    padding-inline: 30px 14px;
   }
 
   .mobile-app-surface .message-card {

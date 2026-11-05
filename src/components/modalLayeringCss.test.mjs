@@ -5,6 +5,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { createElement, useRef } from 'react';
 import { cleanup, render } from '@testing-library/react';
 import useSettingsSurfaceMotion from './settings/useSettingsSurfaceMotion';
+import SettingsReadyContent from './settings/SettingsReadyContent';
+import SettingsPageShell from './settings/SettingsPageShell';
+import { getSettingsNavigationContext } from './settings/settingsNavigation';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -80,9 +83,6 @@ describe('modal 层叠层级契约', () => {
   it.each([
     'settings-shell-enter',
     'settings-shell-exit',
-    'settings-page-reveal',
-    'settings-mobile-page-forward',
-    'settings-mobile-page-backward',
   ])('%s keeps fixed dialog positioning stable throughout the animation', (name) => {
     const css = readCss('src/components/settings/settings-shell.css')
       + readCss('src/components/settings/settings-responsive.css');
@@ -127,11 +127,48 @@ describe('modal 层叠层级契约', () => {
     }
   });
 
-  it('uses opposite small offsets for mobile navigation without a fixed containing block', () => {
-    const css = readCss('src/components/settings/settings-responsive.css');
-    expect(css).toMatch(/@keyframes settings-mobile-page-forward\s*\{\s*from\s*\{[^}]*left:\s*12px/);
-    expect(css).toMatch(/@keyframes settings-mobile-page-backward\s*\{\s*from\s*\{[^}]*left:\s*-12px/);
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.settings-page-motion-forward,\s*\.settings-page-motion-backward\s*\{\s*animation: none/);
+  it('ready settings content animates opacity without capturing fixed descendants', () => {
+    const originalAnimate = HTMLElement.prototype.animate;
+    const animate = vi.fn(() => ({ cancel: vi.fn(), onfinish: null }));
+    HTMLElement.prototype.animate = animate;
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    try {
+      render(createElement(SettingsReadyContent, null,
+        createElement('div', { style: { position: 'fixed', left: 18, top: 200 } }, 'Fixed dialog')));
+      expect(animate).toHaveBeenCalledOnce();
+      const frames = animate.mock.calls[0][0];
+      expect(frames).toEqual([{ opacity: 0.94 }, { opacity: 1 }]);
+      for (const frame of frames) expect(Object.keys(frame)).toEqual(['opacity']);
+      const css = readCss('src/components/settings/settings-shell.css');
+      const content = /\.settings-ready-content\s*\{([^}]*)\}/.exec(css)?.[1];
+      expect(content).toBeDefined();
+      expect(content).not.toMatch(/(?:^|;)\s*(?:transform|translate|scale|rotate|filter|perspective|contain|will-change)\s*:/);
+    } finally {
+      cleanup(); HTMLElement.prototype.animate = originalAnimate; vi.unstubAllGlobals();
+    }
+  });
+
+  it('records nested navigation direction while keeping the heading and fixed-overlay page stationary', () => {
+    const page = (section) => createElement(SettingsPageShell, {
+      activeSection: section, ...getSettingsNavigationContext(section),
+    }, createElement('div', { style: { position: 'fixed', left: 18, top: 200 } }, 'Fixed dialog'));
+    try {
+      const view = render(page('accounts'));
+      const shell = view.container.querySelector('.settings-page');
+      const heading = view.container.querySelector('.settings-page-header');
+      view.rerender(page('providers'));
+      expect(view.container.querySelector('.settings-page')).toBe(shell);
+      expect(view.container.querySelector('.settings-page-header')).toBe(heading);
+      expect(shell.getAttribute('data-page-motion')).toBe('forward');
+      view.rerender(page('accounts'));
+      expect(shell.getAttribute('data-page-motion')).toBe('backward');
+      const css = readCss('src/components/settings/settings-shell.css')
+        + readCss('src/components/settings/settings-responsive.css');
+      expect(css).not.toMatch(/@keyframes settings-(?:mobile-page-(?:forward|backward)|page-reveal)/);
+      for (const match of css.matchAll(/\.settings-page\s*\{([^}]*)\}/g)) {
+        expect(match[1]).not.toMatch(/(?:^|;)\s*(?:transform|translate|scale|rotate|filter|perspective|contain|will-change)\s*:/);
+      }
+    } finally { cleanup(); }
   });
 
   it('联系人导入 portal 在视口内居中并保留可点击的遮罩层', () => {

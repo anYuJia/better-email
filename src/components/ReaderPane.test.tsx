@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ReaderPane, { type ReaderPaneProps } from './ReaderPane';
-import type { Message } from '../app/types';
+import type { Message, ThreadSummary } from '../app/types';
 import * as mailUtils from '../mailUtils';
 import { MAX_AUTO_RENDER_BODY_LENGTH } from '../app/messageBodyPolicy';
 
@@ -40,9 +40,108 @@ function props(overrides: Partial<ReaderPaneProps> = {}): ReaderPaneProps {
 }
 
 describe('ReaderPane content lifecycle', () => {
+  const conversation = (key: string): ThreadSummary => ({ thread_key: key, subject: `会话 ${key}`, participants: 'Ada',
+    message_count: 2, unread_count: 1, latest_at: '2026-10-01T09:00:00Z', latest_preview: '摘要', is_muted: false });
+
+  it('shows the requested thread immediately without old body, actions or read completion while loading', () => {
+    vi.useFakeTimers();
+    const input = props({ activeThread: conversation('B'), threadLoadState: { threadKey: 'B', status: 'loading' } });
+    input.selected = { ...input.selected!, is_read: false };
+    // Deliberately retain old props: the pending branch must itself own what
+    // can be read and acted on, rather than relying on fetch timing.
+    input.threadMessages = [input.selected]; input.activeThreadSelected = input.selected;
+    const view = render(<ReaderPane {...input} />);
+    expect(screen.getByRole('heading', { name: '会话 B' })).toBeDefined();
+    expect(screen.getByLabelText('正在加载邮件正文')).toBeDefined();
+    expect(view.container.querySelector('.reader-panel')?.getAttribute('aria-busy')).toBe('true');
+    expect(screen.queryByText('正文检查')).toBeNull();
+    expect(screen.queryByText('正文内容')).toBeNull();
+    expect(screen.queryByRole('button', { name: '回复最新邮件' })).toBeNull();
+    act(() => vi.advanceTimersByTime(3000));
+    expect(input.onReadComplete).not.toHaveBeenCalled();
+  });
+
+  it('keeps the thread navigation node and keyboard focus through error, retry and ready content', async () => {
+    const input = props({ activeThread: conversation('B'), threadLoadState: { threadKey: 'B', status: 'error' },
+      onRetryThread: vi.fn(), onBackToList: vi.fn() });
+    const view = render(<ReaderPane {...input} />);
+    const panel = view.container.querySelector<HTMLElement>('.reader-panel')!;
+    const back = screen.getByRole('button', { name: '返回邮件列表' });
+    expect(screen.getByRole('alert').textContent).toContain('暂时无法加载此会话');
+    fireEvent.click(screen.getByRole('button', { name: '重新加载会话' }));
+    expect(input.onRetryThread).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(panel);
+    view.rerender(<ReaderPane {...input} threadLoadState={{ threadKey: 'B', status: 'loading' }} />);
+    view.rerender(<ReaderPane {...input} threadLoadState={null} threadMessages={[{ ...input.selected!, subject: '新会话正文' }]} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: /查看会话中的邮件：.*新会话正文/ })).toBeDefined());
+    expect(document.activeElement).toBe(panel);
+    expect(screen.getByRole('button', { name: '返回邮件列表' })).toBe(back);
+    fireEvent.click(back);
+    expect(input.onBackToList).toHaveBeenCalledOnce();
+  });
+
+  it('renders an empty conversation as a finished retryable state instead of showing the previous message', () => {
+    const input = props({ activeThread: conversation('empty'), onRetryThread: vi.fn() });
+    const view = render(<ReaderPane {...input} />);
+    expect(screen.getByRole('heading', { name: '会话 empty' })).toBeDefined();
+    expect(screen.getByText('此会话暂无可显示的邮件')).toBeDefined();
+    expect(view.container.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(screen.queryByText('正文检查')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '重新加载会话' }));
+    expect(input.onRetryThread).toHaveBeenCalledOnce();
+  });
+
+  it('shows the new summary during detail loading and retains it when detail loading fails', () => {
+    const input = props();
+    const summary = { ...input.selected!, subject: 'New message identity', sender_name: 'New sender' };
+    const view = render(<ReaderPane {...input} selected={null} selectedSummary={summary} detailLoadState={{ status: 'loading', messageId: 1 }} />);
+    expect(screen.getByRole('heading', { name: 'New message identity' })).toBeDefined();
+    expect(screen.getByText('New sender')).toBeDefined();
+    expect(screen.getByLabelText('正在加载邮件正文')).toBeDefined();
+    expect(view.container.querySelector('.email-reader-skeleton-header')).toBeNull();
+    view.rerender(<ReaderPane {...input} selected={null} selectedSummary={summary} detailLoadState={{ status: 'error', messageId: 1, error: 'offline' }} />);
+    expect(screen.getByRole('heading', { name: 'New message identity' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '重新加载邮件' })).toBeDefined();
+  });
+
+  it('does not expose old content or complete reading while the mailbox is switching', () => {
+    vi.useFakeTimers();
+    const input = props();
+    input.selected = { ...input.selected!, is_read: false };
+    render(<ReaderPane {...input} mailboxPending />);
+    expect(screen.queryByText('正文检查')).toBeNull();
+    expect(screen.queryByRole('button', { name: '回复' })).toBeNull();
+    act(() => vi.advanceTimersByTime(3000));
+    expect(input.onReadComplete).not.toHaveBeenCalled();
+  });
+
+  it('expresses locally corrupt content without a silent blank or a fake remote retry', () => {
+    const input = props();
+    input.selected = { ...input.selected!, body: '--boundary\nContent-Type: text/plain\nCorrupt', sanitized_html: '', remote_uid: 0 };
+    render(<ReaderPane {...input} />);
+    expect(screen.getByRole('alert').textContent).toContain('无法解析邮件正文');
+    expect(screen.queryByRole('button', { name: '重试拉取正文' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: '导出邮件副本' }));
+    expect(input.onExportMessage).toHaveBeenCalledOnce();
+  });
+
+  it('ends the busy indicator when mailbox switching fails without showing an old message', () => {
+    const input = props();
+    const view = render(<ReaderPane {...input} mailboxPending mailboxError="offline" />);
+    expect(screen.getByText('邮件列表加载失败')).toBeDefined();
+    expect(view.container.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(screen.queryByText('正文检查')).toBeNull();
+  });
+
+  it('routes missing credentials to the account owning the current message', () => {
+    const input = props({ onRepairCredentials: vi.fn() });
+    render(<ReaderPane {...input} bodyFetchState={{ messageId: 1, status: 'error', errorKind: 'credentials', error: '本机未保存登录凭据' }} />);
+    fireEvent.click(screen.getByRole('button', { name: '修复此账号登录' }));
+    expect(input.onRepairCredentials).toHaveBeenCalledWith(1);
+  });
   it('shows a persistent retry after corrupt body loading fails, then renders the recovered reply', () => {
     const input = props();
-    input.selected = { ...input.selected!, body: '--boundary\nContent-Type: text/plain\nBroken MIME', sanitized_html: '', is_read: false };
+    input.selected = { ...input.selected!, body: '--boundary\nContent-Type: text/plain\nBroken MIME', sanitized_html: '', is_read: false, remote_uid: 77 };
     const view = render(<ReaderPane {...input} bodyFetchState={{ messageId: 1, status: 'error', error: '服务器离线' }} />);
     expect(screen.getByRole('alert').textContent).toContain('服务器离线');
     expect(screen.queryByRole('textbox', { name: '输入回复' })).toBeNull();
@@ -50,7 +149,7 @@ describe('ReaderPane content lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: '重试拉取正文' }));
     expect(input.onFetchBody).toHaveBeenCalledWith(false);
     view.rerender(<ReaderPane {...input} bodyFetchState={{ messageId: 1, status: 'loading', error: null }} />);
-    expect(screen.getByLabelText('正在加载邮件内容')).toBeDefined();
+    expect(screen.getByLabelText('正在加载邮件正文')).toBeDefined();
     expect(input.onReadComplete).not.toHaveBeenCalled();
     view.rerender(<ReaderPane {...input} selected={{ ...input.selected!, body: '已恢复的正文' }} />);
     expect(screen.queryByRole('alert')).toBeNull();

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { messagePageSize } from '../app/appConfig';
 import type {
   Account,
@@ -15,6 +15,9 @@ import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
 import type { MailboxDataController } from './useMailboxData';
 import { IPC } from '../ipc/commands';
+
+export type ThreadLoadState = { threadKey: string; status: 'loading' | 'error' } | null;
+type ThreadIntent = { thread: ThreadSummary; scope: AccountScope; generation: number; ready: boolean };
 
 type UseMailboxNavigationOptions = {
   account: Account | null;
@@ -82,10 +85,26 @@ export default function useMailboxNavigation({
   setThreadMessages,
 }: UseMailboxNavigationOptions) {
   const [scopeRevision, setScopeRevision] = useState(0);
+  const [folderRevision, setFolderRevision] = useState(0);
   const threadRequestRef = useRef(0);
+  const threadIntentRef = useRef<ThreadIntent | null>(null);
+  const [threadLoadState, setThreadLoadState] = useState<ThreadLoadState>(null);
   const activeScopeRef = useRef(accountScope);
   activeScopeRef.current = accountScope;
-  const invalidateThreadRequest = useCallback(() => { threadRequestRef.current += 1; }, []);
+  const invalidateThreadRequest = useCallback(() => {
+    threadRequestRef.current += 1;
+    threadIntentRef.current = null;
+    setThreadLoadState(null);
+  }, []);
+  const mailboxGeneration = mailboxRefreshRef.current;
+  useEffect(() => {
+    const intent = threadIntentRef.current;
+    if (!intent || (intent.scope === accountScope && intent.generation === mailboxGeneration)) return;
+    invalidateThreadRequest();
+    setActiveThread(null);
+    setThreadMessages([]);
+  }, [accountScope, mailboxGeneration, invalidateThreadRequest, setActiveThread, setThreadMessages]);
+  useEffect(() => () => { threadRequestRef.current += 1; }, []);
   const accountIdForScope = useCallback((scope: AccountScope): number | null => {
     return scope === 'all' ? null : scope;
   }, []);
@@ -209,32 +228,61 @@ export default function useMailboxNavigation({
     );
   }, [folders]);
 
+  // Context menus only read membership; they must not select a thread or own
+  // the reader's request generation.
+  const loadThreadMessages = useCallback((thread: ThreadSummary) => invoke<MessageSummary[]>(IPC.ListThreadMessages, {
+    accountId: accountIdForScope(accountScope), threadKey: thread.thread_key, limit: 80,
+  }), [accountScope, accountIdForScope]);
+
   const openThread = useCallback(async (thread: ThreadSummary, announce = true) => {
-    const requestId = ++threadRequestRef.current;
+    const previousIntent = threadIntentRef.current;
     const refreshId = mailboxRefreshRef.current;
+    // A background sync may finish after a newer reader intent. It can refresh
+    // only an already loaded current thread, never navigate back or interrupt
+    // its visible initial request.
+    if (!announce && (!previousIntent?.ready || previousIntent.thread.thread_key !== thread.thread_key
+      || previousIntent.scope !== accountScope || previousIntent.generation !== refreshId)) return [];
+    const requestId = ++threadRequestRef.current;
     const isCurrent = () => requestId === threadRequestRef.current
       && refreshId === mailboxRefreshRef.current && accountScope === activeScopeRef.current;
+    if (announce) {
+      threadIntentRef.current = { thread, scope: accountScope, generation: refreshId, ready: false };
+      setActiveThread(thread);
+      setThreadMessages([]);
+      setSelectedId(null);
+      setSelectedMessageIds([]);
+      setThreadLoadState({ threadKey: thread.thread_key, status: 'loading' });
+    }
     let nextMessages: MessageSummary[];
     try {
-      nextMessages = await invoke<MessageSummary[]>(IPC.ListThreadMessages, {
-        accountId: accountIdForScope(accountScope),
-        threadKey: thread.thread_key,
-        limit: 80,
-      });
+      nextMessages = await loadThreadMessages(thread);
     } catch (error) {
       if (!isCurrent()) return [];
+      if (announce) {
+        setThreadLoadState({ threadKey: thread.thread_key, status: 'error' });
+        return [];
+      }
       throw error;
     }
     if (!isCurrent()) return [];
-    setActiveThread(thread);
+    threadIntentRef.current = { thread, scope: accountScope, generation: refreshId, ready: true };
+    setThreadLoadState(null);
     setThreadMessages(nextMessages);
-    setSelectedId(nextMessages[nextMessages.length - 1]?.id ?? null);
-    setSelectedMessageIds([]);
+    if (announce) setSelectedId(nextMessages[nextMessages.length - 1]?.id ?? null);
+    else setSelectedId((current) => nextMessages.some((message) => message.id === current)
+      ? current : nextMessages[nextMessages.length - 1]?.id ?? null);
     if (announce) {
-      setStatus(`已打开会话：${thread.subject} · ${nextMessages.length} 封`);
+      setStatus(nextMessages.length ? `已打开会话：${thread.subject} · ${nextMessages.length} 封` : '此会话暂无可显示的邮件');
     }
     return nextMessages;
-  }, [accountScope, accountIdForScope, mailboxRefreshRef, setActiveThread, setSelectedId, setSelectedMessageIds, setStatus, setThreadMessages]);
+  }, [accountScope, loadThreadMessages, mailboxRefreshRef, setActiveThread, setSelectedId, setSelectedMessageIds, setStatus, setThreadMessages]);
+
+  const retryThread = useCallback(() => {
+    const intent = threadIntentRef.current;
+    if (intent && intent.scope === accountScope && intent.generation === mailboxRefreshRef.current) {
+      void openThread(intent.thread);
+    }
+  }, [accountScope, mailboxRefreshRef, openThread]);
 
   const changeAccountScope = useCallback((value: string) => {
     mailboxRefreshRef.current += 1;
@@ -267,6 +315,9 @@ export default function useMailboxNavigation({
 
   const selectFolder = useCallback((nextFolderId: number) => {
     mailboxRefreshRef.current += 1;
+    // Every invalidated request must have a replacement, even when React
+    // keeps the same folderId (reselect, or A → B → A in one event batch).
+    setFolderRevision((current) => current + 1);
     skipNextFolderEffectLoadRef.current = false;
     resetSearch();
     setFolderId(nextFolderId);
@@ -274,6 +325,7 @@ export default function useMailboxNavigation({
 
   return {
     scopeRevision,
+    folderRevision,
     accountIdForScope,
     scrollSettingsSection,
     openSettingsHome,
@@ -281,6 +333,8 @@ export default function useMailboxNavigation({
     currentFolderAccountId,
     visibleFolderIdForRole,
     openThread,
+    loadThreadMessages,
+    threadReaderProps: { threadLoadState, onRetryThread: retryThread },
     invalidateThreadRequest,
     changeAccountScope,
     selectFolder,

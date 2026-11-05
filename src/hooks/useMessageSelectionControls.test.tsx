@@ -38,6 +38,26 @@ function localDay(offset: number) {
 }
 
 describe('useMessageSelectionControls', () => {
+  it.each(['all', 'group', 'date'] as const)('keeps selection exited when a pending %s query completes', async kind => {
+    const visible = [message(1, localDay(0))];
+    let finish!: (items: MessageSummary[]) => void;
+    const pending = new Promise<MessageSummary[]>(resolve => { finish = resolve; });
+    const { result } = renderHook(() => {
+      const [selected, setSelected] = useState<number[]>([]);
+      return { selected, ...useMessageSelectionControls(visible, setSelected, vi.fn(), () => pending, { current: 1 }, selected) };
+    });
+    let work!: Promise<unknown>;
+    act(() => {
+      work = kind === 'all' ? result.current.toggleAllMessages(true)
+        : kind === 'group' ? result.current.toggleGroup('all', [1], true)
+        : result.current.selectDateRange({ startDate: localDateKey(localDay(0))!, endDate: localDateKey(localDay(0))!, startTime: '00:00', endTime: '23:59' });
+    });
+    act(() => result.current.clearSelection());
+    await act(async () => { finish(visible); await work; });
+    expect(result.current.selected).toEqual([]);
+    expect(result.current.groupSyncBusy).toBe(false);
+    expect(result.current.isAllMessagesSelected).toBe(false);
+  });
   it('selects and cancels a complete date group, including unloaded messages', async () => {
     const visible = [message(1, localDay(0)), message(3, localDay(1))];
     const hiddenToday = message(2, localDay(0));

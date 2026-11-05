@@ -26,9 +26,13 @@ function renderBody(overrides: Partial<React.ComponentProps<typeof ReaderBodyCon
 }
 
 describe('ReaderBodyContent remote body states', () => {
+  it('never returns an unlabelled empty node while body preparation is unavailable', () => {
+    renderBody({ isBodyRenderReady: false, showPlaceholder: false });
+    expect(screen.getByRole('status').textContent).toContain('正在准备邮件正文');
+  });
   it('shows a stable busy state while the remote body is loading', () => {
     renderBody({ bodyFetchStatus: 'loading' });
-    expect(screen.getByLabelText('正在加载邮件内容').getAttribute('aria-busy')).toBe('true');
+    expect(screen.getByLabelText('正在加载邮件正文').getAttribute('aria-busy')).toBe('true');
     expect(screen.queryByText('无正文')).toBeNull();
   });
 

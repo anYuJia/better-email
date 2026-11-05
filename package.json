@@ -19,6 +19,7 @@
     "test:ui": "node scripts/run-ui-smoke.mjs",
     "test:ui:quality": "node scripts/run-ui-quality.mjs",
     "test:ui:attachments": "node scripts/run-ui-attachments.mjs",
+    "test:ui:navigation": "node scripts/run-ui-navigation.mjs",
     "test:ui:motion": "node scripts/run-ui-motion.mjs",
     "test:ui:workflow": "node scripts/run-ui-workflow.mjs",
     "tauri:dev": "node scripts/tauri-dev.mjs",

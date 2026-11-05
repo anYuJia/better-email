@@ -1,0 +1,15 @@
+/* Eager shared frame: the deferred and ready composer occupy the same space. */
+.composer-frame {
+  width: min(760px, calc(100vw - 32px));
+  height: min(640px, calc(100vh - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-float);
+}

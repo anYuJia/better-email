@@ -55,4 +55,31 @@ describe('ReaderSecurityBanner', () => {
     expect(screen.getByText('已拦截外部内容')).toBeDefined();
     expect(screen.queryByRole('button', { name: '显示图片' })).toBeNull();
   });
+
+  it('expands the low-risk explanation without allowing images or trusting the sender', () => {
+    const input = props();
+    render(<ReaderSecurityBanner {...input} />);
+    const disclosure = screen.getByRole('button', { name: '远程图片已拦截' });
+    const notes = document.getElementById(disclosure.getAttribute('aria-controls')!);
+    expect(notes?.hidden).toBe(true);
+    fireEvent.click(disclosure);
+    expect(disclosure.getAttribute('aria-expanded')).toBe('true');
+    expect(notes?.hidden).toBe(false);
+    expect(notes?.parentElement).toBe(screen.getByLabelText('安全提示'));
+    expect(screen.getByRole('button', { name: '显示图片' })).toBeDefined();
+    expect(screen.getByLabelText('更多安全选项')).toBeDefined();
+    expect(input.onAllowRemoteImagesOnce).not.toHaveBeenCalled();
+    expect(input.onTrustSender).not.toHaveBeenCalled();
+    fireEvent.click(disclosure);
+    expect(notes?.hidden).toBe(true);
+  });
+
+  it('keeps suspicious-content warnings visible without requiring disclosure', () => {
+    render(<ReaderSecurityBanner {...props({ warnings: ['发件人身份校验失败，请核对邮件内容。'] })} />);
+    const warning = screen.getByText('发件人身份校验失败，请核对邮件内容。');
+    expect(warning.parentElement?.hidden).toBe(false);
+    expect(screen.getByLabelText('安全提示').classList.contains('is-caution')).toBe(true);
+    expect(screen.queryByRole('button', { name: '请核对邮件内容' })).toBeNull();
+    expect(screen.getByRole('button', { name: '显示图片' })).toBeDefined();
+  });
 });

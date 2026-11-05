@@ -40,20 +40,17 @@
   background: var(--workspace-reader);
 }
 
-/* The article holds header + body + attachments + reply. It uses a readable
-   max-width so wide windows don't stretch lines past a comfortable measure,
-   while the header/toolbar can use the full pane width. */
+/* Keep the header, body and reply on the same reading measure. */
 .reader {
   width: 100%;
-  max-width: 880px;
+  max-width: 840px;
   margin: 0 auto;
-  padding: 20px clamp(24px, 3vw, 32px) 40px;
+  padding: 16px clamp(24px, 5cqi, 40px) 48px;
   overflow: visible;
 }
 
 .app-shell .reader {
-  max-width: 880px;
-  padding: 20px clamp(24px, 3vw, 32px) 40px;
+  padding: 16px clamp(24px, 5cqi, 40px) 48px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -76,21 +73,16 @@
   border-bottom: 0;
 }
 
-.reader-title-block {
-  min-width: 0;
-  order: 2;
-}
-
 /* The subject leads the reading surface; controls stay subordinate. */
 .reader-header h1,
 .app-shell .reader-header h1 {
   max-width: 100%;
-  margin: 0 0 14px;
+  margin: 0;
   color: var(--ui-text);
   font-size: clamp(22px, 4.8cqi, 24px);
-  font-weight: 650;
-  line-height: 1.3;
-  letter-spacing: -0.025em;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.012em;
   overflow-wrap: anywhere;
 }
 
@@ -99,6 +91,7 @@
   color: var(--ui-text-tertiary);
   font-size: 13px;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 /* A single 36px toolbar rhythm, with one quietly emphasized reply action. */
@@ -110,10 +103,9 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px;
   min-height: 44px;
   padding: 0 0 8px;
-  order: 1;
   border: 0;
   border-bottom: 1px solid var(--ui-border);
   border-radius: 0;
@@ -121,20 +113,85 @@
   box-shadow: none;
 }
 
+.reader-actions-placeholder {
+  display: none;
+}
+
+@media (min-width: 721px) {
+  .app-shell .reader-header {
+    gap: 8px 16px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .reader-header .reader-actions {
+    min-height: 36px;
+    padding: 0;
+    border: 0;
+  }
+
+  .reader-actions-placeholder {
+    display: block;
+    min-height: 36px;
+  }
+
+  .reader-header > .reader-context-row {
+    min-height: 24px;
+  }
+
+  @container (min-width: 580px) {
+    .app-shell .reader-header {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+    }
+
+    .reader-header > :is(.reader-title-block, .reader-context-row) {
+      grid-column: 1 / -1;
+    }
+
+    .reader-header > .reader-context-row {
+      padding-inline-start: 42px;
+    }
+
+    .reader-header .reader-actions {
+      justify-content: flex-end;
+      width: fit-content;
+      max-width: min(48cqi, 360px);
+    }
+
+    .reader-actions-placeholder {
+      display: none;
+    }
+  }
+}
+
 .reader-action-group {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   min-height: 36px;
 }
 
-.reader-message-actions {
-  margin-inline-start: 4px;
-  padding-inline-start: 8px;
-  border-inline-start: 1px solid var(--ui-border);
+@media (min-width: 721px) {
+  .reader-response-actions + .reader-message-actions {
+    position: relative;
+    margin-inline-start: 4px;
+    padding-inline-start: 7px;
+  }
+
+  .reader-response-actions + .reader-message-actions::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block: 10px;
+    width: 1px;
+    background: var(--ui-border);
+    pointer-events: none;
+  }
 }
 
-.reader-actions :is(.reader-action-group > button, .reader-translate-action, .reader-ai-trigger, .reader-more-menu > summary, .reader-reply-menu > summary) {
+.reader-actions :is(.reader-action-group > button, .reader-ai-trigger, .reader-more-menu > summary, .reader-reply-menu > summary) {
   width: auto;
   min-width: 36px;
   min-height: 36px;
@@ -155,9 +212,16 @@
   transition: var(--ui-transition-control);
 }
 
-.reader-actions :is(.reader-action-group > button, .reader-translate-action, .reader-ai-trigger, .reader-more-menu > summary, .reader-reply-menu > summary):hover:not(:disabled) {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
+.reader-actions :is(.reader-action-group > button, .reader-ai-trigger, .reader-more-menu > summary, .reader-reply-menu > summary):focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .reader-actions :is(.reader-action-group > button, .reader-ai-trigger, .reader-more-menu > summary, .reader-reply-menu > summary):hover:not(:disabled) {
+    color: var(--ui-text);
+    background: var(--ui-control-hover);
+  }
 }
 
 .reader-actions :is(button.icon-only-action, summary.icon-only-summary) {
@@ -168,15 +232,16 @@
 .reader-actions button.primary-action {
   min-width: 72px;
   padding-inline: 12px;
-  color: var(--ui-text-accent);
-  background: var(--ui-accent-soft);
+  color: var(--ui-text);
+  background: transparent;
   font-weight: 600;
 }
 
-.reader-actions .primary-action:hover:not(:disabled) {
-  color: var(--ui-text-accent);
-  background: var(--ui-accent-soft);
-  border-color: color-mix(in srgb, var(--ui-accent) 20%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .reader-actions .primary-action:hover:not(:disabled) {
+    color: var(--ui-text-accent);
+    background: var(--ui-control-hover);
+  }
 }
 
 .reader-actions svg {
@@ -187,11 +252,6 @@
 .reader-actions .danger-action:hover:not(:disabled) {
   color: var(--ui-danger);
   background: var(--ui-danger-bg);
-}
-
-.reader-actions .reader-translate-action.active {
-  color: var(--ui-text-accent);
-  background: var(--ui-accent-soft);
 }
 
 .reader-actions button:disabled {
@@ -259,15 +319,6 @@
 }
 
 @media (max-width: 1180px) {
-  .reader-action-group {
-    gap: 4px;
-  }
-
-  .reader-message-actions {
-    margin-inline-start: 8px;
-    padding-inline-start: 8px;
-  }
-
   .app-shell .reader {
     padding-inline: 24px;
   }
@@ -280,10 +331,6 @@
     row-gap: 4px;
   }
 
-  .app-shell .reader-action-group {
-    gap: 2px;
-  }
-
   .app-shell .reader-message-actions {
     margin-inline-start: 6px;
     padding-inline-start: 6px;
@@ -294,11 +341,6 @@
     padding-inline: 11px;
   }
 
-  .app-shell .reader-translate-action {
-    order: 3;
-    flex: 1 1 100%;
-    justify-content: flex-start;
-  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -530,7 +572,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 12px;
-  margin-top: 8px;
 }
 
 .reader-meta {
@@ -625,7 +666,8 @@
   position: relative;
 }
 
-.label-tools .label-menu summary {
+.label-tools .label-menu summary,
+.reader-context-row .reader-translate-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -653,10 +695,21 @@
 }
 
 .label-tools .label-menu[open] summary,
-.label-tools .label-menu summary:hover {
+.label-tools .label-menu summary:hover,
+.reader-context-row .reader-translate-action:hover:not(:disabled) {
   color: var(--ui-text);
   border-color: transparent;
   background: var(--quiet-row-hover);
+}
+
+.reader-context-row .reader-translate-action.active {
+  color: var(--ui-text-accent);
+  background: var(--ui-accent-soft);
+}
+
+.reader-context-row .reader-translate-action:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .label-tools .label-menu > .label-menu-container {
@@ -973,8 +1026,7 @@
 
 /* Body typography: 14–15px, line-height 1.55–1.65. Reader = read, not scan. */
 .body-text,
-.reader-html,
-.empty-reader-card {
+.reader-html {
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -1197,7 +1249,7 @@
 }
 
 .attachment-section-header {
-  min-height: 36px;
+  min-height: 44px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -1211,6 +1263,11 @@
   display: flex;
   align-items: baseline;
   gap: 6px;
+}
+
+.attachment-section:not(.attachment-section-multiple) .attachment-summary-copy {
+  display: grid;
+  gap: 2px;
 }
 
 .attachment-section-header strong {
@@ -1435,27 +1492,9 @@
   background: var(--quiet-row-hover);
 }
 
-.attachment-actions .attachment-primary-button {
-  min-width: 0;
+.attachment-actions button.attachment-primary-button {
   color: var(--ui-text);
   font-weight: 600;
-  background: var(--ui-surface-muted);
-}
-
-.attachments .attachment-actions .attachment-primary-button {
-  color: var(--ui-text);
-  font-weight: 600;
-  background: var(--ui-surface-muted);
-}
-
-.attachment-actions .attachment-primary-button:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
-}
-
-.attachments .attachment-actions .attachment-primary-button:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: var(--quiet-row-hover);
 }
 
 .attachment-actions button[aria-busy="true"] {
@@ -1637,6 +1676,11 @@
 
 .reader-warning-messages[hidden] { display: none; }
 
+.reader-warning-panel > .reader-warning-messages {
+  flex-basis: 100%;
+  grid-column: 1 / -1;
+}
+
 .reader-security-disclosure {
   justify-self: start;
   display: inline-flex;
@@ -1711,7 +1755,7 @@
   border: 0;
   border-radius: var(--ui-radius-sm);
   color: var(--ui-text-accent);
-  background: var(--ui-accent-soft);
+  background: transparent;
   font-size: 12px;
   font-weight: 600;
   box-shadow: var(--ui-box-shadow-none);
@@ -1720,7 +1764,7 @@
 
 .reader-security-primary-action:hover {
   color: var(--ui-text-accent);
-  background: color-mix(in srgb, var(--ui-accent-soft) 76%, var(--ui-surface));
+  background: var(--ui-control-hover);
 }
 
 .reader-security-primary-action:focus-visible,
@@ -1735,6 +1779,7 @@
     padding: 8px 0;
   }
 
+  .app-shell.is-mobile-app .reader-security-disclosure,
   .app-shell.is-mobile-app .reader-security-primary-action,
   .app-shell.is-mobile-app .reader-warning-more > summary {
     min-height: var(--ui-control-height-touch);
@@ -1742,6 +1787,29 @@
 
   .app-shell.is-mobile-app .reader-warning-more > summary {
     width: auto;
+  }
+
+  .app-shell.is-mobile-app .reader-warning-panel:not(.is-caution) {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+  }
+
+  .app-shell.is-mobile-app .reader-warning-panel:not(.is-caution) .reader-warning-icon {
+    align-self: center;
+  }
+
+  .app-shell.is-mobile-app .reader-warning-panel:not(.is-caution) .reader-warning-action-row {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  .app-shell.is-mobile-app .reader-warning-panel:not(.is-caution) .reader-warning-more > summary {
+    width: var(--ui-control-height-touch);
+    padding: 0;
+  }
+
+  .app-shell.is-mobile-app .reader-warning-panel:not(.is-caution) .reader-warning-more > summary > span {
+    display: none;
   }
 }
 
@@ -1852,19 +1920,30 @@
 }
 
 .quick-reply.is-collapsed {
-  padding: 0;
+  padding: 8px 0 0;
   gap: 0;
+  border-inline: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.quick-reply.is-collapsed:focus-within {
+  border-color: var(--ui-border);
+  box-shadow: none;
 }
 
 .quick-reply-entry {
   min-width: 0;
+  max-width: 100%;
   min-height: 44px;
+  justify-self: start;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
   border: 0;
-  border-radius: inherit;
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
   text-align: start;
@@ -2404,7 +2483,7 @@
  * 13. Empty / loading states
  * --------------------------------------------------------------------------- */
 
-/* Empty reader: a weak icon + text. Not a marketing empty state. */
+/* The empty pane leaves recovery actions to the list. */
 .empty-reader {
   padding: 32px;
   background: var(--ui-reader);
@@ -2412,14 +2491,6 @@
 
 .app-shell .empty-reader {
   padding: 28px;
-}
-
-.empty-reader-card {
-  padding: 24px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
 }
 
 .empty-reader-quiet {
@@ -2431,88 +2502,9 @@
   text-align: center;
 }
 
-.app-shell .empty-reader-card {
-  width: min(100%, 360px);
-  max-width: 360px;
-  padding: 0;
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  color: var(--ui-text-secondary);
-  background: transparent;
-  box-shadow: var(--ui-box-shadow-none);
-  text-align: center;
-}
-
-.empty-reader-card strong {
-  color: var(--ui-text);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.app-shell .empty-reader-card strong {
-  color: var(--ui-text);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.empty-reader-card span {
-  max-width: 360px;
-  color: var(--ui-text-tertiary);
-  font-size: 12px;
-}
-
-.app-shell .empty-reader-card span {
-  max-width: 260px;
-  color: var(--ui-text-tertiary);
-  line-height: 1.55;
-}
-
-.app-shell .empty-reader-card .empty-state-mark {
-  width: 48px;
-  height: 48px;
-  margin-bottom: 0;
-  border-radius: 50%;
-  color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.app-shell .empty-reader-compose {
-  min-height: 32px;
-  padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-control);
-  color: var(--ui-text);
-  background: var(--ui-surface);
-  font-size: 12px;
-  font-weight: 500;
-  box-shadow: var(--ui-box-shadow-none);
-}
-
-.app-shell .empty-reader-compose:hover:not(:disabled) {
-  border-color: var(--ui-border-strong);
-  color: var(--ui-text);
-  background: var(--workspace-control);
-}
-
 @media (max-width: 720px) {
   .app-shell .empty-reader {
     padding: 24px 16px;
-  }
-
-  .app-shell .empty-reader-card {
-    width: min(100%, 320px);
-  }
-
-  .app-shell .empty-reader-compose {
-    min-height: 44px;
-    padding-inline: 16px;
   }
 }
 

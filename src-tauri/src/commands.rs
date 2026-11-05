@@ -13,6 +13,7 @@ mod common;
 mod composer_recovery;
 mod contacts_rules;
 mod executor;
+mod message_deletion;
 mod messages;
 mod oauth;
 mod outbox;

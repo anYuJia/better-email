@@ -1,4 +1,7 @@
-import AccountLoginRecovery from './components/AccountLoginRecovery';
+import AccountLoginRecovery, { useAccountLoginRepair } from './components/AccountLoginRecovery';
+import PaneResizer from './components/PaneResizer';
+import SettingsLoadingSurface from './components/settings/SettingsLoadingSurface';
+import { LazySettingsOverlay as SettingsOverlay, preloadSettingsOverlay } from './components/settings/lazySettingsOverlay';
 import useOnboardingAccount, { usePendingOnboardingAccount } from './hooks/useOnboardingAccount';
 import useMobileVisualViewport from './hooks/useMobileVisualViewport';
 import useMailFeedback from './hooks/useMailFeedback';
@@ -29,7 +32,7 @@ import AppUpdateSurface from './components/AppUpdateSurface';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import type { PendingSendUndo } from './components/UndoSnackbarStack';
-import useAppLayout, { APP_LAYOUT_BOUNDS } from './hooks/useAppLayout';
+import useAppLayout from './hooks/useAppLayout';
 import { logError } from './app/logger';
 import useAppShortcuts from './hooks/useAppShortcuts';
 import useAccountConnectionController from './hooks/useAccountConnectionController';
@@ -54,6 +57,8 @@ import useIdentityManagement from './hooks/useIdentityManagement';
 import useLabelManagement from './hooks/useLabelManagement';
 import useMailboxSelectionController from './hooks/useMailboxSelectionController';
 import useMailboxNavigation from './hooks/useMailboxNavigation';
+import useMailboxIdentityLabels from './hooks/useMailboxIdentityLabels';
+import useMobileInboxSelection from './hooks/useMobileInboxSelection';
 import useMailboxSearchController, { type MailboxSearchLoaders } from './hooks/useMailboxSearchController';
 import useMailboxSync from './hooks/useMailboxSync';
 import useRuleManagement from './hooks/useRuleManagement';
@@ -127,7 +132,6 @@ import { buildMailboxContextKey } from './app/mailboxContext';
 import { snapshotMessageSummaries as snapshotMessages } from './app/messageActionState';
 import { buildTitlebarViewSummary } from './app/titlebarSummary';
 import { openUnreadInbox } from './app/trayActions';
-import './ui-2026.css';
 
 const loadComposerWindow = () => import('./components/ComposerWindow');
 const ComposerWindow = lazy(loadComposerWindow);
@@ -135,7 +139,6 @@ const preloadComposerWindow = () => { void loadComposerWindow().catch(() => unde
 const SnoozePicker = lazy(() => import('./components/SnoozePicker'));
 import DeferredSurface from './components/DeferredSurface';
 import useSettingsAccountSelection from './hooks/useSettingsAccountSelection';
-const SettingsOverlay = lazy(() => import('./components/settings/SettingsOverlay'));
 const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
 const FirstRunOnboarding = lazy(() => import('./components/FirstRunOnboarding'));
 const AccountLoginDialog = lazy(() => import('./components/AccountLoginDialog'));
@@ -193,20 +196,10 @@ function MailboxApp({
   const [account, setAccount] = useState<Account | null>(null);
   const readerScrollPositions = useRef(new Map<string, number>());
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const accountSourceLabels = useMemo(() => {
-    const names = new Map<string, number>();
-    for (const entry of accounts) {
-      const name = entry.display_name.trim().toLocaleLowerCase();
-      if (name) names.set(name, (names.get(name) ?? 0) + 1);
-    }
-    return new Map(accounts.map((entry) => {
-      const name = entry.display_name.trim();
-      return [entry.id, name && names.get(name.toLocaleLowerCase()) === 1 ? name : entry.email];
-    }));
-  }, [accounts]);
   const [accountScope, setAccountScope] = useState<AccountScope>(
     () => requestedSettingsAccountScope ?? loadAccountScope(),
   );
+  const { accountSourceLabels, mobileAccountScopeLabel } = useMailboxIdentityLabels({ accounts, accountScope });
   const scopedAccountId = accountScope === 'all' ? null : accountScope;
   const [accountForm, setAccountForm] = useState<Account | null>(null);
   const [newAccountForm, setNewAccountForm] = useState<AccountCreateInput>(emptyAccountCreateForm);
@@ -331,7 +324,8 @@ function MailboxApp({
     handleQueryChange,
     handleSearchScopeChange,
     handleClearSearchAndFilter,
-    handleClearSearchForFilter,
+    handleClearSearch,
+    onExpandSearch,
     handleApplySearchShortcut,
     handleShowMessages: showMessagesMode,
     handleShowThreads: showThreadsMode,
@@ -524,6 +518,8 @@ function MailboxApp({
     loadMessagesWithVisibleFallback,
     loadThreads,
     refreshMailbox,
+    mailboxView,
+    retryMailbox,
   } = useMailboxData({
     accountScope,
     currentAccountId: account?.id ?? null,
@@ -665,9 +661,10 @@ function MailboxApp({
     openSettingsHome,
     focusMailboxRole,
     scopeRevision,
+    folderRevision,
     currentFolderAccountId,
     visibleFolderIdForRole,
-    openThread,
+    openThread, loadThreadMessages, threadReaderProps,
     invalidateThreadRequest,
     changeAccountScope,
     selectFolder,
@@ -714,6 +711,7 @@ function MailboxApp({
   }, [accountScope]);
 
   const openMobileSettings = useCallback(() => {
+    if (!useNativeSettingsWindow) preloadSettingsOverlay();
     if (isMobileApp) {
       navigateMobileScreen('settings');
       return;
@@ -726,6 +724,7 @@ function MailboxApp({
   }, [isMobileApp, navigateMobileScreen, openDesktopSettingsWindow, openSettingsHome, useNativeSettingsWindow]);
 
   const openMobileSettingsSection = useCallback((section: SettingsSectionId) => {
+    if (!useNativeSettingsWindow) preloadSettingsOverlay(section);
     if (useNativeSettingsWindow) {
       openDesktopSettingsWindow(section);
       return;
@@ -801,6 +800,7 @@ function MailboxApp({
     enabled: !standaloneSettingsWindow,
     accountScope,
     scopeRevision,
+    folderRevision,
     folderId,
     appliedQuery,
     filter,
@@ -823,10 +823,7 @@ function MailboxApp({
   // refreshUnreadIndicators 是稳定 useCallback，任何无关渲染都不会重新订阅或触发 GetStats。
   useUnreadFocusSync(refreshUnreadIndicators, accountScope, !standaloneSettingsWindow);
 
-  const unreadTotal = stats?.unread_messages ?? 0;
-  const messageListSummary = stats
-    ? `${stats.total_messages} 封 · ${unreadTotal} 未读`
-    : `${messages.length} 封`;
+  const messageListSummary = `${threads.length} 个会话`;
   const visibleListSummary = messageResultCount !== null
     ? `${messageResultCount} 封`
     : hasMoreMessages
@@ -839,13 +836,14 @@ function MailboxApp({
     messageResultCount,
   ) ?? (listMode === 'messages' ? visibleListSummary : undefined);
   const currentViewLabel = folders.find((folder) => folder.id === folderId)?.name ?? '邮件';
+  const visibleMailboxListKey = mailboxView.committedKey ?? mailboxListStateKey;
   const mailboxListScrollTop = useMemo(
-    () => Math.max(0, loadMailboxListStates()[mailboxListStateKey]?.scrollTop ?? 0),
-    [mailboxListStateKey],
+    () => Math.max(0, loadMailboxListStates()[visibleMailboxListKey]?.scrollTop ?? 0),
+    [visibleMailboxListKey],
   );
   const handleMailboxListScrollTopChange = useCallback((scrollTop: number) => {
-    saveMailboxListState(mailboxListStateKey, { scrollTop });
-  }, [mailboxListStateKey]);
+    saveMailboxListState(visibleMailboxListKey, { scrollTop });
+  }, [visibleMailboxListKey]);
   const activeThreadSelected = readerSelectedDetail;
   const selectedHasRemoteImageWarning = Boolean(
     readerSelectedDetail?.security_warnings.some((warning) => warning.includes('远程图片')),
@@ -1144,6 +1142,10 @@ function MailboxApp({
     mailboxListStateKey,
     setIsSelectingAllMessages,
   );
+  const { mobileSelectionMode, headerSelectionProps, listSelectionProps, selectionShortcutsProps } = useMobileInboxSelection({
+    isMobileApp, mobileScreen, mobileSearchOpen, listMode, mailboxUnavailable: mailboxView.unavailable,
+    mailboxListStateKey, selectedMessageIds, messageCount: messages.length, clearSelection,
+  });
 
   const {
     snoozeTarget,
@@ -1169,11 +1171,14 @@ function MailboxApp({
 
   const {
     confirmPermanentlyDelete,
+    deleteRefreshError,
+    retryDeleteRefresh,
     setConfirmPermanentlyDelete,
     requestPermanentlyDeleteMessages,
     handlePermanentlyDelete,
     permanentlyDeleteMessageConfirmed,
   } = usePermanentDeleteController({
+    mailboxContextKey: `${accountScope}:${folderId}`,
     selected,
     messages,
     threadMessages,
@@ -1412,12 +1417,13 @@ function MailboxApp({
   }
 
   useAppShortcuts({
+    ...selectionShortcutsProps,
     searchInputRef,
-    messages,
-    selected,
+    messages: mailboxView.unavailable ? [] : messages,
+    selected: mailboxView.unavailable ? null : selected,
     selectedId,
-    selectedMessages,
-    selectedMessageIds,
+    selectedMessages: mailboxView.unavailable ? [] : selectedMessages,
+    selectedMessageIds: mailboxView.unavailable ? [] : selectedMessageIds,
     listMode,
     undoAction,
     isComposerOpen,
@@ -1431,7 +1437,6 @@ function MailboxApp({
       setSettingsOpen(false);
       setShortcutsOpen(false);
     },
-    clearSelection,
     setStatus,
     restoreUndoAction,
     toggleAllVisibleMessages: toggleAllMessages,
@@ -1634,20 +1639,10 @@ function MailboxApp({
     return openThread(thread);
   }, [focusNarrowNavigationControl, isMobileApp, navigateMobileScreen, openThread]);
 
-  const handlePaneResizerKeyDown = useCallback((
-    pane: keyof typeof APP_LAYOUT_BOUNDS,
-    event: React.KeyboardEvent<HTMLButtonElement>,
-  ) => {
-    if (event.key === 'Home') {
-      event.preventDefault();
-      resetAppLayoutPane(pane);
-      return;
-    }
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    event.preventDefault();
-    const step = event.shiftKey ? 24 : 8;
-    adjustAppLayout(pane, event.key === 'ArrowRight' ? step : -step);
-  }, [adjustAppLayout, resetAppLayoutPane]);
+  const { repairCredentials, repairError } = useAccountLoginRepair({
+    accounts, accountScope, nativeSettings: useNativeSettingsWindow,
+    changeAccountScope, selectSettingsAccount, openSection: openMobileSettingsSection,
+  });
 
   const confirmationDialogsOpen = Boolean(
     confirmDeleteFolder
@@ -1662,10 +1657,18 @@ function MailboxApp({
   const messageListContent = (
     <AppErrorBoundary>
       <MessageListPane
-        notice={<AccountLoginRecovery accounts={accounts} accountScope={accountScope}
+        mailboxPending={mailboxView.pending} mailboxUnavailable={mailboxView.unavailable}
+        mailboxError={mailboxView.error} onRetryMailbox={() => { void retryMailbox().catch(() => undefined); }}
+        notice={<><AccountLoginRecovery accounts={accounts} accountScope={accountScope}
           nativeSettings={useNativeSettingsWindow} changeAccountScope={changeAccountScope}
-          selectSettingsAccount={selectSettingsAccount} openSection={openMobileSettingsSection} />}
+          selectSettingsAccount={selectSettingsAccount} openSection={openMobileSettingsSection}
+          onRepairCredentials={repairCredentials} repairError={repairError} />
+          {deleteRefreshError && <div className="message-list-refresh-error" role="alert">
+            <span>{deleteRefreshError}</span><button type="button" onClick={() => { void retryDeleteRefresh(); }}>重试刷新</button>
+          </div>}
+        </>}
         mobile={isMobileApp}
+        {...listSelectionProps}
         showAccountSource={accountScope === 'all'}
         accountSourceLabels={accountSourceLabels}
         appliedQuery={appliedQuery}
@@ -1685,10 +1688,11 @@ function MailboxApp({
         currentViewLabel={currentViewLabel}
         visibleListSummary={visibleListSummary}
         messageListSummary={messageListSummary}
-        listStateKey={mailboxListStateKey}
+        listStateKey={visibleMailboxListKey}
         initialScrollTop={mailboxListScrollTop}
         onScrollTopChange={handleMailboxListScrollTopChange}
         onClearSearchAndFilter={handleClearSearchAndFilter}
+        onExpandSearch={onExpandSearch}
         onRefresh={handleRefresh}
         onShowMessages={handleShowMessages}
         onShowThreads={handleShowThreads}
@@ -1706,7 +1710,7 @@ function MailboxApp({
         onToggleMessageLabel={handleToggleMessageLabel}
         onComposeFromMessage={composeFromMessage}
         onOpenThread={showThreadInNarrowReader}
-        onLoadThreadMessages={(thread) => openThread(thread, false)}
+        onLoadThreadMessages={loadThreadMessages}
         onRunThreadAction={handleRunThreadAction}
         onMoveThreadToFolder={handleMoveThreadToFolder}
         onToggleThreadLabel={handleToggleThreadLabel}
@@ -1725,6 +1729,9 @@ function MailboxApp({
   const readerContent = (
     <AppErrorBoundary>
       <ReaderPane
+        {...threadReaderProps}
+        mailboxPending={mailboxView.unavailable} mailboxError={mailboxView.error} selectedSummary={selected}
+        onRepairCredentials={repairCredentials}
         scrollPositions={readerScrollPositions.current}
         deliveryStatus={outbox.find((item) => item.message_id === selected?.id)}
         onResolveDelivery={resolveDelivery}
@@ -1818,9 +1825,13 @@ function MailboxApp({
         <div className={`mobile-app-surface mobile-screen-${mobileScreen}`}>
           <MobileScreenSurface kind="mail" active={mobileScreen === 'mail' || mobileScreen === 'mailbox'} persistent>
               <MobileInboxHeader
-                accountScopeLabel={accountScope === 'all' ? '统一邮箱' : (account?.display_name || account?.email)}
+                accountScopeLabel={mobileAccountScopeLabel}
                 currentViewLabel={currentViewLabel}
-                visibleListSummary={visibleListSummary}
+                visibleListSummary={listMode === 'threads' ? messageListSummary : visibleListSummary}
+                mailboxPending={mailboxView.pending}
+                mailboxUnavailable={mailboxView.unavailable}
+                {...headerSelectionProps}
+                appliedQuery={appliedQuery}
                 query={queryDraft}
                 filter={filter}
                 listMode={listMode}
@@ -1832,29 +1843,17 @@ function MailboxApp({
                 onRefresh={handleRefreshAction}
                 onSearchSubmit={runSearch}
                 onQueryChange={handleQueryChange}
-                onClearSearchAndFilter={handleClearSearchAndFilter}
+                onClearSearch={handleClearSearch}
                 onFilterChange={setFilter}
                 onShowMessages={handleShowMessages}
                 onShowThreads={handleShowThreads}
                 searchOpen={mobileSearchOpen}
               />
               {messageListContent}
-              <MobileBottomNav
+              {!mobileSelectionMode && <MobileBottomNav
                 onComposeIntent={useNativeComposerWindow ? undefined : preloadComposerWindow}
-                filter={filter}
-                onOpenMail={() => {
-                  handleClearSearchForFilter('all', false);
-                  handleShowMessages();
-                  navigateMobileScreen('mail');
-                }}
-                onOpenStarred={() => {
-                  handleClearSearchForFilter('starred', false);
-                  handleShowMessages();
-                  navigateMobileScreen('mail');
-                }}
                 onCompose={() => handleComposeNew(undefined)}
-                onOpenSettings={openMobileSettings}
-              />
+              />}
           </MobileScreenSurface>
           <MobileScreenSurface kind="reader" active={mobileScreen === 'reader'}>
             <div className="mobile-reader-surface">
@@ -1891,12 +1890,11 @@ function MailboxApp({
         query={queryDraft}
         appliedQuery={appliedQuery}
         searchScope={searchScope}
-        filter={filter}
         messages={messages}
         onSearchSubmit={runSearch}
         onQueryChange={handleQueryChange}
         onSearchScopeChange={handleSearchScopeChange}
-        onClearSearchAndFilter={handleClearSearchAndFilter}
+        onClearSearch={handleClearSearch}
         onApplySearchShortcut={handleApplySearchShortcut}
         currentViewLabel={currentViewLabel}
         viewSummary={titlebarViewSummary}
@@ -1963,52 +1961,27 @@ function MailboxApp({
         onMarkFolderRead={(folder) => { markFolderRead(folder).catch((error) => setStatus(String(error))); }}
         onEmptyTrash={() => { emptyCurrentTrash(); }}
         onOpenSettings={openMobileSettings}
+        onSettingsIntent={useNativeSettingsWindow ? undefined : () => preloadSettingsOverlay()}
         onOpenShortcuts={() => setShortcutsOpen(true)}
         onCloseNavigation={showNarrowList}
       />
 
-      <button
-        className="pane-resizer sidebar-resizer"
-        type="button"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="调整侧边栏宽度"
-        aria-valuemin={APP_LAYOUT_BOUNDS.sidebar.min}
-        aria-valuemax={APP_LAYOUT_BOUNDS.sidebar.max}
-        aria-valuenow={appLayout.sidebar}
-        aria-valuetext={`${appLayout.sidebar} 像素`}
-        title="拖拽调整侧边栏宽度"
-        onKeyDown={(event) => handlePaneResizerKeyDown('sidebar', event)}
-        onDoubleClick={() => resetAppLayoutPane('sidebar')}
-        onPointerDown={(event) => beginLayoutResize('sidebar', event)}
-        onMouseDown={(event) => beginLayoutMouseResize('sidebar', event)}
-      />
+      <PaneResizer pane="sidebar" width={appLayout.sidebar}
+        onAdjust={adjustAppLayout} onReset={resetAppLayoutPane}
+        onPointerDown={beginLayoutResize} onMouseDown={beginLayoutMouseResize} />
 
       {messageListContent}
 
-      <button
-        className="pane-resizer list-resizer"
-        type="button"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="调整邮件列表宽度"
-        aria-valuemin={APP_LAYOUT_BOUNDS.list.min}
-        aria-valuemax={APP_LAYOUT_BOUNDS.list.max}
-        aria-valuenow={appLayout.list}
-        aria-valuetext={`${appLayout.list} 像素`}
-        title="拖拽调整邮件列表宽度"
-        onKeyDown={(event) => handlePaneResizerKeyDown('list', event)}
-        onDoubleClick={() => resetAppLayoutPane('list')}
-        onPointerDown={(event) => beginLayoutResize('list', event)}
-        onMouseDown={(event) => beginLayoutMouseResize('list', event)}
-      />
+      <PaneResizer pane="list" width={appLayout.list}
+        onAdjust={adjustAppLayout} onReset={resetAppLayoutPane}
+        onPointerDown={beginLayoutResize} onMouseDown={beginLayoutMouseResize} />
 
       {readerContent}
         </>
       )}
 
       {!isAccountLoginActive && !useNativeComposerWindow && composerPresent && (
-        <Suspense fallback={<DeferredSurface label="正在打开写信窗口" />}>
+        <DeferredSurface compose={isComposerOpen && closeComposer} mobile={isMobileApp}>
           <AppErrorBoundary>
             <ComposerWindow
               editorFlushRef={editorFlushRef}
@@ -2069,7 +2042,7 @@ function MailboxApp({
               crossAccountRisks={crossAccountRisks}
             />
           </AppErrorBoundary>
-        </Suspense>
+        </DeferredSurface>
       )}
 
       {!isAccountLoginActive && snoozeTarget && (
@@ -2084,7 +2057,7 @@ function MailboxApp({
       )}
 
       {!isAccountLoginActive && isSettingsOpen && (
-        <Suspense fallback={<DeferredSurface label="正在打开设置" />}>
+        <Suspense fallback={<SettingsLoadingSurface onClose={() => setSettingsOpen(false)} />}>
           <AppErrorBoundary
             title="设置界面渲染失败"
             description="设置窗口发生渲染错误，但账号与草稿数据并未丢失。你可以先关闭设置窗口；如果问题持续，尝试刷新应用。"

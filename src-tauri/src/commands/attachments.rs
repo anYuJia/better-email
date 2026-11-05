@@ -1601,6 +1601,7 @@ mod tests {
             snippet: "Snippet".to_string(),
             body: "Hello\nworld".to_string(),
             sanitized_html: String::new(),
+            remote_body_fetched: true,
             security_warnings: Vec::new(),
             received_at: "2026-07-09T10:00:00+08:00".to_string(),
             is_read: true,
@@ -2503,7 +2504,7 @@ mod tests {
                 .mark_outbox_smtp_sent_pending_archive(item.message_id, "<legacy@test>")
                 .unwrap();
             store
-                .mark_outbox_remote_archived(item.message_id, "Sent", 0)
+                .mark_outbox_remote_archived(item.message_id, "Sent", 0, "100")
                 .unwrap();
         }
         let attachment = store.list_attachments(item.message_id).unwrap().remove(0);

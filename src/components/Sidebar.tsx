@@ -49,6 +49,7 @@ export type SidebarProps = {
   onMarkFolderRead: (folder: Folder) => void;
   onEmptyTrash: () => void;
   onOpenSettings: () => void;
+  onSettingsIntent?: () => void;
   onOpenShortcuts: () => void;
   onCloseNavigation?: () => void;
 };
@@ -131,6 +132,7 @@ function Sidebar({
   onMarkFolderRead,
   onEmptyTrash,
   onOpenSettings,
+  onSettingsIntent,
   onOpenShortcuts,
   onCloseNavigation,
 }: SidebarProps) {
@@ -181,6 +183,7 @@ function Sidebar({
         )}
       </div>
       <AccountSwitcher
+        variant="identity"
         accountScope={accountScope}
         accounts={accounts}
         onChange={onAccountScopeChange}
@@ -239,6 +242,9 @@ function Sidebar({
           <button
             className="settings-button"
             data-no-tooltip
+            onPointerEnter={onSettingsIntent}
+            onFocus={onSettingsIntent}
+            onPointerDown={onSettingsIntent}
             onClick={onOpenSettings}
           >
             <Settings size={16} strokeWidth={1.75} aria-hidden="true" /> <span>设置</span>

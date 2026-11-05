@@ -77,11 +77,19 @@ export default function useMessageSelectionControls(
   }, [messages, selectedMessageIds, snapshotRevision]);
 
   const clearSelection = useCallback(() => {
+    selectAllRequestRef.current += 1;
+    groupRequestRef.current += 1;
+    dateRangeRequestRef.current += 1;
+    groupBusyRef.current = false;
+    dateRangeBusyRef.current = false;
+    setSelectingAll?.(false);
+    setGroupSyncBusy(false);
+    setDateRangeBusy(false);
     messageSnapshotRef.current.clear();
     setSnapshotRevision((current) => current + 1);
     setSelectionMode('none');
     setSelectedMessageIds([]);
-  }, [setSelectedMessageIds]);
+  }, [setSelectedMessageIds, setSelectingAll]);
 
   const markPartialSelection = useCallback((sourceMessages: MessageSummary[] = []) => {
     rememberMessages(sourceMessages);

@@ -2,6 +2,7 @@ import useCompositionGuard from '../../hooks/useCompositionGuard';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
+  ListChecks,
   Menu,
   RefreshCw,
   Search,
@@ -17,6 +18,14 @@ type MobileInboxHeaderProps = {
   currentViewLabel: string;
   visibleListSummary: string;
   query: string;
+  appliedQuery?: string;
+  mailboxPending?: boolean;
+  mailboxUnavailable?: boolean;
+  selectionMode?: boolean;
+  selectedCount?: number;
+  canSelect?: boolean;
+  onEnterSelection?: () => void;
+  onExitSelection?: () => void;
   filter: FilterMode;
   listMode: ListMode;
   isRefreshing: boolean;
@@ -27,7 +36,7 @@ type MobileInboxHeaderProps = {
   onRefresh: () => void;
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onQueryChange: (value: string) => void;
-  onClearSearchAndFilter: () => void;
+  onClearSearch: () => void;
   onFilterChange: (filter: FilterMode) => void;
   onShowMessages: () => void;
   onShowThreads: () => void;
@@ -39,6 +48,14 @@ export default function MobileInboxHeader({
   currentViewLabel,
   visibleListSummary,
   query,
+  appliedQuery = '',
+  mailboxPending = false,
+  mailboxUnavailable = false,
+  selectionMode = false,
+  selectedCount = 0,
+  canSelect = true,
+  onEnterSelection,
+  onExitSelection,
   filter,
   listMode,
   isRefreshing,
@@ -49,7 +66,7 @@ export default function MobileInboxHeader({
   onRefresh,
   onSearchSubmit,
   onQueryChange,
-  onClearSearchAndFilter,
+  onClearSearch,
   onFilterChange,
   onShowMessages,
   onShowThreads,
@@ -59,16 +76,34 @@ export default function MobileInboxHeader({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const searchTriggerRef = useRef<HTMLButtonElement | null>(null);
   const restoreSearchFocusRef = useRef(false);
+  const selectionExitRef = useRef<HTMLButtonElement | null>(null);
+  const restoreSelectionFocusRef = useRef(false);
   const filterMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
-    if (searchOpen) searchInputRef.current?.focus({ preventScroll: true });
+    if (selectionMode) {
+      restoreSelectionFocusRef.current = true;
+      selectionExitRef.current?.focus({ preventScroll: true });
+    }
+    else if (restoreSelectionFocusRef.current) {
+      restoreSelectionFocusRef.current = false;
+      (searchOpen ? searchInputRef.current : filterMenuTriggerRef.current)?.focus({ preventScroll: true });
+    }
+  }, [selectionMode, searchOpen]);
+
+  function exitSelection() {
+    restoreSelectionFocusRef.current = true;
+    onExitSelection?.();
+  }
+
+  useEffect(() => {
+    if (searchOpen && !selectionMode) searchInputRef.current?.focus({ preventScroll: true });
     else if (restoreSearchFocusRef.current) {
       restoreSearchFocusRef.current = false;
       searchTriggerRef.current?.focus({ preventScroll: true });
     }
-  }, [searchOpen]);
+  }, [searchOpen, selectionMode]);
 
   function closeSearch() {
     restoreSearchFocusRef.current = true;
@@ -82,20 +117,27 @@ export default function MobileInboxHeader({
   }
 
   const activeFilter = filters.find((item) => item.id === filter) ?? filters[0];
-  const hasNonDefaultView = filter !== 'all' || listMode !== 'messages';
+  const hasFilter = filter !== 'all';
+  const resultSummary = mailboxUnavailable ? (mailboxPending ? '正在加载…' : '加载未完成') : visibleListSummary;
   const secondarySummary = [
     accountScopeLabel,
-    visibleListSummary,
-    filter !== 'all' ? activeFilter.label : '',
-    listMode === 'threads' ? '会话' : '',
+    resultSummary,
+    listMode === 'threads' && !resultSummary?.includes('会话') ? '会话' : '',
   ].filter(Boolean).join(' · ');
   const filterMenuItems: ContextMenuItem[] = [
+    ...(onEnterSelection && listMode === 'messages' ? [{
+      id: 'mobile-select', label: '选择邮件',
+      icon: <ListChecks size={18} strokeWidth={1.75} aria-hidden="true" />,
+      disabled: !canSelect || mailboxUnavailable,
+      onSelect: onEnterSelection,
+    }] : []),
     ...filters.map((item) => ({
       id: `mobile-filter-${item.id}`,
       label: item.label,
       checked: filter === item.id,
       selectionRole: 'radio' as const,
-      onSelect: () => onFilterChange(item.id),
+      separatorBefore: item === filters[0] && Boolean(onEnterSelection) && listMode === 'messages',
+      onSelect: () => { if (item.id !== filter) onFilterChange(item.id); },
     })),
     {
       id: 'mobile-list-mode-messages',
@@ -121,6 +163,20 @@ export default function MobileInboxHeader({
       onSelect: onRefresh,
     },
   ];
+
+  if (selectionMode) {
+    return <header className="mobile-inbox-header" aria-label="选择邮件">
+      <div className="mobile-inbox-title-row">
+        <button ref={selectionExitRef} type="button" className="mobile-header-icon" aria-label="退出选择" onClick={exitSelection}>
+          <X size={20} strokeWidth={1.75} aria-hidden="true" />
+        </button>
+        <div className="mobile-inbox-title"><span className="mobile-inbox-title-copy">
+          <strong aria-live="polite">已选 {selectedCount} 封</strong>
+          <small>{currentViewLabel}</small>
+        </span></div>
+      </div>
+    </header>;
+  }
 
   if (searchOpen) {
     return (
@@ -157,7 +213,7 @@ export default function MobileInboxHeader({
               aria-label="清空搜索"
               onClick={() => {
                 onQueryChange('');
-                onClearSearchAndFilter();
+                onClearSearch();
                 searchInputRef.current?.focus({ preventScroll: true });
               }}
             >
@@ -190,8 +246,8 @@ export default function MobileInboxHeader({
           <button
             ref={filterMenuTriggerRef}
             type="button"
-            className={`mobile-header-icon mobile-filter-trigger${hasNonDefaultView ? ' active' : ''}`}
-            aria-label={`筛选和列表，当前：${activeFilter.label}${listMode === 'threads' ? '，会话列表' : ''}`}
+            className={`mobile-header-icon mobile-filter-trigger${hasFilter ? ' active' : ''}`}
+            aria-label={`筛选和列表，当前：${activeFilter.label}${listMode === 'threads' ? '，会话列表' : ''}${appliedQuery ? `，搜索：${appliedQuery}` : ''}`}
             aria-haspopup="menu"
             aria-expanded={Boolean(filterMenu)}
             onClick={(event) => {
@@ -208,7 +264,7 @@ export default function MobileInboxHeader({
           <button
             ref={searchTriggerRef}
             type="button"
-            className="mobile-header-icon"
+            className={`mobile-header-icon${appliedQuery ? ' active' : ''}`}
             aria-label="搜索邮件"
             onClick={onOpenSearch}
           >
@@ -216,6 +272,25 @@ export default function MobileInboxHeader({
           </button>
         </div>
       </div>
+      {(appliedQuery || hasFilter) && <div className="mobile-inbox-refinements" role="group" aria-label="当前搜索和筛选">
+        {appliedQuery && <div className="mobile-active-search">
+          <button type="button" className="mobile-active-search-query" onClick={onOpenSearch} title={appliedQuery}>
+            <Search size={16} strokeWidth={1.75} aria-hidden="true" /><span>搜索：{appliedQuery}</span>
+          </button>
+          <button type="button" className="mobile-header-icon" aria-label="清除当前搜索" onClick={() => {
+            searchTriggerRef.current?.focus({ preventScroll: true });
+            onClearSearch();
+          }}>
+            <X size={20} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>}
+        {hasFilter && <button type="button" className="mobile-clear-filter" aria-label={`清除筛选：${activeFilter.label}`} onClick={() => {
+          filterMenuTriggerRef.current?.focus({ preventScroll: true });
+          onFilterChange('all');
+        }}>
+          {activeFilter.label}<X size={16} strokeWidth={1.75} aria-hidden="true" />
+        </button>}
+      </div>}
       {(isRefreshing || refreshNotice) && (
         <div className={`mobile-inbox-sync-bar${refreshNotice && !isRefreshing ? ' is-notice' : ''}`} role="status" aria-live="polite">
           {isRefreshing ? (
@@ -233,17 +308,11 @@ export default function MobileInboxHeader({
           )}
         </div>
       )}
-      {filterMenu && (
-        <ContextMenu
-          x={filterMenu.x}
-          y={filterMenu.y}
-          items={filterMenuItems}
-          onClose={() => setFilterMenu(null)}
-          closeIgnoreRef={filterMenuTriggerRef}
-          className="mobile-inbox-filter-menu-surface"
-          ariaLabel="邮件筛选和列表模式"
-        />
-      )}
+      <ContextMenu menu={filterMenu ? {
+        x: filterMenu.x, y: filterMenu.y, items: filterMenuItems,
+        onClose: () => setFilterMenu(null), closeIgnoreRef: filterMenuTriggerRef,
+        className: 'mobile-inbox-filter-menu-surface', ariaLabel: '邮件筛选和列表模式',
+      } : null} />
     </header>
   );
 }

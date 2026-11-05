@@ -94,15 +94,10 @@
 
 /* --- Snooze / account picker --- */
 
-:root[data-theme="dark"] .account-switcher-trigger,
 :root[data-theme="dark"] .account-row,
 :root[data-theme="dark"] .account-menu-row {
   background: var(--ui-surface-muted);
   color: var(--ui-text);
-}
-
-:root[data-theme="dark"] .account-switcher-trigger {
-  background: transparent;
 }
 
 :root[data-theme="dark"] .snooze-picker button,
@@ -296,7 +291,9 @@
   border-color: var(--ui-accent);
 }
 
-:root[data-theme="dark"] .app-shell .message-select input:checked {
+:root[data-theme="dark"] .app-shell .message-select input:checked,
+:root[data-theme="dark"] .app-shell .message-selection-all input:checked,
+:root[data-theme="dark"] .app-shell .message-date-header-selection input:checked {
   background: var(--ui-surface);
   border-color: var(--ui-accent);
 }

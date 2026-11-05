@@ -1,3 +1,4 @@
+@import './composer-frame.css';
 @import './composer-motion.css';
 @import './composer-tools.css';
 
@@ -2048,15 +2049,7 @@
   --compose-contact-row-height: 60px;
   --compose-field-label-width: 4em;
   --compose-divider: color-mix(in oklch, var(--ui-border) 82%, var(--ui-surface));
-  width: min(760px, calc(100vw - 32px));
-  height: min(640px, calc(100vh - 32px));
-  max-width: calc(100vw - 32px);
-  max-height: calc(100vh - 32px);
-  overflow: hidden;
-  border: 1px solid var(--ui-border);
-  border-radius: 12px;
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-float);
+
 }
 
 .composer-backdrop {
@@ -3421,23 +3414,21 @@
   line-height: 1.5;
 }
 
-@media (max-width: 720px) {
-  .composer-backdrop.is-modal {
-    align-items: stretch;
-    justify-content: stretch;
-    padding: 0;
-    background: var(--ui-surface-muted);
-  }
+.composer-backdrop.is-modal {
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  background: var(--ui-surface-muted);
+}
 
-  .composer-backdrop.is-modal > .composer {
-    width: 100%;
-    height: 100%;
-    max-width: none;
-    max-height: none;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
+.composer-backdrop.is-modal > .composer {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 @media (max-width: 520px) {

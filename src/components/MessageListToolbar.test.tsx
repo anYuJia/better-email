@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { MessageSummary } from '../app/types';
+import type { FilterMode, MessageSummary } from '../app/types';
 import GlobalSearch from './GlobalSearch';
 import MessageBulkToolbar from './MessageBulkToolbar';
 import MessageListToolbar from './MessageListToolbar';
@@ -42,25 +42,26 @@ function renderSearch() {
       query="Security"
       appliedQuery=""
       searchScope="folder"
-      filter="all"
       messages={[message]}
       shortcutLabel="⌘K"
       onSearchSubmit={vi.fn()}
       onQueryChange={onQueryChange}
       onSearchScopeChange={vi.fn()}
-      onClearSearchAndFilter={vi.fn()}
+      onClearSearch={vi.fn()}
       onApplySearchShortcut={onApplySearchShortcut}
     />,
   );
   return { ...view, onQueryChange, onApplySearchShortcut };
 }
 
-function renderToolbar(selectedMessageIds: number[] = []) {
+function renderToolbar(selectedMessageIds: number[] = [], filter: FilterMode = 'all') {
   const onToggleAllVisible = vi.fn();
+  const onClearSelection = vi.fn();
   const onSelectMessageDateRange = vi.fn();
+  const onFilterChange = vi.fn();
   const view = render(
     <MessageListToolbar
-      filter="all"
+      filter={filter}
       listMode="messages"
       listSort="newest"
       currentViewLabel="收件箱"
@@ -68,7 +69,7 @@ function renderToolbar(selectedMessageIds: number[] = []) {
       messageListSummary="40 封 · 8 未读"
       onShowMessages={vi.fn()}
       onShowThreads={vi.fn()}
-      onFilterChange={vi.fn()}
+      onFilterChange={onFilterChange}
       onSortChange={vi.fn()}
       selectedMessageIds={selectedMessageIds}
       selectedMessages={selectedMessageIds.length > 0 ? [message] : []}
@@ -78,6 +79,7 @@ function renderToolbar(selectedMessageIds: number[] = []) {
       onRequestSnooze={vi.fn()}
       onMoveBulkToFolder={vi.fn()}
       onToggleBulkLabel={vi.fn()}
+      onClearSelection={onClearSelection}
       selectionControls={(
         <MessageSelectionControls
           compact
@@ -91,7 +93,7 @@ function renderToolbar(selectedMessageIds: number[] = []) {
       )}
     />,
   );
-  return { ...view, onToggleAllVisible, onSelectMessageDateRange };
+  return { ...view, onToggleAllVisible, onSelectMessageDateRange, onClearSelection, onFilterChange };
 }
 
 describe('GlobalSearch search combobox', () => {
@@ -131,9 +133,11 @@ describe('GlobalSearch search combobox', () => {
 describe('Inbox toolbar selection mode', () => {
   it('keeps all-selection and the date dialog in the existing toolbar before bulk selection', () => {
     const view = renderToolbar();
+    expect(screen.getByRole('heading', { level: 2, name: '收件箱' }).className).toBe('list-folder-title');
+    expect(view.container.querySelector('.list-result-count')?.textContent).toBe('40 封');
     const controlRow = view.container.querySelector('.list-control-row');
     const selectAll = screen.getByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' });
-    const dateButton = screen.getByRole('button', { name: '按日期范围筛选邮件' });
+    const dateButton = screen.getByRole('button', { name: '按日期选择邮件' });
     expect(controlRow?.contains(selectAll)).toBe(true);
     expect(controlRow?.contains(dateButton)).toBe(true);
     expect(view.container.querySelector('.message-selection-strip')).toBeNull();
@@ -143,7 +147,7 @@ describe('Inbox toolbar selection mode', () => {
 
     act(() => dateButton.focus());
     fireEvent.click(dateButton);
-    expect(screen.getByRole('dialog', { name: '按日期范围筛选邮件' })).toBeDefined();
+    expect(screen.getByRole('dialog', { name: '按日期选择邮件' })).toBeDefined();
     fireEvent.change(screen.getByLabelText('开始日期'), { target: { value: '2026-08-01' } });
     fireEvent.change(screen.getByLabelText('结束日期'), { target: { value: '2026-08-09' } });
     fireEvent.click(screen.getByRole('button', { name: '确定' }));
@@ -196,6 +200,13 @@ describe('Inbox toolbar selection mode', () => {
     expect(onSortChange).toHaveBeenCalledWith('oldest');
   });
 
+  it('clears the active filter directly and returns focus to the filter menu', () => {
+    const { onFilterChange } = renderToolbar([], 'attachments');
+    fireEvent.click(screen.getByRole('button', { name: '清除筛选：附件' }));
+    expect(onFilterChange).toHaveBeenCalledWith('all');
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '筛选邮件，当前：附件' }));
+  });
+
   it('replaces the second control row in place without adding a toolbar row', () => {
     const view = renderToolbar();
     const strip = view.container.querySelector('.list-control-strip');
@@ -236,8 +247,21 @@ describe('Inbox toolbar selection mode', () => {
     expect(view.container.querySelector('.list-control-row')?.querySelector('.bulk-toolbar')).not.toBeNull();
     expect(view.container.querySelector('.list-control-row')?.querySelector('.list-control-actions')).toBeNull();
     expect(screen.getByRole('button', { name: '对选中的邮件执行：归档' })).toBeDefined();
-    expect(screen.getByRole('button', { name: '对选中的邮件执行：移到废纸篓' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: '对选中的邮件执行：移到废纸篓' })).toBeNull();
     expect(screen.getByRole('button', { name: '更多批量操作，已选 1 封' })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: '更多批量操作，已选 1 封' }));
+    expect(screen.getByRole('menuitem', { name: '移到废纸篓' })).toBeDefined();
+  });
+
+  it('shows the selection count once in the header and exits back to the stable checkbox', () => {
+    const view = renderToolbar([message.id]);
+    expect(view.container.querySelector('.list-summary')?.textContent).toBe('收件箱已选 1 封');
+    expect(screen.queryByRole('button', { name: '按日期选择邮件' })).toBeNull();
+    expect(view.container.querySelector('.bulk-more-menu summary')?.textContent).toBe('');
+    fireEvent.click(screen.getByRole('button', { name: '退出选择' }));
+    expect(view.onClearSelection).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(screen.getByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' }));
+    expect(view.onToggleAllVisible).not.toHaveBeenCalled();
   });
 
   it('keeps the bulk actions compact without a duplicate selection control', () => {

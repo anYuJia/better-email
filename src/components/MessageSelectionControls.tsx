@@ -70,7 +70,9 @@ export default function MessageSelectionControls({
         />
         <span className={compact ? 'sr-only' : 'message-selection-all-label'}>全选</span>
       </label>
-      <MessageDateRangePicker onConfirm={handleDateRangeConfirm} disabled={disabled} iconOnly={compact} />
+      {(!compact || selectedMessageIds.length === 0) && (
+        <MessageDateRangePicker onConfirm={handleDateRangeConfirm} disabled={disabled} iconOnly={compact} />
+      )}
       <span className={compact ? 'sr-only' : 'message-selection-strip-summary'} aria-live="polite" aria-busy={busy}>
         {isSelectingAll ? '正在选择全部邮件…' : isSelectingMessageGroup ? '正在读取完整结果…'
           : selectedMessageIds.length > 0 ? `已选 ${selectedMessageIds.length} 封` : ''}

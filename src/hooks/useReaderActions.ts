@@ -46,7 +46,7 @@ type UseReaderActionsOptions = {
   loadMessages: (folderId: number | null) => Promise<any>;
   bodyFetchFailedRef: MutableRefObject<Set<number>>;
   bodyFetchInFlightRef: MutableRefObject<Set<number>>;
-  onBodyFetchStart: (messageId: number) => void;
+  onBodyFetchStart: (messageId: number, reason?: 'manual') => void;
   onBodyFetchSuccess: (messageId: number) => void;
   onBodyFetchError: (messageId: number, error: string) => void;
 };
@@ -103,10 +103,10 @@ export default function useReaderActions({
   }
 
   async function fetchSelectedBody(isSilent = false) {
-    if (!selected) return;
+    if (!selected || bodyFetchInFlightRef.current.has(selected.id)) return;
     bodyFetchFailedRef.current.delete(selected.id);
     bodyFetchInFlightRef.current.add(selected.id);
-    onBodyFetchStart(selected.id);
+    onBodyFetchStart(selected.id, 'manual');
     appFlowLog('manualFetchBody start', {
       messageId: selected.id,
       accountId: selected.account_id,

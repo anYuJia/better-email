@@ -112,6 +112,7 @@ export default function RecipientField({
   const suggestionMenuRef = useRef<HTMLDivElement>(null);
   const composingRef = useRef(false);
   const compositionEndedAtRef = useRef(0);
+  const suggestionChosenRef = useRef(false);
   const blockedEmailSet = useMemo(
     () => new Set(blockedEmails.map((email) => email.trim().toLowerCase()).filter(Boolean)),
     [blockedEmails],
@@ -150,6 +151,7 @@ export default function RecipientField({
     setQuery(next.query);
     setValidationMessage(next.validationMessage);
     setHighlight(0);
+    suggestionChosenRef.current = false;
   }, [value]);
 
   function emit(nextChips: string[], nextLabels = chipLabelsRef.current) {
@@ -176,6 +178,7 @@ export default function RecipientField({
     setValidationMessage(recipientErrorMessage(invalidCount, duplicates.length));
     emit(next, nextLabels);
     setHighlight(0);
+    suggestionChosenRef.current = false;
   }
 
   function commitEmail(raw: string) {
@@ -205,20 +208,20 @@ export default function RecipientField({
     queryRef.current = nextQuery;
     setQuery(nextQuery);
     setHighlight(0);
+    suggestionChosenRef.current = false;
     setSuggestionsDismissed(false);
     if (!nextQuery.trim()) setValidationMessage('');
   }
 
-  function insertTabAtCaret() {
-    const input = inputRef.current;
-    if (!input) return;
-    const start = input.selectionStart ?? queryRef.current.length;
-    const end = input.selectionEnd ?? start;
-    const nextQuery = `${queryRef.current.slice(0, start)}\t${queryRef.current.slice(end)}`;
-    setQueryValue(nextQuery);
-    requestAnimationFrame(() => {
-      input.setSelectionRange(start + 1, start + 1);
-    });
+  function commitCurrentRecipient() {
+    const raw = queryRef.current.trim();
+    // An explicitly typed complete address wins over a fuzzy default match.
+    // Arrow/pointer selection is the user's explicit choice of a suggestion.
+    if (menuOpen && activeMatch && (suggestionChosenRef.current || !parseRecipientToken(raw).valid)) {
+      commitEmail(activeMatch.email);
+    } else if (raw) {
+      commitEmail(raw);
+    }
   }
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -244,9 +247,13 @@ export default function RecipientField({
     if (event.key === 'Enter' && performance.now() - compositionEndedAtRef.current < compositionEnterGuardMs) return;
 
     if (event.key === 'Tab') {
-      event.preventDefault();
-      event.stopPropagation();
-      insertTabAtCaret();
+      // Commit only a visible forward suggestion; Shift+Tab goes back without
+      // silently choosing a contact. Leave focus traversal to the browser.
+      if (!event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        const raw = queryRef.current.trim();
+        if (menuOpen || (raw && parseRecipientToken(raw).valid)) commitCurrentRecipient();
+      }
+      setSuggestionsDismissed(true);
       return;
     }
 
@@ -255,20 +262,22 @@ export default function RecipientField({
       if (['a', 'c', 'x', 'v', 'z', 'y'].includes(key)) event.stopPropagation();
     }
 
-    if (matches.length > 0) {
+    if (menuOpen) {
       if (event.key === 'ArrowDown') {
         event.preventDefault();
+        suggestionChosenRef.current = true;
         setHighlight((current) => (current + 1) % matches.length);
         return;
       }
       if (event.key === 'ArrowUp') {
         event.preventDefault();
+        suggestionChosenRef.current = true;
         setHighlight((current) => (current - 1 + matches.length) % matches.length);
         return;
       }
       if (event.key === 'Enter') {
         event.preventDefault();
-        commitEmail(activeMatch.email);
+        commitCurrentRecipient();
         return;
       }
       if (event.key === 'Escape') {
@@ -359,6 +368,7 @@ export default function RecipientField({
               onFocus?.();
               setFocused(true);
               setHighlight(0);
+              suggestionChosenRef.current = false;
               setSuggestionsDismissed(false);
             }}
             onBlur={handleBlur}
@@ -381,12 +391,16 @@ export default function RecipientField({
             <button
               type="button"
               role="option"
+              tabIndex={-1}
               id={`${suggestionListId}-option-${contact.id}`}
               key={contact.id}
               className={index === highlight ? 'is-active' : ''}
               aria-selected={index === highlight}
               onMouseDown={(event) => event.preventDefault()}
-              onMouseEnter={() => setHighlight(index)}
+              onMouseEnter={() => {
+                suggestionChosenRef.current = true;
+                setHighlight(index);
+              }}
               onClick={() => commitEmail(contact.email)}
             >
               <strong>{contact.name || contact.email}</strong>

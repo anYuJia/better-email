@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import { containWheelWithin } from '../app/wheelContainment';
 import { focusMenuItem, focusPastMenu, getMenuFocusTargets } from '../app/menuFocus';
-import { enterMenu, exitMenu, finishMenuEnter, pauseMenuExit } from '../app/transientMenuMotion';
+import { cancelMenuExit, enterMenu, exitMenu, finishMenuEnter, pauseMenuExit } from '../app/transientMenuMotion';
 
 type UseDetailsMenuOptions = {
   floating?: boolean;
@@ -101,20 +101,38 @@ export function useDetailsMenu(
   const needsInitialFocusRef = useRef(false);
   const motionOpenRef = useRef(false);
   const lastPanelRef = useRef<HTMLElement | null>(null);
-  useEffect(() => () => finishMenuEnter(lastPanelRef.current), []);
+  useEffect(() => () => {
+    finishMenuEnter(lastPanelRef.current);
+    const owner = lastPanelRef.current?.parentElement;
+    if (owner) cancelMenuExit(owner);
+  }, []);
   const closeMenu = useCallback(({ restoreFocus = true }: { restoreFocus?: boolean } = {}) => {
     const details = ref.current;
     if (!details) return;
     const panel = getFloatingPanel(details);
-    if (details.hasAttribute('open')) exitMenu(panel, details);
+    if (!details.hasAttribute('open')) return;
     motionOpenRef.current = false;
-    hideFromTopLayer(panel);
-    clearPanelFloatingStyles(panel);
-    if (details.hasAttribute('open')) {
-      details.removeAttribute('open');
-    }
+    const finish = () => {
+      if (details.hasAttribute('open')) return;
+      details.removeAttribute('data-menu-exiting');
+      details.removeAttribute('data-menu-positioned');
+      hideFromTopLayer(panel);
+      clearPanelFloatingStyles(panel);
+    };
+    // Closed <details> normally hides its content, even in the top layer.
+    // Modern engines can retain that content box without retaining disclosure
+    // semantics. Older WebViews close immediately instead of cloning the DOM.
+    const retain = Boolean(panel && typeof CSS !== 'undefined'
+      && CSS.supports?.('selector(details::details-content)') && typeof panel.animate === 'function');
+    if (retain) details.setAttribute('data-menu-exiting', '');
+    details.removeAttribute('open');
     syncSummaryDisclosureState(details);
-    details.removeAttribute('data-menu-positioned');
+    if (retain) exitMenu(panel, details, finish);
+    else {
+      finishMenuEnter(panel);
+      if (panel) { panel.setAttribute('inert', ''); panel.setAttribute('aria-hidden', 'true'); }
+      finish();
+    }
     const summary = details.querySelector('summary');
     openingFocusRef.current = null;
     needsInitialFocusRef.current = false;
@@ -137,6 +155,7 @@ export function useDetailsMenu(
       }
       lastPanelRef.current = panel;
       if (!motionOpenRef.current) pauseMenuExit(menu);
+      menu.removeAttribute('data-menu-exiting');
       panel.removeAttribute('inert');
       panel.removeAttribute('aria-hidden');
       panel.style.removeProperty('pointer-events');
@@ -243,6 +262,7 @@ export function useDetailsMenu(
     function handleToggle() {
       syncSummaryDisclosureState(menu);
       if (!menu.hasAttribute('open')) {
+        if (menu.hasAttribute('data-menu-exiting')) return;
         motionOpenRef.current = false;
         needsInitialFocusRef.current = false;
         clearPositionFrame();
@@ -311,6 +331,7 @@ export function useDetailsMenu(
         event.preventDefault();
         openingFocusRef.current = event.key === 'ArrowUp' ? 'last' : 'first';
         menu.setAttribute('open', '');
+        preparePanel(panel);
         syncSummaryDisclosureState(menu);
         positionFloatingMenu();
         const targets = getMenuFocusTargets(panel);

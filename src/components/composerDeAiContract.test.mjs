@@ -68,6 +68,16 @@ function extractBlock(css, prelude) {
   throw new Error(`Unclosed CSS block: ${prelude}`);
 }
 
+function extractBlocks(css, prelude) {
+  const blocks = [];
+  let cursor = css.indexOf(prelude);
+  while (cursor >= 0) {
+    blocks.push(extractBlock(css.slice(cursor), prelude));
+    cursor = css.indexOf(prelude, cursor + prelude.length);
+  }
+  return blocks.join('\n');
+}
+
 /* ----------------------------------------------------------------------- *
  * Contract: the composer is a desktop email editor, not an AI writing app.
  *
@@ -287,7 +297,13 @@ describe('composer motion contract — named actions share tactile feedback', ()
     // Geometry must not leak into reduced motion through an unguarded rule.
     expect(sharedMotionCss.replace(motionEnabled, ''))
       .not.toMatch(/(?:^|;)\s*(?:translate|scale)\s*:/m);
-    expect(sharedMotionCss.replace(motionEnabled, '')).not.toMatch(/--ui-control-feedback:\s*tactile/);
+    // Stationary menu triggers retain immediate touch colour in reduced motion.
+    const stationaryMenuFeedback = extractBlock(sharedMotionCss,
+      ':is(.compact-dropdown, .custom-select-menu, .account-switcher) > :is(summary, button)[aria-expanded]');
+    expect(stationaryMenuFeedback).toMatch(/--ui-control-feedback:\s*tactile/);
+    expect(stationaryMenuFeedback).not.toMatch(/(?:^|;)\s*(?:transform|translate|scale)\s*:/);
+    expect(sharedMotionCss.replace(motionEnabled, '').replace(stationaryMenuFeedback, ''))
+      .not.toMatch(/--ui-control-feedback:\s*tactile/);
     const base = parseRules(sharedMotionCss).find((rule) => rule.selector === 'button');
     expect(base.body).toMatch(/--ui-control-feedback:\s*none/);
     expect(sharedMotionCss).not.toContain('.composer *');
@@ -321,7 +337,7 @@ describe('composer motion contract — named actions share tactile feedback', ()
     expect(base.body).toMatch(/transition:\s*var\(--ui-transition-control\)/);
     expect(base.body).not.toMatch(/(?:^|;)\s*(?:transform|translate|scale)\s*:/);
 
-    const hover = extractBlock(sharedMotionCss, '@media (hover: hover) and (pointer: fine)');
+    const hover = extractBlocks(sharedMotionCss, '@media (hover: hover) and (pointer: fine)');
     expect(hover).toContain(':is(button, summary):hover');
     expect(hover).toMatch(/--ui-control-duration:\s*var\(--ui-motion-hover\)/);
     expect(hover).not.toContain('--ui-control-scale-duration:');

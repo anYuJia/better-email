@@ -13,6 +13,11 @@
  * descendant's transition-property would also suppress those state changes.
  */
 
+/* A palette switch paints as one frame, including in inactive WebViews. */
+:root[data-theme-changing] :where(*, *::before, *::after) {
+  transition: none !important;
+}
+
 /* Spinner rotation -------------------------------------------------------
  * --ui-motion-spin is the single functional period for continuous rotation;
  * historic per-surface speeds were collapsed onto it in the token layer.
@@ -70,6 +75,40 @@ summary,
     opacity var(--ui-control-duration) var(--ui-control-easing),
     scale var(--ui-control-scale-duration) var(--ui-control-easing);
   transition: var(--ui-transition-control);
+}
+
+/* Menu triggers share stationary feedback. Expanded state stays anchored even
+ * as the pointer crosses the toolbar; touch cancellation cannot leave hover
+ * paint behind. The opt-in also gives reduced-motion users immediate colour
+ * feedback, with geometry and transitions still disabled by their policy. */
+:is(.compact-dropdown, .custom-select-menu, .account-switcher) > :is(summary, button)[aria-expanded] {
+  --ui-menu-trigger-rest: transparent;
+  --ui-control-feedback: tactile;
+  transition: var(--ui-transition-control);
+}
+
+.custom-select-menu > .custom-select-summary[aria-expanded] {
+  --ui-menu-trigger-rest: var(--ui-surface);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(.compact-dropdown, .custom-select-menu, .account-switcher) > :is(summary, button)[aria-expanded]:hover:where(:not(:disabled, [aria-disabled="true"], [aria-busy="true"])) {
+    background-color: var(--quiet-row-hover);
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  :is(.compact-dropdown, .custom-select-menu, .account-switcher) > :is(summary, button)[aria-expanded]:hover {
+    background-color: var(--ui-menu-trigger-rest);
+  }
+}
+
+:is(.compact-dropdown, .custom-select-menu, .account-switcher) > :is(summary, button)[aria-expanded="true"]:not(:disabled) {
+  background-color: var(--ui-surface-muted);
+}
+
+:is(.compact-dropdown, .custom-select-menu, .account-switcher) > :is(summary, button)[aria-expanded]:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):where(:not(:disabled, [aria-disabled="true"], [aria-busy="true"])) {
+  background-color: var(--ui-control-pressed);
 }
 
 /* Hover changes colour only. Toolbars stay still as the pointer crosses them. */

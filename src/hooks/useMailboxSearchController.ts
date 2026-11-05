@@ -291,8 +291,8 @@ export default function useMailboxSearchController({
   ]);
 
   const clearSearchAndFilter = useCallback(async (
-    nextFilter: FilterMode = 'all',
-    nextIncludeThreads = listMode === 'threads',
+    nextFilter: FilterMode,
+    successMessage: string,
   ) => {
     const loaders = loadersRef.current;
     if (!loaders) return;
@@ -314,9 +314,9 @@ export default function useMailboxSearchController({
       folders,
       messagePageSize,
       'folder',
-      nextIncludeThreads,
+      listMode === 'threads',
     );
-    setStatus('已清空搜索和筛选');
+    setStatus(successMessage);
   }, [
     loadersRef,
     folderId,
@@ -386,16 +386,18 @@ export default function useMailboxSearchController({
     changeSearchScope(nextScope).catch((error) => setStatus(String(error)));
   }, [changeSearchScope, setStatus]);
 
+  const expandSearch = useCallback(() => {
+    handleSearchScopeChange('all');
+  }, [handleSearchScopeChange]);
+
   const handleClearSearchAndFilter = useCallback(() => {
-    clearSearchAndFilter().catch((error) => setStatus(String(error)));
+    clearSearchAndFilter('all', '已清空搜索和筛选').catch((error) => setStatus(String(error)));
   }, [clearSearchAndFilter, setStatus]);
 
-  const handleClearSearchForFilter = useCallback((
-    nextFilter: FilterMode,
-    nextIncludeThreads = false,
-  ) => {
-    clearSearchAndFilter(nextFilter, nextIncludeThreads).catch((error) => setStatus(String(error)));
-  }, [clearSearchAndFilter, setStatus]);
+  const handleClearSearch = useCallback(() => {
+    const message = filter === 'all' ? '已清空搜索' : '已清空搜索，保留当前筛选';
+    clearSearchAndFilter(filter, message).catch((error) => setStatus(String(error)));
+  }, [clearSearchAndFilter, filter, setStatus]);
 
   const handleApplySearchShortcut = useCallback((nextQuery: string) => {
     applySearchShortcut(nextQuery).catch((error) => setStatus(String(error)));
@@ -476,7 +478,6 @@ export default function useMailboxSearchController({
     runSearch,
     changeSearchScope,
     applySearchShortcut,
-    clearSearchAndFilter,
     loadMoreMessages,
     loadAllMessages,
     runSavedSearch,
@@ -485,8 +486,9 @@ export default function useMailboxSearchController({
     resetSearch,
     handleQueryChange,
     handleSearchScopeChange,
+    onExpandSearch: appliedQuery.trim() && searchScope !== 'all' ? expandSearch : undefined,
     handleClearSearchAndFilter,
-    handleClearSearchForFilter,
+    handleClearSearch,
     handleApplySearchShortcut,
     handleShowMessages,
     handleShowThreads,

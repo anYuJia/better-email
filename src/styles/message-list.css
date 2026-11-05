@@ -429,36 +429,33 @@
  * ------------------------------------------------------------------------- */
 
 .list-control-strip {
-  min-height: 52px;
-  padding: 8px 12px;
+  position: relative;
+  z-index: 20;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  min-height: 90px;
+  max-height: none;
+  padding: 16px 16px 3px;
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  overflow: visible;
   border-bottom: 1px solid var(--ui-border);
-  background: var(--ui-list);
-}
-
-.app-shell .list-control-strip {
-  min-height: 52px;
-  padding: 6px 14px;
-  gap: 14px;
-}
-
-.app-shell .toolbar,
-.app-shell .list-control-strip {
-  border-top: 0;
-  background: var(--ui-list);
+  background: var(--workspace-toolbar);
+  container-type: inline-size;
+  container-name: mail-list-toolbar;
 }
 
 .app-shell .toolbar {
+  border-top: 0;
+  background: var(--ui-list);
   border-bottom: 0;
 }
 
-.app-shell .list-control-strip {
-  border-bottom-color: color-mix(in srgb, var(--ui-border) 68%, transparent);
-}
-
-/* Summary: natural metadata, not three pills. */
+/* The folder is the pane heading; counts and active filters remain metadata. */
 .list-summary {
   min-width: 0;
   display: flex;
@@ -470,18 +467,19 @@
   gap: 9px;
 }
 
-.list-summary strong {
+.list-folder-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
   overflow: hidden;
   color: var(--ui-text);
-  font-size: var(--ui-font-size-secondary);
+  font-size: 22px;
   font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.012em;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.app-shell .list-summary strong {
-  font-size: var(--ui-font-size-secondary);
-  font-weight: 600;
 }
 
 .list-summary span {
@@ -927,7 +925,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 50%;
+  border-radius: 4px;
   background: var(--ui-surface);
   cursor: pointer;
 }
@@ -1059,10 +1057,13 @@
  *
  * A mail row is a continuous list line, not a rounded card.
  * Default surface is transparent (the list surface shows through);
- * rows are separated by a 1px inset bottom divider.
+ * rows are separated by a 1px inset bottom divider. The selection surface
+ * changes with the reader content in the same paint.
  * ------------------------------------------------------------------------- */
 
 .message-card {
+  --mail-row-text-start: 64px;
+  --mail-row-divider-end: 16px;
   box-sizing: border-box;
   position: relative;
   height: auto;
@@ -1076,8 +1077,7 @@
   border-radius: 0;
   color: var(--ui-text);
   background: transparent;
-  box-shadow: inset 0 -1px 0 var(--ui-border);
-  transition: var(--ui-transition-bg-color-standard);
+  box-shadow: none;
   width: 100%;
   max-width: 100%;
   align-content: center;
@@ -1093,8 +1093,14 @@
   z-index: 2;
 }
 
-.app-shell .message-card {
-  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--ui-border) 48%, transparent);
+.message-card::after,
+.thread-card::after {
+  position: absolute;
+  inset: auto var(--mail-row-divider-end) 0 var(--mail-row-text-start);
+  height: 1px;
+  background: color-mix(in srgb, var(--ui-border) 62%, transparent);
+  content: "";
+  pointer-events: none;
 }
 
 .message-card > .message-topline,
@@ -1274,7 +1280,7 @@
   min-height: 16px;
   max-width: 16px;
   max-height: 16px;
-  border-radius: 50%;
+  border-radius: 4px;
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
 }
@@ -1410,8 +1416,8 @@
   width: 100%;
   max-width: 100%;
   color: var(--ui-text-tertiary);
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: var(--ui-font-size-meta);
+  line-height: 1.4;
 }
 
 .message-card time {
@@ -1444,9 +1450,9 @@
   z-index: 2;
   flex: 0 1 auto;
   min-width: 0;
-  /* Keep the account identity readable in the list. The preview yields
-     first, while a long address still clips with its full value in title. */
-  max-width: min(180px, calc(100% - 64px));
+  /* Preserve room for the actual preview; the full source remains available
+     in the row's accessible name and the label's native tooltip. */
+  max-width: min(120px, 34%);
   margin: 1px 0 0 auto;
   padding: 0;
   color: var(--ui-text-tertiary);
@@ -1578,11 +1584,6 @@
 .message-card.is-unread:hover {
   border-color: transparent;
   background: var(--quiet-row-hover);
-  box-shadow: inset 0 -1px 0 var(--ui-border);
-}
-
-.app-shell .message-card:hover,
-.app-shell .message-card.is-unread:hover {
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1667,19 +1668,23 @@
 }
 
 .thread-card {
+  --mail-row-text-start: 30px;
+  --mail-row-divider-end: 12px;
   position: relative;
   width: 100%;
-  height: 72px;
+  min-height: 80px;
   box-sizing: border-box;
   padding: 7px 12px 7px 30px;
   display: grid;
+  grid-auto-rows: max-content;
+  align-content: center;
   gap: 3px;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: var(--ui-text);
-  box-shadow: inset 0 -1px 0 var(--ui-border);
-  transition: var(--ui-transition-bg-color-standard);
+  box-shadow: none;
+  transition: none;
   text-align: left;
   min-width: 0;
 }
@@ -1883,9 +1888,21 @@
   max-width: 360px;
   color: var(--ui-text-tertiary);
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
-.message-list .empty-state button {
+.mailbox-empty-state .empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.message-list .empty-state button,
+.mailbox-state-action,
+.message-list-refresh-error button {
   min-height: 32px;
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-control);
@@ -1898,10 +1915,55 @@
   box-shadow: var(--ui-box-shadow-none);
 }
 
-.message-list .empty-state button:hover:not(:disabled) {
+.message-list .empty-state button:hover:not(:disabled),
+.mailbox-state-action:hover:not(:disabled),
+.message-list-refresh-error button:hover:not(:disabled) {
   border-color: var(--ui-border-strong);
   background: var(--quiet-row-hover);
 }
+
+.message-list .empty-state button {
+  min-height: var(--ui-control-height);
+  padding-block: 6px;
+  line-height: 1.5;
+}
+
+.message-list .empty-state .mailbox-expand-search {
+  flex-basis: 100%;
+  border-color: transparent;
+  color: var(--color-text-on-accent);
+  background: var(--ui-accent);
+}
+
+.message-list .empty-state .mailbox-expand-search:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--ui-accent-hover);
+}
+
+.message-list .empty-state .mailbox-expand-search:active:not(:disabled) {
+  background: var(--ui-accent-pressed);
+}
+
+@media (max-width: 720px) {
+  .message-list .empty-state button { min-height: var(--ui-control-height-touch); }
+}
+
+.message-list .empty-state button,
+.mailbox-state-action,
+.message-list-refresh-error button {
+  font-family: inherit;
+  transition: var(--ui-transition-fast-color-background);
+}
+.message-list .empty-state button:active:not(:disabled),
+.mailbox-state-action:active:not(:disabled),
+.message-list-refresh-error button:active:not(:disabled) { background: var(--ui-control-pressed); }
+.message-list .empty-state button:focus-visible,
+.message-list-panel:focus-visible,
+.mailbox-state-action:focus-visible,
+.message-list-refresh-error button:focus-visible { outline: var(--ui-focus-outline); outline-offset: 2px; }
+.message-list .empty-state button:disabled,
+.mailbox-state-action:disabled,
+.message-list-refresh-error button:disabled { opacity: 0.55; cursor: wait; }
 
 /* Load more affordance below the scan rail. */
 .btn-load-more {
@@ -2026,27 +2088,6 @@
  * mode plus independent filter and sort controls.
  * ------------------------------------------------------------------------- */
 
-.app-shell .list-control-strip {
-  position: relative;
-  z-index: 20;
-  box-sizing: border-box;
-  flex: 0 0 auto;
-  width: 100%;
-  height: auto;
-  min-height: 84px;
-  max-height: none;
-  padding: 6px 14px;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  overflow: visible;
-  border-bottom: 1px solid var(--ui-border);
-  background: var(--workspace-toolbar);
-  container-type: inline-size;
-  container-name: mail-list-toolbar;
-}
-
 .list-summary-row,
 .list-control-row {
   min-width: 0;
@@ -2070,18 +2111,9 @@
   gap: 10px;
 }
 
-.app-shell .list-summary strong {
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.app-shell .list-summary span {
-  max-width: none;
+.app-shell .list-summary .list-result-count {
+  flex: 0 0 auto;
+  max-width: 45%;
   margin-left: auto;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -2093,10 +2125,35 @@
   color: var(--ui-text-accent);
 }
 
+.list-summary .list-clear-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-accent-soft);
+  font-size: var(--ui-font-size-meta);
+  white-space: nowrap;
+  transition: var(--ui-transition-control);
+}
+
+.list-summary .list-clear-filter:hover {
+  background: var(--ui-control-hover);
+}
+
+.list-summary .list-clear-filter:active {
+  background: var(--ui-control-pressed);
+}
+
 .list-control-row {
   flex: 1 1 auto;
   width: 100%;
-  min-height: 34px;
+  /* Reserve the same scaled text line and padding as the mode tabs, so
+     replacing them with selection actions never moves the first message. */
+  min-height: max(36px, calc(1em * var(--ui-line-height-tight) + 12px));
+  font-size: var(--ui-font-size-secondary);
   gap: 6px;
 }
 
@@ -2133,33 +2190,28 @@
 
 .app-shell .list-control-tabs {
   flex: 0 0 auto;
-  --list-tab-gap: 2px;
-  --list-tab-indicator-width: max(44px, calc(2em + 16px));
+  --list-tab-gap: 4px;
+  --list-tab-indicator-width: max(48px, calc(2em + 16px));
   position: relative;
   gap: var(--list-tab-gap);
-  padding: 2px;
-  border-radius: var(--ui-radius-control);
-  background: var(--ui-surface-muted);
   font-size: var(--ui-font-size-secondary);
 }
 
 .app-shell .list-control-tab-indicator {
   position: absolute;
-  left: 2px;
-  top: 2px;
-  bottom: 2px;
-  z-index: 0;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  z-index: 2;
   width: var(--list-tab-indicator-width);
-  border-radius: calc(var(--ui-radius-control) - 2px);
-  background: var(--ui-surface);
-  box-shadow: inset 0 0 0 1px var(--ui-border);
+  background: var(--ui-text-secondary);
   pointer-events: none;
   transform: translateX(0);
   transition: transform var(--ui-motion-normal) var(--ui-ease-emphasized);
 }
 
 .app-shell .list-control-tabs[data-active-mode="threads"] .list-control-tab-indicator {
-  transform: translateX(calc(var(--list-tab-indicator-width) + var(--list-tab-gap)));
+  transform: translateX(calc(100% + var(--list-tab-gap)));
 }
 
 .app-shell .list-control-menus {
@@ -2178,10 +2230,13 @@
   min-width: var(--list-tab-indicator-width);
   min-height: 32px;
   height: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 4px 8px;
   line-height: var(--ui-line-height-tight);
   border: 0;
-  border-radius: var(--ui-radius-control);
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
@@ -2201,12 +2256,13 @@
   outline-offset: -2px;
 }
 
+.app-shell .list-control-tabs > button:active {
+  background: var(--ui-control-pressed);
+}
+
 .app-shell .list-control-tabs > button.active {
   color: var(--ui-text);
-  background: transparent;
-  border-bottom: 0;
   font-weight: 600;
-  box-shadow: var(--ui-box-shadow-none);
 }
 
 .compact-dropdown {
@@ -2300,6 +2356,16 @@
 
   .list-control-menus .compact-dropdown.is-filtered .compact-dropdown-trigger-icon svg {
     color: inherit;
+  }
+
+  .list-control-menus .compact-dropdown.sort-menu.is-custom-sort > summary {
+    width: auto;
+    gap: 4px;
+    padding-inline: 8px;
+  }
+
+  .list-control-menus .compact-dropdown.sort-menu.is-custom-sort > summary > strong {
+    display: inline;
   }
 }
 
@@ -2397,10 +2463,11 @@
   min-width: 0;
   min-height: 32px;
   height: auto;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   padding: 0;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 3px;
   overflow: visible;
   border: 0;
@@ -2420,6 +2487,7 @@
   background: transparent;
   font-size: var(--ui-font-size-meta);
   font-weight: 500;
+  white-space: nowrap;
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -2431,6 +2499,10 @@
   color: var(--ui-text);
   background: var(--quiet-row-hover);
   outline: none;
+}
+
+.app-shell .bulk-toolbar .bulk-delete-action {
+  color: var(--ui-danger);
 }
 
 .app-shell .bulk-toolbar-inline .bulk-delete-action:hover:not(:disabled),
@@ -2445,16 +2517,23 @@
 
 .app-shell .bulk-toolbar-inline .bulk-more-menu summary {
   gap: 4px;
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
+.app-shell .bulk-toolbar-inline .bulk-exit-selection {
+  flex: 0 0 32px;
+  width: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
 }
 
 @media (max-width: 1180px) {
   .app-shell .list-control-actions,
   .app-shell .list-control-menus {
     gap: 4px;
-  }
-
-  .app-shell .list-control-tabs {
-    --list-tab-gap: 2px;
   }
 
   .app-shell .list-control-tabs > button {
@@ -2481,11 +2560,6 @@
   .app-shell .list-control-menus {
     flex-wrap: nowrap;
     gap: 1px;
-  }
-
-  .app-shell .list-control-tabs {
-    --list-tab-gap: 2px;
-    --list-tab-indicator-width: max(44px, calc(2em + 16px));
   }
 
   .app-shell .list-control-tabs > button {
@@ -2967,11 +3041,9 @@
 .message-list { overflow-anchor: none; }
 
 .account-login-recovery {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   flex-shrink: 0;
-  padding: 12px 16px;
+  min-width: 0;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--color-border-subtle);
   font-size: var(--ui-font-size-secondary);
   line-height: 1.5;
@@ -2979,10 +3051,56 @@
   overflow: auto;
 }
 
-.account-login-recovery > svg { flex-shrink: 0; margin-top: 2px; }
-.account-login-recovery > div { min-width: 0; flex: 1; }
+.account-login-recovery-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 32px;
+  gap: 6px;
+}
+.account-login-recovery-heading > svg { flex: 0 0 auto; color: var(--ui-text-secondary); }
+.account-login-recovery-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  background: transparent;
+  color: var(--ui-text-secondary);
+  font: inherit;
+  text-align: left;
+}
+.account-login-recovery-summary > svg { flex: 0 0 auto; }
+.account-login-recovery-summary[aria-expanded="true"] > svg { transform: rotate(180deg); }
+.account-login-recovery-action {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  background: transparent;
+  color: var(--ui-text-accent);
+  font: inherit;
+  white-space: nowrap;
+}
+.account-login-recovery :is(.account-login-recovery-summary, .account-login-recovery-action):hover {
+  background: var(--quiet-row-hover);
+}
+.account-login-recovery :is(.account-login-recovery-summary, .account-login-recovery-action):focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
+}
+.account-login-recovery-details { padding-top: 4px; }
+.account-login-recovery-details[hidden] { display: none; }
 .account-login-recovery p { margin: 4px 0 0; }
 .account-login-recovery-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 .account-login-recovery-row span { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
 .account-login-recovery-row b { display: block; }
-.account-login-recovery-row button { flex: 0 0 auto; min-height: 44px; padding: 8px 12px; }
+
+@media (max-width: 720px), (pointer: coarse) {
+  .account-login-recovery :is(.account-login-recovery-summary, .account-login-recovery-action) { min-height: 44px; }
+}

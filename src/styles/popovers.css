@@ -1,3 +1,14 @@
+/* Native disclosure closes immediately, while its original inert content can
+ * finish a short exit. Unsupported engines fall back to immediate removal. */
+details[data-menu-exiting]::details-content {
+  content-visibility: visible;
+}
+
+details[data-menu-exiting] > :is([data-floating-menu-panel="true"], div) {
+  display: block;
+  visibility: visible;
+}
+
 /*
  * Shared anchored popover geometry.
  *

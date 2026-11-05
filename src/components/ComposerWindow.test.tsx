@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { cloneElement, StrictMode, useRef, useState, type SetStateAction } from 'react';
+import { cloneElement, lazy, StrictMode, useRef, useState, type ComponentType, type SetStateAction } from 'react';
 import { emptyDraft } from '../app/composerConfig';
 import type { Account, Contact, DraftInput } from '../app/types';
 import ComposerWindow from './ComposerWindow';
+import DeferredSurface from './DeferredSurface';
 import useExitPresence from '../hooks/useExitPresence';
 import * as contactSuggestions from './composer/contactSuggestions';
 
@@ -743,4 +744,92 @@ describe('composer contacts container layout', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '主题' }), { target: { value: 'late input' } });
     expect(onDraftChange).not.toHaveBeenCalled();
   });
+});
+
+
+describe('first-open composer loading handoff', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+  function pendingComposer(mobile = window.innerWidth <= 720) {
+    type Props = { open: boolean; onClose: () => void; mobile: boolean };
+    let resolve!: (module: { default: ComponentType<Props> }) => void;
+    const Ready = lazy(() => new Promise<{ default: ComponentType<Props> }>(done => { resolve = done; }));
+    function Harness() {
+      const [open, setOpen] = useState(false);
+      const [present, setPresent] = useState(false);
+      return <div>
+        <button onClick={() => { setPresent(true); setOpen(true); }}>打开写信</button>
+        <button>继续阅读其他邮件</button>
+        {present && <DeferredSurface compose={open && (() => setOpen(false))} mobile={mobile}><Ready mobile={mobile} open={open} onClose={() => setOpen(false)} /></DeferredSurface>}
+      </div>;
+    }
+    const view = render(<StrictMode><Harness /></StrictMode>);
+    const opener = screen.getByRole('button', { name: '打开写信' });
+    opener.focus();
+    fireEvent.click(opener);
+    return { ...view, opener, resolve: () => resolve({ default: (props) => cloneElement(composer(), props) }) };
+  }
+
+  it('keeps desktop loading non-modal and preserves continued workspace focus when ready', async () => {
+    vi.stubGlobal('innerWidth', 1280);
+    const view = pendingComposer();
+    const loading = screen.getByRole('dialog', { name: '写信窗口' });
+    expect(loading.hasAttribute('aria-modal')).toBe(false);
+    expect(view.opener.closest('[inert]')).toBeNull();
+    expect(document.activeElement).toBe(view.opener);
+    const readerAction = screen.getByRole('button', { name: '继续阅读其他邮件' });
+    // A background webview may update activeElement without focusin.
+    const suppressFocusEvent = (event: Event) => event.stopImmediatePropagation();
+    document.addEventListener('focusin', suppressFocusEvent, true);
+    readerAction.focus();
+    document.removeEventListener('focusin', suppressFocusEvent, true);
+    await act(async () => { view.resolve(); });
+    expect(screen.getByRole('textbox', { name: '邮件正文' })).toBeTruthy();
+    expect(document.activeElement).toBe(readerAction);
+    expect(view.container.querySelector('.composer-loading-layer')).toBeNull();
+  });
+
+  it('allows cancellation before the chunk arrives, without reopening when it resolves', async () => {
+    vi.stubGlobal('innerWidth', 1280);
+    const view = pendingComposer();
+    const close = screen.getByRole('button', { name: '关闭写信窗口' });
+    close.focus();
+    await act(async () => { fireEvent.click(close); });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(view.opener);
+    await act(async () => { view.resolve(); });
+    expect(screen.queryByRole('textbox', { name: '邮件正文' })).toBeNull();
+  });
+
+  it('uses the existing full-screen modal focus contract on mobile while loading', async () => {
+    vi.stubGlobal('innerWidth', 390);
+    const view = pendingComposer();
+    expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true');
+    expect(view.opener.closest('[inert]')).not.toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '关闭写信窗口' }));
+    await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }); });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(view.opener.closest('[inert]')).toBeNull();
+    expect(document.activeElement).toBe(view.opener);
+  });
+  it('starts a fresh focus handoff when reopening during the retained loading boundary', async () => {
+    vi.stubGlobal('innerWidth', 1280);
+    const view = pendingComposer();
+    screen.getByRole('button', { name: '继续阅读其他邮件' }).focus();
+    const close = screen.getByRole('button', { name: '关闭写信窗口' });
+    close.focus();
+    await act(async () => { fireEvent.click(close); });
+    view.opener.focus();
+    fireEvent.click(view.opener);
+    await act(async () => { view.resolve(); });
+    expect(document.activeElement?.closest('.composer')).not.toBeNull();
+  });
+
+  it('honors the app mobile platform even when its viewport is wider than a phone', () => {
+    vi.stubGlobal('innerWidth', 1024);
+    const view = pendingComposer(true);
+    expect(screen.getByRole('dialog').getAttribute('aria-modal')).toBe('true');
+    expect(view.container.querySelector('.composer-loading-layer.is-mobile')).toBeTruthy();
+    expect(view.opener.closest('[inert]')).not.toBeNull();
+  });
+
 });

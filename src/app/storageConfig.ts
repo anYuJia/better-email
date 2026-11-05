@@ -50,9 +50,11 @@ export function getDefaultAppLayout(viewportWidth = typeof window === 'undefined
 /** Fit the visible panes without overwriting the user's preferred sizes. */
 export function fitAppLayout(layout: AppLayout, viewportWidth: number): AppLayout {
   const width = Number.isFinite(viewportWidth) ? viewportWidth : 1440;
-  // Below this breakpoint CSS uses fixed compact panes / full-screen navigation.
-  if (width <= 1180) return layout;
-  const paneBudget = width - 560 - 2;
+  // Below this breakpoint navigation becomes a drawer. Above it, continuously
+  // fit all three panes instead of replacing manual widths at 1180px.
+  if (width <= 1040) return layout;
+  const readerMinimum = Math.min(560, width - appLayoutBounds.sidebar.min - appLayoutBounds.list.min - 2);
+  const paneBudget = width - readerMinimum - 2;
   const sidebar = clampNumber(layout.sidebar, appLayoutBounds.sidebar.min,
     Math.min(appLayoutBounds.sidebar.max, paneBudget - appLayoutBounds.list.min));
   return {

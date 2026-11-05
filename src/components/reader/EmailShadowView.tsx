@@ -93,10 +93,10 @@ export default function EmailShadowView({
           margin-bottom: 14px;
         }
         a {
-          color: var(--ui-accent);
+          color: var(--ui-text-accent);
         }
         a[data-better-email-hidden-link] {
-          color: var(--ui-accent);
+          color: var(--ui-text-tertiary);
           text-decoration: none;
           cursor: default;
         }

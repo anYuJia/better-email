@@ -24,6 +24,12 @@ function imageAttachment(overrides: Partial<Attachment> = {}): Attachment {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((yes) => { resolve = yes; });
+  return { promise, resolve };
+}
+
 function renderHookManager() {
   const onDownloadAttachment = vi.fn();
   const onOpenAttachment = vi.fn();
@@ -163,5 +169,65 @@ describe('useReaderAttachments preview-after-download', () => {
     expect(openImagePreview).not.toHaveBeenCalled();
     expect(onRefreshAttachments).toHaveBeenCalledWith(1);
     expect(utils.result.current.attachmentErrors[1]).toContain('重新下载');
+  });
+
+  it('keeps batch activity with its message while another message downloads independently', async () => {
+    const a = [imageAttachment(), imageAttachment({ id: 2 })];
+    const b = [imageAttachment({ id: 3, message_id: 2 }), imageAttachment({ id: 4, message_id: 2 })];
+    const requests = [1, 2, 3, 4].map(() => deferred<Attachment>());
+    const download = vi.fn((attachment: Attachment) => requests[attachment.id - 1].promise);
+    const view = renderHook(({ selectedId, attachments }) => useReaderAttachments({
+      selectedId, attachments, onDownloadAttachment: download,
+      onOpenAttachment: vi.fn(), onSaveAttachmentAs: vi.fn(), openImagePreview: vi.fn(),
+    }), { initialProps: { selectedId: 1, attachments: a } });
+    let batchA!: Promise<void>;
+    let batchB!: Promise<void>;
+    await act(async () => { batchA = view.result.current.handleDownloadAllAttachments(); });
+    expect(view.result.current.isDownloadingAllAttachments).toBe(true);
+
+    view.rerender({ selectedId: 2, attachments: b });
+    expect(view.result.current.isDownloadingAllAttachments).toBe(false);
+    expect(view.result.current.attachmentMenuItems(b[0]).find((item) => item.id === 'download')?.disabled).toBe(false);
+    await act(async () => { batchB = view.result.current.handleDownloadAllAttachments(); });
+    expect(download.mock.calls.map(([attachment]) => attachment.id)).toEqual([1, 3]);
+    expect(view.result.current.isDownloadingAllAttachments).toBe(true);
+
+    view.rerender({ selectedId: 1, attachments: a });
+    expect(view.result.current.isDownloadingAllAttachments).toBe(true);
+    view.rerender({ selectedId: 2, attachments: b });
+    await act(async () => { requests[0].resolve(a[0]); });
+    expect(download.mock.calls.map(([attachment]) => attachment.id)).toEqual([1, 3, 2]);
+    await act(async () => { requests[1].resolve(a[1]); await batchA; });
+    expect(view.result.current.isDownloadingAllAttachments).toBe(true);
+    await act(async () => { requests[2].resolve(b[0]); });
+    await act(async () => { requests[3].resolve(b[1]); await batchB; });
+    expect(view.result.current.isDownloadingAllAttachments).toBe(false);
+  });
+
+  it('joins in-flight downloads and repeated batches before React commits their busy state', async () => {
+    const attachment = imageAttachment();
+    const request = deferred<Attachment>();
+    const download = vi.fn(() => request.promise);
+    const view = renderHook(() => useReaderAttachments({
+      selectedId: 1, attachments: [attachment], onDownloadAttachment: download,
+      onOpenAttachment: vi.fn(), onSaveAttachmentAs: vi.fn(), openImagePreview: vi.fn(),
+    }));
+    let single!: Promise<Attachment | null>;
+    let another!: Promise<Attachment | null>;
+    let batch!: Promise<void>;
+    let duplicateBatch!: Promise<void>;
+    await act(async () => {
+      single = view.result.current.handleAttachmentDownload(attachment);
+      another = view.result.current.handleAttachmentDownload(attachment);
+      batch = view.result.current.handleDownloadAllAttachments();
+      duplicateBatch = view.result.current.handleDownloadAllAttachments();
+    });
+    expect(download).toHaveBeenCalledTimes(1);
+    const fresh = { ...attachment, is_downloaded: true, local_path: '/attachments/photo.png' };
+    await act(async () => { request.resolve(fresh); await Promise.all([single, another, batch, duplicateBatch]); });
+    expect(await single).toBe(fresh);
+    expect(await another).toBe(fresh);
+    expect(view.result.current.downloadingAttachmentIds.size).toBe(0);
+    expect(view.result.current.isDownloadingAllAttachments).toBe(false);
   });
 });

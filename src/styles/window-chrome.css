@@ -27,6 +27,10 @@ body {
   border-bottom: 1px solid var(--titlebar-border);
 }
 
+.app-titlebar {
+  background: var(--workspace-chrome);
+}
+
 /* Login, onboarding and image preview keep window controls above the gate. */
 body:has(.account-login-gate) .window-chrome,
 body:has(.first-run-onboarding-backdrop) .window-chrome,
@@ -175,21 +179,20 @@ body[data-image-preview-modal='1'] .window-chrome {
   align-items: center;
   width: 100%;
   max-width: var(--global-search-width);
-  height: 38px;
-  min-height: 38px;
+  height: 36px;
+  min-height: 36px;
   padding: 0 5px 0 11px;
   gap: 6px;
   overflow: visible;
-  border: 1px solid color-mix(in srgb, var(--ui-border) 82%, transparent);
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
-  background: color-mix(in srgb, var(--ui-surface-muted) 78%, var(--ui-bg));
+  background: var(--workspace-search);
   box-shadow: var(--ui-box-shadow-none);
 }
 
 .app-titlebar .global-search-box:hover {
-  border-color: var(--ui-border-strong);
-  background: color-mix(in srgb, var(--ui-surface-muted) 88%, var(--ui-bg));
+  border-color: var(--ui-border);
 }
 
 .app-titlebar .global-search-box:focus-within {

@@ -10,6 +10,7 @@ import { MESSAGE_ROW_HEIGHT, MOBILE_MESSAGE_ROW_HEIGHT } from './messageListLayo
 type MessageListCardProps = {
   mobile?: boolean;
   showAccountSource?: boolean;
+  showAccountSourceLabel?: boolean;
   accountSourceLabels?: ReadonlyMap<number, string>;
   message: MessageSummary;
   isCurrentMessage: boolean;
@@ -32,6 +33,7 @@ type MessageListCardProps = {
 export default React.memo(function MessageListCard({
   mobile = false,
   showAccountSource = false,
+  showAccountSourceLabel = showAccountSource,
   accountSourceLabels,
   message,
   isCurrentMessage,
@@ -73,12 +75,17 @@ export default React.memo(function MessageListCard({
   }, [message.account_email, message.labels, message.sender_email, message.sender_name, message.subject]);
   const metadataLabels = metadataLabelState.labels;
   const cardLabel = [
-    `查看邮件：${message.sender_name || '未知发件人'}，${formatDate(message.received_at)}，`,
+    `${mobile && isSelectionMode ? '选择邮件' : '查看邮件'}：${message.sender_name || '未知发件人'}，${formatDate(message.received_at)}，`,
     message.subject || '无主题',
     accountSource ? `，来源邮箱：${accountSource}` : '',
     message.is_read ? '' : '，未读',
-    `。按回车打开，按空格${isSelected ? '取消选择' : '选择'}`,
+    mobile && isSelectionMode ? `，${isSelected ? '已选择' : '未选择'}` : `。按回车打开，按空格${isSelected ? '取消选择' : '选择'}`,
   ].join('');
+
+  function activateMessage() {
+    if (mobile && isSelectionMode) onToggleMessageSelection(message.id, !isSelected);
+    else onSelectMessage(message.id);
+  }
 
   function openMessageMenuAt(x: number, y: number) {
     const selectedMessageIds = selectedMessageIdsRef.current;
@@ -134,7 +141,7 @@ export default React.memo(function MessageListCard({
       data-folder-role={message.folder_role}
       style={{ minHeight: mobile ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT }}
       draggable={!mobile}
-      onClick={() => onSelectMessage(message.id)}
+      onClick={activateMessage}
       onTouchStart={longPress.onTouchStart}
       onTouchMove={longPress.onTouchMove}
       onTouchEnd={longPress.onTouchEnd}
@@ -186,10 +193,10 @@ export default React.memo(function MessageListCard({
         }}
         onClick={(event) => {
           event.stopPropagation();
-          onSelectMessage(message.id);
+          activateMessage();
         }}
       />
-      {mobile && (
+      {mobile && !isSelectionMode && (
         <button
           type="button"
           className="message-mobile-menu-button"
@@ -249,7 +256,7 @@ export default React.memo(function MessageListCard({
             )}
           </div>
         )}
-        {accountSource && (
+        {accountSource && showAccountSourceLabel && (
           <span className="message-account-source" title={`来源邮箱：${accountSource}`}>
             {accountSourceShort}
           </span>

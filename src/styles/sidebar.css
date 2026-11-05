@@ -16,7 +16,7 @@
      Secondary   12–12.5px
      Unread      12px / tabular-nums
 
-   Radius: 6px rows, 8px primary controls; 999px reserved for the sync bar
+   Radius: 6px rows and the compose control; 999px reserved for the sync bar
    and true status dots only.
    ========================================================================== */
 
@@ -25,7 +25,7 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
   padding: 0 12px 14px;
   overflow: hidden;
@@ -78,20 +78,22 @@
 }
 
 /* Compose -------------------------------------------------------------------
- * A first-class navigation action, but not a floating CTA card. It sits on
- * the sidebar plane and gains a quiet tint only when the user engages it. */
+ * A compact primary action, aligned to the folder labels' leading edge. */
 
 .compose-button {
   min-height: 36px;
   flex-shrink: 0;
-  margin: 0;
-  padding: 0 12px;
+  align-self: flex-start;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  margin: 2px 8px 4px;
+  padding: 0 14px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
   border: 1px solid transparent;
-  border-radius: var(--ui-radius-control);
+  border-radius: var(--ui-radius-sm);
   color: var(--color-text-on-accent);
   background: var(--ui-accent);
   box-shadow: var(--ui-box-shadow-none);
@@ -130,11 +132,12 @@
 /* Section label -------------------------------------------------------------- */
 
 .sidebar-label {
-  margin: 5px 0 1px;
+  margin: 0 0 4px;
   padding: 0 10px;
   color: var(--ui-text-tertiary);
   font-size: var(--ui-font-size-meta);
   font-weight: 500;
+  line-height: 1.4;
 }
 
 /* Folder navigation ----------------------------------------------------------
@@ -145,9 +148,17 @@
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  gap: 2px;
+  gap: 16px;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+.sidebar-folder-group {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-width: 0;
+  gap: 2px;
 }
 
 /* The mock-mode tools section hangs off the folder navigation. */
@@ -162,11 +173,10 @@
   gap: 2px;
   min-height: 36px;
   border: 0;
-  border-radius: var(--ui-radius-control);
+  border-radius: var(--ui-radius-sm);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  transition: var(--ui-transition-fast-color-background);
 }
 
 .folder-main {
@@ -228,7 +238,7 @@
 
 /* Hover / selected: one or two signals only.
  * Hover    — quiet neutral surface.
- * Selected — surface + stronger text (no border, no icon recolor, no rail). */
+ * Selected — muted accent surface + stronger text + accent icon, no rail. */
 .folder:hover,
 .folder:focus-within,
 .folder-main:focus-visible {
@@ -239,7 +249,7 @@
 .folder.active,
 .folder.active:hover {
   color: var(--ui-text);
-  background: var(--ui-surface);
+  background: var(--quiet-row-selected);
 }
 
 .folder.active .folder-main {

@@ -50,6 +50,7 @@ export default function AttachmentList({
   }, []);
   const currentErrors = { ...errors, ...localErrors };
   const singleAttachment = attachments.length === 1 ? attachments[0] : null;
+  const SummaryIcon = singleAttachment ? fileIcons[attachmentKind(singleAttachment)] : Paperclip;
   const activeTransfers = attachments
     .filter((attachment) => downloadingIds.has(attachment.id) || currentErrors[attachment.id])
     .map((attachment) => `${attachment.id}:${currentErrors[attachment.id] ?? 'downloading'}`)
@@ -180,7 +181,7 @@ export default function AttachmentList({
           title={singleAttachment?.filename}
           onClick={() => setExpanded((value) => !value)}
         >
-          <Paperclip size={16} strokeWidth={1.75} aria-hidden="true" />
+          <SummaryIcon size={18} strokeWidth={1.75} aria-hidden="true" />
           <span className="attachment-summary-copy">
             <strong>{singleAttachment?.filename ?? `${attachments.length} 个附件`}</strong>
             <small>{formatBytes(totalSize)}</small>

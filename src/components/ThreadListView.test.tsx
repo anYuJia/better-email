@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import type { ThreadSummary } from '../app/types';
 import ThreadListView, { THREAD_ROW_HEIGHT } from './ThreadListView';
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 function thread(index: number): ThreadSummary {
   return {
@@ -19,6 +19,33 @@ function thread(index: number): ThreadSummary {
 }
 
 describe('ThreadListView 虚拟化', () => {
+  it('keeps virtual offsets in sync when text grows after first paint', () => {
+    vi.useFakeTimers();
+    let height = 80;
+    const observers: { notify: ResizeObserverCallback; nodes: Set<Element> }[] = [];
+    vi.stubGlobal('ResizeObserver', class {
+      nodes = new Set<Element>();
+      constructor(notify: ResizeObserverCallback) { observers.push({ notify, nodes: this.nodes }); }
+      observe(node: Element) { this.nodes.add(node); }
+      unobserve(node: Element) { this.nodes.delete(node); }
+      disconnect() { this.nodes.clear(); }
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const h = this.classList.contains('thread-card') ? height : 0;
+      return { x: 0, y: 0, left: 0, top: 0, right: 320, bottom: h, width: 320, height: h, toJSON() {} };
+    });
+    const { container } = render(<ThreadListView threads={[thread(0), thread(1)]} activeThread={null}
+      onOpenThread={vi.fn()} onOpenThreadMenu={vi.fn()} />);
+    height = 112;
+    act(() => {
+      for (const observer of observers) observer.notify([...observer.nodes].map(target => ({ target }) as ResizeObserverEntry), {} as ResizeObserver);
+      vi.advanceTimersByTime(20);
+    });
+    const rows = container.querySelectorAll<HTMLElement>('.thread-list-item');
+    expect(rows[0].style.height).toBe('112px');
+    expect(rows[1].style.transform).toBe('translateY(112px)');
+    expect((container.querySelector('.thread-list-viewport-wrapper') as HTMLElement).style.height).toBe('224px');
+  });
   it('keeps the conversation hierarchy and only shows counts above one', () => {
     const single = { ...thread(0), message_count: 1 };
     const multiple = { ...thread(1), message_count: 3 };

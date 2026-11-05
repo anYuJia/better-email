@@ -1,4 +1,4 @@
-import { useRef, startTransition, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useRef, useState, startTransition, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import type {
   AccountScope,
   FilterMode,
@@ -28,6 +28,7 @@ import type {
   LoadMetaResult,
   MailboxRefreshRequest,
 } from './useAppMetaLoader';
+import { MailboxLoadError } from './mailboxLoadError';
 import { IPC } from '../ipc/commands';
 import { reportStartupMilestone } from '../startupTelemetry';
 
@@ -100,6 +101,8 @@ export type MailboxLoadRequest = {
 };
 
 export type MailboxDataController = {
+  mailboxView: { pending: boolean; unavailable: boolean; error: string | null; committedKey: string | null };
+  retryMailbox: () => Promise<unknown>;
   mailboxRefreshRef: MutableRefObject<number>;
   loadMailbox: (request: MailboxLoadRequest) => Promise<MessageSummary[]>;
   loadMessages: (
@@ -163,6 +166,12 @@ export default function useMailboxData({
   loadMeta,
   maybeRunBenchmarkSync,
 }: UseMailboxDataOptions): MailboxDataController {
+  const activeViewKey = buildMailboxListStateKey({ accountScope, folderId, query, filter, searchScope, listSort });
+  const [committedKey, setCommittedKey] = useState<string | null>(null);
+  const [committedThreadKey, setCommittedThreadKey] = useState<string | null>(null);
+  const [threadError, setThreadError] = useState<{ key: string; message: string } | null>(null);
+  const [metadataFailure, setMetadataFailure] = useState<{ scope: AccountScope; generation: number; message: string } | null>(null);
+  const [viewError, setViewError] = useState<{ key: string; message: string } | null>(null);
   const frontendReadyRef = useRef(false);
   const threadCacheRef = useRef<Map<string, ThreadSummary[]>>(new Map());
   const threadInflightRef = useRef<Map<string, PendingThreadRequest>>(new Map());
@@ -171,6 +180,7 @@ export default function useMailboxData({
   const messagePageBufferRef = useRef<{ key: string; messages: MessageSummary[] } | null>(null);
   const messageCountRequestRef = useRef(0);
   const messageSnapshotEpochRef = useRef(0);
+  const threadSnapshotRef = useRef<{ key: string; epoch: number } | null>(null);
   const internalMailboxRefreshRef = useRef(0);
   const mailboxRefreshRef = mailboxRefreshRefProp ?? internalMailboxRefreshRef;
   const activeMailboxScopeRef = useRef<AccountScope>(accountScope);
@@ -233,6 +243,11 @@ export default function useMailboxData({
     const snapshotEpoch = messageSnapshotEpochRef.current;
     const isSnapshotCurrent = () => (nextReturnPageOnly || snapshotEpoch === messageSnapshotEpochRef.current)
       && isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest);
+    const stateKey = buildMailboxListStateKey({
+      accountScope: nextScope, folderId: nextFolderId, query: nextQuery,
+      filter: nextFilter, searchScope: nextSearchScope, listSort,
+    });
+    if (startsSnapshot) { setViewError(null); setMetadataFailure(null); }
     if (nextSearchScope === 'folder' && !nextFolderId) {
       mailboxFlowLog('loadMessages skipped: missing folder', {
         searchScope: nextSearchScope,
@@ -240,6 +255,8 @@ export default function useMailboxData({
       });
       if (!nextReturnPageOnly && isSnapshotCurrent()) {
         startTransition(() => {
+          setCommittedKey(stateKey);
+          setCommittedThreadKey(stateKey);
           setMessageCount?.(null);
           setMessages([]);
           setThreads([]);
@@ -260,14 +277,6 @@ export default function useMailboxData({
       threadRequestEpochRef.current += 1;
       threadInflightRef.current.clear();
     }
-    const stateKey = buildMailboxListStateKey({
-      accountScope: nextScope,
-      folderId: nextFolderId,
-      query: nextQuery,
-      filter: nextFilter,
-      searchScope: nextSearchScope,
-      listSort,
-    });
     const effectiveLimit = nextLimit ?? loadMailboxMessageLimit(stateKey);
     const requests = buildMailboxRequests(
       nextScope,
@@ -316,6 +325,9 @@ export default function useMailboxData({
         nextMessages = await invoke<MessageSummary[]>(IPC.ListMessages, requests.messages);
       }
     } catch (error) {
+      if (startsSnapshot && isSnapshotCurrent()) {
+        setViewError({ key: stateKey, message: '邮件列表未能加载，请重试。' });
+      }
       mailboxFlowWarn('loadMessages failed', {
         scope: nextScope,
         folderId: nextFolderId ?? 0,
@@ -323,7 +335,7 @@ export default function useMailboxData({
         requestMessages: requests.messages,
         error: error instanceof Error ? error.message : String(error),
       });
-      throw error;
+      throw startsSnapshot ? new MailboxLoadError(error) : error;
     }
     if (!isSnapshotCurrent()) {
       mailboxFlowLog('loadMessages ignored stale mailbox result', {
@@ -367,7 +379,17 @@ export default function useMailboxData({
     setMessageLimit(effectiveLimit);
     setHasMoreMessages(nextMessages.length > effectiveLimit || hasMoreRemote);
     startTransition(() => {
-      setThreads(nextIncludeThreads ? nextThreads : []);
+      setCommittedKey(stateKey);
+      setViewError(null);
+      if (nextIncludeThreads) {
+        threadSnapshotRef.current = { key: stateKey, epoch: snapshotEpoch };
+        setCommittedThreadKey(stateKey);
+        setThreadError(null);
+        setThreads(nextThreads);
+      } else if (threadSnapshotRef.current?.key !== stateKey || threadSnapshotRef.current.epoch !== snapshotEpoch) {
+        setCommittedThreadKey(null);
+        setThreads([]);
+      }
       setMessages(visibleMessages);
       // Loading another page must not discard IDs already selected from the
       // complete result. Only a fresh scope load may prune stale selections.
@@ -499,7 +521,7 @@ export default function useMailboxData({
       nextIncludeThreads,
       mailboxRequest,
       nextOffset,
-      nextReturnPageOnly,
+      true,
     );
     const unreadSnapshotEpoch = messageSnapshotEpochRef.current;
     const unreadMessages = await unreadRequest;
@@ -512,7 +534,8 @@ export default function useMailboxData({
     }
     setFilter('unread');
     setStatus('当前文件夹暂无全部邮件，已切到未读视图显示可见邮件。');
-    return unreadMessages;
+    return loadMessages(nextFolderId, '', 'unread', nextScope, refreshId, nextLimit,
+      nextSearchScope, nextIncludeThreads, mailboxRequest);
   }
 
   async function refreshMailbox(
@@ -531,16 +554,24 @@ export default function useMailboxData({
     threadRequestEpochRef.current += 1;
     threadInflightRef.current.clear();
     const mailboxRequest: MailboxRefreshRequest = { id: refreshId, scope: nextScope };
+    setCommittedKey(null);
+    setCommittedThreadKey(null);
     setHasMoreMessages(false);
     setMessageCount?.(null);
     setMessages([]);
     setThreads([]);
     setSelectedId(null);
     setSelectedMessageIds([]);
-    const meta = await loadMeta(preferredFolderId, nextScope, {
-      mode: 'mailbox',
-      mailboxRequest,
-    });
+    setMetadataFailure(null);
+    let meta: LoadMetaResult;
+    try {
+      meta = await loadMeta(preferredFolderId, nextScope, { mode: 'mailbox', mailboxRequest });
+    } catch (error) {
+      if (isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) {
+        setMetadataFailure({ scope: nextScope, generation: refreshId, message: '邮箱信息未能加载，请重试。' });
+      }
+      throw error;
+    }
     const nextFolderId = meta.folderId;
     if (!isMailboxRequestCurrent(nextScope, refreshId, mailboxRequest)) return nextFolderId;
     await loadMessagesWithVisibleFallback(
@@ -566,63 +597,79 @@ export default function useMailboxData({
     refreshId = mailboxRefreshRef.current,
     nextSearchScope = searchScope,
   ) {
-    if (nextSearchScope === 'folder' && !nextFolderId) return [];
-    const cacheKey = JSON.stringify([
-      nextScope,
-      currentAccountId,
-      nextFolderId,
-      nextQuery.trim(),
-      nextFilter,
-      nextSearchScope,
-      listSort,
-    ]);
-    const cacheEpoch = threadCacheEpochRef.current;
+    const stateKey = buildMailboxListStateKey({ accountScope: nextScope, folderId: nextFolderId,
+      query: nextQuery, filter: nextFilter, searchScope: nextSearchScope, listSort });
     const requestEpoch = threadRequestEpochRef.current;
-    const cachedThreads = threadCacheRef.current.get(cacheKey);
-    if (cachedThreads) {
-      if (isMailboxRequestCurrent(nextScope, refreshId)) setThreads(cachedThreads);
-      return cachedThreads;
-    }
-    const pendingRequest = threadInflightRef.current.get(cacheKey);
-    if (pendingRequest) {
-      const nextThreads = await pendingRequest.promise;
+    const canCommit = () => requestEpoch === threadRequestEpochRef.current && isMailboxRequestCurrent(nextScope, refreshId);
+    const commit = (next: ThreadSummary[]) => {
+      if (!canCommit()) return;
+      threadSnapshotRef.current = { key: stateKey, epoch: messageSnapshotEpochRef.current };
+      setThreads(next);
+      setCommittedThreadKey(stateKey);
+      setThreadError(null);
+    };
+    if (canCommit()) setThreadError(null);
+    if (nextSearchScope === 'folder' && !nextFolderId) { commit([]); return []; }
+    try {
+      const cacheKey = JSON.stringify([
+        nextScope,
+        currentAccountId,
+        nextFolderId,
+        nextQuery.trim(),
+        nextFilter,
+        nextSearchScope,
+        listSort,
+      ]);
+      const cacheEpoch = threadCacheEpochRef.current;
+      const cachedThreads = threadCacheRef.current.get(cacheKey);
+      if (cachedThreads) {
+        commit(cachedThreads);
+        return cachedThreads;
+      }
+      const pendingRequest = threadInflightRef.current.get(cacheKey);
+      if (pendingRequest) {
+        const nextThreads = await pendingRequest.promise;
+        if (
+          requestEpoch !== threadRequestEpochRef.current
+          || !isMailboxRequestCurrent(nextScope, refreshId)
+        ) return nextThreads;
+        commit(nextThreads);
+        return nextThreads;
+      }
+      const requests = buildMailboxRequests(
+        nextScope,
+        currentAccountId,
+        nextFolderId ?? 0,
+        nextSearchScope,
+        nextQuery,
+        nextFilter,
+        listSort,
+        THREAD_PAGE_LIMIT,
+      );
+      let threadRequest!: Promise<ThreadSummary[]>;
+      threadRequest = invoke<ThreadSummary[]>(IPC.ListThreads, requests.threads)
+        .then((nextThreads) => {
+          if (cacheEpoch === threadCacheEpochRef.current) {
+            threadCacheRef.current.set(cacheKey, nextThreads);
+          }
+          return nextThreads;
+        })
+        .finally(() => {
+          const current = threadInflightRef.current.get(cacheKey);
+          if (current?.promise === threadRequest) threadInflightRef.current.delete(cacheKey);
+        });
+      threadInflightRef.current.set(cacheKey, { promise: threadRequest });
+      const nextThreads = await threadRequest;
       if (
         requestEpoch !== threadRequestEpochRef.current
         || !isMailboxRequestCurrent(nextScope, refreshId)
       ) return nextThreads;
-      setThreads(nextThreads);
+      commit(nextThreads);
       return nextThreads;
+    } catch (error) {
+      if (canCommit()) setThreadError({ key: stateKey, message: '会话列表未能加载，请重试。' });
+      throw error;
     }
-    const requests = buildMailboxRequests(
-      nextScope,
-      currentAccountId,
-      nextFolderId ?? 0,
-      nextSearchScope,
-      nextQuery,
-      nextFilter,
-      listSort,
-      THREAD_PAGE_LIMIT,
-    );
-    let threadRequest!: Promise<ThreadSummary[]>;
-    threadRequest = invoke<ThreadSummary[]>(IPC.ListThreads, requests.threads)
-      .then((nextThreads) => {
-        if (cacheEpoch === threadCacheEpochRef.current) {
-          threadCacheRef.current.set(cacheKey, nextThreads);
-        }
-        return nextThreads;
-      })
-      .finally(() => {
-        const current = threadInflightRef.current.get(cacheKey);
-        if (current?.promise === threadRequest) threadInflightRef.current.delete(cacheKey);
-      });
-    threadInflightRef.current.set(cacheKey, { promise: threadRequest });
-    const nextThreads = await threadRequest;
-    if (
-      requestEpoch !== threadRequestEpochRef.current
-      || !isMailboxRequestCurrent(nextScope, refreshId)
-    ) return nextThreads;
-    setThreads(nextThreads);
-    return nextThreads;
   }
 
   function invalidateThreads() {
@@ -635,7 +682,15 @@ export default function useMailboxData({
 
   const threadLoader = Object.assign(loadThreads, { invalidate: invalidateThreads });
 
+  const needsMetadata = metadataFailure?.scope === accountScope && metadataFailure.generation === mailboxRefreshRef.current;
+  const error = needsMetadata ? metadataFailure.message : listMode === 'threads' && threadError?.key === activeViewKey
+    ? threadError.message : viewError?.key === activeViewKey ? viewError.message : null;
+  const unavailable = committedKey !== activeViewKey || (listMode === 'threads' && committedThreadKey !== activeViewKey);
   return {
+    mailboxView: { pending: unavailable && !error, unavailable, error, committedKey },
+    retryMailbox: () => needsMetadata
+      ? refreshMailbox(accountScope, folderId, query, filter)
+      : loadMailbox({}),
     mailboxRefreshRef,
     loadMailbox,
     loadMessages,

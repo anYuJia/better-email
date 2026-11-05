@@ -66,6 +66,25 @@ afterEach(() => {
 });
 
 describe('useAppShortcuts text selection boundary', () => {
+  it('exits explicit selection with Escape before any message is selected', () => {
+    const options = { ...makeOptions(), selectionMode: true };
+    render(<ShortcutHarness options={options} />);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(options.clearSelection).toHaveBeenCalledOnce();
+  });
+
+  it('closes an open menu before Escape exits an empty touch selection', () => {
+    const options = { ...makeOptions(), selectionMode: true };
+    render(<MenuShortcutHarness options={options} />);
+    const trigger = screen.getByRole('button', { name: '更多邮件操作' });
+    fireEvent.click(trigger);
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    expect(options.clearSelection).not.toHaveBeenCalled();
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    expect(options.clearSelection).toHaveBeenCalledOnce();
+  });
+
   it.each(['composer', 'settings'] as const)('lets Escape close %s when a custom select is closed', (surface) => {
     const options = makeOptions();
     options.isComposerOpen = surface === 'composer';
@@ -235,6 +254,20 @@ describe('useAppShortcuts text selection boundary', () => {
     expect(options.clearSelection).toHaveBeenCalledOnce();
     expect(options.setStatus).toHaveBeenCalledWith('已取消邮件选择');
     anchoredSurface.remove();
+  });
+
+  it('does not let a retained inert context exit swallow the next Escape', () => {
+    const options = makeOptions();
+    options.isComposerOpen = true;
+    const outgoing = document.createElement('div');
+    outgoing.className = 'context-menu context-menu-surface';
+    outgoing.setAttribute('aria-hidden', 'true');
+    outgoing.setAttribute('inert', '');
+    document.body.append(outgoing);
+    render(<ShortcutHarness options={options} />);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(options.closeOverlays).toHaveBeenCalledOnce();
+    outgoing.remove();
   });
 
   it('leaves Escape to an open floating context menu', () => {

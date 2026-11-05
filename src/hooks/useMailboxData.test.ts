@@ -44,6 +44,15 @@ describe('visible list snapshot ownership within one mailbox generation', () => 
     return { ...hook, ...setters };
   }
 
+  it('keeps the all view committed when an unread fallback probe is also empty', async () => {
+    mockInvoke.mockImplementation((command) => Promise.resolve(command === IPC.GetMessageCount ? 0 : []) as never);
+    const { result, setFilter } = setup();
+    await act(async () => { await result.current.loadMessagesWithVisibleFallback(); });
+    expect(result.current.mailboxView).toMatchObject({ pending: false, unavailable: false });
+    expect(result.current.mailboxView.committedKey).toContain('filter=all');
+    expect(setFilter).not.toHaveBeenCalled();
+  });
+
   it('does not let an earlier refresh roll back a newer read/star snapshot', async () => {
     const older = deferred<MessageSummary[]>();
     const newer = deferred<MessageSummary[]>();
@@ -748,5 +757,88 @@ describe('useMailboxData request guard', () => {
       { id: 1, received_at: '2026-08-09T00:00:00Z' },
       { id: 2, received_at: '2026-08-09T00:00:01Z' },
     ]);
+  });
+});
+
+
+describe('mailbox presentation ownership', () => {
+  function setupView() {
+    const generation = { current: 1 };
+    const loadMeta = vi.fn().mockResolvedValue({ folderId: 101, folders: [] });
+    const hook = renderHook(({ folderId, listMode = 'messages' }: { folderId: number; listMode?: 'messages' | 'threads' }) => useMailboxData({
+      accountScope: 1, currentAccountId: 1, folderId, searchScope: 'folder',
+      query: '', filter: 'all', listMode, listSort: 'newest',
+      folders: [], imapMailboxes: [], mailboxRefreshRef: generation,
+      setMessages: vi.fn(), setThreads: vi.fn(), setMessageLimit: vi.fn(),
+      setHasMoreMessages: vi.fn(), setSelectedId: vi.fn(), setSelectedMessageIds: vi.fn(),
+      setFilter: vi.fn(), setStatus: vi.fn(),
+      loadMeta,
+      maybeRunBenchmarkSync: vi.fn().mockResolvedValue(undefined),
+    }), { initialProps: { folderId: 101 } as { folderId: number; listMode?: 'messages' | 'threads' } });
+    return { ...hook, generation, loadMeta };
+  }
+
+  it('masks old content immediately on navigation, and a stale result cannot release the new loading state', async () => {
+    mockInvoke.mockResolvedValue([]);
+    const view = setupView();
+    await act(async () => { await view.result.current.loadMailbox({}); });
+    const committed = view.result.current.mailboxView.committedKey;
+    expect(view.result.current.mailboxView.unavailable).toBe(false);
+    const first = deferred<MessageSummary[]>();
+    const second = deferred<MessageSummary[]>();
+    mockInvoke.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    view.generation.current += 1;
+    view.rerender({ folderId: 102 });
+    expect(view.result.current.mailboxView).toMatchObject({ pending: true, unavailable: true, committedKey: committed });
+    let request!: Promise<MessageSummary[]>;
+    act(() => { request = view.result.current.loadMailbox({}); });
+    view.generation.current += 1;
+    view.rerender({ folderId: 103 });
+    let latest!: Promise<MessageSummary[]>;
+    act(() => { latest = view.result.current.loadMailbox({}); });
+    await act(async () => { first.resolve([]); await request; });
+    expect(view.result.current.mailboxView.pending).toBe(true);
+    await act(async () => { second.resolve([]); await latest; });
+    expect(view.result.current.mailboxView).toMatchObject({ pending: false, unavailable: false, error: null });
+    expect(view.result.current.mailboxView.committedKey).toContain('folder=103');
+  });
+
+  it('retains the thread snapshot when an earlier message-only request finishes after entering threads', async () => {
+    const page = deferred<MessageSummary[]>();
+    const thread = { thread_key: 'thread-a' } as ThreadSummary;
+    mockInvoke.mockImplementation((command) => (command === IPC.ListMessages ? page.promise : Promise.resolve([thread])) as never);
+    const view = setupView();
+    let first!: Promise<MessageSummary[]>;
+    act(() => { first = view.result.current.loadMailbox({ includeThreads: false }); });
+    view.rerender({ folderId: 101, listMode: 'threads' });
+    await act(async () => { await view.result.current.loadThreads(); });
+    await act(async () => { page.resolve([]); await first; });
+    expect(view.result.current.mailboxView).toMatchObject({ pending: false, unavailable: false });
+  });
+
+  it('surfaces metadata failure and retries metadata before releasing the list', async () => {
+    mockInvoke.mockResolvedValue([]);
+    const view = setupView();
+    view.loadMeta.mockRejectedValueOnce(new Error('metadata offline'));
+    await act(async () => { await view.result.current.refreshMailbox().catch(() => undefined); });
+    expect(view.result.current.mailboxView).toMatchObject({ pending: false, unavailable: true, error: '邮箱信息未能加载，请重试。' });
+    expect(mockInvoke).not.toHaveBeenCalled();
+    await act(async () => { await view.result.current.retryMailbox(); });
+    expect(view.loadMeta).toHaveBeenCalledTimes(2);
+    expect(view.result.current.mailboxView).toMatchObject({ pending: false, unavailable: false, error: null });
+  });
+
+  it('exposes a retryable error, then commits legitimate empty results instead of staying busy', async () => {
+    const view = setupView();
+    mockInvoke.mockRejectedValueOnce(new Error('offline'));
+    await act(async () => { await view.result.current.loadMailbox({}).catch(() => undefined); });
+    expect(view.result.current.mailboxView).toMatchObject({ pending: false, unavailable: true, error: expect.any(String) });
+    const retry = deferred<MessageSummary[]>();
+    mockInvoke.mockReturnValueOnce(retry.promise);
+    let request!: Promise<MessageSummary[]>;
+    act(() => { request = view.result.current.loadMailbox({}); });
+    expect(view.result.current.mailboxView).toMatchObject({ pending: true, error: null });
+    await act(async () => { retry.resolve([]); await request; });
+    expect(view.result.current.mailboxView).toMatchObject({ pending: false, unavailable: false, error: null });
   });
 });

@@ -17,6 +17,9 @@ import {
   scheduleReaderBackgroundWork,
 } from './readerSelectionState';
 import { IPC } from '../ipc/commands';
+import { CREDENTIALS_CHANGED_EVENT } from '../app/credentialEvents';
+import { listen } from '../tauriBridge';
+import { needsRemoteMessageBody, readerBodyErrorKind, readableBodyError } from './readerBodyState';
 
 type ReaderBodyLoadingOptions = {
   readerSelectedDetail: Message | null;
@@ -35,6 +38,7 @@ export type ReaderBodyFetchState = {
   messageId: number;
   status: 'loading' | 'error';
   error: string | null;
+  errorKind?: 'credentials' | 'network' | 'invalid-content';
 };
 
 export default function useReaderBodyLoading({
@@ -56,22 +60,28 @@ export default function useReaderBodyLoading({
   // Empty bodies are valid successful results. Remember recent completions so
   // revisiting one does not show a new skeleton or fetch it on every selection.
   const bodyFetchCompletedRef = useRef(new Set<number>());
+  // A user-requested refresh must survive an authentication repair even when
+  // the cached body is already complete (including a legitimate empty body).
+  const explicitBodyRefreshRef = useRef(new Set<number>());
   const currentMessageRef = useRef(readerSelectedDetail);
   currentMessageRef.current = readerSelectedDetail;
   const [bodyFetchState, setBodyFetchState] = useState<ReaderBodyFetchState | null>(null);
+  const [credentialRevision, setCredentialRevision] = useState(0);
   const trustedRemoteImageRenderRef = useRef(new Map<number, Promise<Message>>());
   /** 附件列表当前属于哪封邮件；解析结果只在与当前选中一致时才生效 */
   const attachmentsOwnerRef = useRef<number | null>(null);
   /** 附件列表是否已加载完成（或加载失败）——内嵌图片解析、快速回复框都要等它 */
   const [attachmentsLoaded, setAttachmentsLoaded] = useState(false);
 
-  const markBodyFetchStarted = useCallback((messageId: number) => {
+  const markBodyFetchStarted = useCallback((messageId: number, reason?: 'manual') => {
+    if (reason === 'manual') explicitBodyRefreshRef.current.add(messageId);
     bodyFetchCompletedRef.current.delete(messageId);
     bodyFetchErrorsRef.current.delete(messageId);
     if (currentMessageRef.current?.id === messageId) setBodyFetchState({ messageId, status: 'loading', error: null });
   }, []);
 
   const markBodyFetchSucceeded = useCallback((messageId: number) => {
+    explicitBodyRefreshRef.current.delete(messageId);
     bodyFetchCompletedRef.current.delete(messageId);
     bodyFetchCompletedRef.current.add(messageId);
     if (bodyFetchCompletedRef.current.size > 100) {
@@ -85,7 +95,24 @@ export default function useReaderBodyLoading({
   const markBodyFetchFailed = useCallback((messageId: number, error: string) => {
     bodyFetchCompletedRef.current.delete(messageId);
     bodyFetchErrorsRef.current.set(messageId, error);
-    if (currentMessageRef.current?.id === messageId) setBodyFetchState({ messageId, status: 'error', error });
+    if (currentMessageRef.current?.id === messageId) setBodyFetchState({ messageId, status: 'error', error, errorKind: readerBodyErrorKind(error) });
+  }, []);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    const changed = () => {
+      const id = currentMessageRef.current?.id;
+      if (!id || readerBodyErrorKind(bodyFetchErrorsRef.current.get(id) ?? '') !== 'credentials') return;
+      bodyFetchErrorsRef.current.delete(id);
+      bodyFetchFailedRef.current.delete(id);
+      setBodyFetchState(null);
+      setCredentialRevision((revision) => revision + 1);
+    };
+    window.addEventListener(CREDENTIALS_CHANGED_EVENT, changed);
+    void Promise.resolve().then(() => listen(CREDENTIALS_CHANGED_EVENT, changed))
+      .then((cleanup) => { if (disposed) cleanup(); else unlisten = cleanup; }).catch(() => undefined);
+    return () => { disposed = true; unlisten?.(); window.removeEventListener(CREDENTIALS_CHANGED_EVENT, changed); };
   }, []);
 
   useEffect(() => {
@@ -185,14 +212,8 @@ export default function useReaderBodyLoading({
 
   useEffect(() => {
     if (!readerSelectedDetail) return undefined;
-    const hasCachedBody = Boolean(
-      readerSelectedDetail.body.trim() ||
-        readerSelectedDetail.sanitized_html.trim(),
-    );
-    const isHeaderOnlyRemoteMessage =
-      readerSelectedDetail.remote_uid > 0 &&
-      (!hasCachedBody || isMessageBodyCorrupted(readerSelectedDetail.body));
-    if (!isHeaderOnlyRemoteMessage || bodyFetchCompletedRef.current.has(readerSelectedDetail.id)) return undefined;
+    const explicitRefresh = explicitBodyRefreshRef.current.has(readerSelectedDetail.id);
+    if ((!needsRemoteMessageBody(readerSelectedDetail) && !explicitRefresh) || bodyFetchCompletedRef.current.has(readerSelectedDetail.id)) return undefined;
     if (bodyFetchFailedRef.current.has(readerSelectedDetail.id)) {
       markBodyFetchFailed(readerSelectedDetail.id, bodyFetchErrorsRef.current.get(readerSelectedDetail.id) ?? '正文加载失败，请重试');
       return undefined;
@@ -293,6 +314,7 @@ export default function useReaderBodyLoading({
     };
   }, [
     activeThread?.thread_key,
+    credentialRevision,
     messageDetailCacheRef,
     markBodyFetchFailed,
     markBodyFetchStarted,
@@ -309,21 +331,24 @@ export default function useReaderBodyLoading({
 
   // Effects run after child layout/effects. Expose initial header-only loading
   // during render too, so a short/empty reader cannot complete reading first.
-  const needsRemoteBody = useMemo(() => Boolean(readerSelectedDetail && readerSelectedDetail.remote_uid > 0
-    && (!readerSelectedDetail.body.trim() && !readerSelectedDetail.sanitized_html.trim()
-      || isMessageBodyCorrupted(readerSelectedDetail.body))),
-  [readerSelectedDetail?.remote_uid, readerSelectedDetail?.body, readerSelectedDetail?.sanitized_html]);
+  const needsRemoteBody = useMemo(() => Boolean(readerSelectedDetail && needsRemoteMessageBody(readerSelectedDetail)),
+    [readerSelectedDetail?.remote_uid, readerSelectedDetail?.remote_body_fetched, readerSelectedDetail?.body, readerSelectedDetail?.sanitized_html]);
   const currentMessageId = readerSelectedDetail?.id;
   let currentBodyFetchState = bodyFetchState?.messageId === currentMessageId ? bodyFetchState : null;
-  if (!currentBodyFetchState && currentMessageId && needsRemoteBody && !bodyFetchCompletedRef.current.has(currentMessageId)) {
+  if (!currentBodyFetchState && currentMessageId && (needsRemoteBody || explicitBodyRefreshRef.current.has(currentMessageId)) && !bodyFetchCompletedRef.current.has(currentMessageId)) {
     const error = bodyFetchErrorsRef.current.get(currentMessageId);
     currentBodyFetchState = error
-      ? { messageId: currentMessageId, status: 'error', error }
+      ? { messageId: currentMessageId, status: 'error', error: readableBodyError(error), errorKind: readerBodyErrorKind(error) }
       : { messageId: currentMessageId, status: 'loading', error: null };
+  }
+  if (!currentBodyFetchState && currentMessageId && readerSelectedDetail && isMessageBodyCorrupted(readerSelectedDetail.body)) {
+    currentBodyFetchState = { messageId: currentMessageId, status: 'error', errorKind: 'invalid-content', error: '已保存的正文格式无法解析。邮件和附件仍保留在本机。' };
   }
 
   return {
-    attachmentsLoaded,
+    // Selection can synchronously reveal a cached body before the attachment
+    // effect runs. Never expose the previous message's completion flag.
+    attachmentsLoaded: attachmentsLoaded && attachmentsOwnerRef.current === currentMessageId,
     bodyFetchFailedRef,
     bodyFetchInFlightRef,
     bodyFetchState: currentBodyFetchState,

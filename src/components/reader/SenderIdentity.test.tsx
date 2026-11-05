@@ -13,8 +13,8 @@ function message(overrides: Partial<MessageSummary> = {}): MessageSummary {
     folder_id: 1,
     folder_role: 'inbox',
     sender_name: 'Gitee',
-    sender_email: 'no-reply@mailer.oschina.net',
-    recipients: 'yhan-sun@foxmail.com',
+    sender_email: 'no-reply@example.com',
+    recipients: 'recipient@example.com',
     cc: '',
     bcc: '',
     subject: '通知',
@@ -37,6 +37,14 @@ function message(overrides: Partial<MessageSummary> = {}): MessageSummary {
 }
 
 describe('SenderIdentity recipient summary', () => {
+  it.each(['', 'no-reply@example.com', 'NO-REPLY@EXAMPLE.COM'])('shows an address-only sender once and preserves its compose action (%s)', (sender_name) => {
+    const onComposeNew = vi.fn();
+    render(<SenderIdentity message={message({ sender_name })} onComposeNew={onComposeNew} />);
+    expect(screen.getAllByText('no-reply@example.com')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'no-reply@example.com' }));
+    expect(onComposeNew).toHaveBeenCalledWith({ to: 'no-reply@example.com' });
+    expect(screen.getByText('发给 recipient@example.com')).toBeDefined();
+  });
   it('uses a quiet personal label when the recipient is the current account', () => {
     render(<SenderIdentity message={message({ recipients: 'me@example.com' })} />);
     expect(screen.getByText('发给 我')).toBeDefined();
@@ -45,7 +53,7 @@ describe('SenderIdentity recipient summary', () => {
 
   it('shows cc in the compact sender line', () => {
     render(<SenderIdentity message={message({ cc: 'copy@example.com' })} />);
-    expect(screen.getByText('发给 yhan-sun@foxmail.com，抄送 copy@example.com')).toBeDefined();
+    expect(screen.getByText('发给 recipient@example.com，抄送 copy@example.com')).toBeDefined();
   });
 
   it('opens all recipients in an accessible dialog when the compact line overflows', () => {

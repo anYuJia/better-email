@@ -88,7 +88,7 @@ function getCoreReaderCss() {
  *  2. No persistent glass / blur on reader workspace surfaces.
  *  3. No !important crutches.
  *  4. No hardcoded hex in core reader regions (overlay is exempt).
- *  5. Subject follows spec §46: 22-24px / 650, with a 22px mobile heading.
+ *  5. Subject follows spec §46: 22-24px / 600, with a 22px mobile heading.
  *  6. Body typography is for reading (14-15px, line-height 1.55-1.65).
  *  7. Attachments are compact rows, not big cards.
  *  8. Quick reply is a quiet inline entry, not a large input card.
@@ -170,20 +170,11 @@ describe('reader de-AI contract — reader is an opaque pane, not a floating car
 });
 
 describe('reader empty state contract', () => {
-  it('uses a centered vertical composition instead of an inline text run', () => {
-    const rules = findRules(readerCss, '.app-shell .empty-reader-card');
-    const cardRule = rules.find((rule) => rule.selector === '.app-shell .empty-reader-card');
-    expect(cardRule).toBeDefined();
-    expect(cardRule.body).toMatch(/display:\s*grid/);
-    expect(cardRule.body).toMatch(/justify-items:\s*center/);
-    expect(cardRule.body).toMatch(/text-align:\s*center/);
-  });
-
-  it('keeps the empty reader icon in the same quiet neutral language as the inbox', () => {
-    const rules = findRules(readerCss, '.app-shell .empty-reader-card .empty-state-mark');
-    expect(rules.length).toBeGreaterThan(0);
-    expect(rules[0].body).toMatch(/border-radius:\s*50%/);
-    expect(rules[0].body).toMatch(/background:\s*var\(--ui-surface-muted\)/);
+  it('keeps the inactive reading pane centered and visually quiet', () => {
+    const rule = parseRules(readerCss).find((entry) => entry.selector === '.empty-reader-quiet');
+    expect(rule?.body).toMatch(/place-items:\s*center/);
+    expect(rule?.body).toMatch(/color:\s*var\(--ui-text-tertiary\)/);
+    expect(rule?.body).not.toMatch(/background|box-shadow/);
   });
 });
 
@@ -199,10 +190,11 @@ describe('reader de-AI contract — subject is a heading, not a hero', () => {
     expect(extractDecl(mobileHeadings.at(-1).body, 'font-size')).toBe(22);
   });
 
-  it('subject h1 uses the approved 650 weight', () => {
+  it('subject h1 keeps a readable 600 weight without a compressed long-title rhythm', () => {
     const heading = parseRules(readerCss).find((r) => r.selector === '.reader-header h1');
     expect(heading).toBeDefined();
-    expect(extractDecl(heading.body, 'font-weight')).toBe(650);
+    expect(extractDecl(heading.body, 'font-weight')).toBe(600);
+    expect(heading.body).toMatch(/line-height:\s*1\.35\s*;/);
   });
 
   it('subject h1 line-height is <= 1.4 (not loose hero spacing)', () => {
@@ -467,7 +459,7 @@ describe('reader de-AI contract — dark mode reader overrides use semantic toke
 
 describe('reader de-AI contract — Shadow DOM email styles use inherited tokens', () => {
   it('EmailShadowView inline styles use var() for link colour, not hex fallback', () => {
-    expect(emailShadowTs).toMatch(/var\(--ui-accent\)/);
+    expect(emailShadowTs).toMatch(/var\(--ui-text-accent\)/);
     expect(emailShadowTs).not.toMatch(/var\(--accent,/);
   });
 
@@ -487,8 +479,9 @@ describe('reader de-AI contract — Shadow DOM email styles use inherited tokens
 });
 
 describe('reader de-AI contract — TSX inline styles use semantic tokens', () => {
-  it('PlainMessageBody uses var(--ui-accent) for all link colours', () => {
-    expect(plainMessageTs).toMatch(/var\(--ui-accent\)/);
+  it('PlainMessageBody uses the theme text colors for links and hidden links', () => {
+    expect(plainMessageTs).toMatch(/var\(--ui-text-accent\)/);
+    expect(plainMessageTs).toMatch(/var\(--ui-text-tertiary\)/);
     expect(plainMessageTs).not.toMatch(/var\(--color-primary,/);
     expect(plainMessageTs).not.toMatch(/#2563eb/);
   });

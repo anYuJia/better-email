@@ -117,24 +117,6 @@
   background: var(--ui-surface);
   color: var(--ui-text);
   box-shadow: var(--ui-shadow-popover);
-  opacity: 0;
-  transform: translateY(-3px);
-  transform-origin: top center;
-  transition:
-    opacity var(--ui-motion-menu-exit, 120ms) var(--ui-ease-standard),
-    transform var(--ui-motion-menu-exit, 120ms) var(--ui-ease-standard);
-  will-change: opacity, transform;
-}
-
-.custom-select-dropdown[data-side="top"] {
-  transform: translateY(3px);
-  transform-origin: bottom center;
-}
-
-.custom-select-dropdown.is-open {
-  opacity: 1;
-  transform: translateY(0);
-  transition-duration: var(--ui-motion-menu-enter, 180ms);
 }
 
 .custom-select-dropdown button {

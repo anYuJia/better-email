@@ -121,7 +121,7 @@ function renderTextWithLinks(text: string, linksHidden: boolean) {
           <span
             key={index}
             style={{
-              color: 'var(--ui-accent)',
+              color: 'var(--ui-text-tertiary)',
               cursor: 'default',
             }}
           >
@@ -143,7 +143,7 @@ function renderTextWithLinks(text: string, linksHidden: boolean) {
           }}
           style={{
             wordBreak: 'break-all',
-            color: 'var(--ui-accent)',
+            color: 'var(--ui-text-accent)',
             textDecoration: 'underline',
             cursor: 'pointer'
           }}

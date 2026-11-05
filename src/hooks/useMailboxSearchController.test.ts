@@ -275,7 +275,7 @@ describe('useMailboxSearchController', () => {
       result.current.searchInputRef.current = searchInput;
     });
     await act(async () => {
-      await result.current.clearSearchAndFilter();
+      result.current.handleClearSearchAndFilter();
     });
     expect(result.current.queryDraft).toBe('');
     expect(result.current.appliedQuery).toBe('');
@@ -289,17 +289,22 @@ describe('useMailboxSearchController', () => {
     expect(setStatus).toHaveBeenCalledWith('已清空搜索和筛选');
   });
 
-  it('clearSearchAndFilter can reload a target filter as a message list', async () => {
-    const { result, loadMessagesWithVisibleFallback } = renderController();
+  it('clears just the search and keeps the current filter and conversation mode', async () => {
+    const { result, loadMessagesWithVisibleFallback, setStatus } = renderController();
+    act(() => {
+      result.current.setQuery('invoice');
+      result.current.setFilter('starred');
+      result.current.setListMode('threads');
+    });
     await act(async () => {
-      act(() => result.current.setQuery('invoice'));
-      await result.current.clearSearchAndFilter('starred', false);
+      result.current.handleClearSearch();
     });
     expect(result.current.appliedQuery).toBe('');
     expect(result.current.filter).toBe('starred');
     expect(loadMessagesWithVisibleFallback).toHaveBeenCalledWith(
-      101, '', 'starred', 'all', 2, folders, messagePageSize, 'folder', false,
+      101, '', 'starred', 'all', 3, folders, messagePageSize, 'folder', true,
     );
+    expect(setStatus).toHaveBeenCalledWith('已清空搜索，保留当前筛选');
   });
 
   it('loadMoreMessages grows the limit and reports the visible count', async () => {

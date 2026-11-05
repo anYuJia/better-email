@@ -144,9 +144,11 @@ export async function runMotionQuality(cdp, api) {
     const entered = await trace('filter menu enter', menu, () => click('.compact-dropdown.filter-menu > summary'));
     assertInterpolated(entered, ['opacity', 'transform'], 'Filter menu enter');
     await captureScreenshot(cdp, 'motion-menu-open');
+    await evalInPage(cdp, `(() => { window.__motionDetailsPanel = document.querySelector(${JSON.stringify(menu)}); return true; })()`);
     const menuExit = await trace('filter menu exit', '[data-transient-exit]', () => key('Escape'));
     if (!menuExit.some(f => f.present && f.inert) || menuExit.at(-1)?.present) throw new Error('Menu exit did not retain an inert visual then remove it');
     assertInterpolated(menuExit, ['opacity', 'transform'], 'Filter menu exit');
+    if (!await evalInPage(cdp, `window.__motionDetailsPanel === document.querySelector(${JSON.stringify(menu)})`)) throw new Error('Details exit replaced its original DOM');
     await waitForExpression(cdp, "!document.querySelector('.filter-menu[open]') && !document.querySelector('[data-transient-exit]')");
 
     const nextMessageSelector = await evalInPage(cdp, `(() => {
@@ -154,7 +156,7 @@ export async function runMotionQuality(cdp, api) {
       return '.message-card[data-message-id="' + row.dataset.messageId + '"] .message-card-main';
     })()`);
     const selected = await trace('reader identity reveal', '.reader-title-block', () => click(nextMessageSelector));
-    assertInterpolated(selected, ['opacity', 'translate'], 'Reader reveal');
+    if (selected.some(f => f.present && Number(f.opacity) < 0.99)) throw new Error('Reader selection dimmed readable text');
     // Keep rapid browsing legible; only the first selection in a burst may
     // reveal. This checks painted opacity, not just cancelled animation calls.
     let burstSamples;
@@ -185,15 +187,22 @@ export async function runMotionQuality(cdp, api) {
     await waitForExpression(cdp, "document.querySelector('.context-menu .context-menu-branch.is-pointer-open > .context-submenu')");
     const flyoutBounds = await evalInPage(cdp, "(() => { const r = document.querySelector('.context-menu .context-menu-branch.is-pointer-open > .context-submenu').getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })()");
     await captureScreenshot(cdp, 'motion-context-flyout');
+    await evalInPage(cdp, "(() => { window.__motionContextRoot = document.querySelector('.context-menu'); return true; })()");
     const contextExit = await trace('context menu and flyout exit', '[data-transient-exit]', async () => {
       await key('Escape');
-      const copies = await evalInPage(cdp, "[...document.querySelectorAll('[data-transient-exit]')].map(e => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height, independent: e.parentElement === document.body, inert: e.inert }; })");
-      if (!copies.some(r => r.independent && r.inert && Math.abs(r.x - flyoutBounds.x) < 6 && Math.abs(r.y - flyoutBounds.y) < 6
-        && r.width >= flyoutBounds.width * 0.98 && r.height >= flyoutBounds.height * 0.98)) throw new Error('Exiting flyout moved or remained inside its parent clipping context');
+      const retained = await evalInPage(cdp, "(() => { const root = document.querySelector('.context-menu[data-transient-exit]'); const flyout = root?.querySelector('.context-menu-branch.is-pointer-open > .context-submenu'); const r = flyout?.getBoundingClientRect(); return { inert: root?.inert, hidden: root?.getAttribute('aria-hidden'), x: r?.x, y: r?.y, width: r?.width, height: r?.height, same: root === window.__motionContextRoot }; })()");
+      if (!retained.same || !retained.inert || retained.hidden !== 'true' || Math.abs(retained.x - flyoutBounds.x) >= 6 || Math.abs(retained.y - flyoutBounds.y) >= 6
+        || retained.width < flyoutBounds.width * 0.98 || retained.height < flyoutBounds.height * 0.98) throw new Error('Same-DOM exiting flyout moved or remained interactive: ' + JSON.stringify(retained));
     });
     if (!contextExit.some(f => f.present && f.inert) || contextExit.at(-1)?.present) throw new Error('Context menu exit presentation is missing or retained');
-    const composerEnter = await trace('composer enter', '.composer', () => click('.compose-button'), 1000);
-    assertInterpolated(composerEnter, ['opacity', 'translate'], 'Composer enter');
+    // A deferred composer already occupies the floating frame before the
+    // editor arrives. Measure the enter animation on a subsequent warm open.
+    await click('.compose-button');
+    await waitForExpression(cdp, "document.querySelector('.composer [aria-label=\"关闭写信窗口\"]')");
+    await click('.composer [aria-label="关闭写信窗口"]');
+    await waitForExpression(cdp, "!document.querySelector('.composer')");
+    const composerEnter = await trace('composer warm enter', '.composer', () => click('.compose-button'), 1000);
+    assertInterpolated(composerEnter, ['opacity', 'translate'], 'Composer warm enter');
     await waitForExpression(cdp, "document.querySelector('.composer') && document.querySelector('.composer [aria-label=\"关闭写信窗口\"]')");
     const morePanel = '.composer-advanced-popover';
     const moreEnter = await trace('composer more enter', morePanel, () => click('.composer-tool-more'));
@@ -290,13 +299,14 @@ export async function runMotionQuality(cdp, api) {
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'z', code: 'KeyZ', windowsVirtualKeyCode: 90, modifiers: undoModifiers });
     await waitForExpression(cdp, "!document.querySelector('.composer-richtext-body')?.textContent.trim()");
     await captureScreenshot(cdp, 'motion-composer-open');
-    const exiting = await trace('composer exit', '.composer', () => click('.composer [aria-label="关闭写信窗口"]'));
+    const exiting = await trace('composer exit', '.composer', () => click('.composer [aria-label="关闭写信窗口"]'), 700);
     if (!exiting.some(f => f.present && f.inert) || exiting.at(-1)?.present) throw new Error('Composer exit did not retain an inert outgoing surface then remove it');
     const settingsEnter = await trace('settings enter', '.settings-modal', () => click('.sidebar-footer .settings-button'), 800);
     assertInterpolated(settingsEnter, ['opacity', 'transform'], 'Settings enter');
     await waitForExpression(cdp, "document.querySelector('.settings-page')");
-    const section = await trace('settings page switch', '.settings-page', () => clickButton(cdp, '关于', "document.querySelector('.settings-modal')"));
-    assertInterpolated(section, ['opacity', 'transform'], 'Settings page switch');
+    const section = await trace('settings ready content switch', '.settings-ready-content', () => clickButton(cdp, '关于', "document.querySelector('.settings-modal')"));
+    assertInterpolated(section, ['opacity'], 'Settings ready content switch');
+    if (section.some(f => f.transform && f.transform !== 'none')) throw new Error('Settings content established a fixed-dialog containing block');
     await captureScreenshot(cdp, 'motion-settings-open');
     await click('[aria-label="关闭设置"]');
     await waitForExpression(cdp, "!document.querySelector('.settings-modal')");
@@ -418,7 +428,7 @@ export async function runMotionQuality(cdp, api) {
     await click('.settings-header-account-switcher .account-switcher-trigger');
     await click('.account-switcher-menu [data-context-item^="account-scope-"]:not([data-context-item="account-scope-all"])');
     await waitForExpression(cdp, "document.querySelector('.settings-page .settings-destination-row')");
-    const nestedPush = await trace('mobile settings nested forward', '.settings-page', async () => {
+    const nestedPush = await trace('mobile settings nested ready content', '.settings-ready-content', async () => {
       await clickButton(cdp, '服务器与协议', "document.querySelector('.settings-page')");
       await evalInPage(cdp, `(() => {
         const probe = document.createElement('div'); probe.dataset.motionFixedProbe = '1';
@@ -426,13 +436,13 @@ export async function runMotionQuality(cdp, api) {
         document.querySelector('.settings-page').append(probe);
       })()`);
     });
-    assertInterpolated(nestedPush, ['left'], 'Mobile settings nested forward');
-    if (!nestedPush.some(f => Number.parseFloat(f.left) > 1)) throw new Error('Nested settings forward lost its direction');
+    assertInterpolated(nestedPush, ['opacity'], 'Mobile settings ready content');
+    assertStationary(nestedPush, 'Mobile settings ready content');
     if (nestedPush.some(f => f.fixedProbeLeft !== undefined && Math.abs(f.fixedProbeLeft - 18) > 0.1)) throw new Error('Settings motion moved a fixed descendant');
     await captureScreenshot(cdp, 'motion-mobile-settings-detail');
-    const nestedPop = await trace('mobile settings nested backward', '.settings-page', () => click('.settings-mobile-back'));
-    assertInterpolated(nestedPop, ['left'], 'Mobile settings nested backward');
-    if (!nestedPop.some(f => Number.parseFloat(f.left) < -1)) throw new Error('Nested settings return lost its opposite direction');
+    const nestedPop = await trace('mobile settings nested return ready content', '.settings-ready-content', () => click('.settings-mobile-back'));
+    assertInterpolated(nestedPop, ['opacity'], 'Mobile settings return content');
+    assertStationary(nestedPop, 'Mobile settings return content');
     const settingsPop = await trace('mobile settings detail pop', '.settings-modal', () => click('.settings-mobile-back'));
     assertInterpolated(settingsPop, ['left'], 'Mobile settings detail pop');
     if (settingsPop.at(-1)?.present) throw new Error('Settings detail remained after returning to its root');

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { messagePageSize } from '../app/appConfig';
 import type { MessageSummary } from '../app/types';
 import useMailboxBootstrap from './useMailboxBootstrap';
+import { MailboxLoadError } from './mailboxLoadError';
 
 type BootstrapProps = {
   enabled?: boolean;
@@ -65,6 +66,16 @@ describe('useMailboxBootstrap', () => {
   beforeEach(() => {
     window.localStorage.clear();
     vi.clearAllMocks();
+  });
+
+  it('leaves the selected account intact when its list reports a local retryable loading error', async () => {
+    const view = renderBootstrap();
+    await act(async () => {});
+    view.refreshMailbox.mockRejectedValueOnce(new MailboxLoadError('offline'));
+    await act(async () => view.rerender({ accountScope: 2, folderId: 201, filter: 'all', listSort: 'newest' }));
+    expect(view.setAccountScope).not.toHaveBeenCalled();
+    expect(view.setStatus).not.toHaveBeenCalled();
+    expect(view.skipNextFolderEffectLoadRef.current).toBe(false);
   });
 
   it('claims a scope once when StrictMode replays mount effects', () => {

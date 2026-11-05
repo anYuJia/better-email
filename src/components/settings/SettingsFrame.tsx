@@ -20,6 +20,7 @@ import {
   getSettingsNavigationContext,
   getSettingsSectionPresentation,
   resolveSettingsNavigationSectionId,
+  type SettingsSearchEntry,
   type SettingsSectionId,
 } from './settingsNavigation';
 import './settings-tokens.css';
@@ -139,6 +140,7 @@ export default function SettingsFrame({
   const isMobileViewport = useSettingsMobileViewport();
   const isAccountScoped = accountScopedSections.has(activeSection);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [searchTarget, setSearchTarget] = useState<SettingsSearchEntry | null>(null);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [pendingAccountScope, setPendingAccountScope] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
@@ -149,6 +151,11 @@ export default function SettingsFrame({
   const onCloseRef = useRef(onClose);
   const closingRef = useRef(false);
   const handledNativeCloseRequestRef = useRef(0);
+
+  useEffect(() => {
+    setSearchTarget((current) => current?.section === activeSection ? current : null);
+  }, [activeSection]);
+  useEffect(() => { setSearchTarget(null); }, [accountScope, isClosing]);
 
   useModalAccessibility({
     dialogRef: shellRef,
@@ -372,7 +379,12 @@ export default function SettingsFrame({
             expanded={isSearchExpanded}
             onExpandedChange={setIsSearchExpanded}
             accountSectionsEnabled={accountSectionsEnabled}
-            onNavigate={onNavigate}
+            onNavigate={(entry) => {
+              // A new object also identifies a repeated search for the same
+              // target. The ready content, not a fixed delay, owns focus.
+              setSearchTarget({ ...entry });
+              onNavigate(entry.section);
+            }}
           />
           <div className="settings-header-actions" {...(isMobileViewport && isSearchExpanded ? { inert: '', 'aria-hidden': true } : {})}>
             {canActOnConnection && (
@@ -461,7 +473,7 @@ export default function SettingsFrame({
           <SettingsSidebar
             activeSection={activeSection}
             accountSectionsEnabled={accountSectionsEnabled}
-            onNavigate={onNavigate}
+            onNavigate={(section) => { setSearchTarget(null); onNavigate(section); }}
           />
           <div className="settings-content-area">
             <div className="settings-content">
@@ -471,6 +483,7 @@ export default function SettingsFrame({
                 item={activeItem}
                 accountScope={accountScope}
                 accounts={accounts}
+                searchTarget={isClosing ? null : searchTarget}
               >
                 {children}
               </SettingsPageShell>

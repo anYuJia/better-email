@@ -28,6 +28,9 @@ export default function useTrashController({
     const report = await invoke<TrashActionReport>(IPC.EmptyTrash, { accountId: targetAccountId });
     await refreshAll();
     setStatus(report.message);
+    if (report.remote_failed_count > 0 || report.remote_skipped_count > 0) {
+      throw new Error(report.message);
+    }
   }
 
   function emptyCurrentTrash() {

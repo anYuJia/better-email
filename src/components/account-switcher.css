@@ -57,6 +57,38 @@
   outline-offset: 1px;
 }
 
+/* The navigation identity has a compact mark; settings retains the compact
+ * scope selector and its existing layout. Neither variant adds a card. */
+.account-switcher--identity .account-switcher-trigger {
+  grid-template-columns: 32px minmax(0, 1fr) 14px;
+  min-height: 48px;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.account-switcher-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: var(--ui-surface-muted);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.account-switcher--identity .account-switcher-copy strong {
+  font-size: var(--ui-font-size-body);
+  line-height: 1.4;
+}
+
+.account-switcher--identity .account-switcher-copy > span {
+  font-weight: 400;
+  line-height: 1.4;
+}
+
 .account-switcher-copy {
   display: grid;
   min-width: 0;

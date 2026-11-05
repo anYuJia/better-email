@@ -1,15 +1,15 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { VolumeX } from 'lucide-react';
 import type { ThreadSummary } from '../app/types';
 import { formatDate, formatListDate } from '../mailUtils';
 import { calculateVisibleRange } from './messageListLayout';
+import useVirtualRowMeasurements from '../hooks/useVirtualRowMeasurements';
 
 /**
- * 会话行高 —— 与 `styles/message-list.css` 中 `.thread-card` 的
- * `height: 72px` 保持一致，虚拟计算高度必须等于实际渲染高度，
- * 否则滚动会跳动、选中/悬停会错位。
+ * Initial estimate only. Natural row height is measured so larger text and
+ * touch typography cannot be clipped or overlap the next virtual row.
  */
-export const THREAD_ROW_HEIGHT = 72;
+export const THREAD_ROW_HEIGHT = 80;
 
 function normalizedThreadText(value: string | undefined): string {
   return (value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
@@ -36,6 +36,7 @@ function threadPreview(thread: ThreadSummary): string {
 
 type ThreadListViewProps = {
   threads: ThreadSummary[];
+  listStateKey?: string;
   activeThread: ThreadSummary | null;
   onOpenThread: (thread: ThreadSummary) => void;
   onOpenThreadMenu: (thread: ThreadSummary, x: number, y: number) => void;
@@ -43,6 +44,7 @@ type ThreadListViewProps = {
 
 export default function ThreadListView({
   threads,
+  listStateKey = 'threads',
   activeThread,
   onOpenThread,
   onOpenThreadMenu,
@@ -50,6 +52,10 @@ export default function ThreadListView({
   const listRef = useRef<HTMLDivElement | null>(null);
   const rafIdRef = useRef<number | null>(null);
   const [viewportHeight, setViewportHeight] = useState(600);
+  const rowNodes = useRef(new Map<string, HTMLElement | null>());
+  const rowHeights = useRef(new Map<string, number>());
+  const [measurementVersion, setMeasurementVersion] = useState(0);
+  const onHeightsChanged = useCallback(() => setMeasurementVersion((value) => value + 1), []);
   const [visibleRange, setVisibleRange] = useState(() =>
     calculateVisibleRange([], 0, 600),
   );
@@ -58,13 +64,15 @@ export default function ThreadListView({
     const items: { top: number; height: number }[] = [];
     let top = 0;
     for (let i = 0; i < threads.length; i++) {
-      items.push({ top, height: THREAD_ROW_HEIGHT });
-      top += THREAD_ROW_HEIGHT;
+      const height = rowHeights.current.get(threads[i].thread_key) ?? THREAD_ROW_HEIGHT;
+      items.push({ top, height });
+      top += height;
     }
     return items;
-  }, [threads.length]);
+  }, [threads, measurementVersion]);
 
-  const totalHeight = layout.length === 0 ? 0 : THREAD_ROW_HEIGHT * layout.length;
+  const lastRow = layout[layout.length - 1];
+  const totalHeight = lastRow ? lastRow.top + lastRow.height : 0;
 
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
@@ -130,6 +138,19 @@ export default function ThreadListView({
     return items;
   }, [threads, visibleRange]);
 
+  const measuredRows = useMemo(() => visibleThreads.map(({ thread }) => ({
+    key: thread.thread_key, type: 'message' as const,
+  })), [visibleThreads]);
+  useVirtualRowMeasurements({
+    rows: measuredRows, nodes: rowNodes, heightCache: rowHeights,
+    messageHeight: THREAD_ROW_HEIGHT, headerHeight: 0,
+    contextKey: listStateKey, version: 0, onHeightsChanged,
+  });
+  useEffect(() => {
+    const keys = new Set(threads.map((thread) => thread.thread_key));
+    for (const key of rowHeights.current.keys()) if (!keys.has(key)) rowHeights.current.delete(key);
+  }, [threads]);
+
   return (
     <div className="thread-list" ref={listRef} role="list" aria-label="会话列表" onScroll={handleScroll}>
       {threads.length > 0 && (
@@ -149,6 +170,10 @@ export default function ThreadListView({
             return (
               <div
                 key={thread.thread_key}
+                ref={(node) => {
+                  if (node) rowNodes.current.set(thread.thread_key, node);
+                  else rowNodes.current.delete(thread.thread_key);
+                }}
                 className="thread-list-item"
                 role="listitem"
                 aria-current={activeThread?.thread_key === thread.thread_key ? 'true' : undefined}
@@ -159,7 +184,7 @@ export default function ThreadListView({
                   top: 0,
                   left: 0,
                   right: 0,
-                  height: THREAD_ROW_HEIGHT,
+                  height: layout[index].height,
                   transform: `translateY(${layout[index].top}px)`,
                 }}
               >

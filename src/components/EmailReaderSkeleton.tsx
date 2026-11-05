@@ -17,7 +17,7 @@ export function EmailHeaderSkeleton() {
 
 export function EmailBodySkeleton() {
   return (
-    <div className="email-reader-skeleton-body">
+    <div className="email-reader-skeleton-body" role="status" aria-busy="true" aria-label="正在加载邮件正文">
       <div className="skeleton-line skeleton-body-line width-90" />
       <div className="skeleton-line skeleton-body-line width-100" />
       <div className="skeleton-line skeleton-body-line width-95" />

@@ -7,15 +7,12 @@ afterEach(() => {
   cleanup();
 });
 
-function renderNav(filter: 'all' | 'starred' = 'all') {
+function renderNav() {
   const handlers = {
-    onOpenMail: vi.fn(),
-    onOpenStarred: vi.fn(),
     onCompose: vi.fn(),
     onComposeIntent: vi.fn(),
-    onOpenSettings: vi.fn(),
   };
-  const view = render(<MobileBottomNav filter={filter} {...handlers} />);
+  const view = render(<MobileBottomNav {...handlers} />);
   return { ...handlers, ...view };
 }
 
@@ -28,13 +25,10 @@ describe('MobileBottomNav', () => {
     expect(screen.getAllByRole('button')).toEqual([compose]);
     fireEvent.click(compose);
     expect(handlers.onCompose).toHaveBeenCalledTimes(1);
-    expect(handlers.onOpenMail).not.toHaveBeenCalled();
-    expect(handlers.onOpenStarred).not.toHaveBeenCalled();
-    expect(handlers.onOpenSettings).not.toHaveBeenCalled();
   });
 
   it('prepares the composer on pointer or keyboard intent without opening it early', () => {
-    const handlers = renderNav('starred');
+    const handlers = renderNav();
     const compose = screen.getByRole('button', { name: '写邮件' });
     fireEvent.pointerDown(compose);
     fireEvent.focus(compose);

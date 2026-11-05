@@ -45,7 +45,7 @@ function extractBlock(css, selector) {
 
 /** Extract a numeric value from a CSS declaration string. */
 function extractDecl(block, prop) {
-  const m = block.match(new RegExp(`${prop}\\s*:\\s*([0-9]+)(?:px)?`));
+  const m = block.match(new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([0-9]+)(?:px)?`));
   return m ? parseInt(m[1], 10) : null;
 }
 
@@ -103,12 +103,15 @@ describe('message list de-AI contract — rows are flat lines, not cards', () =>
     expect(blocks[0]).toMatch(/border-radius:\s*0/);
   });
 
-  it('message-card has no floating box-shadow (only inset divider allowed)', () => {
+  it('keeps flat rows with a one-pixel separator aligned to the text column', () => {
     const blocks = extractBlock(messageListCss, '.message-card');
     expect(blocks.length).toBeGreaterThan(0);
-    // The only shadow allowed on the base row is the inset 1px divider.
-    expect(blocks[0]).not.toMatch(/box-shadow:\s*var\(--ui-shadow(?!-none)/);
-    expect(blocks[0]).toMatch(/box-shadow:\s*inset 0 -1px 0 var\(--ui-border\)/);
+    expect(blocks[0]).toMatch(/box-shadow:\s*none/);
+    expect(blocks[0]).toMatch(/--mail-row-text-start:\s*64px/);
+    const divider = extractBlock(messageListCss, '.message-card::after,\n.thread-card::after')[0];
+    expect(divider).toMatch(/inset:\s*auto var\(--mail-row-divider-end\) 0 var\(--mail-row-text-start\)/);
+    expect(divider).toMatch(/height:\s*1px/);
+    expect(divider).toMatch(/pointer-events:\s*none/);
   });
 
   it('message-list-item has no margin/padding gap between rows', () => {
@@ -241,15 +244,15 @@ describe('message list de-AI contract — CSS/TS row-height chain', () => {
     expect(cssHeight).toBe(30);
   });
 
-  it('thread-card CSS height === THREAD_ROW_HEIGHT TS constant', () => {
+  it('thread-card minimum matches the estimate and permits measured text growth', () => {
     const cssBlocks = extractBlock(messageListCss, '.thread-card');
     expect(cssBlocks.length).toBeGreaterThan(0);
-    const cssHeight = extractDecl(cssBlocks[0], 'height');
+    const cssHeight = extractDecl(cssBlocks[0], 'min-height');
     const tsHeight = extractTsConst(threadTs, 'THREAD_ROW_HEIGHT');
     expect(cssHeight).not.toBeNull();
     expect(tsHeight).not.toBeNull();
     expect(cssHeight).toBe(tsHeight);
-    expect(cssHeight).toBe(72);
+    expect(extractDecl(cssBlocks[0], 'height')).toBeNull();
   });
 
   it('LIST_FOOTER_HEIGHT TS constant matches message-list-footer CSS height', () => {
@@ -270,11 +273,11 @@ describe('message list de-AI contract — thread list speaks the same language',
     expect(blocks[0]).toMatch(/border-radius:\s*0/);
   });
 
-  it('thread-card has no floating box-shadow (only inset divider)', () => {
+  it('thread-card shares the flat separator aligned to its own text column', () => {
     const blocks = extractBlock(messageListCss, '.thread-card');
     expect(blocks.length).toBeGreaterThan(0);
-    expect(blocks[0]).toMatch(/box-shadow:\s*inset 0 -1px 0 var\(--ui-border\)/);
-    expect(blocks[0]).not.toMatch(/box-shadow:\s*var\(--ui-shadow(?!-none)/);
+    expect(blocks[0]).toMatch(/box-shadow:\s*none/);
+    expect(blocks[0]).toMatch(/--mail-row-text-start:\s*30px/);
   });
 
   it('thread-card background is transparent by default', () => {
@@ -413,17 +416,16 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
     expect(activeRule).toMatch(/box-shadow:\s*var\(--ui-box-shadow-none\)/);
 
     const segment = extractBlock(messageListCss, '.app-shell .list-control-tabs');
-    expect(segment[0]).toMatch(/background:\s*var\(--ui-surface-muted\)/);
-    expect(segment[0]).toMatch(/border-radius:\s*var\(--ui-radius-control\)/);
+    expect(segment[0]).not.toMatch(/background:|box-shadow:|border-radius:/);
     const tabs = extractBlock(messageListCss, '.app-shell .list-control-tab-indicator');
     expect(tabs.length).toBeGreaterThan(0);
     const indicator = tabs.find((block) => block.includes('width:'));
     expect(indicator).toBeDefined();
     expect(indicator).toMatch(/width:\s*var\(--list-tab-indicator-width\)/);
-    expect(indicator).toMatch(/top:\s*2px/);
-    expect(indicator).toMatch(/bottom:\s*2px/);
-    expect(indicator).toMatch(/background:\s*var\(--ui-surface\)/);
-    expect(indicator).toMatch(/z-index:\s*0/);
+    expect(indicator).toMatch(/height:\s*2px/);
+    expect(indicator).toMatch(/bottom:\s*0/);
+    expect(indicator).toMatch(/background:\s*var\(--ui-text-secondary\)/);
+    expect(indicator).not.toMatch(/box-shadow:/);
     expect(indicator).toMatch(/pointer-events:\s*none/);
     expect(indicator).toMatch(/transform:\s*translateX\(0\)/);
     expect(indicator).toMatch(/transition:\s*transform var\(--ui-motion-normal\) var\(--ui-ease-emphasized\)/);
@@ -432,7 +434,7 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
     expect(tabButton[0]).toMatch(/z-index:\s*1/);
     const activeTab = extractBlock(messageListCss, '.app-shell .list-control-tabs > button.active');
     expect(activeTab[0]).toMatch(/color:\s*var\(--ui-text\)/);
-    expect(activeTab[0]).toMatch(/background:\s*transparent/);
+    expect(activeTab[0]).not.toMatch(/background:|box-shadow:/);
     expect(activeTab[0]).toMatch(/font-weight:\s*600/);
     expect(messageListCss).toMatch(
       /@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\.app-shell \.list-control-tab-indicator\s*\{\s*transition:\s*var\(--ui-transition-none\)/,
@@ -444,7 +446,7 @@ describe('message list de-AI contract — toolbar is a tool bar, not a SaaS head
     );
     expect(threadsIndicator.length).toBeGreaterThan(0);
     expect(threadsIndicator[0]).toMatch(
-      /transform:\s*translateX\(calc\(var\(--list-tab-indicator-width\) \+ var\(--list-tab-gap\)\)\)/,
+      /transform:\s*translateX\(calc\(100% \+ var\(--list-tab-gap\)\)\)/,
     );
   });
 

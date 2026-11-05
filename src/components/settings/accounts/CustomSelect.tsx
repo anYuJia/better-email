@@ -9,6 +9,7 @@ import {
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown } from 'lucide-react';
 import { useWheelContainment } from '../../../hooks/useWheelContainment';
+import { cancelMenuExit, enterMenu, exitMenu, finishMenuEnter, pauseMenuExit } from '../../../app/transientMenuMotion';
 
 type Option = {
   value: string;
@@ -61,13 +62,6 @@ const TYPEAHEAD_RESET_MS = 700;
 const MENU_GAP = 4;
 const VIEWPORT_GUTTER = 12;
 const MENU_MAX_HEIGHT = 280;
-const MENU_EXIT_MS = 120;
-
-function prefersReducedMotion() {
-  return typeof window === 'undefined'
-    || typeof window.matchMedia !== 'function'
-    || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
 
 /**
  * Shared dropdown control used across the settings workspace and the
@@ -93,7 +87,6 @@ export function CustomSelect({
   const activeOption = options.find((o) => o.value === value);
   const [open, setOpen] = useState(false);
   const [menuMounted, setMenuMounted] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
   const [activeValue, setActiveValue] = useState<string | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -101,14 +94,17 @@ export function CustomSelect({
   const comboboxId = useId();
   const listboxId = useId();
   const typeaheadRef = useRef({ query: '', updatedAt: 0 });
-  const closeTimerRef = useRef<number | null>(null);
+  const motionOwnerRef = useRef({});
+  const motionOpenRef = useRef(false);
+  const motionPanelRef = useRef<HTMLElement | null>(null);
   useWheelContainment(menuRef, active && menuMounted);
 
   useLayoutEffect(() => {
     if (active) return;
-    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+    cancelMenuExit(motionOwnerRef.current);
+    finishMenuEnter(motionPanelRef.current);
+    motionOpenRef.current = false;
     setOpen(false);
-    setMenuVisible(false);
     finishMenuClose();
     resetTypeahead();
   }, [active]);
@@ -143,21 +139,15 @@ export function CustomSelect({
     setMenuMounted(false);
     setActiveValue(null);
     setPlacement(null);
-    closeTimerRef.current = null;
   }
 
   function closeMenu({ restoreFocus = false } = {}) {
     setOpen(false);
-    setMenuVisible(false);
+    motionOpenRef.current = false;
     resetTypeahead();
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
-    }
-    if (prefersReducedMotion()) {
-      finishMenuClose();
-    } else {
-      closeTimerRef.current = window.setTimeout(finishMenuClose, MENU_EXIT_MS);
-    }
+    // Keep this exact listbox inert until its shared exit finishes. Reopening
+    // samples the painted frame instead of waiting another CSS-transition RAF.
+    exitMenu(menuRef.current, motionOwnerRef.current, finishMenuClose);
     if (restoreFocus && active && !triggerRef.current?.closest('[inert]')) {
       triggerRef.current?.focus();
     }
@@ -165,13 +155,9 @@ export function CustomSelect({
 
   function prepareMenuOpen() {
     if (!active || disabled) return;
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
+    pauseMenuExit(motionOwnerRef.current);
     if (!open) {
       if (!menuMounted) setPlacement(null);
-      setMenuVisible(false);
     }
     setMenuMounted(true);
     setOpen(true);
@@ -367,21 +353,22 @@ export function CustomSelect({
     };
   }, [active, dense, open, optionContentSignature]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active || !open || !menuMounted || !placement) return undefined;
-    const show = () => setMenuVisible(true);
-    if (typeof window.requestAnimationFrame === 'function') {
-      const frame = window.requestAnimationFrame(show);
-      return () => window.cancelAnimationFrame(frame);
-    }
-    const timer = window.setTimeout(show, 0);
-    return () => window.clearTimeout(timer);
+    const menu = menuRef.current;
+    if (!menu || motionOpenRef.current) return;
+    motionPanelRef.current = menu;
+    motionOpenRef.current = true;
+    enterMenu(menu, motionOwnerRef.current, placement.width / 2,
+      placement.opensAbove ? menu.getBoundingClientRect().height : 0, !placement.opensAbove);
   }, [active, menuMounted, open, placement]);
 
-  useEffect(() => () => {
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current);
-    }
+  useEffect(() => {
+    const owner = motionOwnerRef.current;
+    return () => {
+      finishMenuEnter(motionPanelRef.current);
+      cancelMenuExit(owner);
+    };
   }, []);
 
   useEffect(() => {
@@ -435,9 +422,10 @@ export function CustomSelect({
         <div
           ref={menuRef}
           id={listboxId}
-          className={`custom-select-dropdown${dense ? ' dense' : ''}${menuVisible ? ' is-open' : ''}`}
+          className={`custom-select-dropdown${dense ? ' dense' : ''}${open ? ' is-open' : ''}`}
           role="listbox"
           aria-hidden={!open}
+          {...(!open ? { inert: '' } : {})}
           aria-label={ariaLabel}
           aria-labelledby={ariaLabel ? undefined : comboboxId}
           data-portal-layer={portalZIndex}

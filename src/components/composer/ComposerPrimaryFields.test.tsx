@@ -135,6 +135,63 @@ describe('ComposerPrimaryFields', () => {
     mockLocalFileAssetUrl.mockReset();
   });
 
+  it.each([true, false])('allows Tab and Shift+Tab out of subject and body (rich=%s)', (richComposer) => {
+    const { onPatchDraft } = renderFields(draft({ subject: 'Subject', body: 'Body' }), richComposer);
+    const subject = screen.getByRole('textbox', { name: '主题' });
+    const body = screen.getByRole('textbox', { name: richComposer ? '邮件正文（富文本）' : '邮件正文' });
+    for (const field of [subject, body]) {
+      field.focus();
+      for (const shiftKey of [false, true]) {
+        expect(fireEvent.keyDown(field, { key: 'Tab', shiftKey })).toBe(true);
+      }
+    }
+    expect(onPatchDraft).not.toHaveBeenCalled();
+  });
+
+  it('uses explicit command shortcuts for rich-text indentation, leaving IME and modified Tab alone', () => {
+    renderFields(draft({ body: 'Body' }));
+    const body = screen.getByRole('textbox', { name: '邮件正文（富文本）' });
+    const original = Object.getOwnPropertyDescriptor(document, 'execCommand');
+    const execCommand = vi.fn(() => true);
+    Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommand });
+    try {
+      body.focus();
+      expect(fireEvent.keyDown(body, { key: ']', metaKey: true })).toBe(false);
+      expect(execCommand).toHaveBeenLastCalledWith('indent', false, undefined);
+      expect(fireEvent.keyDown(body, { key: '[', ctrlKey: true })).toBe(false);
+      expect(execCommand).toHaveBeenLastCalledWith('outdent', false, undefined);
+      execCommand.mockClear();
+      expect(fireEvent.keyDown(body, { key: ']', metaKey: true, isComposing: true, keyCode: 229 })).toBe(true);
+      expect(fireEvent.keyDown(body, { key: 'Tab', altKey: true })).toBe(true);
+      expect(execCommand).not.toHaveBeenCalled();
+    } finally {
+      if (original) Object.defineProperty(document, 'execCommand', original);
+      else Reflect.deleteProperty(document, 'execCommand');
+    }
+  });
+
+  it('indents and outdents selected plain-text lines without including the following line', async () => {
+    const initialDraft = draft({ body: 'first\nsecond\nthird' });
+    const { view, unmount } = renderFields(initialDraft, false);
+    unmount();
+    function Harness() {
+      const [current, setCurrent] = useState(initialDraft);
+      return cloneElement(view, { draft: current, onPatchDraft: (patch: Partial<DraftInput>) => setCurrent(prev => ({ ...prev, ...patch })) });
+    }
+    render(<Harness />);
+    const body = screen.getByRole('textbox', { name: '邮件正文' }) as HTMLTextAreaElement;
+    body.focus();
+    body.setSelectionRange(0, 13);
+    expect(fireEvent.keyDown(body, { key: ']', ctrlKey: true })).toBe(false);
+    expect(body.value).toBe('\tfirst\n\tsecond\nthird');
+    await waitFor(() => expect(body.selectionEnd).toBe(15));
+    expect(fireEvent.keyDown(body, { key: '[', metaKey: true })).toBe(false);
+    expect(body.value).toBe('first\nsecond\nthird');
+    await waitFor(() => expect(body.selectionEnd).toBe(13));
+    expect(fireEvent.keyDown(body, { key: 'Tab' })).toBe(true);
+    expect(body.value).toBe('first\nsecond\nthird');
+  });
+
   it('uses the app-controlled contact menu only after a query is entered', () => {
     const { container } = renderFields(draft());
     const recipient = screen.getByRole('combobox', { name: '收件人' });
@@ -170,6 +227,7 @@ describe('ComposerPrimaryFields', () => {
     const { onPatchDraft } = renderFields(draft(), true, vi.fn(), [ada, adaWu]);
     const recipient = screen.getByRole('combobox', { name: '收件人' });
 
+    fireEvent.focus(recipient);
     fireEvent.change(recipient, { target: { value: 'ada' } });
     fireEvent.keyDown(recipient, { key: 'ArrowDown' });
     fireEvent.keyDown(recipient, { key: 'Enter' });
@@ -177,7 +235,7 @@ describe('ComposerPrimaryFields', () => {
     expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'ada.wu@example.com' });
   });
 
-  it('shows four matches and keeps Tab as a literal character while arrows navigate suggestions', () => {
+  it('shows four matches and commits the keyboard-highlighted suggestion on Tab', () => {
     const contacts = Array.from({ length: 5 }, (_, index) => ({
       ...ada,
       id: index + 10,
@@ -195,12 +253,6 @@ describe('ComposerPrimaryFields', () => {
     expect(options).toHaveLength(4);
     expect(options[0].getAttribute('aria-selected')).toBe('true');
 
-    (recipient as HTMLInputElement).setSelectionRange(4, 4);
-    expect(fireEvent.keyDown(recipient, { key: 'Tab' })).toBe(false);
-    expect((recipient as HTMLInputElement).value).toBe('wang\t');
-    expect(options[0].getAttribute('aria-selected')).toBe('true');
-
-    // 建议导航只由 ArrowUp/ArrowDown 驱动。
     fireEvent.keyDown(recipient, { key: 'ArrowDown' });
     expect(options[1].getAttribute('aria-selected')).toBe('true');
 
@@ -208,7 +260,7 @@ describe('ComposerPrimaryFields', () => {
     expect(options[0].getAttribute('aria-selected')).toBe('true');
 
     fireEvent.keyDown(recipient, { key: 'ArrowDown' });
-    fireEvent.keyDown(recipient, { key: 'Enter' });
+    expect(fireEvent.keyDown(recipient, { key: 'Tab' })).toBe(true);
     expect(onPatchDraft).toHaveBeenLastCalledWith({ to: 'wang2@example.com' });
   });
 
@@ -216,6 +268,7 @@ describe('ComposerPrimaryFields', () => {
     const { container, onPatchDraft } = renderFields(draft());
     const recipient = screen.getByRole('combobox', { name: '收件人' });
 
+    fireEvent.focus(recipient);
     fireEvent.change(recipient, { target: { value: 'ada' } });
     fireEvent.keyDown(recipient, { key: 'Enter' });
 
@@ -229,6 +282,7 @@ describe('ComposerPrimaryFields', () => {
 
   it('removes the last chip with Backspace on an empty input', () => {
     const { container, onPatchDraft } = renderFields(draft());
+    fireEvent.focus(recipientInput(container));
     const recipient = screen.getByRole('combobox', { name: '收件人' });
 
     fireEvent.change(recipient, { target: { value: 'ada' } });
@@ -242,10 +296,12 @@ describe('ComposerPrimaryFields', () => {
     const { container, onPatchDraft } = renderFields(draft(), true, vi.fn(), [ada, adaWu]);
     const recipient = screen.getByRole('combobox', { name: '收件人' });
 
+    fireEvent.focus(recipient);
     fireEvent.change(recipient, { target: { value: 'ada' } });
     fireEvent.keyDown(recipient, { key: 'Enter' });
 
     const editorInput = recipientInput(container);
+    fireEvent.focus(editorInput);
     fireEvent.change(editorInput, { target: { value: 'ada.wu' } });
     fireEvent.keyDown(editorInput, { key: 'Enter' });
 

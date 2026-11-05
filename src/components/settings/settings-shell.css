@@ -657,16 +657,8 @@ body[data-settings-window-platform='macos']
   animation: none;
 }
 
-.settings-page-motion-forward,
-.settings-page-motion-backward,
-.settings-page-motion-lateral {
-  animation: settings-page-reveal var(--ui-motion-normal) var(--ui-ease-standard) backwards;
-}
-
-@keyframes settings-page-reveal {
-  from { opacity: 0.84; }
-  to { opacity: 1; }
-}
+/* Navigation/header stay stationary while only committed content reveals. */
+.settings-ready-content { min-width: 0; display: grid; gap: 24px; align-content: start; }
 
 .settings-page-header {
   flex: 0 0 auto;
@@ -731,6 +723,7 @@ body[data-settings-window-platform='macos']
 }
 
 .settings-page-loading {
+  min-height: 120px;
   flex: 1;
   display: grid;
   place-items: center;

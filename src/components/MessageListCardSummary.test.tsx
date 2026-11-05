@@ -154,7 +154,7 @@ describe('message list summary single-line rendering', () => {
     expect(container.querySelector('.message-card .message-chips')?.textContent).not.toContain('项目通知');
   });
 
-  it('reveals a circular upper-left checkbox in selection mode without shifting row content', () => {
+  it('reveals a square upper-left checkbox in selection mode without shifting row content', () => {
     const onToggleMessageSelection = vi.fn();
     injectCascade();
     const { container } = renderCard(messageWithLongPreview(), {
@@ -176,7 +176,7 @@ describe('message list summary single-line rendering', () => {
     expect(getComputedStyle(selection).top).toBe('0px');
     expect(getComputedStyle(selection).width).toBe('40px');
     expect(getComputedStyle(selection).height).toBe('40px');
-    expect(getComputedStyle(checkbox).borderRadius).toBe('50%');
+    expect(getComputedStyle(checkbox).borderRadius).toBe('4px');
     fireEvent.click(checkbox);
     expect(onToggleMessageSelection).toHaveBeenCalledWith(1, false);
 

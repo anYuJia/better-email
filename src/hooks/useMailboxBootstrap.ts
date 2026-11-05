@@ -5,6 +5,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from 'react';
+import { MailboxLoadError } from './mailboxLoadError';
 import { loadMailboxMessageLimit } from '../app/mailboxListState';
 import type {
   AccountScope,
@@ -18,6 +19,8 @@ type UseMailboxBootstrapOptions = {
   accountScope: AccountScope;
   /** Increments for every explicit account-scope selection, including same-scope reselects. */
   scopeRevision?: number;
+  /** Explicit folder intent, including same-folder reselects. */
+  folderRevision?: number;
   folderId: number | null;
   appliedQuery: string;
   filter: FilterMode;
@@ -45,6 +48,7 @@ export default function useMailboxBootstrap({
   enabled = true,
   accountScope,
   scopeRevision = 0,
+  folderRevision = 0,
   folderId,
   appliedQuery,
   filter,
@@ -111,6 +115,7 @@ export default function useMailboxBootstrap({
           return;
         }
         skipNextFolderEffectLoadRef.current = false;
+        if (error instanceof MailboxLoadError) return;
         if (typeof accountScope === 'number') {
           // The remembered account may have been removed. The new scope owns
           // its own bootstrap request on the next effect pass.
@@ -151,12 +156,12 @@ export default function useMailboxBootstrap({
         );
       })
       .catch((error) => {
-        if (active && refreshId === mailboxRefreshRef.current) {
+        if (active && refreshId === mailboxRefreshRef.current && !(error instanceof MailboxLoadError)) {
           setStatus(String(error));
         }
       });
     return () => {
       active = false;
     };
-  }, [enabled, folderId, filter, listSort]);
+  }, [enabled, folderId, folderRevision, filter, listSort]);
 }

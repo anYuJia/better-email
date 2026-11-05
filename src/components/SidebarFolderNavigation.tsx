@@ -236,6 +236,7 @@ export default function SidebarFolderNavigation({
   onFavoriteChange,
 }: SidebarFolderNavigationProps) {
   const [contextMenu, setContextMenu] = React.useState<{
+    targetKey: number;
     x: number;
     y: number;
     ariaLabel: string;
@@ -303,6 +304,7 @@ export default function SidebarFolderNavigation({
       const isFavorite = favoriteFolderKeySet.has(folderPreferenceKey(folder));
       const canToggleFavorite = !primaryFolderRoles.has(folder.role);
       setContextMenu({
+        targetKey: folder.id,
         x: event.clientX || bounds.right,
         y: event.clientY || bounds.bottom,
         ariaLabel: `${folder.name} 文件夹操作`,
@@ -367,22 +369,21 @@ export default function SidebarFolderNavigation({
   return (
     <>
       <nav className="folder-list primary-folder-list" aria-label="邮箱文件夹">
-        <FolderItems folders={[...primaryFolders, ...moreFolders]} {...folderItemProps} />
+        {primaryFolders.length > 0 && <div className="sidebar-folder-group" role="group" aria-label="常用邮箱">
+          <span className="sidebar-label" aria-hidden="true">常用邮箱</span>
+          <FolderItems folders={primaryFolders} {...folderItemProps} />
+        </div>}
+        {moreFolders.length > 0 && <div className="sidebar-folder-group" role="group" aria-label="其他文件夹">
+          <span className="sidebar-label" aria-hidden="true">其他文件夹</span>
+          <FolderItems folders={moreFolders} {...folderItemProps} />
+        </div>}
       </nav>
 
       {children && <div className="sidebar-secondary sidebar-quick-menus">{children}</div>}
 
-      {contextMenu && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          items={contextMenu.items}
-          title={contextMenu.title}
-          detail={contextMenu.detail}
-          ariaLabel={contextMenu.ariaLabel}
-          onClose={() => setContextMenu(null)}
-        />
-      )}
+      <ContextMenu menu={contextMenu ? {
+        ...contextMenu, onClose: () => setContextMenu(null),
+      } : null} />
     </>
   );
 }

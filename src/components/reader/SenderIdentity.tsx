@@ -18,6 +18,9 @@ function recipientDisplayName(address: string, accountEmail: string) {
 
 export default function SenderIdentity({ message, onComposeNew }: SenderIdentityProps) {
   const senderEmail = message.sender_email.trim();
+  const senderName = message.sender_name.trim();
+  const hasDistinctName = Boolean(senderName && senderName.toLocaleLowerCase() !== senderEmail.toLocaleLowerCase());
+  const senderLabel = hasDistinctName ? senderName : senderEmail || senderName || '未知发件人';
   const recipientGroups = recipientGroupsForMessage(message);
   const recipientCount = recipientGroups.reduce((total, group) => total + group.addresses.length, 0);
   const allRecipientText = recipientGroups
@@ -43,9 +46,16 @@ export default function SenderIdentity({ message, onComposeNew }: SenderIdentity
           className={`reader-avatar avatar-tone-${senderAvatarTone(message.sender_name, message.sender_email)}`}
         />
         <span className="reader-sender-copy">
-          <strong title={message.sender_name || message.sender_email}>{message.sender_name || message.sender_email}</strong>
+          <strong title={senderLabel}>
+            {!hasDistinctName && senderEmail && onComposeNew ? (
+              <button type="button" className="reader-sender-email" title={`写信给 ${senderEmail}`}
+                onClick={(event) => { event.stopPropagation(); onComposeNew({ to: senderEmail }); }}>
+                {senderLabel}
+              </button>
+            ) : senderLabel}
+          </strong>
           <span className="reader-sender-email-line">
-            {senderEmail && onComposeNew ? (
+            {hasDistinctName && senderEmail && onComposeNew ? (
               <button
                 type="button"
                 className="reader-sender-email"
@@ -57,9 +67,9 @@ export default function SenderIdentity({ message, onComposeNew }: SenderIdentity
               >
                 {senderEmail}
               </button>
-            ) : (
+            ) : hasDistinctName && senderEmail ? (
               <span className="reader-sender-email-text">{message.sender_email}</span>
-            )}
+            ) : null}
             {recipientSummary && (
               <span className="reader-recipient-summary" title={allRecipientText}>{recipientSummary}</span>
             )}

@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { Check, ChevronRight } from 'lucide-react';
 import { useWheelContainment } from '../hooks/useWheelContainment';
 import { focusMenuItem, focusPastMenu } from '../app/menuFocus';
-import { enterMenu, exitMenu, finishMenuEnter } from '../app/transientMenuMotion';
+import { cancelMenuExit, enterMenu, exitMenu, finishMenuEnter } from '../app/transientMenuMotion';
+import useExitPresence from '../hooks/useExitPresence';
 import './context-menu.css';
 
 export type ContextMenuItem = {
@@ -22,7 +23,9 @@ export type ContextMenuItem = {
   onSelect?: () => void;
 };
 
-type ContextMenuProps = {
+export type ContextMenuProps = {
+  /** Logical command target; keep stable across rerenders/reopening. */
+  targetKey?: string | number;
   x: number;
   y: number;
   items: ContextMenuItem[];
@@ -301,7 +304,18 @@ export function ContextMenuContent({
   );
 }
 
-export default function ContextMenu({
+/** Keep this owner mounted with menu=null so dismissal can retain its exact
+ * inert DOM. Existing direct-prop callers remain supported. */
+export default function ContextMenu(props: ContextMenuProps | { menu: ContextMenuProps | null }) {
+  const next = 'menu' in props ? props.menu : props;
+  const retained = useRef<ContextMenuProps | null>(next);
+  if (next) retained.current = next;
+  const present = useExitPresence(Boolean(next), 120);
+  return present && retained.current ? <ContextMenuSurface {...retained.current} active={Boolean(next)} /> : null;
+}
+
+function ContextMenuSurface({
+  targetKey,
   x,
   y,
   items,
@@ -312,9 +326,13 @@ export default function ContextMenu({
   title,
   detail,
   note,
-}: ContextMenuProps) {
+  active,
+}: ContextMenuProps & { active: boolean }) {
+  // A moved anchor also starts a new branch context: fixed flyout coordinates
+  // from the previous anchor cannot be reused. Keep the outer motion DOM.
+  const contentKey = JSON.stringify([targetKey ?? null, x, y]);
   const menuRef = useRef<HTMLDivElement>(null);
-  useWheelContainment(menuRef);
+  useWheelContainment(menuRef, active);
   const [position, setPosition] = useState({ x, y });
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const motionOwnerRef = useRef<object | null>(null);
@@ -325,7 +343,6 @@ export default function ContextMenu({
     if (dismissedRef.current) return;
     dismissedRef.current = true;
     const menu = menuRef.current;
-    exitMenu(menu, motionOwnerRef.current ?? document.body);
     if (!skipFocusRestoreRef.current) previousFocusRef.current?.focus({ preventScroll: true });
     skipFocusRestoreRef.current = true;
     menu?.setAttribute('inert', '');
@@ -337,6 +354,10 @@ export default function ContextMenu({
   useLayoutEffect(() => {
     const menu = menuRef.current;
     if (!menu) return;
+    if (!active) {
+      exitMenu(menu, motionOwnerRef.current ?? menu);
+      return;
+    }
     const updatePosition = () => {
       const margin = 8;
       const width = Math.min(
@@ -374,15 +395,24 @@ export default function ContextMenu({
     // can extend past the viewport with no remaining internal scroll range.
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updatePosition);
     observer?.observe(menu);
-    return () => { observer?.disconnect(); finishMenuEnter(menu); };
-  }, [x, y, closeIgnoreRef]);
+    return () => { observer?.disconnect(); };
+  }, [active, x, y, closeIgnoreRef, contentKey]);
 
   useEffect(() => {
+    const panel = menuRef.current;
+    return () => {
+      finishMenuEnter(panel);
+      if (motionOwnerRef.current) cancelMenuExit(motionOwnerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!active) return undefined;
     // 记录打开菜单前的焦点（右键目标或触发按钮），关闭时按规则恢复。
     // 不用“只执行一次”标记：React StrictMode 会先执行一次
     // setup/cleanup 探测。如果跳过第二次 setup，菜单将保留在背景焦点。
     skipFocusRestoreRef.current = false;
-    if (document.activeElement instanceof HTMLElement) {
+    if (document.activeElement instanceof HTMLElement && !menuRef.current?.contains(document.activeElement)) {
       previousFocusRef.current = document.activeElement;
     }
     menuRef.current
@@ -402,9 +432,10 @@ export default function ContextMenu({
         }
       }
     };
-  }, []);
+  }, [active, contentKey]);
 
   useEffect(() => {
+    if (!active) return undefined;
     function handlePointerDown(event: PointerEvent) {
       if (dismissedRef.current) return;
       const target = event.target as Node;
@@ -414,7 +445,7 @@ export default function ContextMenu({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (dismissedRef.current) return;
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !event.isComposing && event.keyCode !== 229) {
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
@@ -454,7 +485,7 @@ export default function ContextMenu({
       window.removeEventListener('resize', handleViewportChange);
       window.removeEventListener('scroll', handleViewportChange, true);
     };
-  }, [closeIgnoreRef, dismiss]);
+  }, [active, closeIgnoreRef, dismiss]);
 
   return createPortal(
     <div
@@ -465,9 +496,12 @@ export default function ContextMenu({
         className ?? '',
       ].filter(Boolean).join(' ')}
       style={{ left: position.x, top: position.y }}
+      aria-hidden={!active || undefined}
+      {...(!active ? { inert: '' } : {})}
       onContextMenu={(event) => event.preventDefault()}
     >
       <ContextMenuContent
+        key={contentKey}
         items={items}
         onClose={dismiss}
         ariaLabel={ariaLabel}

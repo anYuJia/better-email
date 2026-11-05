@@ -187,8 +187,13 @@ export default function useMailboxSelectionController({
 
   // Never expose another message's content while actions already target the new
   // selection. The reader renders an explicit loading/error surface instead.
-  const readerSelectedDetail = selectedDetail?.id === selectedId
-    && detailContextKeyRef.current === mailboxContextKey ? selectedDetail : null;
+  // A cache hit is already usable in this render. Waiting for the effect to
+  // copy it into state briefly replaces the reader with a loading surface.
+  // Context changes and explicit invalidation must still hide stale content.
+  const readerSelectedDetail = detailContextKeyRef.current === mailboxContextKey
+    ? selectedDetail?.id === selectedId ? selectedDetail
+      : selectedId == null ? null : messageDetailCacheRef.current.peek(selectedId) ?? null
+    : null;
   const visibleDetailLoadState: MessageDetailLoadState = selectedId == null || readerSelectedDetail
     ? { status: 'idle' }
     : detailLoadState.status !== 'idle' && detailLoadState.messageId === selectedId

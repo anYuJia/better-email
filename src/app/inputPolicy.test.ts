@@ -6,37 +6,30 @@ afterEach(() => {
 });
 
 describe('input policy', () => {
-  it('keeps Tab literal inside Composer and leaves non-Composer Tab alone', () => {
+  it('leaves Tab and Shift+Tab navigation intact in every composer text control', () => {
     document.body.innerHTML = `
       <section class="composer">
         <input id="composer-input" value="ab">
+        <input id="contact-search" type="search" value="Ada">
+        <textarea id="composer-body">body</textarea>
+        <div id="rich-body" contenteditable="true">rich body</div>
       </section>
       <input id="outside-input" value="cd">
     `;
     installInputPolicy();
 
-    const composerInput = document.getElementById('composer-input') as HTMLInputElement;
-    composerInput.focus();
-    composerInput.setSelectionRange(2, 2);
-    const composerTab = new KeyboardEvent('keydown', {
-      key: 'Tab',
-      bubbles: true,
-      cancelable: true,
-    });
-    composerInput.dispatchEvent(composerTab);
-
-    expect(composerTab.defaultPrevented).toBe(true);
-    expect(composerInput.value).toBe('ab\t');
-    expect(document.activeElement).toBe(composerInput);
-
-    const outsideInput = document.getElementById('outside-input') as HTMLInputElement;
-    const outsideTab = new KeyboardEvent('keydown', {
-      key: 'Tab',
-      bubbles: true,
-      cancelable: true,
-    });
-    outsideInput.dispatchEvent(outsideTab);
-    expect(outsideTab.defaultPrevented).toBe(false);
+    for (const control of document.querySelectorAll<HTMLElement>('input, textarea, [contenteditable]')) {
+      control.focus();
+      const before = control.outerHTML;
+      const value = control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement ? control.value : control.textContent;
+      for (const shiftKey of [false, true]) {
+        const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+        control.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(false);
+        expect(control.outerHTML).toBe(before);
+        expect(control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement ? control.value : control.textContent).toBe(value);
+      }
+    }
   });
 
   it('disables writing assistance on dynamically focused text controls', () => {

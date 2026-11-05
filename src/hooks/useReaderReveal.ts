@@ -8,13 +8,13 @@ export default function useReaderReveal(
   ready: boolean,
 ) {
   const revealedKey = useRef<string | null>(null);
-  const lastReadyAt = useRef<number | null>(null);
+  const hasRevealed = useRef(false);
 
   useLayoutEffect(() => {
     if (!messageKey) {
       revealedKey.current = null;
     }
-    if (!ready || !messageKey || revealedKey.current === messageKey) return undefined;
+    if (!ready || !messageKey || hasRevealed.current || revealedKey.current === messageKey) return undefined;
     const panel = readerRef.current;
     if (!panel) return undefined;
     const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)');
@@ -27,21 +27,19 @@ export default function useReaderReveal(
     const tokens = getComputedStyle(document.documentElement);
     const duration = Number.parseFloat(tokens.getPropertyValue('--ui-motion-normal')) || 180;
     const easing = tokens.getPropertyValue('--ui-ease-emphasized').trim() || 'cubic-bezier(0.16, 1, 0.3, 1)';
-    // During continuous browsing, show the next text at full opacity instead
-    // of darkening it again. Keep the timestamp through brief empty/loading
-    // selections; that intermediate state is part of the same browsing burst.
-    const continuous = lastReadyAt.current !== null && performance.now() - lastReadyAt.current < duration;
-    const animations = continuous ? [] : Array.from(panel.querySelectorAll<HTMLElement>(
+    // Reading text never fades. Only the first arrival receives a small
+    // positional settle; further selections render immediately at full opacity.
+    const animations = Array.from(panel.querySelectorAll<HTMLElement>(
       '.reader-title-block, .reader > .reader-html-container, .reader > .body-text',
     )).flatMap((element) => typeof element.animate === 'function' ? [element.animate(
-      [{ opacity: 0.72, translate: '0 2px' }, { opacity: 1, translate: '0 0' }],
+      [{ translate: '0 2px' }, { translate: '0 0' }],
       { duration, easing },
     )] : []);
     // Mark it only after a paint: StrictMode's setup/cleanup probe must not
     // consume the reveal before the real surface has ever been displayed.
     const frame = window.requestAnimationFrame(() => {
       revealedKey.current = messageKey;
-      lastReadyAt.current = performance.now();
+      hasRevealed.current = true;
     });
     const cancel = () => animations.forEach((animation) => animation.cancel());
     const preferenceChanged = () => { if (reduced?.matches) cancel(); };

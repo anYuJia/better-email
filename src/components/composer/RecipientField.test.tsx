@@ -67,15 +67,43 @@ describe('RecipientField keyboard', () => {
     expect(input.getAttribute('aria-controls')).toBe(listbox.id);
   });
 
-  it('inserts a tab character instead of moving focus', async () => {
-    renderField();
+  it('commits the visible suggestion on Tab without cancelling native focus traversal', async () => {
+    const onChange = vi.fn();
+    renderField(onChange);
+    const input = recipientInput();
+    await openSuggestions(input);
+    expect(screen.getByRole('option').tabIndex).toBe(-1);
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
+    await act(async () => {});
+    expect(onChange).toHaveBeenCalledWith('ada@example.com');
+    expect(input.value).toBe('');
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('leaves Shift+Tab free without choosing a suggestion or modifying text', async () => {
+    const onChange = vi.fn();
+    renderField(onChange);
+    const input = recipientInput();
+    await openSuggestions(input);
+    expect(fireEvent.keyDown(input, { key: 'Tab', shiftKey: true })).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('ada');
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('commits a valid unmatched email on Tab but preserves incomplete input', () => {
+    const onChange = vi.fn();
+    renderField(onChange);
     const input = recipientInput();
     fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: 'ada' } });
-    input.setSelectionRange(3, 3);
-    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(false);
-    await act(async () => {});
-    expect(input.value).toBe('ada\t');
+    fireEvent.change(input, { target: { value: 'new@example.com' } });
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
+    expect(onChange).toHaveBeenLastCalledWith('new@example.com');
+    onChange.mockClear();
+    fireEvent.change(input, { target: { value: 'unfinished@' } });
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
+    expect(input.value).toBe('unfinished@');
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('keeps focus in the field when Escape closes the suggestions', async () => {
@@ -99,6 +127,54 @@ describe('RecipientField keyboard', () => {
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onChange).toHaveBeenCalledWith(expect.stringContaining('ada@example.com'));
+  });
+
+  it('never commits a dismissed contact on Enter or Tab', async () => {
+    const onChange = vi.fn();
+    renderField(onChange);
+    const input = recipientInput();
+    await openSuggestions(input);
+    fireEvent.keyDown(input, { key: 'Escape' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('ada');
+    expect(screen.getByRole('status').textContent).toContain('完整邮箱地址');
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('does not confirm a contact while IME owns Tab', async () => {
+    const onChange = vi.fn();
+    renderField(onChange);
+    const input = recipientInput();
+    await openSuggestions(input);
+    fireEvent.compositionStart(input);
+    expect(fireEvent.keyDown(input, { key: 'Tab', isComposing: true, keyCode: 229 })).toBe(true);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input.value).toBe('ada');
+  });
+
+  it.each(['Tab', 'Enter'])('preserves a complete typed address over the fuzzy default match on %s', async (key) => {
+    const onChange = vi.fn();
+    renderField(onChange);
+    const input = recipientInput();
+    input.focus();
+    fireEvent.change(input, { target: { value: 'a@example.com' } });
+    expect(screen.getAllByRole('option').length).toBeGreaterThan(0);
+    fireEvent.keyDown(input, { key });
+    expect(onChange).toHaveBeenLastCalledWith('a@example.com');
+  });
+
+  it('honors a deliberately highlighted contact over a complete typed address', () => {
+    const onChange = vi.fn();
+    renderField(onChange);
+    const input = recipientInput();
+    input.focus();
+    fireEvent.change(input, { target: { value: 'a@example.com' } });
+    expect(screen.getByRole('option').textContent).toContain('ada@example.com');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Tab' });
+    expect(onChange).toHaveBeenLastCalledWith('ada@example.com');
   });
 
   it('does not treat IME Enter as recipient confirmation', async () => {

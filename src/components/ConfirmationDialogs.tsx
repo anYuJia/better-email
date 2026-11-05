@@ -128,7 +128,8 @@ export default function ConfirmationDialogs({
         open={!!confirmEmptyTrashState}
         title="清空废纸篓"
         summaryText={confirmEmptyTrashState ? `确认要清空账号 "${confirmEmptyTrashState.accountName}" 的废纸篓吗？` : '确认要清空当前账号的废纸篓吗？'}
-        description="此操作不可逆。废纸篓中所有已删除的邮件都将被永久从本地和服务器上删除，无法恢复。"
+        description="此操作不可逆。服务器确认删除后才会删除本地副本；连接失败的邮件会保留，供你重试。仅本地及 POP3 邮件只删除本地副本。"
+        confirmText="清空废纸篓"
         onConfirm={async () => {
           if (confirmEmptyTrashState) {
             await onEmptyTrashConfirmed(confirmEmptyTrashState.accountId);
@@ -145,7 +146,8 @@ export default function ConfirmationDialogs({
             ? `确认要永久删除选中的 ${confirmPermanentlyDelete.length} 封邮件吗？`
             : `确认要永久删除邮件 "${confirmPermanentlyDelete[0]?.subject || '(无主题)'}" 吗？`
           : '确认要永久删除选中的邮件吗？'}
-        description="此操作不可逆。邮件将被直接从服务器及本地存储中彻底抹去，无法从废纸篓找回。"
+        description="此操作不可逆。服务器确认删除后才会删除本地副本；连接失败的邮件会保留，供你重试。仅本地及 POP3 邮件只删除本地副本。"
+        confirmText="永久删除"
         onConfirm={async () => {
           if (confirmPermanentlyDelete) {
             await onPermanentlyDeleteConfirmed(confirmPermanentlyDelete);

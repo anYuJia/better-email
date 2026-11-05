@@ -1,0 +1,71 @@
+.composer-loading-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-composer, 1000);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 16px;
+  pointer-events: none;
+}
+
+.composer-loading {
+  pointer-events: auto;
+  color: var(--ui-text);
+}
+
+.composer-loading header {
+  flex: 0 0 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-inline: 20px;
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 15px;
+}
+
+.composer-loading header button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ui-radius-control);
+  background: transparent;
+  color: var(--ui-text-secondary);
+}
+
+.composer-loading header button:hover { background: var(--ui-control-hover); }
+.composer-loading header button:active { background: var(--ui-control-pressed); }
+.composer-loading header button:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+
+.composer-loading-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px 0;
+  font-size: 13px;
+  color: var(--ui-text-secondary);
+}
+
+.composer-loading-fields { padding-inline: 20px; }
+.composer-loading-fields > div {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 48px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text-tertiary);
+  font-size: 13px;
+}
+.composer-loading-fields span { width: 4em; flex: 0 0 auto; }
+.composer-loading-fields i { width: 30%; height: 8px; background: var(--ui-surface-muted); border-radius: 4px; }
+.composer-loading-body { flex: 1; }
+.composer-loading footer { flex: 0 0 64px; border-top: 1px solid var(--ui-border); }
+
+  .composer-loading-layer.is-mobile { padding: 0; pointer-events: auto; background: var(--ui-surface); }
+  .composer-loading-layer.is-mobile .composer-frame { width: 100%; height: 100dvh; max-width: none; max-height: none; border: 0; border-radius: 0; box-shadow: none; }
+  .composer-loading-layer.is-mobile header { flex-basis: 56px; padding-inline: 16px; }
+  .composer-loading-layer.is-mobile header button { width: 44px; height: 44px; }
+  .composer-loading-layer.is-mobile header button svg { width: 20px; height: 20px; }

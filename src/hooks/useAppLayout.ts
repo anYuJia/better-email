@@ -25,6 +25,7 @@ type LayoutResize = {
   origin: AppLayout;
   captureTarget: HTMLButtonElement | null;
   pointerId: number | null;
+  surface: HTMLElement | null;
 };
 
 export default function useAppLayout() {
@@ -56,29 +57,22 @@ export default function useAppLayout() {
     }
   }, [preferredLayout]);
 
-  const applyResize = useCallback((resize: LayoutResize, clientX: number) => {
-    preferenceChangedRef.current = true;
+  const resizedLayout = useCallback((resize: LayoutResize, clientX: number) => {
     const delta = clientX - resize.startX;
-    if (resize.pane === 'sidebar') {
-      setPreferredLayout({
-        ...resize.origin,
-        sidebar: clampNumber(
-          resize.origin.sidebar + delta,
-          APP_LAYOUT_BOUNDS.sidebar.min,
-          APP_LAYOUT_BOUNDS.sidebar.max,
-        ),
-      });
-      return;
-    }
-    setPreferredLayout({
+    const bounds = APP_LAYOUT_BOUNDS[resize.pane];
+    return fitAppLayout({
       ...resize.origin,
-      list: clampNumber(
-        resize.origin.list + delta,
-        APP_LAYOUT_BOUNDS.list.min,
-        APP_LAYOUT_BOUNDS.list.max,
-      ),
-    });
+      [resize.pane]: clampNumber(resize.origin[resize.pane] + delta, bounds.min, bounds.max),
+    }, window.innerWidth);
   }, []);
+
+  const paintResize = useCallback((resize: LayoutResize, clientX: number) => {
+    const next = resizedLayout(resize, clientX);
+    resize.surface?.style.setProperty('--app-sidebar-width-preferred', `${next.sidebar}px`);
+    resize.surface?.style.setProperty('--app-list-width-preferred', `${next.list}px`);
+    resize.captureTarget?.setAttribute('aria-valuenow', String(next[resize.pane]));
+    resize.captureTarget?.setAttribute('aria-valuetext', `${next[resize.pane]} 像素`);
+  }, [resizedLayout]);
 
   const adjustAppLayout = useCallback((pane: ResizablePane, delta: number) => {
     preferenceChangedRef.current = true;
@@ -107,8 +101,11 @@ export default function useAppLayout() {
       cancelAnimationFrame(resizeRafRef.current);
       resizeRafRef.current = null;
     }
-    applyResize(resize, latestClientXRef.current);
+    preferenceChangedRef.current = true;
+    paintResize(resize, latestClientXRef.current);
+    setPreferredLayout(resizedLayout(resize, latestClientXRef.current));
     document.body.classList.remove('pane-resizing');
+    document.dispatchEvent(new Event('better-email:pane-resize-end'));
     if (
       resize.captureTarget
       && resize.pointerId !== null
@@ -116,11 +113,15 @@ export default function useAppLayout() {
     ) {
       resize.captureTarget.releasePointerCapture(resize.pointerId);
     }
-  }, [applyResize]);
+  }, [paintResize, resizedLayout]);
 
-  useEffect(() => () => {
-    finishResize();
-    document.body.classList.remove('pane-resizing');
+  useEffect(() => {
+    window.addEventListener('blur', finishResize);
+    return () => {
+      window.removeEventListener('blur', finishResize);
+      finishResize();
+      document.body.classList.remove('pane-resizing');
+    };
   }, [finishResize]);
 
   const beginResize = useCallback((
@@ -136,6 +137,7 @@ export default function useAppLayout() {
       origin: appLayout,
       captureTarget,
       pointerId,
+      surface: captureTarget?.closest<HTMLElement>('.app-shell') ?? null,
     };
     resizeActiveRef.current = true;
     document.body.classList.add('pane-resizing');
@@ -156,7 +158,7 @@ export default function useAppLayout() {
   ) => {
     event.preventDefault();
     if (resizeRef.current) return;
-    beginResize(pane, event.clientX);
+    beginResize(pane, event.clientX, event.currentTarget);
   }, [beginResize]);
 
   const moveResize = useCallback((clientX: number) => {
@@ -168,10 +170,10 @@ export default function useAppLayout() {
       resizeRafRef.current = null;
       const currentResize = resizeRef.current;
       if (currentResize) {
-        applyResize(currentResize, latestClientXRef.current);
+        paintResize(currentResize, latestClientXRef.current);
       }
     });
-  }, [applyResize]);
+  }, [paintResize]);
 
   const moveLayoutResize = useCallback((event: PointerEvent<HTMLElement>) => {
     moveResize(event.clientX);

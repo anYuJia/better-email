@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { useLayoutEffect } from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import useMailboxSelectionController from './useMailboxSelectionController';
 import type { Attachment, Folder, MailStats, Message, MessageSummary, ThreadSummary } from '../app/types';
@@ -96,8 +97,10 @@ function renderController({
     mailboxContextKey: string;
     remoteImageTrusts?: Parameters<typeof useMailboxSelectionController>[0]['remoteImageTrusts'];
   } = { mailboxContextKey };
+  const commits: Array<{ selectedId: number | null; detailId: number | null; loading: string; attachmentsLoaded: boolean }> = [];
   const hook = renderHook(
-    (props: { mailboxContextKey: string; remoteImageTrusts?: Parameters<typeof useMailboxSelectionController>[0]['remoteImageTrusts'] }) => useMailboxSelectionController({
+    (props: { mailboxContextKey: string; remoteImageTrusts?: Parameters<typeof useMailboxSelectionController>[0]['remoteImageTrusts'] }) => {
+      const result = useMailboxSelectionController({
       messages,
       threadMessages,
       threads,
@@ -107,10 +110,16 @@ function renderController({
       mailboxContextKey: props.mailboxContextKey,
       remoteImageTrusts: props.remoteImageTrusts ?? remoteImageTrusts,
       ...setters,
-    }),
+      });
+      useLayoutEffect(() => {
+        commits.push({ selectedId: result.selectedId, detailId: result.readerSelectedDetail?.id ?? null,
+          loading: result.detailLoadState.status, attachmentsLoaded: result.attachmentsLoaded });
+      });
+      return result;
+    },
     { initialProps },
   );
-  return { ...hook, setters };
+  return { ...hook, setters, commits };
 }
 
 describe('useMailboxSelectionController', () => {
@@ -137,6 +146,39 @@ describe('useMailboxSelectionController', () => {
       expect(result.current.readerSelectedDetail?.id).toBe(1);
     });
     expect(result.current.readerSelectedDetail?.subject).toBe('Subject 1');
+  });
+
+  it('revisits a cached message without committing a loading surface or reusing another message attachment state', async () => {
+    mockInvoke.mockImplementation(((command: string, args?: { messageId: number }) => command === 'get_message_detail'
+      ? Promise.resolve(message(args!.messageId)) : Promise.resolve([])) as never);
+    const { result, commits } = renderController();
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(result.current.attachmentsLoaded).toBe(true));
+    act(() => result.current.setSelectedId(2));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(2));
+    await waitFor(() => expect(result.current.attachmentsLoaded).toBe(true));
+    commits.length = 0;
+    act(() => result.current.setSelectedId(1));
+    expect(commits[0]).toEqual({ selectedId: 1, detailId: 1, loading: 'idle', attachmentsLoaded: false });
+    expect(commits.every(commit => commit.detailId === 1 && commit.loading === 'idle')).toBe(true);
+    expect(mockInvoke.mock.calls.filter(([command]) => command === 'get_message_detail')).toHaveLength(2);
+  });
+
+  it('does not reveal cached content on the first commit after a mailbox context change', async () => {
+    let resolveReload!: (value: Message) => void;
+    mockInvoke.mockImplementation(((command: string) => command === 'get_message_detail'
+      ? Promise.resolve(message(1)) : Promise.resolve([])) as never);
+    const { result, rerender, commits } = renderController();
+    act(() => result.current.setSelectedId(1));
+    await waitFor(() => expect(result.current.readerSelectedDetail?.id).toBe(1));
+    mockInvoke.mockImplementation(((command: string) => command === 'get_message_detail'
+      ? new Promise<Message>(resolve => { resolveReload = resolve; }) : Promise.resolve([])) as never);
+    commits.length = 0;
+    rerender({ mailboxContextKey: '1|101|new-search|all|messages' });
+    expect(commits[0].detailId).toBeNull();
+    expect(commits.every(commit => commit.detailId === null && commit.loading === 'loading')).toBe(true);
+    await act(async () => resolveReload(message(1, { body: 'Reloaded content' })));
+    expect(result.current.readerSelectedDetail?.body).toBe('Reloaded content');
   });
 
   it('syncs optimistic label updates to both list and thread caches and selected detail', async () => {
@@ -556,7 +598,7 @@ describe('useMailboxSelectionController', () => {
     expect(result.current.bodyFetchState).toEqual({ messageId: 2, status: 'loading', error: null });
     expect(setters.setStatus).not.toHaveBeenCalled();
     act(() => result.current.setSelectedId(1));
-    await waitFor(() => expect(result.current.bodyFetchState).toEqual({ messageId: 1, status: 'error', error: 'First message offline' }));
+    await waitFor(() => expect(result.current.bodyFetchState).toEqual({ messageId: 1, status: 'error', error: 'First message offline', errorKind: 'network' }));
   });
 
   it('preserves a successfully fetched body when refreshing its attachments fails', async () => {

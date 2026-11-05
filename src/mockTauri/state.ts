@@ -1618,6 +1618,7 @@ export function fetchMockMessageBody(args?: InvokeArgs) {
   if (!message) throw new Error('message not found');
   const updated: MockMessage = {
     ...message,
+    remote_body_fetched: true,
     body: message.body.trim() || `已缓存远端正文：${message.subject}`,
     snippet: message.snippet.replace('远端邮件头已同步', '远端正文已同步'),
     sanitized_html: message.sanitized_html || '',

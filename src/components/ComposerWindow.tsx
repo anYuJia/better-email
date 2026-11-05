@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -39,6 +39,7 @@ import useSurfaceMotion from '../hooks/useSurfaceMotion';
 import useComposerGeometry from '../hooks/useComposerGeometry';
 import { useWheelContainment } from '../hooks/useWheelContainment';
 import { startDraggingCurrentWindow } from '../tauriBridge';
+import { ComposerLoadingContext } from './composer/ComposerLoadingBoundary';
 import './composer/composer.css';
 import './composer/composer-geometry.css';
 import './composer/composer-recovery.css';
@@ -181,6 +182,14 @@ export default function ComposerWindow({
   onDismissAttachmentImport,
   sendIssue,
 }: ComposerWindowProps) {
+  const loadingContext = useContext(ComposerLoadingContext);
+  const loadingHandoff = useRef(loadingContext?.current.shown ? {
+    ...loadingContext.current,
+    focusMoved: document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+      && document.activeElement !== loadingContext.current.opener
+      && !document.activeElement.closest('.composer-loading-layer'),
+  } : null);
+  const initialFocusRequest = useRef(focusRequest);
   const surfaceActive = open && !minimized;
   const localEditorFlushRef = useRef<(() => void) | null>(null);
   const flushPendingRef = editorFlushRef ?? localEditorFlushRef;
@@ -209,7 +218,7 @@ export default function ComposerWindow({
   const minimizedRestoreRef = useRef<HTMLButtonElement | null>(null);
   const minimizedLayerRef = useRef<HTMLElement | null>(null);
   const editingSession = useComposerEditingSession(panelRef, surfaceActive);
-  const composerOpenerRef = useRef<HTMLElement | null | undefined>(undefined);
+  const composerOpenerRef = useRef<HTMLElement | null | undefined>(loadingHandoff.current?.opener);
   const focusSessionRef = useRef({ mounted: false, closeHandled: false, generation: 0 });
   const [contactsOpen, setContactsOpen] = useState(() => {
     if (defaultContactsOpen !== undefined) return defaultContactsOpen;
@@ -240,6 +249,11 @@ export default function ComposerWindow({
   }, [floating, minimized]);
   useSurfaceMotion(panelRef, surfaceActive, { enabled: !standaloneWindow, getOffset: minimizeOffset });
   useSurfaceMotion(minimizedLayerRef, open && minimized, { distance: -8 });
+  useLayoutEffect(() => {
+    // The loading frame is already visible at this exact geometry. Do not
+    // reveal the ready editor from transparent again during the handoff.
+    if (loadingHandoff.current) panelRef.current?.getAnimations?.().forEach(animation => animation.cancel());
+  }, []);
   useLayoutEffect(() => { previousMinimized.current = minimized; }, [minimized]);
   const [ccOpen, setCcOpen] = useState(() => Boolean(draft.cc.trim()));
   const [bccOpen, setBccOpen] = useState(() => Boolean(draft.bcc.trim()));
@@ -448,11 +462,15 @@ export default function ComposerWindow({
   useEffect(() => {
     if (!open) return;
     if (minimized) {
+      if (loadingHandoff.current) loadingHandoff.current.focusMoved = false;
       editingSession.capture();
       minimizedRestoreRef.current?.focus({ preventScroll: true });
       return;
     }
     if (contactsOverlayOpen) return;
+    // Desktop loading never owns the workspace: completing the lazy import
+    // must not steal focus if the user continued reading another message.
+    if (!isMobileComposerViewport && loadingHandoff.current?.focusMoved && focusRequest === initialFocusRequest.current) return;
     if (editingSession.restore()) return;
     const panel = panelRef.current;
     const firstField = panel?.querySelector<HTMLElement>('input[type="text"], input:not([type]), textarea');
@@ -605,7 +623,7 @@ export default function ComposerWindow({
     >
       <section
         ref={panelRef}
-        className={`composer${contactsPanelVisible ? ' has-contacts-panel' : ''}`}
+        className={`composer composer-frame${contactsPanelVisible ? ' has-contacts-panel' : ''}`}
         aria-busy={saveDraftPending || submissionPending || undefined}
         style={geometry.style}
         onMouseDown={standaloneWindow ? undefined : (event) => event.stopPropagation()}

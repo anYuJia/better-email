@@ -104,6 +104,8 @@ function ReaderToolbar({
   const isTrash = selected.folder_role === 'trash';
   const canReply = canReplyToMessageRole(selected.folder_role);
   const canArchive = canArchiveMessageRole(selected.folder_role);
+  const canSnooze = canSnoozeRole(selected.folder_role);
+  const isSnoozed = selected.folder_role === 'snoozed';
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const moreMenu = useDetailsMenu(moreMenuRef, { floating: true });
   const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth <= 720);
@@ -159,13 +161,14 @@ function ReaderToolbar({
     folders,
     labels: [],
     onSelectMessage: () => {},
-    onComposeFromMessage: (_message, mode) => onComposeFromMessage(selected, mode),
+    onComposeFromMessage: (_message, mode) => mode === 'reply' && onReply
+      ? onReply() : onComposeFromMessage(selected, mode),
     onRunMessageAction: (_message, action) => runContextAction(action),
     onMoveMessageToFolder: (_message, folder) => onMoveToFolder(folder),
     onToggleMessageLabel: () => {},
   }).filter((item) => ![
     'open',
-    'reply',
+    ...(!isTrash ? ['reply'] : []),
     'snooze',
     'unsnooze',
     'archive',
@@ -178,6 +181,7 @@ function ReaderToolbar({
     : translationCompleted
       ? '显示译文'
       : '翻译邮件';
+  const showTranslationAction = !isDraft && needsTranslation && !isMobileViewport;
   const extraItems: ContextMenuItem[] = [
     {
       id: 'export-eml',
@@ -195,7 +199,7 @@ function ReaderToolbar({
                 icon: <Clock size={16} />,
                 onSelect: onUnsnooze,
               }]
-            : canSnoozeRole(selected.folder_role)
+            : canSnooze
               ? [{
                   id: 'menu-snooze',
                   label: '稍后处理',
@@ -268,13 +272,18 @@ function ReaderToolbar({
 
   return (
     <header className="reader-header">
-      <div className="reader-title-block">
-        <h1>{selected.subject || '(无主题)'}</h1>
-        <SenderIdentity message={selected} onComposeNew={onComposeNew} />
-        {metadata}
-      </div>
+      <h1 className="reader-title-block">{selected.subject || '(无主题)'}</h1>
+      <SenderIdentity message={selected} onComposeNew={onComposeNew} />
       <div className="reader-actions" aria-label="邮件操作">
-        {isDraft ? (
+        {isTrash ? (
+          <div className="reader-action-group reader-response-actions" role="group" aria-label="废纸篓操作">
+            <button type="button" className="primary-action reader-restore-action"
+              title="恢复到收件箱" aria-label="恢复到收件箱" onClick={onRestoreFromTrash}>
+              <RotateCcw size={16} strokeWidth={1.75} />
+              <span>恢复</span>
+            </button>
+          </div>
+        ) : isDraft ? (
           <div className="reader-action-group reader-response-actions" role="group" aria-label="草稿操作">
             <button className="primary-action" title="继续编辑草稿" onClick={() => onEditDraft(selected)}>
               <MailOpen size={16} />
@@ -289,53 +298,32 @@ function ReaderToolbar({
             </button>
           </div>
         ) : null}
-        <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">
-          {isTrash ? (
-            <button className="icon-only-action reader-restore-action" title="恢复到收件箱" aria-label="恢复到收件箱" onClick={onRestoreFromTrash}>
-              <RotateCcw size={16} />
-            </button>
-          ) : canArchive && (
+        {!isTrash && (canArchive || canSnooze || isSnoozed) && <div className="reader-action-group reader-message-actions" role="group" aria-label="整理操作">
+          {canArchive && (
             <button className="icon-only-action reader-archive-action" aria-label="归档" title="归档" onClick={onMoveArchive}>
-              <Archive size={16} />
+              <Archive size={18} aria-hidden="true" />
             </button>
           )}
-          {selected.folder_role === 'snoozed' ? (
+          {isSnoozed ? (
             <button
               className="icon-only-action reader-snooze-action"
               aria-label="取消稍后处理"
               title="取消稍后处理"
               onClick={onUnsnooze}
             >
-              <Clock size={16} />
+              <Clock size={18} aria-hidden="true" />
             </button>
-          ) : canSnoozeRole(selected.folder_role) && (
+          ) : canSnooze && (
             <button
               className="icon-only-action reader-snooze-action"
               aria-label="稍后处理"
               title="稍后处理"
               onClick={onSnooze}
             >
-              <Clock size={16} />
+              <Clock size={18} aria-hidden="true" />
             </button>
           )}
-        </div>
-        {!isDraft && needsTranslation && (
-          <button
-            type="button"
-            className={`reader-translate-action${translationActive ? ' active' : ''}`}
-            title="检测到外语邮件，点击翻译为中文"
-            aria-label={translationActionLabel === '翻译邮件' ? '翻译为中文' : translationActionLabel}
-            onClick={canToggleTranslation ? onToggleTranslation : onTranslateMessage}
-            disabled={translationLoading}
-          >
-            {translationLoading ? (
-              <Loader2 size={16} className="reader-translation-spinner" />
-            ) : (
-              <Languages size={16} />
-            )}
-            <span>{translationActive ? '显示原文' : translationCompleted ? '显示译文' : '翻译为中文'}</span>
-          </button>
-        )}
+        </div>}
         {!isDraft && (
           <div className="reader-ai-context-actions">
             <ReaderAiContextActions
@@ -351,22 +339,36 @@ function ReaderToolbar({
           data-floating-menu="true"
         >
           <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
-            <MoreHorizontal size={18} />
+            <MoreHorizontal size={18} aria-hidden="true" />
           </summary>
           <div
             className="context-menu-surface context-menu--anchored reader-more-menu-panel"
             data-floating-menu-panel="true"
           >
-            <ContextMenuContent
-              items={readerMenuItems}
-              onClose={moreMenu.closeMenu}
-              ariaLabel="邮件操作"
-              title={selected.subject || '(无主题)'}
-              detail={selected.sender_name || selected.sender_email}
-            />
+            <ContextMenuContent items={readerMenuItems} onClose={moreMenu.closeMenu} ariaLabel="邮件操作" />
           </div>
         </details>
       </div>
+      {(metadata || showTranslationAction) && <div className="reader-context-row">
+        {metadata}
+        {showTranslationAction && (
+          <button
+            type="button"
+            className={`reader-translate-action${translationActive ? ' active' : ''}`}
+            title="检测到外语邮件，点击翻译为中文"
+            aria-label={translationActionLabel === '翻译邮件' ? '翻译为中文' : translationActionLabel}
+            onClick={canToggleTranslation ? onToggleTranslation : onTranslateMessage}
+            disabled={translationLoading}
+          >
+            {translationLoading ? (
+              <Loader2 size={14} className="reader-translation-spinner" />
+            ) : (
+              <Languages size={14} />
+            )}
+            <span>{translationActive ? '显示原文' : translationCompleted ? '显示译文' : '翻译为中文'}</span>
+          </button>
+        )}
+      </div>}
     </header>
   );
 }

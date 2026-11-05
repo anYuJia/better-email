@@ -12,6 +12,7 @@ const nativeAnimate = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'an
 
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.stubGlobal('CSS', { supports: () => true });
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
     x: 20, y: 30, left: 20, top: 30, width: 200, height: 80, right: 220, bottom: 110,
@@ -41,7 +42,7 @@ function ContextHarness({ command }: { command: () => void }) {
   const [open, setOpen] = useState(false);
   return <>
     <button onClick={() => setOpen(true)}>打开菜单</button>
-    {open && <ContextMenu x={20} y={30} items={[{ id: 'action', label: '立即执行', onSelect: command }]} onClose={() => setOpen(false)} />}
+    <ContextMenu menu={open ? { x: 20, y: 30, items: [{ id: 'action', label: '立即执行', onSelect: command }], onClose: () => setOpen(false) } : null} />
   </>;
 }
 
@@ -84,7 +85,8 @@ describe('transient menu integration', () => {
     expect(animations[0].cancel).toHaveBeenCalledTimes(1);
 
     fireEvent.click(trigger);
-    expect(visual.isConnected).toBe(false);
+    expect(visual.isConnected).toBe(true);
+    expect(visual.hasAttribute('data-transient-exit')).toBe(false);
     expect(screen.getByRole('menuitem', { name: '立即执行' })).toBeDefined();
     act(() => vi.advanceTimersByTime(175));
     expect(screen.getByRole('menu')).toBeDefined();
@@ -117,7 +119,8 @@ describe('transient menu integration', () => {
     fireEvent.click(trigger);
     fireEvent(details, new Event('toggle'));
     expect(details.open).toBe(true);
-    expect(visual.isConnected).toBe(false);
+    expect(visual.isConnected).toBe(true);
+    expect(visual.hasAttribute('data-transient-exit')).toBe(false);
     act(() => vi.advanceTimersByTime(175));
     expect(details.open).toBe(true);
     expect(command).not.toHaveBeenCalled();
@@ -169,8 +172,57 @@ describe('transient menu integration', () => {
     expect(outgoing.pause).toHaveBeenCalledOnce();
     expect(visual.isConnected).toBe(true);
     flushFrame();
-    expect(visual.isConnected).toBe(false);
+    expect(visual.isConnected).toBe(true);
+    expect(visual.hasAttribute('data-transient-exit')).toBe(false);
     expect(animations[animations.length - 1].frames[0].opacity).toBe('0.32');
     expect(details.open).toBe(true);
+  });
+});
+
+describe('context menu target ownership', () => {
+  const menuFor = (targetKey: string, x = 20) => ({
+    targetKey, x, y: 30, ariaLabel: `${targetKey}邮件操作`, onClose: vi.fn(),
+    items: [
+      { id: 'open', label: `打开 ${targetKey}`, onSelect: vi.fn() },
+      { id: 'move', label: '移动到', children: [{ id: 'move-202', label: '归档', onSelect: vi.fn() }] },
+    ],
+  });
+
+  it('resets a new target even at the same coordinates and cancels the previous pointerleave timer', () => {
+    const { rerender } = render(<ContextMenu menu={menuFor('A')} />);
+    const panel = document.querySelector('.context-menu');
+    const oldBranch = screen.getByRole('menuitem', { name: '移动到' });
+    fireEvent.pointerEnter(oldBranch.parentElement!);
+    expect(oldBranch.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.pointerLeave(oldBranch.parentElement!);
+    rerender(<ContextMenu menu={null} />);
+    expect(panel?.getAttribute('aria-hidden')).toBe('true');
+    act(() => vi.advanceTimersByTime(50));
+    rerender(<ContextMenu menu={menuFor('B')} />);
+    const newBranch = screen.getByRole('menuitem', { name: '移动到' });
+    expect(document.querySelector('.context-menu')).toBe(panel);
+    expect(newBranch).not.toBe(oldBranch);
+    expect(newBranch.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: '打开 B' }));
+    fireEvent.pointerEnter(newBranch.parentElement!);
+    act(() => vi.advanceTimersByTime(210));
+    expect(newBranch.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('keeps the same target subtree when reversing its exit at the same anchor', () => {
+    const { rerender } = render(<ContextMenu menu={menuFor('A')} />);
+    const panel = document.querySelector('.context-menu');
+    const branch = screen.getByRole('menuitem', { name: '移动到' });
+    fireEvent.keyDown(branch, { key: 'ArrowRight' });
+    expect(branch.getAttribute('aria-expanded')).toBe('true');
+    rerender(<ContextMenu menu={null} />);
+    act(() => vi.advanceTimersByTime(50));
+    rerender(<ContextMenu menu={menuFor('A')} />);
+    expect(document.querySelector('.context-menu')).toBe(panel);
+    expect(screen.getByRole('menuitem', { name: '移动到' })).toBe(branch);
+    expect(branch.getAttribute('aria-expanded')).toBe('true');
+    act(() => vi.advanceTimersByTime(260));
+    expect(branch.getAttribute('aria-expanded')).toBe('true');
+    expect(panel?.hasAttribute('inert')).toBe(false);
   });
 });

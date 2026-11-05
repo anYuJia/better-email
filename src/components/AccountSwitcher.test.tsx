@@ -135,4 +135,21 @@ describe('AccountSwitcher', () => {
     expect(trigger.textContent).not.toContain('Gmail');
     expect(trigger.textContent).not.toContain('默认');
   });
+
+  it('身份布局精简可见范围文案，同时保留完整范围名称和账号切换', () => {
+    const onChange = vi.fn();
+    const view = render(<AccountSwitcher variant="identity" accountScope="all" accounts={accounts}
+      onChange={onChange} onSetDefault={vi.fn()} onAddAccount={vi.fn()} />);
+    const trigger = screen.getByRole('button', { name: '统一邮箱，所有邮箱账号 · 2 个账号' });
+    expect(trigger.textContent).toBe('统一邮箱2 个账号');
+    expect(trigger.querySelector('.account-switcher-mark')?.getAttribute('aria-hidden')).toBe('true');
+    openMenu(trigger);
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Second' }));
+    expect(onChange).toHaveBeenCalledWith('2');
+    view.rerender(<AccountSwitcher variant="identity" accountScope={2} accounts={accounts}
+      onChange={onChange} onSetDefault={vi.fn()} onAddAccount={vi.fn()} />);
+    const selected = screen.getByRole('button', { name: 'Second，second@example.com' });
+    expect(selected.getAttribute('title')).toContain('second@example.com');
+    expect(selected.querySelector('.account-switcher-mark')?.textContent).toBe('S');
+  });
 });

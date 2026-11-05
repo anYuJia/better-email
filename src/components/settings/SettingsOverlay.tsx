@@ -1,5 +1,4 @@
 import {
-  Suspense,
   lazy,
   memo,
   useMemo,
@@ -42,23 +41,24 @@ import type { ThemeMode } from '../../hooks/useThemeMode';
 import type { SettingsSectionId } from './SettingsFrame';
 import type { SettingsAccountValueChange, SettingsAccountValues } from './accountScopeTypes';
 import type { MessageToast } from '../MessageToastStack';
-import DeferredSurface from '../DeferredSurface';
+import { settingsPageLoaders } from './settingsPageLoaders';
+export { preloadSettingsSection } from './settingsPageLoaders';
 import SettingsFrame from './SettingsFrame';
 import { createSettingsHandlers } from './settingsOverlayHandlers';
 
-const AccountConnectionSettings = lazy(() => import('./AccountConnectionSettings'));
-const CredentialSecuritySettings = lazy(() => import('./CredentialSecuritySettings'));
-const ExperienceSettings = lazy(() => import('./ExperienceSettings'));
-const GeneralSettings = lazy(() => import('./GeneralSettings'));
-const DataSafetySettings = lazy(() => import('./DataSafetySettings'));
-const SyncOperationsSettings = lazy(() => import('./SyncOperationsSettings'));
-const ContactAutomationSettings = lazy(() => import('./ContactAutomationSettings'));
-const RuleAutomationSettings = lazy(() => import('./RuleAutomationSettings'));
-const ToolsSettingsPage = lazy(() => import('./ToolsSettingsPage'));
-const AiServiceSettings = lazy(() => import('./AiServiceSettings'));
-const McpSettings = lazy(() => import('./McpSettings'));
-const TemplateSettings = lazy(() => import('./TemplateSettings'));
-const AboutSettings = lazy(() => import('./AboutSettings'));
+const AccountConnectionSettings = lazy(settingsPageLoaders.accounts);
+const CredentialSecuritySettings = lazy(settingsPageLoaders.credentials);
+const ExperienceSettings = lazy(settingsPageLoaders.experience);
+const GeneralSettings = lazy(settingsPageLoaders.general);
+const DataSafetySettings = lazy(settingsPageLoaders.backup);
+const SyncOperationsSettings = lazy(settingsPageLoaders.sync);
+const ContactAutomationSettings = lazy(settingsPageLoaders.contacts);
+const RuleAutomationSettings = lazy(settingsPageLoaders.rules);
+const ToolsSettingsPage = lazy(settingsPageLoaders.tools);
+const AiServiceSettings = lazy(settingsPageLoaders.ai);
+const McpSettings = lazy(settingsPageLoaders.mcp);
+const TemplateSettings = lazy(settingsPageLoaders.templates);
+const AboutSettings = lazy(settingsPageLoaders.about);
 
 export type SettingsOverlayProps = {
   standalone?: boolean;
@@ -385,7 +385,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
     || activeSettingsSection === 'identities';
 
   return (
-    <Suspense fallback={<DeferredSurface label="正在打开设置" />}>
       <SettingsFrame
         title="设置"
         standalone={props.standalone}
@@ -413,7 +412,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
         canSave={settingsDirty && (props.accountScope === 'all' ? props.accounts.length > 0 : Boolean(accountForm))}
         {...handlers}
       >
-        <Suspense fallback={<div className="settings-page-loading" role="status">正在加载设置页面…</div>}>
           {isAccountSection && (
             <>
               <MemoizedAccountConnection
@@ -496,8 +494,6 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
           {activeSettingsSection === 'about' && (
             <MemoizedAbout onNotify={props.onNotify} />
           )}
-        </Suspense>
       </SettingsFrame>
-    </Suspense>
   );
 }

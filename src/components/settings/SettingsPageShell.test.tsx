@@ -23,14 +23,14 @@ describe('SettingsPageShell navigation motion', () => {
     expect(node?.getAttribute('data-page-motion')).toBe('lateral');
   });
 
-  it('allows immediate successive navigation with a fresh page identity', () => {
+  it('keeps the heading surface stable through immediate successive navigation', () => {
     const { container, rerender } = render(page('accounts'));
     rerender(page('providers'));
     const forward = container.querySelector('[data-settings-page]');
     expect(forward?.getAttribute('data-page-motion')).toBe('forward');
     rerender(page('accounts'));
     const backward = container.querySelector('[data-settings-page]');
-    expect(backward).not.toBe(forward);
+    expect(backward).toBe(forward);
     expect(backward?.getAttribute('data-page-motion')).toBe('backward');
   });
 });

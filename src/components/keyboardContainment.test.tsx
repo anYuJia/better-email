@@ -43,7 +43,7 @@ describe('Keyboard Containment in Overlays and Menus', () => {
       />
     );
 
-    const trigger = screen.getByRole('button', { name: '按日期范围筛选邮件' });
+    const trigger = screen.getByRole('button', { name: '按日期选择邮件' });
     fireEvent.click(trigger);
 
     const monthButton = screen.getByRole('combobox', { name: '开始月份' });

@@ -1,22 +1,14 @@
 import { PenLine } from 'lucide-react';
-import type { FilterMode } from '../../app/types';
 
 type MobileBottomNavProps = {
-  filter: FilterMode;
-  onOpenMail: () => void;
-  onOpenStarred: () => void;
   onCompose: () => void;
   onComposeIntent?: () => void;
-  onOpenSettings: () => void;
 };
 
 /**
  * Mobile mail no longer has a generic four-tab bottom navigation. Mail and
  * starred are states of the inbox, settings lives in mailbox navigation, and
  * compose is the only global action that benefits from persistent reachability.
- *
- * Keep the legacy callback shape for App-level compatibility while the shell
- * owns the migration; only onCompose is rendered here.
  */
 export default function MobileBottomNav({ onCompose, onComposeIntent }: MobileBottomNavProps) {
   return (

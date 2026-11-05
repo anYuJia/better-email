@@ -35,7 +35,22 @@ afterEach(() => {
 });
 
 describe('reader content reveal', () => {
-  it('animates ready message identity once, without replay on replies or body reload', () => {
+  it.each([80, 250, 500])('never fades text during %sms browsing with delayed body responses', (interval) => {
+    const view = render(<Reader />);
+    act(() => vi.advanceTimersByTime(20));
+    for (let id = 2; id < 5; id += 1) {
+      act(() => vi.advanceTimersByTime(interval));
+      view.rerender(<Reader id={`1:${id}`} ready={false} />);
+      act(() => vi.advanceTimersByTime(800));
+      view.rerender(<Reader id={`1:${id}`} />);
+      act(() => vi.advanceTimersByTime(20));
+    }
+    expect(animate).toHaveBeenCalledTimes(2);
+    for (const args of animate.mock.calls as unknown as [Record<string, unknown>[]][]) {
+      expect(args[0].every((frame) => frame.opacity === undefined)).toBe(true);
+    }
+  });
+  it('settles the first arrival without replay on subsequent selections, replies or reload', () => {
     const view = render(<Reader ready={false} />);
     expect(animate).not.toHaveBeenCalled();
     view.rerender(<Reader />);
@@ -47,12 +62,12 @@ describe('reader content reveal', () => {
     expect(animate).toHaveBeenCalledTimes(2);
     act(() => vi.advanceTimersByTime(200));
     view.rerender(<Reader id="1:2" />);
-    expect(animate).toHaveBeenCalledTimes(4);
+    expect(animate).toHaveBeenCalledTimes(2);
     view.unmount();
-    expect(cancel).toHaveBeenCalledTimes(4);
+    expect(cancel).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps continuous selections fully visible, then reveals again after a pause', () => {
+  it('keeps selections fully visible even after a pause', () => {
     let now = 0;
     vi.spyOn(performance, 'now').mockImplementation(() => now);
     const view = render(<Reader />);
@@ -68,7 +83,7 @@ describe('reader content reveal', () => {
     expect(cancel).toHaveBeenCalledTimes(2);
     now += 200;
     view.rerender(<Reader id="1:6" />);
-    expect(animate).toHaveBeenCalledTimes(4);
+    expect(animate).toHaveBeenCalledTimes(2);
   });
 
   it.each(['reduce', 'mobile'])('does not stack content motion in %s mode', (mode) => {

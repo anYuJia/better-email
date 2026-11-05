@@ -33,11 +33,15 @@ export default function useReaderAttachments({
     () => new Set(),
   );
   const [attachmentErrors, setAttachmentErrors] = useState<Record<number, string>>({});
-  const [isDownloadingAllAttachments, setIsDownloadingAllAttachments] = useState(false);
+  const downloadRequestsRef = useRef(new Map<number, Promise<Attachment | null>>());
+  const batchRequestsRef = useRef(new Map<number, Promise<void>>());
+  const [downloadingBatchMessageIds, setDownloadingBatchMessageIds] = useState<Set<number>>(() => new Set());
+  const isDownloadingAllAttachments = selectedId !== null && downloadingBatchMessageIds.has(selectedId);
 
   const handleAttachmentDownload = useCallback(
-    async (attachment: Attachment): Promise<Attachment | null> => {
-      if (downloadingAttachmentIds.has(attachment.id)) return null;
+    (attachment: Attachment): Promise<Attachment | null> => {
+      const existing = downloadRequestsRef.current.get(attachment.id);
+      if (existing) return existing;
       setAttachmentErrors((current) => {
         const next = { ...current };
         delete next[attachment.id];
@@ -48,25 +52,31 @@ export default function useReaderAttachments({
         next.add(attachment.id);
         return next;
       });
-      try {
-        // 下载接口返回持久化后的新附件（local_path 等字段已经更新）。
-        const fresh = await onDownloadAttachment(attachment);
-        return fresh instanceof Object && fresh !== null ? fresh : null;
-      } catch (error) {
-        setAttachmentErrors((current) => ({
-          ...current,
-          [attachment.id]: attachmentErrorMessage(error),
-        }));
-        return null;
-      } finally {
-        setDownloadingAttachmentIds((current) => {
-          const next = new Set(current);
-          next.delete(attachment.id);
-          return next;
-        });
-      }
+      // Register before starting the native call. A second click, preview or
+      // batch joins the same result even before React commits the busy state.
+      const request = Promise.resolve().then(async () => {
+        try {
+          const fresh = await onDownloadAttachment(attachment);
+          return fresh instanceof Object && fresh !== null ? fresh : null;
+        } catch (error) {
+          setAttachmentErrors((current) => ({
+            ...current,
+            [attachment.id]: attachmentErrorMessage(error),
+          }));
+          return null;
+        } finally {
+          downloadRequestsRef.current.delete(attachment.id);
+          setDownloadingAttachmentIds((current) => {
+            const next = new Set(current);
+            next.delete(attachment.id);
+            return next;
+          });
+        }
+      });
+      downloadRequestsRef.current.set(attachment.id, request);
+      return request;
     },
-    [downloadingAttachmentIds, onDownloadAttachment],
+    [onDownloadAttachment],
   );
 
   const regularAttachments = useMemo(
@@ -82,19 +92,33 @@ export default function useReaderAttachments({
     [regularAttachments],
   );
 
-  const handleDownloadAllAttachments = useCallback(async () => {
-    if (isDownloadingAllAttachments) return;
-    const pending = regularAttachments.filter((attachment) => !attachment.is_downloaded);
-    if (pending.length === 0) return;
-    setIsDownloadingAllAttachments(true);
-    try {
-      for (const attachment of pending) {
-        await handleAttachmentDownload(attachment);
+  const handleDownloadAllAttachments = useCallback((): Promise<void> => {
+    if (selectedId === null) return Promise.resolve();
+    const ownerId = selectedId;
+    const existing = batchRequestsRef.current.get(ownerId);
+    if (existing) return existing;
+    const pending = regularAttachments.filter((attachment) => attachment.message_id === ownerId && !attachment.is_downloaded);
+    if (pending.length === 0) return Promise.resolve();
+    setDownloadingBatchMessageIds((current) => new Set(current).add(ownerId));
+    // A background batch remains owned by its message. Switching readers does
+    // not block another message, and finishing A cannot clear B's busy state.
+    const request = Promise.resolve().then(async () => {
+      try {
+        for (const attachment of pending) {
+          await handleAttachmentDownload(attachment);
+        }
+      } finally {
+        batchRequestsRef.current.delete(ownerId);
+        setDownloadingBatchMessageIds((current) => {
+          const next = new Set(current);
+          next.delete(ownerId);
+          return next;
+        });
       }
-    } finally {
-      setIsDownloadingAllAttachments(false);
-    }
-  }, [isDownloadingAllAttachments, regularAttachments, handleAttachmentDownload]);
+    });
+    batchRequestsRef.current.set(ownerId, request);
+    return request;
+  }, [selectedId, regularAttachments, handleAttachmentDownload]);
 
   const previewAttachment = useCallback(async (
     attachment: Attachment,
@@ -220,12 +244,6 @@ export default function useReaderAttachments({
     copyAttachmentToClipboard,
   ]);
 
-  function resetAttachmentState() {
-    setDownloadingAttachmentIds(new Set());
-    setAttachmentErrors({});
-    setIsDownloadingAllAttachments(false);
-  }
-
   return {
     downloadingAttachmentIds,
     attachmentErrors,
@@ -240,6 +258,5 @@ export default function useReaderAttachments({
     revealAttachmentInFinder,
     copyAttachmentToClipboard,
     attachmentMenuItems,
-    resetAttachmentState,
   };
 }

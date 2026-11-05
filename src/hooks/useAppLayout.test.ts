@@ -1,5 +1,6 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MouseEvent } from 'react';
 import useAppLayout from './useAppLayout';
 import { appLayoutStorageKey, fitAppLayout, getDefaultAppLayout } from '../app/storageConfig';
 
@@ -17,6 +18,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   resizeTo(originalWidth);
+  vi.useRealTimers();
 });
 
 describe('workspace pane preferences', () => {
@@ -65,5 +67,43 @@ describe('workspace pane preferences', () => {
     expect(fitted.sidebar).toBeGreaterThanOrEqual(218);
     expect(fitted.list).toBeGreaterThanOrEqual(340);
     expect(1181 - fitted.sidebar - fitted.list - 2).toBeGreaterThanOrEqual(560);
+  });
+});
+
+
+describe('direct pane resize feedback', () => {
+  it('paints drag frames without rerendering the workspace and saves the final width once released', () => {
+    vi.useFakeTimers();
+    let renders = 0;
+    const { result } = renderHook(() => { renders += 1; return useAppLayout(); });
+    const shell = document.createElement('main');
+    shell.className = 'app-shell';
+    const handle = document.createElement('button');
+    shell.append(handle);
+    document.body.append(shell);
+    const before = renders;
+    const initial = result.current.appLayout.sidebar;
+    act(() => result.current.beginLayoutMouseResize('sidebar', {
+      preventDefault() {}, clientX: 200, currentTarget: handle,
+    } as unknown as MouseEvent<HTMLButtonElement>));
+    act(() => result.current.moveLayoutMouseResize({ clientX: 228 } as MouseEvent<HTMLElement>));
+    act(() => vi.advanceTimersByTime(20));
+    expect(shell.style.getPropertyValue('--app-sidebar-width-preferred')).toBe(`${initial + 28}px`);
+    expect(handle.getAttribute('aria-valuenow')).toBe(String(initial + 28));
+    expect(renders).toBe(before);
+    expect(localStorage.getItem(appLayoutStorageKey)).toBeNull();
+    act(() => result.current.endLayoutMouseResize());
+    expect(result.current.appLayout.sidebar).toBe(initial + 28);
+    expect(JSON.parse(localStorage.getItem(appLayoutStorageKey)!).sidebar).toBe(initial + 28);
+    expect(document.body.classList.contains('pane-resizing')).toBe(false);
+    shell.remove();
+  });
+
+  it('keeps widths continuous across the former 1180px breakpoint', () => {
+    const wider = fitAppLayout({ sidebar: 244, list: 410 }, 1181);
+    const narrower = fitAppLayout({ sidebar: 244, list: 410 }, 1180);
+    expect(Math.abs(wider.sidebar - narrower.sidebar)).toBeLessThanOrEqual(1);
+    expect(Math.abs(wider.list - narrower.list)).toBeLessThanOrEqual(1);
+    expect(narrower.list).toBeGreaterThanOrEqual(340);
   });
 });

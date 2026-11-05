@@ -86,6 +86,11 @@ export default function ReaderSecurityBanner({
     showLinkAction && !showRemoteImageNote ? readerSecurityCopy.linksHidden : null,
   ].filter((note): note is string => Boolean(note)))];
   const SecurityIcon = isCaution ? ShieldAlert : ShieldCheck;
+  const noteContent = (
+    <div id={notesId} className="reader-warning-messages" hidden={!isCaution && !detailsExpanded}>
+      {notes.map((note) => <p key={note}>{note}</p>)}
+    </div>
+  );
 
   return (
     <aside
@@ -103,9 +108,7 @@ export default function ReaderSecurityBanner({
           aria-controls={notesId}
           onClick={() => setDetailsExpanded((current) => !current)}
         >{title}<ChevronDown size={14} aria-hidden="true" /></button>}
-        <div id={notesId} className="reader-warning-messages" hidden={!isCaution && !detailsExpanded}>
-          {notes.map((note) => <p key={note}>{note}</p>)}
-        </div>
+        {isCaution && noteContent}
       </div>
       {showActionRow && (
         <div className="reader-warning-action-row">
@@ -169,6 +172,7 @@ export default function ReaderSecurityBanner({
           )}
         </div>
       )}
+      {!isCaution && noteContent}
     </aside>
   );
 }

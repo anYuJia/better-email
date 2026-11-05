@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type React from 'react';
+import SettingsReadyContent from './SettingsReadyContent';
 import type { Account, AccountScope } from '../../app/types';
 import type {
   SettingsNavigationGroup,
   SettingsNavigationItem,
+  SettingsSearchEntry,
   SettingsSectionId,
 } from './settingsNavigation';
 import {
@@ -18,6 +20,7 @@ type SettingsPageShellProps = {
   item: SettingsNavigationItem;
   accountScope?: AccountScope;
   accounts?: Account[];
+  searchTarget?: SettingsSearchEntry | null;
   children: React.ReactNode;
 };
 
@@ -27,6 +30,7 @@ export default function SettingsPageShell({
   item,
   accountScope = 'all',
   accounts = [],
+  searchTarget = null,
   children,
 }: SettingsPageShellProps) {
   const pageRef = useRef<HTMLElement | null>(null);
@@ -64,7 +68,7 @@ export default function SettingsPageShell({
   }
   const pageMotion = transition.motion;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (pageRef.current) {
       pageRef.current.scrollTop = 0;
     }
@@ -73,7 +77,6 @@ export default function SettingsPageShell({
   return (
     <section
       ref={pageRef}
-      key={activeSection}
       className={`settings-page settings-page-motion-${pageMotion}`}
       data-settings-page={activeSection}
       data-page-motion={pageMotion}
@@ -93,7 +96,7 @@ export default function SettingsPageShell({
           )}
         </div>
       </header>
-      <div className="settings-page-content">{children}</div>
+      <div className="settings-page-content"><SettingsReadyContent key={activeSection} searchTarget={searchTarget?.section === activeSection ? searchTarget : null}>{children}</SettingsReadyContent></div>
     </section>
   );
 }

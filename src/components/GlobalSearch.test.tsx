@@ -13,14 +13,25 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 function SearchHarness(props: Partial<GlobalSearchProps> = {}) {
   const [query, setQuery] = useState('季度报告');
   return <GlobalSearch
-    searchInputRef={null} query={query} appliedQuery="" searchScope="folder" filter="all"
+    searchInputRef={null} query={query} appliedQuery="" searchScope="folder"
     messages={[]} shortcutLabel="⌘ K" onSearchSubmit={(event) => event.preventDefault()}
     onQueryChange={setQuery} onSearchScopeChange={vi.fn()}
-    onClearSearchAndFilter={() => setQuery('')} onApplySearchShortcut={setQuery} {...props}
+    onClearSearch={() => setQuery('')} onApplySearchShortcut={setQuery} {...props}
   />;
 }
 
 describe('GlobalSearch keyboard and focus continuity', () => {
+  it('does not replace the typed search when the pointer rests over a suggestion', () => {
+    const applyShortcut = vi.fn();
+    render(<SearchHarness onApplySearchShortcut={applyShortcut} />);
+    const input = screen.getByRole('combobox');
+    fireEvent.focus(input);
+    fireEvent.mouseEnter(screen.getByRole('option', { name: '未读' }));
+    expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(true);
+    expect(applyShortcut).not.toHaveBeenCalled();
+    expect(input.hasAttribute('aria-activedescendant')).toBe(false);
+  });
+
   it('keeps Home/End available for text editing until suggestion navigation starts', () => {
     render(<SearchHarness />);
     const input = screen.getByRole('combobox');
@@ -65,12 +76,12 @@ describe('GlobalSearch keyboard and focus continuity', () => {
     for (const searchInputRef of [objectRef, callbackRef]) {
       const view = render(<SearchHarness searchInputRef={searchInputRef} />);
       const input = screen.getByRole('combobox');
-      const clear = screen.getByRole('button', { name: '清空搜索和筛选' });
+      const clear = screen.getByRole('button', { name: '清空搜索' });
       clear.focus();
       fireEvent.click(clear);
       expect(document.activeElement).toBe(input);
       expect((input as HTMLInputElement).value).toBe('');
-      expect(screen.queryByRole('button', { name: '清空搜索和筛选' })).toBeNull();
+      expect(screen.queryByRole('button', { name: '清空搜索' })).toBeNull();
       if (searchInputRef === objectRef) expect(objectRef.current).toBe(input);
       else expect(callbackRef).toHaveBeenCalledWith(input);
       view.unmount();
@@ -102,13 +113,12 @@ describe('GlobalSearch cold-start accessibility styles', () => {
         query=""
         appliedQuery=""
         searchScope="folder"
-        filter="all"
         messages={[]}
         shortcutLabel="⌘ K"
         onSearchSubmit={vi.fn()}
         onQueryChange={vi.fn()}
         onSearchScopeChange={vi.fn()}
-        onClearSearchAndFilter={vi.fn()}
+        onClearSearch={vi.fn()}
         onApplySearchShortcut={vi.fn()}
       />);
       const input = screen.getByRole('combobox');

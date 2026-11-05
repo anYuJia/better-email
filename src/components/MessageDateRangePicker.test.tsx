@@ -15,21 +15,21 @@ describe('MessageDateRangePicker', () => {
       </div>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '按日期范围筛选邮件' }));
+    fireEvent.click(screen.getByRole('button', { name: '按日期选择邮件' }));
     const backdrop = document.querySelector('.message-date-range-backdrop');
     expect(backdrop?.parentElement).toBe(document.body);
     expect(backdrop?.closest('[data-testid="list-container"]')).toBeNull();
-    expect(screen.getByRole('dialog', { name: '按日期范围筛选邮件' })).not.toBeNull();
+    expect(screen.getByRole('dialog', { name: '按日期选择邮件' })).not.toBeNull();
     expect(document.body.style.overflow).toBe('hidden');
 
     fireEvent.mouseDown(backdrop!, { target: backdrop });
-    expect(screen.queryByRole('dialog', { name: '按日期范围筛选邮件' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: '按日期选择邮件' })).toBeNull();
     expect(document.body.style.overflow).toBe('');
   });
 
   it('keeps independent start and end calendars available in the modal', () => {
     render(<MessageDateRangePicker onConfirm={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '按日期范围筛选邮件' }));
+    fireEvent.click(screen.getByRole('button', { name: '按日期选择邮件' }));
 
     expect(screen.getByRole('button', { name: '开始上一个月' })).not.toBeNull();
     expect(screen.getByRole('button', { name: '结束下一个月' })).not.toBeNull();
@@ -43,7 +43,7 @@ describe('MessageDateRangePicker', () => {
 
   it('supports quick presets and updates the draft dates', () => {
     render(<MessageDateRangePicker onConfirm={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '按日期范围筛选邮件' }));
+    fireEvent.click(screen.getByRole('button', { name: '按日期选择邮件' }));
 
     const preset7Days = screen.getByRole('button', { name: '近 7 天' });
     expect(preset7Days).not.toBeNull();
@@ -62,7 +62,7 @@ describe('MessageDateRangePicker', () => {
     window.HTMLElement.prototype.scrollIntoView = scrollMock;
 
     render(<MessageDateRangePicker onConfirm={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '按日期范围筛选邮件' }));
+    fireEvent.click(screen.getByRole('button', { name: '按日期选择邮件' }));
 
     const monthCombobox = screen.getByRole('combobox', { name: '开始月份' });
     expect(monthCombobox.getAttribute('aria-expanded')).toBe('false');

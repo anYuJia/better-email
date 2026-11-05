@@ -112,12 +112,11 @@ export default function AppTitlebar({
   query,
   appliedQuery,
   searchScope,
-  filter,
   messages,
   onSearchSubmit,
   onQueryChange,
   onSearchScopeChange,
-  onClearSearchAndFilter,
+  onClearSearch,
   onApplySearchShortcut,
   isRefreshing = false,
   refreshNotice = null,
@@ -220,13 +219,12 @@ export default function AppTitlebar({
             query={query}
             appliedQuery={appliedQuery}
             searchScope={searchScope}
-            filter={filter}
             messages={messages}
             shortcutLabel={shortcutLabel}
             onSearchSubmit={onSearchSubmit}
             onQueryChange={onQueryChange}
             onSearchScopeChange={onSearchScopeChange}
-            onClearSearchAndFilter={onClearSearchAndFilter}
+            onClearSearch={onClearSearch}
             onApplySearchShortcut={onApplySearchShortcut}
           />
         </div>

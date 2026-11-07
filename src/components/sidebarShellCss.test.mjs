@@ -73,8 +73,8 @@ describe('sidebar de-AI contract', () => {
     expect(block).not.toBeNull();
     expect(block[1]).not.toMatch(/gradient/);
     expect(block[1]).not.toMatch(/999px/);
-    expect(block[1]).toMatch(/align-self:\s*flex-start/);
-    expect(block[1]).toMatch(/width:\s*max-content/);
+    expect(block[1]).toMatch(/align-self:\s*stretch/);
+    expect(block[1]).toMatch(/width:\s*100%/);
   });
 
   it('folder rows stay flat: no pill radius, no floating shadow, no scale', () => {

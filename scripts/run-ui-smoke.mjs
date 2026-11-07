@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
+import { smokePassed } from './ui-smoke-result.mjs';
 
-const SUCCESS_MARKER = /\n\s*"status"\s*:\s*"ok"\s*,/;
+const SUCCESS_MARKER = /(?:^|\n)\[ui-smoke\] ALL_ASSERTIONS_PASSED(?:\r?\n|$)/;
 const FAILURE_MARKER = /UI smoke failed at /;
 const TRANSIENT_RELOAD_MARKER = /Inspected target navigated or closed/;
 const SUCCESS_EXIT_GRACE_MS = Number(process.env.BETTER_EMAIL_UI_SMOKE_EXIT_GRACE_MS ?? 5000);
@@ -49,8 +50,8 @@ function terminateTree(force) {
 function scheduleTreeCleanup(reason, graceMs) {
   if (failureTimer || successTimer) return;
   const timer = setTimeout(() => {
-    if (successSeen) forcedAfterSuccess = true;
     if (!child || child.exitCode !== null || child.signalCode !== null) return;
+    if (successSeen) forcedAfterSuccess = true;
     console.warn(`[ui-smoke-runner] ${reason}; terminating leaked browser/dev-server processes`);
     terminateTree(false);
     hardKillTimer = setTimeout(() => terminateTree(true), FORCE_KILL_GRACE_MS);
@@ -71,7 +72,6 @@ function observe(chunk, stream) {
       `assertions passed but the smoke process did not exit within ${SUCCESS_EXIT_GRACE_MS}ms`,
       SUCCESS_EXIT_GRACE_MS,
     );
-    return;
   }
 
   if (!failureSeen && FAILURE_MARKER.test(tail)) {
@@ -116,7 +116,7 @@ function startAttempt() {
   });
 
   child.on('close', (code, signal) => {
-    const passed = successSeen;
+    const passed = smokePassed({ successSeen, failureSeen, forcedAfterSuccess, code });
     const wasTransientReloadFailure = transientReloadFailure;
     clearTimers();
 
@@ -137,7 +137,7 @@ function startAttempt() {
     }
 
     if (code !== null) {
-      process.exitCode = code;
+      process.exitCode = code || 1;
       return;
     }
 

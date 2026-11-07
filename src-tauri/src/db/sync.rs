@@ -816,6 +816,16 @@ pub(super) fn reconcile_imap_flag_snapshot_for_conn(
         };
         for (message_id, remote_uid) in local_rows {
             if !remote_uids.contains(&remote_uid) {
+                // A lost MOVE response or another failed write must not erase
+                // the local copy and its pending intent during reconciliation.
+                let has_pending: bool = conn.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM pending_remote_writes WHERE message_id = ?1)",
+                    params![message_id],
+                    |row| row.get(0),
+                )?;
+                if has_pending {
+                    continue;
+                }
                 removed_messages +=
                     conn.execute("DELETE FROM messages WHERE id = ?1", params![message_id])? as i64;
             }

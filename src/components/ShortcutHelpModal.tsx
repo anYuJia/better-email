@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { shortcutGroups } from '../app/appConfig';
 import useModalAccessibility from '../hooks/useModalAccessibility';
 
@@ -27,10 +28,10 @@ export default function ShortcutHelpModal({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       ref={backdropRef}
-      className="composer-backdrop shortcut-backdrop"
+      className="shortcut-backdrop"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -76,6 +77,7 @@ export default function ShortcutHelpModal({
           ))}
         </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

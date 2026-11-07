@@ -144,6 +144,7 @@ pub struct RemoteDeleteCandidate {
 
 #[derive(Debug, Clone)]
 pub struct RemoteDeleteBatchResult {
+    #[cfg_attr(not(test), allow(dead_code))]
     pub deleted_count: i64,
     pub skipped_count: i64,
     /// Input positions whose remote UID was resolved and deletion acknowledged.
@@ -400,6 +401,7 @@ pub fn fetch_message_body(
     secret: &AccountSecret,
     remote_name: &str,
     remote_uid: i64,
+    expected_uid_validity: &str,
 ) -> Result<RemoteMessageBody, MailError> {
     imap_info(format!(
         "[better-email][imap] body fetch start account_id={} mailbox={} uid={} peek=true seen_unchanged=true",
@@ -412,6 +414,7 @@ pub fn fetch_message_body(
         remote_name,
         &[remote_uid],
         &attachment_metadata_uids,
+        expected_uid_validity,
     )?;
     let Some((_, body)) = bodies.pop() else {
         return Err(MailError::Imap("IMAP 未返回邮件正文。".to_string()));
@@ -425,6 +428,7 @@ pub fn fetch_message_bodies(
     remote_name: &str,
     remote_uids: &[i64],
     attachment_metadata_uids: &BTreeSet<i64>,
+    expected_uid_validity: &str,
 ) -> Result<Vec<(i64, RemoteMessageBody)>, MailError> {
     if remote_uids.is_empty() {
         return Ok(Vec::new());
@@ -435,12 +439,13 @@ pub fn fetch_message_bodies(
         remote_name,
         remote_uids.len()
     ));
-    with_selected_mailbox(
+    with_selected_mailbox_identity(
         account,
         secret,
         remote_name,
         SessionPolicy::Transfer,
-        |session| {
+        |session, validity| {
+            validate_uid_generation(validity, expected_uid_validity)?;
             fetch_message_bodies_from_selected(
                 session,
                 remote_uids,
@@ -459,6 +464,7 @@ pub fn fetch_attachment_metadata(
     secret: &AccountSecret,
     remote_name: &str,
     remote_uids: &[i64],
+    expected_uid_validity: &str,
 ) -> Result<Vec<(i64, Vec<RemoteAttachmentMetadata>)>, MailError> {
     if remote_uids.is_empty() {
         return Ok(Vec::new());
@@ -469,12 +475,13 @@ pub fn fetch_attachment_metadata(
         remote_name,
         remote_uids.len()
     ));
-    with_selected_mailbox(
+    with_selected_mailbox_identity(
         account,
         secret,
         remote_name,
         SessionPolicy::Transfer,
-        |session| {
+        |session, validity| {
+            validate_uid_generation(validity, expected_uid_validity)?;
             fetch_attachment_metadata_from_selected(session, remote_uids, account, remote_name)
         },
     )
@@ -833,6 +840,7 @@ struct AttachmentPartMetadata {
 pub struct AttachmentDownloadOptions<'a> {
     pub remote_name: &'a str,
     pub remote_uid: i64,
+    pub remote_uid_validity: &'a str,
     pub filename: &'a str,
     pub content_id: &'a str,
     pub max_bytes: i64,
@@ -936,6 +944,7 @@ pub fn replace_draft_message(
                 );
             }
             if !stale_uids.is_empty() {
+                require_uid_expunge(session)?;
                 let uid_set = remote_uid_set(&stale_uids.into_iter().collect::<Vec<_>>())?;
                 session
                     .uid_store(&uid_set, "+FLAGS.SILENT (\\Deleted)")
@@ -1001,12 +1010,13 @@ pub fn download_attachment_to_writer(
     retry_attachment_session(|| {
         let start_offset = next_offset;
         let mut counted_writer = CountingWriter::new(&mut *writer);
-        let result = with_selected_mailbox(
+        let result = with_selected_mailbox_identity(
             account,
             secret,
             options.remote_name,
             SessionPolicy::Transfer,
-            |session| {
+            |session, validity| {
+                validate_uid_generation(validity, options.remote_uid_validity)?;
                 download_attachment_from_selected(
                     session,
                     options,
@@ -1090,9 +1100,17 @@ pub fn set_remote_seen(
     secret: &AccountSecret,
     remote_name: &str,
     remote_uid: i64,
+    expected_uid_validity: &str,
     is_read: bool,
 ) -> Result<(), MailError> {
-    set_remote_seen_batch(account, secret, remote_name, &[remote_uid], is_read)
+    set_remote_seen_batch(
+        account,
+        secret,
+        remote_name,
+        &[remote_uid],
+        expected_uid_validity,
+        is_read,
+    )
 }
 
 pub fn set_remote_seen_batch(
@@ -1100,24 +1118,21 @@ pub fn set_remote_seen_batch(
     secret: &AccountSecret,
     remote_name: &str,
     remote_uids: &[i64],
+    expected_uid_validity: &str,
     is_read: bool,
 ) -> Result<(), MailError> {
-    let uid_set = remote_uid_set(remote_uids)?;
-    with_selected_mailbox(
+    with_selected_mailbox_identity(
         account,
         secret,
         remote_name,
         SessionPolicy::Command,
-        |session| {
+        |session, validity| {
             let query = if is_read {
                 "+FLAGS.SILENT (\\Seen)"
             } else {
                 "-FLAGS.SILENT (\\Seen)"
             };
-            session
-                .uid_store(uid_set.as_str(), query)
-                .map(|_| ())
-                .map_err(|error| MailError::Imap(format!("IMAP 回写已读状态失败：{error}")))
+            store_flags_from_selected(session, validity, expected_uid_validity, remote_uids, query)
         },
     )
 }
@@ -1127,26 +1142,65 @@ pub fn set_remote_flagged(
     secret: &AccountSecret,
     remote_name: &str,
     remote_uid: i64,
+    expected_uid_validity: &str,
     is_starred: bool,
 ) -> Result<(), MailError> {
-    let uid_set = remote_uid_set(&[remote_uid])?;
-    with_selected_mailbox(
+    with_selected_mailbox_identity(
         account,
         secret,
         remote_name,
         SessionPolicy::Command,
-        |session| {
+        |session, validity| {
             let query = if is_starred {
                 "+FLAGS.SILENT (\\Flagged)"
             } else {
                 "-FLAGS.SILENT (\\Flagged)"
             };
-            session
-                .uid_store(uid_set.as_str(), query)
-                .map(|_| ())
-                .map_err(|error| MailError::Imap(format!("IMAP 回写星标状态失败：{error}")))
+            store_flags_from_selected(
+                session,
+                validity,
+                expected_uid_validity,
+                &[remote_uid],
+                query,
+            )
         },
     )
+}
+
+fn store_flags_from_selected<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    validity: Option<u32>,
+    expected_validity: &str,
+    uids: &[i64],
+    query: &str,
+) -> Result<(), MailError> {
+    validate_uid_generation(validity, expected_validity)?;
+    let uid_set = remote_uid_set(uids)?;
+    ensure_uids_exist(session, &uid_set, uids)?;
+    session
+        .uid_store(&uid_set, query)
+        .map(|_| ())
+        .map_err(|error| MailError::Imap(format!("IMAP 回写邮件状态失败：{error}")))
+}
+
+fn ensure_uids_exist<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    uid_set: &str,
+    expected: &[i64],
+) -> Result<(), MailError> {
+    let found = session
+        .uid_search(format!("UID {uid_set}"))
+        .map_err(|error| MailError::Imap(format!("IMAP 确认邮件失败：{error}")))?;
+    if expected.iter().any(|uid| {
+        u32::try_from(*uid)
+            .ok()
+            .is_none_or(|uid| !found.contains(&uid))
+    }) {
+        return Err(MailError::Imap(
+            "服务器未找到对应邮件，保留待同步操作。".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn remote_uid_set(remote_uids: &[i64]) -> Result<String, MailError> {
@@ -1202,6 +1256,21 @@ pub fn move_remote_message(
                     MailError::Imap("无法在源目录唯一定位远端邮件，未执行移动。".to_string())
                 })?
             };
+            let source_uid_u32 = u32::try_from(source_uid)
+                .map_err(|_| MailError::Imap("远端 UID 无效，未执行移动。".into()))?;
+            // A previous MOVE may have succeeded even if its response was lost.
+            // Never treat a successful no-op MOVE on an absent UID as success.
+            let present = session
+                .uid_search(format!("UID {source_uid}"))
+                .map_err(|error| MailError::Imap(format!("IMAP 确认源邮件失败：{error}")))?;
+            if !present.contains(&source_uid_u32) {
+                return Err(MailError::Imap(
+                    "源邮件不存在，无法安全确认先前移动的结果；保留待处理操作。".into(),
+                ));
+            }
+            if remote_name == target_mailbox {
+                return Ok(Some((source_uid, expected_uid_validity.to_string())));
+            }
             let command = format!(
                 "UID MOVE {} {}",
                 source_uid,
@@ -1279,6 +1348,7 @@ fn delete_from_selected<T: Read + Write>(
             deleted_indices,
         });
     }
+    require_uid_expunge(session)?;
     let uid_set = remote_uid_set(&remote_uids.into_iter().collect::<Vec<_>>())?;
     session
         .uid_store(&uid_set, "+FLAGS.SILENT (\\Deleted)")
@@ -1291,6 +1361,34 @@ fn delete_from_selected<T: Read + Write>(
         skipped_count,
         deleted_indices,
     })
+}
+
+fn require_uid_expunge<T: Read + Write>(session: &mut imap::Session<T>) -> Result<(), MailError> {
+    let capabilities = session
+        .capabilities()
+        .map_err(|error| MailError::Imap(format!("无法确认服务器删除能力，未修改邮件：{error}")))?;
+    let supports_safe_expunge = capabilities.iter().any(|capability| match capability {
+        imap_proto::Capability::Atom(name) => {
+            name.eq_ignore_ascii_case("UIDPLUS") || name.eq_ignore_ascii_case("IMAP4rev2")
+        }
+        _ => false,
+    });
+    if !supports_safe_expunge {
+        return Err(MailError::Imap(
+            "服务器不支持安全的指定邮件删除，未修改服务器邮件。".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_uid_generation(selected: Option<u32>, expected: &str) -> Result<(), MailError> {
+    let selected = selected.filter(|value| *value > 0);
+    if selected.is_none() || expected.parse::<u32>().ok().filter(|value| *value > 0) != selected {
+        return Err(MailError::Imap(
+            "服务器邮件身份尚未确认或 UIDVALIDITY 已变化，未执行远端操作。请同步后重试。".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_delete_uid_validity(
@@ -1400,18 +1498,6 @@ fn parse_single_uid_set(value: &str) -> Option<i64> {
     (start > 0).then_some(start)
 }
 
-fn with_selected_mailbox<T>(
-    account: &Account,
-    secret: &AccountSecret,
-    remote_name: &str,
-    policy: SessionPolicy,
-    operation: impl FnOnce(&mut imap::Session<imap::Connection>) -> Result<T, MailError>,
-) -> Result<T, MailError> {
-    with_selected_mailbox_identity(account, secret, remote_name, policy, |session, _| {
-        operation(session)
-    })
-}
-
 fn with_selected_mailbox_identity<T>(
     account: &Account,
     secret: &AccountSecret,
@@ -1445,14 +1531,14 @@ fn parse_imap_endpoint(configured: &str) -> Result<(String, u16), MailError> {
     }
 }
 
-fn fetch_attachment_payload_from_selected(
-    session: &mut imap::Session<imap::Connection>,
+fn fetch_attachment_payload_from_selected<T: Read + Write>(
+    session: &mut imap::Session<T>,
     remote_uid: i64,
     filename: &str,
     content_id: &str,
 ) -> Result<RemoteAttachmentPayload, MailError> {
     let fetches = session
-        .uid_fetch(remote_uid.to_string(), "RFC822")
+        .uid_fetch(remote_uid.to_string(), "BODY.PEEK[]")
         .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
     let raw = fetches
         .iter()

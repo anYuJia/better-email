@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, Layers3, Plus, Star } from 'lucide-react';
+import { ChevronDown, ChevronsUpDown, Layers3, Plus, Star } from 'lucide-react';
 import type { Account, AccountScope } from '../app/types';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import './account-switcher.css';
@@ -171,7 +171,9 @@ export default function AccountSwitcher({
           <strong>{primaryLabel}</strong>
           <span>{variant === 'identity' && !selectedAccount ? accountCountLabel : secondaryLabel}</span>
         </span>
-        <ChevronDown className="account-switcher-chevron" size={16} aria-hidden="true" />
+        {variant === 'identity'
+          ? <ChevronsUpDown className="account-switcher-chevron" size={16} aria-hidden="true" />
+          : <ChevronDown className="account-switcher-chevron" size={16} aria-hidden="true" />}
       </button>
 
       <ContextMenu menu={menu && !disabled ? {

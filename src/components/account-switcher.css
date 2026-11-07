@@ -57,25 +57,25 @@
   outline-offset: 1px;
 }
 
-/* The navigation identity has a compact mark; settings retains the compact
- * scope selector and its existing layout. Neither variant adds a card. */
+/* The navigation identity has a distinct mark; settings retains its compact
+ * scope selector and existing layout. */
 .account-switcher--identity .account-switcher-trigger {
-  grid-template-columns: 32px minmax(0, 1fr) 14px;
-  min-height: 48px;
+  grid-template-columns: 36px minmax(0, 1fr) 14px;
+  min-height: 52px;
   gap: 8px;
-  padding: 6px 8px;
+  padding: 4px 8px;
 }
 
 .account-switcher-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--ui-radius-control);
-  color: var(--ui-text-secondary);
-  background: var(--ui-surface-muted);
-  font-size: 16px;
+  color: var(--ui-text);
+  background: color-mix(in oklab, var(--ui-sidebar) 90%, var(--ui-text));
+  font-size: 18px;
   font-weight: 600;
 }
 
@@ -124,7 +124,7 @@
   transition: var(--ui-transition-transform-quiet);
 }
 
-.account-switcher-trigger[aria-expanded='true'] .account-switcher-chevron {
+.account-switcher:not(.account-switcher--identity) .account-switcher-trigger[aria-expanded='true'] .account-switcher-chevron {
   transform: rotate(180deg);
 }
 

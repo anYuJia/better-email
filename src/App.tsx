@@ -7,7 +7,6 @@ import useMobileVisualViewport from './hooks/useMobileVisualViewport';
 import useMailFeedback from './hooks/useMailFeedback';
 import useStatusFeedback from './hooks/useStatusFeedback';
 import React, {
-  lazy,
   Suspense,
   useCallback,
   useEffect,
@@ -132,20 +131,13 @@ import { buildMailboxContextKey } from './app/mailboxContext';
 import { snapshotMessageSummaries as snapshotMessages } from './app/messageActionState';
 import { buildTitlebarViewSummary } from './app/titlebarSummary';
 import { openUnreadInbox } from './app/trayActions';
-
-const loadComposerWindow = () => import('./components/ComposerWindow');
-const ComposerWindow = lazy(loadComposerWindow);
-const preloadComposerWindow = () => { void loadComposerWindow().catch(() => undefined); };
-const SnoozePicker = lazy(() => import('./components/SnoozePicker'));
+import {
+  ComposerWindow, preloadComposerWindow, SnoozePicker, ShortcutHelpModal,
+  FirstRunOnboarding, AccountLoginDialog, ComposerCloseConfirmDialog,
+  ConfirmationDialogs, UndoSnackbarStack, MessageToastStack,
+} from './app/lazyMailSurfaces';
 import DeferredSurface from './components/DeferredSurface';
 import useSettingsAccountSelection from './hooks/useSettingsAccountSelection';
-const ShortcutHelpModal = lazy(() => import('./components/ShortcutHelpModal'));
-const FirstRunOnboarding = lazy(() => import('./components/FirstRunOnboarding'));
-const AccountLoginDialog = lazy(() => import('./components/AccountLoginDialog'));
-const ComposerCloseConfirmDialog = lazy(() => import('./components/ComposerCloseConfirmDialog'));
-const ConfirmationDialogs = lazy(() => import('./components/ConfirmationDialogs'));
-const UndoSnackbarStack = lazy(() => import('./components/UndoSnackbarStack'));
-const MessageToastStack = lazy(() => import('./components/MessageToastStack'));
 const NARROW_SHELL_MEDIA_QUERY = '(max-width: 1040px)';
 
 import {

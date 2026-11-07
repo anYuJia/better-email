@@ -88,11 +88,15 @@ export async function runWorkflowQuality(cdp, api) {
       const panel = document.querySelector('.composer-advanced-popover'); const p = panel.getBoundingClientRect();
       return { fits: p.left >= 0 && p.right <= innerWidth && p.top >= 0 && p.bottom <= innerHeight,
         textFits: panel.scrollWidth <= panel.clientWidth + 1,
-        touchTargets: [...panel.querySelectorAll('button, input')].every(el => { const r = el.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; }),
+        smallTouchTargets: [...panel.querySelectorAll('button, input')].flatMap(el => {
+          const r = el.getBoundingClientRect();
+          // Browser layout can report 44 CSS pixels as 43.99997 after scaling.
+          return r.width >= 43.5 && r.height >= 43.5 ? [] : [{ label: el.getAttribute('aria-label') || el.textContent.trim(), width: r.width, height: r.height, scale: getComputedStyle(el).scale }];
+        }),
         duplicateToasts: document.querySelectorAll('.message-toast').length,
         namePreserved: panel.querySelector('input').value === '项目汇报与 Project Report 模板' };
     })()`);
-    if (!templateBounds.fits || !templateBounds.textFits || !templateBounds.namePreserved || templateBounds.duplicateToasts || (mobile && !templateBounds.touchTargets)) throw new Error(`Template validation layout: ${label}: ${JSON.stringify(templateBounds)}`);
+    if (!templateBounds.fits || !templateBounds.textFits || !templateBounds.namePreserved || templateBounds.duplicateToasts || (mobile && templateBounds.smallTouchTargets.length)) throw new Error(`Template validation layout: ${label}: ${JSON.stringify(templateBounds)}`);
     results.push({ ...item, surface: 'template-validation', ...templateBounds });
     await key('Escape', 27);
     await key('Escape', 27);

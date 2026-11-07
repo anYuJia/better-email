@@ -14,6 +14,30 @@ use super::search::{
 use super::*;
 use std::collections::VecDeque;
 
+fn queue_remote_intent_for_conn(
+    conn: &Connection,
+    message_id: i64,
+    kind: &str,
+    value: &str,
+) -> MailResult<()> {
+    // A UID generation reset may have detached a pending message from its
+    // remote identity. Keep its existing intent current even though it cannot
+    // safely be sent until the identity has been resolved.
+    conn.execute(
+        "UPDATE pending_remote_writes SET value = ?3, created_at = ?4 WHERE message_id = ?1 AND kind = ?2",
+        params![message_id, kind, value, Utc::now().to_rfc3339()],
+    )?;
+    conn.execute(
+        "INSERT INTO pending_remote_writes(message_id, kind, value, created_at)
+         SELECT m.id, ?2, ?3, ?4 FROM messages m JOIN accounts a ON a.id = m.account_id
+         WHERE m.id = ?1 AND lower(trim(a.incoming_protocol)) != 'pop3'
+           AND trim(m.remote_mailbox) != '' AND m.remote_uid > 0
+         ON CONFLICT(message_id, kind) DO UPDATE SET value = excluded.value, created_at = excluded.created_at",
+        params![message_id, kind, value, Utc::now().to_rfc3339()],
+    )?;
+    Ok(())
+}
+
 pub(super) fn build_thread_summary_query(
     scope_condition: &str,
     filter_clause: &str,
@@ -292,13 +316,10 @@ impl MailStore {
             hydrate_message_summary_list_metadata(conn, rows)
         })
     }
-    pub fn get_message_remote_ref(&self, message_id: i64) -> MailResult<(String, i64)> {
-        let reference = self.get_message_remote_reference(message_id)?;
-        Ok((reference.remote_mailbox, reference.remote_uid))
-    }
     pub fn get_message_remote_reference(&self, message_id: i64) -> MailResult<MessageRemoteRef> {
         self.with_conn(|conn| message_remote_ref_for_conn(conn, message_id))
     }
+    #[cfg(test)]
     pub fn set_message_remote_ref(
         &self,
         message_id: i64,
@@ -308,6 +329,7 @@ impl MailStore {
         self.set_message_remote_ref_with_validity(message_id, remote_mailbox, remote_uid, "")
     }
 
+    #[cfg(test)]
     pub fn set_message_remote_ref_with_validity(
         &self,
         message_id: i64,
@@ -644,6 +666,7 @@ impl MailStore {
             Ok(current)
         })
     }
+    #[cfg(test)]
     pub fn update_message_body(
         &self,
         message_id: i64,
@@ -723,13 +746,40 @@ impl MailStore {
         }
     }
     /// Backfill attachment metadata without overwriting an already cached body.
+    #[cfg(test)]
     pub fn update_message_attachments(
         &self,
         message_id: i64,
         attachments: &[crate::models::RemoteAttachmentMetadata],
     ) -> MailResult<Message> {
+        self.update_message_attachments_checked(message_id, attachments, None)
+    }
+    pub fn update_message_attachments_from_remote(
+        &self,
+        message_id: i64,
+        attachments: &[crate::models::RemoteAttachmentMetadata],
+        expected: &MessageRemoteRef,
+    ) -> MailResult<Message> {
+        self.update_message_attachments_checked(message_id, attachments, Some(expected))
+    }
+    fn update_message_attachments_checked(
+        &self,
+        message_id: i64,
+        attachments: &[crate::models::RemoteAttachmentMetadata],
+        expected: Option<&MessageRemoteRef>,
+    ) -> MailResult<Message> {
         self.with_conn(|conn| {
             let transaction = conn.unchecked_transaction()?;
+            if let Some(expected) = expected {
+                let actual = message_remote_ref_for_conn(&transaction, message_id)?;
+                if actual.account_id != expected.account_id
+                    || actual.remote_mailbox != expected.remote_mailbox
+                    || actual.remote_uid != expected.remote_uid
+                    || actual.remote_uid_validity != expected.remote_uid_validity
+                {
+                    return Err(MailError::Cancelled);
+                }
+            }
             replace_message_attachments_for_conn(&transaction, message_id, attachments, false)?;
             let message = message_for_conn(&transaction, message_id)?;
             transaction.commit()?;
@@ -1099,6 +1149,7 @@ impl MailStore {
 
         Ok(imported_count)
     }
+    #[cfg(test)]
     pub fn set_message_read(&self, message_id: i64, is_read: bool) -> MailResult<()> {
         self.with_conn(|conn| {
             conn.execute(
@@ -1115,6 +1166,8 @@ impl MailStore {
         is_virtual: bool,
     ) -> MailResult<Vec<UnreadMessageRemoteRef>> {
         self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let conn = &transaction;
             if is_virtual && role.trim().is_empty() {
                 return Err(MailError::Imap(
                     "虚拟文件夹缺少角色，无法批量标为已读。".to_string(),
@@ -1124,7 +1177,7 @@ impl MailStore {
             let unread_messages = if is_virtual {
                 let mut stmt = conn.prepare(
                     "
-                    SELECT m.account_id, m.remote_mailbox, m.remote_uid
+                    SELECT m.id
                     FROM messages m
                     JOIN folders f ON f.id = m.folder_id
                     WHERE m.is_read = 0 AND f.role = ?1
@@ -1134,9 +1187,7 @@ impl MailStore {
                 let rows = stmt
                     .query_map(params![role], |row| {
                         Ok(UnreadMessageRemoteRef {
-                            account_id: row.get(0)?,
-                            remote_mailbox: row.get(1)?,
-                            remote_uid: row.get(2)?,
+                            message_id: row.get(0)?,
                         })
                     })?
                     .collect::<Result<Vec<_>, _>>()?;
@@ -1144,7 +1195,7 @@ impl MailStore {
             } else {
                 let mut stmt = conn.prepare(
                     "
-                    SELECT account_id, remote_mailbox, remote_uid
+                    SELECT id
                     FROM messages
                     WHERE is_read = 0 AND folder_id = ?1
                     ORDER BY remote_mailbox ASC, remote_uid ASC
@@ -1153,9 +1204,7 @@ impl MailStore {
                 let rows = stmt
                     .query_map(params![folder_id], |row| {
                         Ok(UnreadMessageRemoteRef {
-                            account_id: row.get(0)?,
-                            remote_mailbox: row.get(1)?,
-                            remote_uid: row.get(2)?,
+                            message_id: row.get(0)?,
                         })
                     })?
                     .collect::<Result<Vec<_>, _>>()?;
@@ -1163,7 +1212,12 @@ impl MailStore {
             };
 
             if unread_messages.is_empty() {
+                transaction.commit()?;
                 return Ok(unread_messages);
+            }
+
+            for message in &unread_messages {
+                queue_remote_intent_for_conn(conn, message.message_id, "seen", "1")?;
             }
 
             if is_virtual {
@@ -1183,9 +1237,84 @@ impl MailStore {
                 )?;
             }
 
+            transaction.commit()?;
             Ok(unread_messages)
         })
     }
+
+    /// Commit the local edit and its remote intent together so a crash or sync
+    /// cannot silently discard an edit before it has been written back.
+    pub fn apply_local_remote_intent(
+        &self,
+        message_id: i64,
+        kind: &str,
+        value: &str,
+    ) -> MailResult<()> {
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            match kind {
+                "seen" => {
+                    transaction.execute(
+                        "UPDATE messages SET is_read = ?1 WHERE id = ?2",
+                        params![i64::from(value == "1"), message_id],
+                    )?;
+                }
+                "flagged" => {
+                    transaction.execute(
+                        "UPDATE messages SET is_starred = ?1 WHERE id = ?2",
+                        params![i64::from(value == "1"), message_id],
+                    )?;
+                }
+                "move" => {
+                    let folder_id = folder_id_for_message_role(&transaction, message_id, value)?;
+                    transaction.execute(
+                        "UPDATE messages SET folder_id = ?1, snoozed_until = '' WHERE id = ?2",
+                        params![folder_id, message_id],
+                    )?;
+                }
+                _ => return Err(MailError::Imap("不支持的远端操作。".into())),
+            }
+            queue_remote_intent_for_conn(&transaction, message_id, kind, value)?;
+            transaction.commit()?;
+            Ok(())
+        })
+    }
+
+    pub fn clear_pending_remote_write_if_unchanged(
+        &self,
+        pending: &PendingRemoteWrite,
+    ) -> MailResult<bool> {
+        self.with_conn(|conn| Ok(conn.execute(
+            "DELETE FROM pending_remote_writes WHERE message_id = ?1 AND kind = ?2 AND value = ?3 AND created_at = ?4",
+            params![pending.message_id, pending.kind, pending.value, pending.created_at],
+        )? == 1))
+    }
+
+    pub fn finish_pending_move(
+        &self,
+        pending: &PendingRemoteWrite,
+        expected: &MessageRemoteRef,
+        mailbox: &str,
+        uid: i64,
+        validity: &str,
+    ) -> MailResult<bool> {
+        self.with_conn(|conn| {
+            let transaction = conn.unchecked_transaction()?;
+            let actual = message_remote_ref_for_conn(&transaction, pending.message_id)?;
+            if actual.account_id != expected.account_id || actual.remote_mailbox != expected.remote_mailbox
+                || actual.remote_uid != expected.remote_uid || actual.remote_uid_validity != expected.remote_uid_validity {
+                return Ok(false);
+            }
+            let cleared = transaction.execute(
+                "DELETE FROM pending_remote_writes WHERE message_id = ?1 AND kind = ?2 AND value = ?3 AND created_at = ?4",
+                params![pending.message_id, pending.kind, pending.value, pending.created_at],
+            )?;
+            transaction.execute("UPDATE messages SET remote_mailbox = ?1, remote_uid = ?2, remote_uid_validity = ?3 WHERE id = ?4", params![mailbox, uid, validity, pending.message_id])?;
+            transaction.commit()?;
+            Ok(cleared == 1)
+        })
+    }
+    #[cfg(test)]
     pub fn set_message_starred(&self, message_id: i64, is_starred: bool) -> MailResult<()> {
         self.with_conn(|conn| {
             conn.execute(
@@ -1195,6 +1324,7 @@ impl MailStore {
             Ok(())
         })
     }
+    #[cfg(test)]
     pub fn move_message_to_role(&self, message_id: i64, role: &str) -> MailResult<()> {
         self.with_conn(|conn| {
             let folder_id = folder_id_for_message_role(conn, message_id, role)?;
@@ -1205,6 +1335,7 @@ impl MailStore {
             Ok(())
         })
     }
+    #[cfg(test)]
     pub fn record_pending_remote_write(
         &self,
         message_id: i64,
@@ -1223,6 +1354,7 @@ impl MailStore {
             Ok(())
         })
     }
+    #[cfg(test)]
     pub fn clear_pending_remote_write(&self, message_id: i64, kind: &str) -> MailResult<()> {
         self.with_conn(|conn| {
             conn.execute(
@@ -1238,7 +1370,7 @@ impl MailStore {
                 "
                 SELECT message_id, kind, value, created_at
                 FROM pending_remote_writes
-                ORDER BY created_at DESC, message_id ASC
+                ORDER BY created_at ASC, message_id ASC
                 ",
             )?;
             let writes = stmt
@@ -1254,6 +1386,19 @@ impl MailStore {
             Ok(writes)
         })
     }
+
+    pub fn get_pending_remote_write(
+        &self,
+        message_id: i64,
+        kind: &str,
+    ) -> MailResult<Option<PendingRemoteWrite>> {
+        self.with_conn(|conn| Ok(conn.query_row(
+            "SELECT message_id, kind, value, created_at FROM pending_remote_writes WHERE message_id = ?1 AND kind = ?2",
+            params![message_id, kind],
+            |row| Ok(PendingRemoteWrite { message_id: row.get(0)?, kind: row.get(1)?, value: row.get(2)?, created_at: row.get(3)? }),
+        ).optional()?))
+    }
+    #[cfg(test)]
     pub fn restore_message_to_inbox(&self, message_id: i64) -> MailResult<Message> {
         self.with_conn(|conn| {
             let folder_id = folder_id_for_message_role(conn, message_id, "inbox")?;

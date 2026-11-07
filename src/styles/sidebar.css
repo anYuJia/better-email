@@ -78,24 +78,24 @@
 }
 
 /* Compose -------------------------------------------------------------------
- * A compact primary action, aligned to the folder labels' leading edge. */
+ * Full-width action anchors the account identity above folder navigation. */
 
 .compose-button {
-  min-height: 36px;
+  min-height: 40px;
   flex-shrink: 0;
-  align-self: flex-start;
-  width: max-content;
-  max-width: calc(100% - 16px);
-  margin: 2px 8px 4px;
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
   padding: 0 14px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 8px;
   border: 1px solid transparent;
   border-radius: var(--ui-radius-sm);
-  color: var(--color-text-on-accent);
-  background: var(--ui-accent);
+  color: var(--ui-text);
+  background: var(--quiet-row-selected);
   box-shadow: var(--ui-box-shadow-none);
   font-size: var(--ui-font-size-secondary);
   font-weight: 600;
@@ -105,18 +105,18 @@
 .compose-button svg {
   width: 18px;
   height: 18px;
-  color: currentColor;
+  color: var(--ui-text-accent);
 }
 
 .compose-button:hover:not(:disabled) {
-  color: var(--color-text-on-accent);
-  background: var(--ui-accent-hover);
+  color: var(--ui-text);
+  background: color-mix(in oklab, var(--quiet-row-selected) 90%, var(--ui-text-accent));
   box-shadow: var(--ui-box-shadow-none);
 }
 
 .compose-button:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
-  color: var(--color-text-on-accent);
-  background: var(--ui-accent-pressed);
+  color: var(--ui-text);
+  background: color-mix(in oklab, var(--quiet-row-selected) 82%, var(--ui-text-accent));
 }
 
 .compose-button:disabled {
@@ -149,6 +149,8 @@
   flex: 1 1 auto;
   min-height: 0;
   gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-border);
   overflow: auto;
   overscroll-behavior: contain;
 }

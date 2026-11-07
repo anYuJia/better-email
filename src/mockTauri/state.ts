@@ -655,9 +655,16 @@ export function listMessages(args: InvokeArgs) {
         );
         if (!matched) return false;
       } else if (term.startsWith('after:')) {
-        if (message.received_at < `${term.replace(/^after:/, '')}T00:00:00`) return false;
+        const value = term.replace(/^after:/, '');
+        const start = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value).getTime();
+        if (!(new Date(message.received_at).getTime() >= start)) return false;
       } else if (term.startsWith('before:')) {
-        if (message.received_at > `${term.replace(/^before:/, '')}T23:59:59`) return false;
+        const value = term.replace(/^before:/, '');
+        const isDay = /^\d{4}-\d{2}-\d{2}$/.test(value);
+        const end = new Date(isDay ? `${value}T00:00:00` : value);
+        if (isDay) end.setDate(end.getDate() + 1);
+        const received = new Date(message.received_at).getTime();
+        if (!(isDay ? received < end.getTime() : received <= end.getTime())) return false;
       } else if (term === 'has:attachment' || term === 'has:attachments') {
         if (!message.has_attachments) return false;
       } else if (term === 'is:unread') {

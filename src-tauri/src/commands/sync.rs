@@ -683,6 +683,11 @@ fn sync_imap_headers_for_account(
         let report = imap_probe::discover_folders(account, &secret)?;
         mailboxes = store.save_imap_mailboxes_for_account(Some(account.id), &report.folders)?;
     }
+    ensure_not_cancelled(store)?;
+    let (retried_writes, pending_writes) =
+        super::messages::retry_pending_remote_writes(store, account.id, &|| {
+            ensure_not_cancelled(store)
+        })?;
     let (mailboxes, skipped_custom_folders) = syncable_mailboxes(mailboxes);
     if mailboxes.is_empty() {
         return Err(crate::db::MailError::Imap(
@@ -726,6 +731,10 @@ fn sync_imap_headers_for_account(
                 ),
             )?;
         }
+        // A fetched snapshot must be merged before a successful local write
+        // clears its pending intent, otherwise old server flags can win.
+        let account_lock = super::messages::account_snapshot_lock(account.id);
+        let account_guard = account_lock.lock().unwrap_or_else(|e| e.into_inner());
         match imap_probe::fetch_header_page(
             account,
             &secret,
@@ -757,6 +766,7 @@ fn sync_imap_headers_for_account(
                 // reconcile 的删除/状态变更必须一并回滚，避免部分提交。
                 let synced =
                     store.sync_imap_mailbox_into_db(mailbox.id, &fetch.flags, &fetch.headers);
+                drop(account_guard);
                 match synced {
                     Ok(result) => {
                         scanned_folders += 1;
@@ -771,6 +781,7 @@ fn sync_imap_headers_for_account(
                             account,
                             &secret,
                             &mailbox.remote_name,
+                            &fetch.headers.uid_validity,
                             &pre_existing_uids,
                             mailbox.highest_uid,
                             account.fetch_history_attachments,
@@ -814,7 +825,10 @@ fn sync_imap_headers_for_account(
                     }
                 }
             }
-            Err(error) => failures.push(format!("{}: {error}", mailbox.remote_name)),
+            Err(error) => {
+                drop(account_guard);
+                failures.push(format!("{}: {error}", mailbox.remote_name));
+            }
         }
     }
     ensure_not_cancelled(store)?;
@@ -828,6 +842,11 @@ fn sync_imap_headers_for_account(
     } else {
         String::new()
     };
+    if retried_writes > 0 || pending_writes > 0 {
+        custom_note.push_str(&format!(
+            " 已恢复 {retried_writes} 项远端操作，{pending_writes} 项仍待重试。"
+        ));
+    }
     if preserved_local_copies > 0 {
         custom_note.push_str(&format!(" 已保留 {preserved_local_copies} 封旧邮件为本地副本；服务器新邮件是独立记录，删除本地副本不会删除它们。"));
     }
@@ -1078,6 +1097,7 @@ fn sync_mailbox_bodies(
     account: &Account,
     secret: &AccountSecret,
     remote_name: &str,
+    uid_validity: &str,
     pre_existing_uids: &BTreeSet<i64>,
     previous_highest_uid: i64,
     fetch_history_attachments: bool,
@@ -1112,7 +1132,18 @@ fn sync_mailbox_bodies(
             .into_iter()
             .map(|(message_id, uid)| (uid, message_id))
             .collect::<BTreeMap<i64, i64>>();
-        let uids = uid_to_message_id.keys().copied().collect::<Vec<_>>();
+        let references = uid_to_message_id
+            .iter()
+            .filter_map(|(uid, message_id)| {
+                let reference = store.get_message_remote_reference(*message_id).ok()?;
+                (reference.account_id == account.id
+                    && reference.remote_mailbox == remote_name
+                    && reference.remote_uid == *uid
+                    && reference.remote_uid_validity == uid_validity)
+                    .then_some((*uid, reference))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let uids = references.keys().copied().collect::<Vec<_>>();
         let total_messages = uids.len();
         let total_batches = total_messages.div_ceil(BODY_SYNC_BATCH_SIZE);
         for (batch_index, batch_uids) in uids.chunks(BODY_SYNC_BATCH_SIZE).enumerate() {
@@ -1131,6 +1162,7 @@ fn sync_mailbox_bodies(
                 remote_name,
                 batch_uids,
                 &attachment_metadata_uids,
+                uid_validity,
             ) {
                 Ok(bodies) => bodies,
                 Err(error) => {
@@ -1166,7 +1198,7 @@ fn sync_mailbox_bodies(
                 let Some(&message_id) = batch_uid_to_message_id.get(&uid) else {
                     continue;
                 };
-                match store.update_message_body(message_id, &body) {
+                match store.update_message_body_from_remote(message_id, &body, &references[&uid]) {
                     Ok(_) => {
                         stats.fetched += 1;
                         fetched_message_ids.push(message_id);
@@ -1227,7 +1259,18 @@ fn sync_mailbox_bodies(
             .into_iter()
             .map(|(message_id, uid)| (uid, message_id))
             .collect::<BTreeMap<i64, i64>>();
-        let uids = uid_to_message_id.keys().copied().collect::<Vec<_>>();
+        let references = uid_to_message_id
+            .iter()
+            .filter_map(|(uid, message_id)| {
+                let reference = store.get_message_remote_reference(*message_id).ok()?;
+                (reference.account_id == account.id
+                    && reference.remote_mailbox == remote_name
+                    && reference.remote_uid == *uid
+                    && reference.remote_uid_validity == uid_validity)
+                    .then_some((*uid, reference))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let uids = references.keys().copied().collect::<Vec<_>>();
         let total_messages = uids.len();
         let total_batches = total_messages.div_ceil(BODY_SYNC_BATCH_SIZE);
         for (batch_index, batch_uids) in uids.chunks(BODY_SYNC_BATCH_SIZE).enumerate() {
@@ -1237,6 +1280,7 @@ fn sync_mailbox_bodies(
                 secret,
                 remote_name,
                 batch_uids,
+                uid_validity,
             ) {
                 Ok(metadata) => metadata,
                 Err(error) => {
@@ -1271,7 +1315,11 @@ fn sync_mailbox_bodies(
                 let Some(&message_id) = uid_to_message_id.get(&uid) else {
                     continue;
                 };
-                match store.update_message_attachments(message_id, &attachments) {
+                match store.update_message_attachments_from_remote(
+                    message_id,
+                    &attachments,
+                    &references[&uid],
+                ) {
                     Ok(_) => stats.attachment_metadata_synced += 1,
                     Err(error) => {
                         crate::logging::log_line(format!(
@@ -1450,7 +1498,7 @@ pub async fn fetch_message_body(
             "该邮件没有远端 UID，无法按需拉取正文。".to_string(),
         ));
     }
-    let body = imap_probe::fetch_message_body(&account, &secret, remote_mailbox, remote_uid)?;
+    let body = imap_probe::fetch_message_body(&account, &secret, remote_mailbox, remote_uid, &reference.remote_uid_validity)?;
     let updated = store.update_message_body_from_remote(message_id, &body, &reference)?;
     command_info(format!(
         "[better-email][body] fetch command ok message_id={} account_id={} mailbox={} uid={} body_chars={} html_chars={} attachments={}",

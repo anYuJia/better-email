@@ -4,7 +4,10 @@
  * coherent tool, not a dashboard grid. */
 
 .shortcut-backdrop {
+  position: fixed;
+  inset: 0;
   z-index: 10000;
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: clamp(14px, 3vw, 28px);
@@ -112,10 +115,11 @@
 
 .shortcut-row {
   min-height: 38px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
+  padding: 4px 0;
   border-top: 1px solid var(--ui-border);
   color: var(--ui-text-secondary);
   font-size: 12.5px;
@@ -126,15 +130,18 @@
 }
 
 .shortcut-row > span {
+  flex: 1 1 7em;
   min-width: 0;
   line-height: 1.35;
 }
 
 .shortcut-row > div {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: flex-end;
   gap: 4px;
+  margin-left: auto;
 }
 
 .shortcut-row kbd {

@@ -1600,22 +1600,27 @@ async function main() {
 
     if (process.env.BETTER_EMAIL_UI_NAVIGATION === '1') {
       await runNavigationQuality(cdp, { evalInPage, setUiViewport, waitForExpression, captureScreenshot, url, captureDir });
+      console.log('[ui-smoke] ALL_ASSERTIONS_PASSED');
       return;
     }
     if (process.env.BETTER_EMAIL_UI_WORKFLOW === '1') {
       await runWorkflowQuality(cdp, { evalInPage, setUiViewport, waitForExpression, captureScreenshot, clickButton, fillInput, closeComposer, url, captureDir });
+      console.log('[ui-smoke] ALL_ASSERTIONS_PASSED');
       return;
     }
     if (process.env.BETTER_EMAIL_UI_ATTACHMENTS === '1') {
       await runAttachmentQuality(cdp, { evalInPage, setUiViewport, waitForExpression, captureScreenshot, clickButton, fillInput, closeComposer, url, captureDir });
+      console.log('[ui-smoke] ALL_ASSERTIONS_PASSED');
       return;
     }
     if (process.env.BETTER_EMAIL_UI_MOTION === '1') {
       await runMotionQuality(cdp, { evalInPage, setUiViewport, waitForExpression, captureScreenshot, clickButton, url, captureDir });
+      console.log('[ui-smoke] ALL_ASSERTIONS_PASSED');
       return;
     }
     if (process.env.BETTER_EMAIL_UI_QUALITY_MATRIX === '1') {
       await runQualityMatrix(cdp, { evalInPage, setUiViewport, waitForExpression, captureScreenshot, clickButton, fillInput, closeComposer, openSettingsSection, url, captureDir });
+      console.log('[ui-smoke] ALL_ASSERTIONS_PASSED');
       return;
     }
     await withStep('credential recovery lifecycle', () => testCredentialRecovery({
@@ -3494,6 +3499,7 @@ async function main() {
       ],
     };
     console.log(JSON.stringify(report, null, 2));
+    console.log('[ui-smoke] ALL_ASSERTIONS_PASSED');
   } catch (error) {
     console.error(`UI smoke failed at ${currentStep}; elapsed=${formatDuration(Date.now() - startedAt)}; ${error?.message ?? error}`);
     if (cdp) {

@@ -6,8 +6,38 @@ use crate::models::{
     RemoteActionReport, RemoteImageTrust, RemoteImageTrustInput, RestoreMessageReport,
     ThreadSummary, TrashActionReport,
 };
-use std::collections::BTreeMap;
+use once_cell::sync::Lazy;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, Mutex, Weak};
 use tauri::State;
+
+static REMOTE_WRITE_LOCKS: Lazy<Mutex<HashMap<i64, Weak<Mutex<()>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+static ACCOUNT_SNAPSHOT_LOCKS: Lazy<Mutex<HashMap<i64, Weak<Mutex<()>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+pub(super) fn account_snapshot_lock(account_id: i64) -> Arc<Mutex<()>> {
+    let mut locks = ACCOUNT_SNAPSHOT_LOCKS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    locks.retain(|_, lock| lock.strong_count() > 0);
+    if let Some(lock) = locks.get(&account_id).and_then(Weak::upgrade) {
+        return lock;
+    }
+    let lock = Arc::new(Mutex::new(()));
+    locks.insert(account_id, Arc::downgrade(&lock));
+    lock
+}
+fn remote_write_lock(message_id: i64) -> Arc<Mutex<()>> {
+    let mut locks = REMOTE_WRITE_LOCKS.lock().unwrap_or_else(|e| e.into_inner());
+    locks.retain(|_, lock| lock.strong_count() > 0);
+    if let Some(lock) = locks.get(&message_id).and_then(Weak::upgrade) {
+        return lock;
+    }
+    let lock = Arc::new(Mutex::new(()));
+    locks.insert(message_id, Arc::downgrade(&lock));
+    lock
+}
 #[tauri::command]
 // The IPC contract intentionally keeps scope, search, sort, and paging fields
 // flat so the generated command schema remains backwards-compatible.
@@ -168,7 +198,7 @@ pub async fn set_message_read(
     })
     .await?;
     super::executor::network(account_id, move || {
-        store.set_message_read(message_id, is_read)?;
+        store.apply_local_remote_intent(message_id, "seen", if is_read { "1" } else { "0" })?;
         sync_remote_seen(&store, message_id, is_read)
     })
     .await
@@ -197,48 +227,59 @@ pub async fn mark_folder_read(
         });
     }
 
-    let mut groups = BTreeMap::<(i64, String), Vec<i64>>::new();
+    // Batch compatible messages into one IMAP command per mailbox and generation.
+    // The local edits and intents were committed atomically above.
+    let mut groups = BTreeMap::<(i64, String, String), Vec<i64>>::new();
     let mut remote_skipped_count = 0_i64;
-    for reference in unread_messages {
-        if reference.remote_mailbox.trim().is_empty() || reference.remote_uid <= 0 {
-            remote_skipped_count += 1;
-            continue;
-        }
-        groups
-            .entry((reference.account_id, reference.remote_mailbox))
-            .or_default()
-            .push(reference.remote_uid);
-    }
-
     let mut remote_attempted_count = 0_i64;
     let mut remote_applied_count = 0_i64;
     let mut remote_failed_count = 0_i64;
-    for ((account_id, remote_mailbox), remote_uids) in groups {
-        let account = match store.get_account_by_id(Some(account_id)) {
-            Ok(account) => account,
-            Err(_) => {
-                remote_skipped_count += remote_uids.len() as i64;
-                continue;
+    for entry in unread_messages {
+        let reference = store.get_message_remote_reference(entry.message_id)?;
+        if reference.remote_mailbox.trim().is_empty() || reference.remote_uid <= 0
+            || pending_for(&store, entry.message_id, "seen")?.is_none() {
+            remote_skipped_count += 1;
+            continue;
+        }
+        groups.entry((reference.account_id, reference.remote_mailbox, reference.remote_uid_validity))
+            .or_default().push(entry.message_id);
+    }
+    for ((account_id, mailbox, validity), mut ids) in groups {
+        ids.sort_unstable();
+        for chunk in ids.chunks(100) {
+            let account_lock = account_snapshot_lock(account_id);
+            let _account_guard = account_lock.lock().unwrap_or_else(|e| e.into_inner());
+            let locks = chunk.iter().map(|id| remote_write_lock(*id)).collect::<Vec<_>>();
+            let _guards = locks.iter().map(|lock| lock.lock().unwrap_or_else(|e| e.into_inner())).collect::<Vec<_>>();
+            let mut writes = Vec::new();
+            for id in chunk {
+                let reference = store.get_message_remote_reference(*id)?;
+                let pending = pending_for(&store, *id, "seen")?;
+                if reference.account_id == account_id && reference.remote_mailbox == mailbox
+                    && reference.remote_uid_validity == validity && reference.remote_uid > 0
+                    && pending.as_ref().is_some_and(|p| p.value == "1") {
+                    writes.push((reference.remote_uid, pending.unwrap()));
+                } else { remote_skipped_count += 1; }
             }
-        };
-        let secret = match store.get_account_secret(&account) {
-            Ok(secret) => secret,
-            Err(_) => {
-                remote_skipped_count += remote_uids.len() as i64;
-                continue;
+            if writes.is_empty() { continue; }
+            let count = writes.len() as i64;
+            let account = match store.get_account_by_id(Some(account_id)) {
+                Ok(account) => account,
+                Err(_) => { remote_skipped_count += count; continue; }
+            };
+            let secret = match store.get_account_secret(&account) {
+                Ok(secret) => secret,
+                Err(_) => { remote_skipped_count += count; continue; }
+            };
+            let uids = writes.iter().map(|(uid, _)| *uid).collect::<Vec<_>>();
+            remote_attempted_count += count;
+            match imap_probe::set_remote_seen_batch(&account, &secret, &mailbox, &uids, &validity, true) {
+                Ok(()) => {
+                    for (_, pending) in writes { store.clear_pending_remote_write_if_unchanged(&pending)?; }
+                    remote_applied_count += count;
+                }
+                Err(_) => remote_failed_count += count,
             }
-        };
-        let group_count = remote_uids.len() as i64;
-        remote_attempted_count += group_count;
-        match imap_probe::set_remote_seen_batch(
-            &account,
-            &secret,
-            &remote_mailbox,
-            &remote_uids,
-            true,
-        ) {
-            Ok(()) => remote_applied_count += group_count,
-            Err(_) => remote_failed_count += group_count,
         }
     }
 
@@ -283,7 +324,11 @@ pub async fn set_message_starred(
     })
     .await?;
     super::executor::network(account_id, move || {
-        store.set_message_starred(message_id, is_starred)?;
+        store.apply_local_remote_intent(
+            message_id,
+            "flagged",
+            if is_starred { "1" } else { "0" },
+        )?;
         sync_remote_flagged(&store, message_id, is_starred)
     })
     .await
@@ -304,8 +349,10 @@ pub async fn move_message_to_role(
     })
     .await?;
     super::executor::network(account_id, move || {
-        store.move_message_to_role(message_id, &role)?;
-        sync_remote_move(&store, message_id, &role)
+        let account_lock = account_snapshot_lock(account_id);
+        let _account_guard = account_lock.lock().unwrap_or_else(|e| e.into_inner());
+        store.apply_local_remote_intent(message_id, "move", &role)?;
+        sync_remote_move_locked(&store, message_id, &role)
     })
     .await
 }
@@ -324,8 +371,10 @@ pub async fn restore_message_to_inbox(
     })
     .await?;
     super::executor::network(account_id, move || {
-        store.restore_message_to_inbox(message_id)?;
-        let mut remote = sync_remote_move(&store, message_id, "inbox")?;
+        let account_lock = account_snapshot_lock(account_id);
+        let _account_guard = account_lock.lock().unwrap_or_else(|e| e.into_inner());
+        store.apply_local_remote_intent(message_id, "move", "inbox")?;
+        let mut remote = sync_remote_move_locked(&store, message_id, "inbox")?;
         remote.message = remote
             .message
             .replacen("本地已移动", "本地已恢复到收件箱", 1);
@@ -424,51 +473,68 @@ pub async fn remove_label_from_message(
     super::executor::database(move || store.remove_label_from_message(message_id, label_id)).await
 }
 
+fn pending_for(
+    store: &MailStore,
+    message_id: i64,
+    kind: &str,
+) -> MailResult<Option<PendingRemoteWrite>> {
+    store.get_pending_remote_write(message_id, kind)
+}
+
 fn sync_remote_seen(
     store: &MailStore,
     message_id: i64,
     is_read: bool,
 ) -> MailResult<RemoteActionReport> {
-    let (remote_mailbox, remote_uid) = store.get_message_remote_ref(message_id)?;
-    if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
-        return Ok(local_only_report(
-            "本地已更新；该邮件没有远端 UID，跳过远端已读回写。",
-        ));
+    let account_id = store.get_message_remote_reference(message_id)?.account_id;
+    let account_lock = account_snapshot_lock(account_id);
+    let _account_guard = account_lock.lock().unwrap_or_else(|e| e.into_inner());
+    let lock = remote_write_lock(message_id);
+    let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
+    let reference = store.get_message_remote_reference(message_id)?;
+    if reference.remote_mailbox.trim().is_empty() || reference.remote_uid <= 0 {
+        return Ok(local_only_report("本地已更新；该邮件没有可用的远端 UID。"));
     }
-    let account = store.get_message_account(message_id)?;
+    let account = store.get_account_by_id(Some(reference.account_id))?;
     if is_pop3_account(&account) {
         return Ok(local_only_report(
             "本地已更新；POP3 不支持远端已读状态回写。",
+        ));
+    }
+    let pending = pending_for(store, message_id, "seen")?;
+    if pending
+        .as_ref()
+        .is_none_or(|p| p.value != if is_read { "1" } else { "0" })
+    {
+        return Ok(remote_skipped_report(
+            "已存在更新的本地操作，保留待同步状态。",
         ));
     }
     let secret = match store.get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
-                "本地已更新；无法读取本地凭据，远端已读回写已跳过：{error}"
-            )));
-        }
-    };
-    match imap_probe::set_remote_seen(&account, &secret, &remote_mailbox, remote_uid, is_read) {
-        Ok(()) => {
-            let _ = store.clear_pending_remote_write(message_id, "seen");
-            Ok(remote_ok_report(if is_read {
-                "本地已标为已读，远端 \\Seen 状态已同步。"
-            } else {
-                "本地已标为未读，远端 \\Seen 状态已同步。"
-            }))
-        }
-        Err(error) => {
-            // 写回失败：记录待处理意图，避免下次同步静默撤销本地已读状态。
-            let _ = store.record_pending_remote_write(
-                message_id,
-                "seen",
-                if is_read { "1" } else { "0" },
-            );
-            Ok(remote_failed_report(format!(
-                "本地已更新；远端已读状态回写失败：{error}"
+                "本地已更新；凭据不可用，已保留远端待同步操作：{error}"
             )))
         }
+    };
+    match imap_probe::set_remote_seen(
+        &account,
+        &secret,
+        &reference.remote_mailbox,
+        reference.remote_uid,
+        &reference.remote_uid_validity,
+        is_read,
+    ) {
+        Ok(()) => {
+            if let Some(pending) = pending {
+                store.clear_pending_remote_write_if_unchanged(&pending)?;
+            }
+            Ok(remote_ok_report("本地已更新，远端已读状态已同步。"))
+        }
+        Err(error) => Ok(remote_failed_report(format!(
+            "本地已更新；远端已读状态待重试：{error}"
+        ))),
     }
 }
 
@@ -477,47 +543,57 @@ fn sync_remote_flagged(
     message_id: i64,
     is_starred: bool,
 ) -> MailResult<RemoteActionReport> {
-    let (remote_mailbox, remote_uid) = store.get_message_remote_ref(message_id)?;
-    if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
+    let account_id = store.get_message_remote_reference(message_id)?.account_id;
+    let account_lock = account_snapshot_lock(account_id);
+    let _account_guard = account_lock.lock().unwrap_or_else(|e| e.into_inner());
+    let lock = remote_write_lock(message_id);
+    let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
+    let reference = store.get_message_remote_reference(message_id)?;
+    if reference.remote_mailbox.trim().is_empty() || reference.remote_uid <= 0 {
         return Ok(local_only_report(
-            "本地星标已更新；该邮件没有远端 UID，跳过远端星标回写。",
+            "本地星标已更新；该邮件没有可用的远端 UID。",
         ));
     }
-    let account = store.get_message_account(message_id)?;
+    let account = store.get_account_by_id(Some(reference.account_id))?;
     if is_pop3_account(&account) {
         return Ok(local_only_report(
             "本地星标已更新；POP3 不支持远端星标回写。",
+        ));
+    }
+    let pending = pending_for(store, message_id, "flagged")?;
+    if pending
+        .as_ref()
+        .is_none_or(|p| p.value != if is_starred { "1" } else { "0" })
+    {
+        return Ok(remote_skipped_report(
+            "已存在更新的本地操作，保留待同步状态。",
         ));
     }
     let secret = match store.get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
-                "本地星标已更新；无法读取本地凭据，远端星标回写已跳过：{error}"
-            )));
-        }
-    };
-    match imap_probe::set_remote_flagged(&account, &secret, &remote_mailbox, remote_uid, is_starred)
-    {
-        Ok(()) => {
-            let _ = store.clear_pending_remote_write(message_id, "flagged");
-            Ok(remote_ok_report(if is_starred {
-                "本地已添加星标，远端 \\Flagged 状态已同步。"
-            } else {
-                "本地已取消星标，远端 \\Flagged 状态已同步。"
-            }))
-        }
-        Err(error) => {
-            // 写回失败：记录待处理意图，避免下次同步静默撤销本地星标。
-            let _ = store.record_pending_remote_write(
-                message_id,
-                "flagged",
-                if is_starred { "1" } else { "0" },
-            );
-            Ok(remote_failed_report(format!(
-                "本地星标已更新；远端星标状态回写失败：{error}"
+                "本地星标已更新；凭据不可用，已保留远端待同步操作：{error}"
             )))
         }
+    };
+    match imap_probe::set_remote_flagged(
+        &account,
+        &secret,
+        &reference.remote_mailbox,
+        reference.remote_uid,
+        &reference.remote_uid_validity,
+        is_starred,
+    ) {
+        Ok(()) => {
+            if let Some(pending) = pending {
+                store.clear_pending_remote_write_if_unchanged(&pending)?;
+            }
+            Ok(remote_ok_report("本地星标已更新，远端星标状态已同步。"))
+        }
+        Err(error) => Ok(remote_failed_report(format!(
+            "本地星标已更新；远端星标状态待重试：{error}"
+        ))),
     }
 }
 
@@ -526,96 +602,120 @@ fn sync_remote_move(
     message_id: i64,
     role: &str,
 ) -> MailResult<RemoteActionReport> {
+    let account_id = store.get_message_remote_reference(message_id)?.account_id;
+    let account_lock = account_snapshot_lock(account_id);
+    let _account_guard = account_lock.lock().unwrap_or_else(|e| e.into_inner());
+    sync_remote_move_locked(store, message_id, role)
+}
+
+fn sync_remote_move_locked(
+    store: &MailStore,
+    message_id: i64,
+    role: &str,
+) -> MailResult<RemoteActionReport> {
+    let lock = remote_write_lock(message_id);
+    let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
     let reference = store.get_message_remote_reference(message_id)?;
-    if reference.remote_mailbox.trim().is_empty()
-        || (reference.remote_uid <= 0 && reference.message_id_header.trim().is_empty())
-    {
-        return Ok(local_only_report(
-            "本地已移动；该邮件没有远端 UID，跳过远端移动。",
-        ));
+    if reference.remote_mailbox.trim().is_empty() || reference.remote_uid <= 0 {
+        return Ok(local_only_report("本地已移动；该邮件没有可用的远端 UID。"));
     }
     let account = store.get_account_by_id(Some(reference.account_id))?;
     if is_pop3_account(&account) {
-        return Ok(local_only_report(
-            "本地已移动；POP3 不支持远端移动，远端邮件保持不变。",
+        return Ok(local_only_report("本地已移动；POP3 不支持远端移动。"));
+    }
+    let pending = pending_for(store, message_id, "move")?;
+    if pending.as_ref().is_none_or(|p| p.value != role) {
+        return Ok(remote_skipped_report(
+            "已存在更新的本地操作，保留待同步状态。",
         ));
     }
+    let target = match store.remote_mailbox_for_account_role(account.id, role)? {
+        Some(target) => target,
+        None => {
+            return Ok(remote_skipped_report(format!(
+                "本地已移动；未发现角色 {role} 对应的远端文件夹，已保留待同步操作。"
+            )))
+        }
+    };
     let secret = match store.get_account_secret(&account) {
         Ok(secret) => secret,
         Err(error) => {
             return Ok(remote_skipped_report(format!(
-                "本地已移动；无法读取本地凭据，远端移动已跳过：{error}"
-            )));
+                "本地已移动；凭据不可用，已保留远端待同步操作：{error}"
+            )))
         }
     };
-    let target = store.remote_mailbox_for_account_role(account.id, role)?;
-    match target {
-        Some(target_mailbox) => match imap_probe::move_remote_message(
-            &account,
-            &secret,
-            &reference.remote_mailbox,
-            reference.remote_uid,
-            &reference.remote_uid_validity,
-            &target_mailbox,
-            &reference.message_id_header,
-        ) {
-            Ok(target_uid) => {
-                let _ = store.clear_pending_remote_write(message_id, "move");
-                store.set_message_remote_ref_with_validity(
-                    message_id,
-                    &target_mailbox,
-                    target_uid.as_ref().map(|(uid, _)| *uid).unwrap_or(0),
-                    target_uid
-                        .as_ref()
-                        .map(|(_, validity)| validity.as_str())
-                        .unwrap_or(""),
-                )?;
-                Ok(remote_ok_report(if target_uid.is_some() {
-                    format!("本地已移动；远端邮件已移动到 {target_mailbox}，UID 已重绑定。")
-                } else {
-                    format!(
-                        "本地已移动；远端邮件已移动到 {target_mailbox}。本地副本已保留，请同步查看服务器记录。"
-                    )
-                }))
-            }
-            Err(error) => {
-                // 写回失败：记录待处理移动意图，避免下次同步把本地文件夹拉回原目录。
-                let _ = store.record_pending_remote_write(message_id, "move", role);
-                Ok(remote_failed_report(format!(
-                    "本地已移动；远端移动失败：{error}"
-                )))
-            }
-        },
-        None if role == "trash" => {
-            let candidates = [imap_probe::RemoteDeleteCandidate {
-                remote_uid: reference.remote_uid,
-                remote_uid_validity: reference.remote_uid_validity.clone(),
-                message_id_header: reference.message_id_header.clone(),
-            }];
-            match imap_probe::delete_remote_messages(
-                &account,
-                &secret,
-                &reference.remote_mailbox,
-                &candidates,
-            ) {
-                Ok(result) if result.deleted_count == 1 => {
-                    store.set_message_remote_ref(message_id, "", 0)?;
-                    Ok(remote_ok_report(
-                        "本地已移到废纸篓；远端没有废纸篓映射，邮件已直接删除并 expunge。",
-                    ))
+    match imap_probe::move_remote_message(
+        &account,
+        &secret,
+        &reference.remote_mailbox,
+        reference.remote_uid,
+        &reference.remote_uid_validity,
+        &target,
+        &reference.message_id_header,
+    ) {
+        Ok(Some((uid, validity))) if uid > 0 && !validity.is_empty() => {
+            if let Some(pending) = pending {
+                if !store.finish_pending_move(&pending, &reference, &target, uid, &validity)? {
+                    return Ok(remote_skipped_report(
+                        "远端操作已完成，但本地状态已变化，保留新的待同步操作。",
+                    ));
                 }
-                Ok(_) => Ok(remote_skipped_report(
-                    "本地已移到废纸篓；远端邮件无法唯一定位，删除已跳过。",
-                )),
-                Err(error) => Ok(remote_failed_report(format!(
-                    "本地已移到废纸篓；远端删除失败：{error}"
-                ))),
             }
+            Ok(remote_ok_report(format!(
+                "本地已移动；远端邮件已移动到 {target}。"
+            )))
         }
-        None => Ok(remote_skipped_report(format!(
-            "本地已移动；未发现角色 {role} 对应的远端文件夹，远端移动已跳过。"
+        Ok(_) => Ok(remote_failed_report(
+            "服务器未确认目标邮件身份；已保留待同步操作。",
+        )),
+        Err(error) => Ok(remote_failed_report(format!(
+            "本地已移动；远端移动待重试：{error}"
         ))),
     }
+}
+
+/// Retry queued writes before importing server flags. A failed or ambiguous
+/// operation remains queued and continues to protect the local state.
+pub(super) fn retry_pending_remote_writes(
+    store: &MailStore,
+    account_id: i64,
+    ensure_not_cancelled: &dyn Fn() -> MailResult<()>,
+) -> MailResult<(usize, usize)> {
+    retry_pending_remote_writes_with(store, account_id, ensure_not_cancelled, |pending| {
+        match pending.kind.as_str() {
+            "seen" => sync_remote_seen(store, pending.message_id, pending.value == "1"),
+            "flagged" => sync_remote_flagged(store, pending.message_id, pending.value == "1"),
+            "move" => sync_remote_move(store, pending.message_id, &pending.value),
+            _ => Ok(remote_skipped_report("未知的待同步操作。")),
+        }
+    })
+}
+
+fn retry_pending_remote_writes_with(
+    store: &MailStore,
+    account_id: i64,
+    ensure_not_cancelled: &dyn Fn() -> MailResult<()>,
+    mut attempt: impl FnMut(&PendingRemoteWrite) -> MailResult<RemoteActionReport>,
+) -> MailResult<(usize, usize)> {
+    let mut applied = 0;
+    let mut remaining = 0;
+    for pending in store.list_pending_remote_writes()? {
+        ensure_not_cancelled()?;
+        let reference = match store.get_message_remote_reference(pending.message_id) {
+            Ok(reference) => reference,
+            Err(_) => continue,
+        };
+        if reference.account_id != account_id {
+            continue;
+        }
+        let result = attempt(&pending);
+        match result {
+            Ok(report) if report.remote_applied => applied += 1,
+            _ => remaining += 1,
+        }
+    }
+    Ok((applied, remaining))
 }
 
 fn local_only_report(message: impl Into<String>) -> RemoteActionReport {
@@ -684,4 +784,159 @@ pub async fn get_message_count(
         store.count_messages_for_scope(account_id, folder_id.unwrap_or_default(), query, filter)
     })
     .await
+}
+
+#[cfg(test)]
+mod remote_write_tests {
+    use super::*;
+    use crate::models::AccountCreateInput;
+
+    fn fixture() -> (tempfile::TempDir, MailStore, i64) {
+        let dir = tempfile::tempdir().unwrap();
+        let store = MailStore::open_at(dir.path().join("test.sqlite3")).unwrap();
+        store
+            .create_account(AccountCreateInput {
+                email: "remote-write-test@example.invalid".into(),
+                display_name: "Test".into(),
+                provider: "custom".into(),
+                imap_host: "invalid.invalid:993".into(),
+                smtp_host: "invalid.invalid:465".into(),
+                incoming_protocol: "imap".into(),
+                auth_type: "password".into(),
+                sync_mode: "manual".into(),
+                remote_images_allowed: false,
+                signature: String::new(),
+                cross_account_risk_warning: true,
+                block_external_mailboxes: false,
+                intercept_https_links: true,
+                auto_download_attachments: false,
+                fetch_history_attachments: false,
+                warn_external_senders: false,
+            })
+            .unwrap();
+        let message = store
+            .import_eml_message(
+                None,
+                b"From: sender@example.invalid\r\nSubject: test\r\n\r\nbody",
+            )
+            .unwrap();
+        store
+            .set_message_remote_identity(message.id, "INBOX", 41, "<test@example.invalid>", "100")
+            .unwrap();
+        (dir, store, message.id)
+    }
+
+    #[test]
+    fn missing_credentials_persist_local_flag_and_retry_intent() {
+        let (dir, store, id) = fixture();
+        store.apply_local_remote_intent(id, "seen", "1").unwrap();
+        let report = sync_remote_seen(&store, id, true).unwrap();
+        assert!(!report.remote_attempted);
+        assert!(store.get_message(id).unwrap().is_read);
+        let account_id = store.get_message_account(id).unwrap().id;
+        assert_eq!(
+            retry_pending_remote_writes(&store, account_id, &|| Ok(())).unwrap(),
+            (0, 1)
+        );
+        drop(store);
+        let reopened = MailStore::open_at(dir.path().join("test.sqlite3")).unwrap();
+        assert!(reopened.get_message(id).unwrap().is_read);
+        assert!(reopened
+            .list_pending_remote_writes()
+            .unwrap()
+            .iter()
+            .any(|p| p.message_id == id && p.kind == "seen" && p.value == "1"));
+    }
+
+    #[test]
+    fn unmapped_trash_never_deletes_or_discards_pending_move() {
+        let (_dir, store, id) = fixture();
+        store
+            .apply_local_remote_intent(id, "move", "trash")
+            .unwrap();
+        let report = sync_remote_move(&store, id, "trash").unwrap();
+        assert!(!report.remote_attempted);
+        assert!(report.message.contains("文件夹"));
+        assert_eq!(store.get_message(id).unwrap().folder_role, "trash");
+        assert_eq!(
+            store.get_message_remote_reference(id).unwrap().remote_uid,
+            41
+        );
+        assert!(store
+            .list_pending_remote_writes()
+            .unwrap()
+            .iter()
+            .any(|p| p.kind == "move" && p.value == "trash"));
+    }
+
+    #[test]
+    fn newer_intent_is_not_cleared_by_older_completion() {
+        let (_dir, store, id) = fixture();
+        store.apply_local_remote_intent(id, "seen", "1").unwrap();
+        let old = pending_for(&store, id, "seen").unwrap().unwrap();
+        store.apply_local_remote_intent(id, "seen", "0").unwrap();
+        assert!(!store.clear_pending_remote_write_if_unchanged(&old).unwrap());
+        assert!(!store.get_message(id).unwrap().is_read);
+        assert_eq!(pending_for(&store, id, "seen").unwrap().unwrap().value, "0");
+        assert!(!sync_remote_seen(&store, id, true).unwrap().remote_attempted);
+    }
+
+    #[test]
+    fn retry_keeps_failed_intents_then_consumes_acknowledged_writes() {
+        let (_dir, store, id) = fixture();
+        store.apply_local_remote_intent(id, "seen", "1").unwrap();
+        store.apply_local_remote_intent(id, "flagged", "1").unwrap();
+        let account_id = store.get_message_account(id).unwrap().id;
+        let retry = || {
+            retry_pending_remote_writes_with(&store, account_id, &|| Ok(()), |pending| {
+                if pending.kind == "seen" {
+                    store.clear_pending_remote_write_if_unchanged(pending)?;
+                    Ok(remote_ok_report("mock acknowledged"))
+                } else {
+                    Ok(remote_failed_report("mock disconnected"))
+                }
+            })
+        };
+        assert_eq!(retry().unwrap(), (1, 1));
+        assert!(pending_for(&store, id, "seen").unwrap().is_none());
+        assert!(pending_for(&store, id, "flagged").unwrap().is_some());
+        assert_eq!(
+            retry_pending_remote_writes_with(&store, account_id, &|| Ok(()), |pending| {
+                store.clear_pending_remote_write_if_unchanged(pending)?;
+                Ok(remote_ok_report("mock recovered"))
+            })
+            .unwrap(),
+            (1, 0)
+        );
+        assert!(store.list_pending_remote_writes().unwrap().is_empty());
+    }
+
+    #[test]
+    fn remote_write_waits_for_inflight_account_snapshot() {
+        let (_dir, store, id) = fixture();
+        store.apply_local_remote_intent(id, "seen", "1").unwrap();
+        let account_id = store.get_message_account(id).unwrap().id;
+        let lock = account_snapshot_lock(account_id);
+        let guard = lock.lock().unwrap();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let worker_store = store.clone();
+        let worker = std::thread::spawn(move || {
+            started_tx.send(()).unwrap();
+            done_tx
+                .send(sync_remote_seen(&worker_store, id, true))
+                .unwrap();
+        });
+        started_rx.recv().unwrap();
+        assert!(done_rx
+            .recv_timeout(std::time::Duration::from_millis(50))
+            .is_err());
+        drop(guard);
+        assert!(done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap()
+            .is_ok());
+        worker.join().unwrap();
+        assert!(pending_for(&store, id, "seen").unwrap().is_some());
+    }
 }

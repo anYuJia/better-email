@@ -40,16 +40,16 @@ describe('ShortcutHelpModal 键盘可达性', () => {
     // 打开弹窗：焦点移入弹窗内可操作元素（关闭按钮）。
     fireEvent.click(trigger());
     expect(document.activeElement).toBe(closeButton());
-    expect(trigger().hasAttribute('inert')).toBe(true);
-    expect(trigger().getAttribute('aria-hidden')).toBe('true');
+    expect(trigger().closest('[inert]')).not.toBeNull();
+    expect(trigger().closest('[aria-hidden="true"]')).not.toBeNull();
 
     // 关闭弹窗：焦点恢复到打开前的触发按钮。
     fireEvent.click(closeButton());
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(document.querySelector('.shortcut-modal')).toBeNull();
     expect(document.activeElement).toBe(trigger());
-    expect(trigger().hasAttribute('inert')).toBe(false);
-    expect(trigger().hasAttribute('aria-hidden')).toBe(false);
+    expect(trigger().closest('[inert]')).toBeNull();
+    expect(trigger().closest('[aria-hidden="true"]')).toBeNull();
   });
 
   it('Tab / Shift+Tab 在弹窗内循环（焦点不逃逸到弹窗外）', () => {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   messages,
+  listMessages,
   resetMockMessages,
   snoozeMessagesMockMessage,
 } from './state';
@@ -43,5 +44,23 @@ describe('snoozeMessagesMockMessage 批量稍后处理原子性', () => {
     expect(result.map((message) => message.id)).toEqual([1, 1]);
     expect(result[0]).toBe(result[1]);
     expect(messages.filter((message) => message.folder_role === 'snoozed').length).toBe(1);
+  });
+});
+
+describe('mock date search', () => {
+  beforeEach(() => resetMockMessages());
+
+  it('matches the whole local calendar day including fractional seconds', () => {
+    const start = new Date(2026, 7, 30);
+    const end = new Date(2026, 7, 31);
+    messages[0].received_at = new Date(start.getTime() - 1).toISOString();
+    messages[1].received_at = new Date(start.getTime() + 60_000).toISOString();
+    messages[2].received_at = new Date(end.getTime() - 1).toISOString();
+    messages[3].received_at = end.toISOString();
+    const ids = listMessages({ query: 'after:2026-08-30 before:2026-08-30', limit: 1000 }).map((message) => message.id);
+    expect(ids).toContain(messages[1].id);
+    expect(ids).toContain(messages[2].id);
+    expect(ids).not.toContain(messages[0].id);
+    expect(ids).not.toContain(messages[3].id);
   });
 });

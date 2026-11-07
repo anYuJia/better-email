@@ -13,6 +13,7 @@ pub(super) struct SearchCriteria {
     filename: Option<String>,
     after: Option<String>,
     before: Option<String>,
+    before_exclusive: bool,
     has_attachment: bool,
     is_unread: bool,
     is_read: bool,
@@ -90,7 +91,9 @@ impl SearchCriteria {
                 .strip_prefix("before:")
                 .filter(|value| !value.is_empty())
             {
-                criteria.before = Some(normalize_search_date_end(value));
+                let (end, exclusive) = normalize_search_date_end(value);
+                criteria.before = Some(end);
+                criteria.before_exclusive = exclusive;
             } else if matches!(token, "has:attachment" | "has:attachments") {
                 criteria.has_attachment = true;
             } else if token == "is:unread" {
@@ -311,10 +314,14 @@ pub(super) fn build_message_filter_clause(search: &SearchCriteria, filter: &str)
         );
     }
     if search.after.is_some() {
-        sql.push_str("AND m.received_at >= ? ");
+        sql.push_str("AND julianday(m.received_at) >= julianday(?) ");
     }
     if search.before.is_some() {
-        sql.push_str("AND m.received_at <= ? ");
+        sql.push_str(if search.before_exclusive {
+            "AND julianday(m.received_at) < julianday(?) "
+        } else {
+            "AND julianday(m.received_at) <= julianday(?) "
+        });
     }
     if search.has_attachment {
         sql.push_str("AND m.has_attachments = 1 ");
@@ -362,18 +369,91 @@ pub(super) fn build_like_query(term: &str) -> String {
     format!("%{escaped}%")
 }
 pub(super) fn normalize_search_date_start(value: &str) -> String {
-    let trimmed = value.trim();
-    if trimmed.len() == 10 && trimmed.chars().nth(4) == Some('-') {
-        format!("{trimmed}T00:00:00")
-    } else {
-        trimmed.to_string()
+    local_date_boundary(value, false, &chrono::Local).unwrap_or_else(|| value.trim().to_string())
+}
+pub(super) fn normalize_search_date_end(value: &str) -> (String, bool) {
+    match local_date_boundary(value, true, &chrono::Local) {
+        Some(boundary) => (boundary, true),
+        None => (value.trim().to_string(), false),
     }
 }
-pub(super) fn normalize_search_date_end(value: &str) -> String {
-    let trimmed = value.trim();
-    if trimmed.len() == 10 && trimmed.chars().nth(4) == Some('-') {
-        format!("{trimmed}T23:59:59")
-    } else {
-        trimmed.to_string()
+
+fn local_date_boundary<T: chrono::TimeZone>(
+    value: &str,
+    next_day: bool,
+    zone: &T,
+) -> Option<String> {
+    use chrono::NaiveDate;
+    let value = value.trim();
+    if value.len() != 10 {
+        return None;
+    }
+    let mut date = NaiveDate::parse_from_str(value, "%Y-%m-%d").ok()?;
+    if next_day {
+        date = date.succ_opt()?;
+    }
+    let midnight = date.and_hms_opt(0, 0, 0)?;
+    // Some time zones skip or repeat midnight. Pick the first valid instant
+    // belonging to the date, preserving the half-open local-day interval.
+    for minutes in 0..(24 * 60) {
+        let local = midnight.checked_add_signed(chrono::Duration::minutes(minutes))?;
+        if let Some(instant) = zone.from_local_datetime(&local).earliest() {
+            return Some(instant.with_timezone(&chrono::Utc).to_rfc3339());
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod date_tests {
+    use super::*;
+
+    #[test]
+    fn local_day_boundaries_compare_instants_and_include_fractional_last_second() {
+        let zone = chrono::FixedOffset::east_opt(8 * 3600).unwrap();
+        let start = local_date_boundary("2026-08-30", false, &zone).unwrap();
+        let end = local_date_boundary("2026-08-30", true, &zone).unwrap();
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        let contains = |value: &str| -> bool {
+            conn.query_row(
+                "SELECT julianday(?1) >= julianday(?2) AND julianday(?1) < julianday(?3)",
+                rusqlite::params![value, start, end],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+        assert!(!contains("2026-08-29T15:59:59Z"));
+        assert!(contains("2026-08-29T18:00:00Z"));
+        assert!(contains("2026-08-30T23:59:59.500+08:00"));
+        assert!(!contains("2026-08-30T16:00:00Z"));
+        assert!(local_date_boundary("2026-02-30", false, &zone).is_none());
+    }
+
+    #[test]
+    fn date_search_builds_an_inclusive_local_day_filter() {
+        let criteria = SearchCriteria::parse(Some("after:2026-08-30 before:2026-08-30"));
+        let start = chrono::DateTime::parse_from_rfc3339(criteria.after.as_ref().unwrap()).unwrap();
+        let end = chrono::DateTime::parse_from_rfc3339(criteria.before.as_ref().unwrap()).unwrap();
+        let samples = [
+            start - chrono::Duration::seconds(1),
+            start + chrono::Duration::hours(12),
+            end - chrono::Duration::milliseconds(500),
+            end,
+        ];
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        let clause = build_message_filter_clause(&criteria, "all");
+        let sql = format!("SELECT 1 FROM (SELECT ? AS received_at) m WHERE 1=1 {clause}");
+        for (index, sample) in samples.iter().enumerate() {
+            let mut params = vec![sample.to_rfc3339()];
+            params.extend(criteria.params());
+            let hits: Vec<i32> = conn
+                .prepare(&sql)
+                .unwrap()
+                .query_map(rusqlite::params_from_iter(params), |row| row.get(0))
+                .unwrap()
+                .collect::<Result<_, _>>()
+                .unwrap();
+            assert_eq!(!hits.is_empty(), index == 1 || index == 2);
+        }
     }
 }

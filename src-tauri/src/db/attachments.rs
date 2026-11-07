@@ -68,6 +68,31 @@ impl MailStore {
         local_path: &str,
         size_bytes: i64,
     ) -> MailResult<Attachment> {
+        self.mark_attachment_downloaded_checked(attachment_id, local_path, size_bytes, None)
+    }
+
+    pub fn mark_remote_attachment_downloaded(
+        &self,
+        attachment_id: i64,
+        local_path: &str,
+        size_bytes: i64,
+        expected: &MessageRemoteRef,
+    ) -> MailResult<Attachment> {
+        self.mark_attachment_downloaded_checked(
+            attachment_id,
+            local_path,
+            size_bytes,
+            Some(expected),
+        )
+    }
+
+    fn mark_attachment_downloaded_checked(
+        &self,
+        attachment_id: i64,
+        local_path: &str,
+        size_bytes: i64,
+        expected: Option<&MessageRemoteRef>,
+    ) -> MailResult<Attachment> {
         // 正常下载/导入路径在调用前已经把文件原子落盘。只有真实存在、大小一致的
         // 常规文件才记录摘要；旧数据或文件已丢失的记录保留为空摘要，后续外发时
         // 会安全拒绝，而不是把未绑定内容的路径当作可发送来源。
@@ -84,14 +109,22 @@ impl MailStore {
             Err(_) => String::new(),
         };
         self.with_conn(|conn| {
-            conn.execute(
+            let changed = if let Some(expected) = expected {
+                conn.execute(
+                    "UPDATE attachments SET is_downloaded = 1, local_path = ?2, size_bytes = ?3, content_sha256 = ?4
+                     WHERE id = ?1 AND EXISTS (SELECT 1 FROM messages m WHERE m.id = attachments.message_id
+                       AND m.account_id = ?5 AND m.remote_mailbox = ?6 AND m.remote_uid = ?7 AND m.remote_uid_validity = ?8)",
+                    params![attachment_id, local_path, size_bytes, content_sha256, expected.account_id, expected.remote_mailbox, expected.remote_uid, expected.remote_uid_validity],
+                )?
+            } else { conn.execute(
                 "
                 UPDATE attachments
                 SET is_downloaded = 1, local_path = ?2, size_bytes = ?3, content_sha256 = ?4
                 WHERE id = ?1
                 ",
                 params![attachment_id, local_path, size_bytes, content_sha256],
-            )?;
+            )? };
+            if changed == 0 { return Err(MailError::Cancelled); }
             attachment_for_conn(conn, attachment_id)
         })
     }

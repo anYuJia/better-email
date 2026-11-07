@@ -126,6 +126,26 @@ fn delete_with(
         }
     }
     for ((account_id, mailbox), entries) in groups {
+        let account_lock = super::messages::account_snapshot_lock(account_id);
+        let _guard = account_lock.lock().unwrap_or_else(|e| e.into_inner());
+        let mut eligible = Vec::new();
+        for (id, reference) in entries {
+            let still_current = store
+                .get_message(id)
+                .is_ok_and(|message| message.folder_role == "trash")
+                && store
+                    .get_message_remote_reference(id)
+                    .is_ok_and(|actual| actual == reference);
+            if still_current {
+                eligible.push((id, reference));
+            } else {
+                reports.push((id, retained("邮件状态已改变，未执行永久删除。", false)));
+            }
+        }
+        let entries = eligible;
+        if entries.is_empty() {
+            continue;
+        }
         let account = store.get_account_by_id(Some(account_id))?;
         let secret = match store.get_account_secret(&account) {
             Ok(secret) => secret,

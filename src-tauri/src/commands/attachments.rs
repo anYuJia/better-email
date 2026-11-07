@@ -755,7 +755,9 @@ pub fn download_attachment_file(
             Err(error) => return Err(error.into()),
         }
     }
-    let (remote_mailbox, remote_uid) = store.get_message_remote_ref(attachment.message_id)?;
+    let reference = store.get_message_remote_reference(attachment.message_id)?;
+    let remote_mailbox = &reference.remote_mailbox;
+    let remote_uid = reference.remote_uid;
     if remote_mailbox.trim().is_empty() || remote_uid <= 0 {
         return Err(crate::db::MailError::Imap(
             "该附件所属邮件没有远端 UID，无法下载附件文件。".to_string(),
@@ -770,7 +772,17 @@ pub fn download_attachment_file(
     let final_dir = store.resolve_download_dir()?;
     fs::create_dir_all(&final_dir)?;
     let temp_dir = ensure_private_attachment_dir(store, attachment.message_id)?;
-    let temp_path = temp_dir.join(format!("{}.download", attachment.id));
+    let mut identity = Sha256::new();
+    identity.update(reference.account_id.to_be_bytes());
+    identity.update((remote_mailbox.len() as u64).to_be_bytes());
+    identity.update(remote_mailbox.as_bytes());
+    identity.update(remote_uid.to_be_bytes());
+    identity.update(reference.remote_uid_validity.as_bytes());
+    let temp_path = temp_dir.join(format!(
+        "{}-{}.download",
+        attachment.id,
+        sha256_hex(identity.finalize())
+    ));
     // 断点续传既有临时文件在打开前检查：受管目录内的常规文件、权限收紧、
     // 大小未超限；异常文件删除后从零开始。
     let resume_offset = private_resume_offset(&temp_path)?;
@@ -779,8 +791,9 @@ pub fn download_attachment_file(
         &account,
         &secret,
         imap_probe::AttachmentDownloadOptions {
-            remote_name: &remote_mailbox,
+            remote_name: remote_mailbox,
             remote_uid,
+            remote_uid_validity: &reference.remote_uid_validity,
             filename: &attachment.filename,
             content_id: &attachment.content_id,
             max_bytes: MAX_ATTACHMENT_DOWNLOAD_BYTES,
@@ -801,6 +814,9 @@ pub fn download_attachment_file(
             )));
         }
     };
+    if store.get_message_remote_reference(attachment.message_id)? != reference {
+        return Err(crate::db::MailError::Cancelled);
+    }
     let filename = sanitize_filename(if downloaded.filename.trim().is_empty() {
         &attachment.filename
     } else {
@@ -848,8 +864,12 @@ pub fn download_attachment_file(
         }
     };
     let local_path_string = local_path.to_string_lossy().into_owned();
-    let updated =
-        store.mark_attachment_downloaded(attachment.id, &local_path_string, decoded_size)?;
+    let updated = store.mark_remote_attachment_downloaded(
+        attachment.id,
+        &local_path_string,
+        decoded_size,
+        &reference,
+    )?;
 
     Ok(AttachmentDownload {
         attachment: updated,

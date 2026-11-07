@@ -15,6 +15,47 @@ export async function runNavigationQuality(cdp, api) {
   await setUiViewport(cdp, 1180, 760);
   await evalInPage(cdp, `history.replaceState({}, '', ${JSON.stringify(url)}); location.reload()`);
   await waitForExpression(cdp, "document.querySelector('.message-card-main') && document.querySelector('.reader h1')");
+  // Exercise help before opening the lazy composer. Its backdrop must not rely
+  // on the composer's separately loaded CSS or become a sidebar grid item.
+  await evalInPage(cdp, "document.querySelector('.shortcut-help-button').focus(); document.querySelector('.shortcut-help-button').click()");
+  await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.activeElement === document.querySelector('.shortcut-close-button')");
+  await assert(`(() => {
+    const backdrop = document.querySelector('.shortcut-backdrop');
+    const modal = document.querySelector('.shortcut-modal').getBoundingClientRect();
+    const screen = backdrop.getBoundingClientRect();
+    const rowsFit = [...document.querySelectorAll('.shortcut-row')].every(row => {
+      const label = row.querySelector('span').getBoundingClientRect();
+      const keys = row.querySelector('div').getBoundingClientRect();
+      return label.right <= keys.left + 1 || label.bottom <= keys.top + 1;
+    });
+    return backdrop.parentElement === document.body && getComputedStyle(backdrop).position === 'fixed'
+      && Math.abs(screen.width - innerWidth) < 1 && Math.abs(screen.height - innerHeight) < 1
+      && modal.width >= 700 && Math.abs(modal.left + modal.width / 2 - innerWidth / 2) < 2 && rowsFit;
+  })()`, 'Shortcut help opens centered across the viewport before the composer loads');
+  await captureScreenshot(cdp, 'shortcut-help-cold-start');
+  for (const scale of [1.25, 1.5]) {
+    await evalInPage(cdp, `(() => {
+      for (const el of document.querySelectorAll('.shortcut-modal *')) {
+        el.dataset.shortcutFontBase ||= getComputedStyle(el).fontSize;
+        el.style.fontSize = parseFloat(el.dataset.shortcutFontBase) * ${scale} + 'px';
+      }
+    })()`);
+    await assert(`(() => {
+      const modal = document.querySelector('.shortcut-modal');
+      return modal.scrollWidth <= modal.clientWidth + 1
+        && [...modal.querySelectorAll('.shortcut-row')].every(row => {
+          const label = row.querySelector('span').getBoundingClientRect();
+          const keys = row.querySelector('div').getBoundingClientRect();
+          return (label.right <= keys.left + 1 || label.bottom <= keys.top + 1)
+            && row.scrollWidth <= row.clientWidth + 1;
+        });
+    })()`, `Shortcut help remains readable at ${scale * 100}% text size`);
+    await captureScreenshot(cdp, `shortcut-help-${scale * 100}pct`);
+  }
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await waitForExpression(cdp, "!document.querySelector('.shortcut-modal') && document.activeElement === document.querySelector('.shortcut-help-button')");
+  checks.push('Escape closes shortcut help and restores its opener');
   await evalInPage(cdp, `(() => {
     window.__pendingMailboxReads = [];
     window.__betterEmailMockCommandOverride = (command, args) => command === 'list_messages'
@@ -91,6 +132,18 @@ export async function runNavigationQuality(cdp, api) {
     return r.top >= titlebar.bottom && close.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
   })()`, 'Narrow sidebar close remains visible and clickable below the titlebar');
   await captureScreenshot(cdp, 'workspace-1024-drawer');
+  await evalInPage(cdp, "document.querySelector('.shortcut-help-button').focus(); document.querySelector('.shortcut-help-button').click()");
+  await waitForExpression(cdp, "document.querySelector('.shortcut-modal') && document.activeElement === document.querySelector('.shortcut-close-button')");
+  await assert(`(() => {
+    const backdrop = document.querySelector('.shortcut-backdrop').getBoundingClientRect();
+    const modal = document.querySelector('.shortcut-modal').getBoundingClientRect();
+    return Math.abs(backdrop.width - innerWidth) < 1 && modal.width >= 700
+      && Math.abs(modal.left + modal.width / 2 - innerWidth / 2) < 2;
+  })()`, 'Shortcut help covers the window when opened from the narrow sidebar');
+  await captureScreenshot(cdp, 'shortcut-help-1024');
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+  await waitForExpression(cdp, "!document.querySelector('.shortcut-modal') && document.activeElement === document.querySelector('.shortcut-help-button')");
   await evalInPage(cdp, "document.querySelector('[data-narrow-sidebar-close]').click()");
   await waitForExpression(cdp, "!document.querySelector('.narrow-view-sidebar') && document.activeElement?.hasAttribute('data-narrow-sidebar-open')");
   checks.push('Closing the narrow sidebar returns focus to its opener');

@@ -692,6 +692,14 @@ describe('ComposerWindow focus lifecycle', () => {
 });
 
 describe('composer submission interaction lock', () => {
+  it('shows actual SMTP upload percentage and waits for server confirmation separately', () => {
+    const { rerender } = render(cloneElement(composer(), { submissionPending: true, sendProgress: 70, sendProgressMessage: 'SMTP 上传 42% · 4 MB / 10 MB' }));
+    expect(screen.getByRole('progressbar', { name: '发送进度' }).getAttribute('aria-valuenow')).toBe('42');
+    expect(screen.getAllByText('SMTP 上传 42% · 4 MB / 10 MB').length).toBeGreaterThan(0);
+    rerender(cloneElement(composer(), { submissionPending: true, sendProgress: 84, sendProgressMessage: '上传完成，等待服务器确认' }));
+    expect(screen.getByRole('progressbar', { name: '发送进度' }).hasAttribute('aria-valuenow')).toBe(false);
+    expect(screen.getAllByText('上传完成，等待服务器确认').length).toBeGreaterThan(0);
+  });
   it('locks the editor and send controls before progress is available and unlocks after completion', () => {
     const { container, rerender } = render(cloneElement(composer(), { submissionPending: true }));
     const panel = container.querySelector('.composer')!;

@@ -26,6 +26,13 @@ const baseProps: ComponentProps<typeof MobileInboxHeader> = {
 };
 
 describe('MobileInboxHeader filter menu', () => {
+  it('shows actual background upload progress and waiting for confirmation', () => {
+    const view = render(<MobileInboxHeader {...baseProps} sendStatus="第 1/2 封 · SMTP 上传 42% · 4 MB / 10 MB" />);
+    expect(screen.getByRole('progressbar', { name: '邮件上传进度' }).getAttribute('value')).toBe('42');
+    view.rerender(<MobileInboxHeader {...baseProps} sendStatus="上传完成，等待服务器确认" />);
+    expect(screen.queryByRole('progressbar', { name: '邮件上传进度' })).toBeNull();
+    expect(screen.getByText('上传完成，等待服务器确认')).toBeTruthy();
+  });
   it('announces the thread mode only once when the count already names conversations', () => {
     const view = render(<MobileInboxHeader {...baseProps} filter="all" accountScopeLabel="统一邮箱"
       listMode="threads" visibleListSummary="49 个会话" />);

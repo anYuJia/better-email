@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { filters } from '../../app/appConfig';
 import type { FilterMode, ListMode } from '../../app/types';
+import { smtpUploadPercent } from '../../app/smtpUploadProgress';
 import ContextMenu, { type ContextMenuItem } from '../ContextMenu';
 
 type MobileInboxHeaderProps = {
@@ -30,6 +31,7 @@ type MobileInboxHeaderProps = {
   listMode: ListMode;
   isRefreshing: boolean;
   refreshNotice?: string | null;
+  sendStatus?: string | null;
   onOpenMailbox: () => void;
   onOpenSearch: () => void;
   onCloseSearch: () => void;
@@ -60,6 +62,7 @@ export default function MobileInboxHeader({
   listMode,
   isRefreshing,
   refreshNotice,
+  sendStatus,
   onOpenMailbox,
   onOpenSearch,
   onCloseSearch,
@@ -305,6 +308,14 @@ export default function MobileInboxHeader({
                 重试
               </button>
             </>
+          )}
+        </div>
+      )}
+      {sendStatus && (
+        <div className="mobile-inbox-send-status" role="status" aria-live="polite">
+          <span>{sendStatus}</span>
+          {smtpUploadPercent(sendStatus) !== null && (
+            <progress max={100} value={smtpUploadPercent(sendStatus) ?? undefined} aria-label="邮件上传进度" />
           )}
         </div>
       )}

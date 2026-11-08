@@ -1840,6 +1840,9 @@ export function cancelMockBackgroundTask(args?: InvokeArgs) {
   const taskId = Number(args?.taskId);
   const task = backgroundTasks.find((item) => item.id === taskId);
   if (!task) throw new Error('background task not found');
+  if (task.kind === 'outbox-smtp' && task.status === 'running') {
+    throw new Error('邮件正在发送，无法安全取消，请等待服务器确认。');
+  }
   const updated = task.status === 'queued'
     ? { ...task, status: 'cancelled', message: '已取消', finished_at: now }
     : task.status === 'running'

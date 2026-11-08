@@ -121,6 +121,26 @@ fn deduplication_keeps_accounts_and_task_kinds_independent() {
 }
 
 #[test]
+fn running_smtp_task_cannot_be_misreported_as_cancelled() {
+    let (_dir, store, _, _) = fixture();
+    let queued = store
+        .enqueue_background_task(input("outbox-smtp", None))
+        .unwrap();
+    store.mark_background_task_running(queued.id).unwrap();
+    assert!(store
+        .cancel_background_task(queued.id)
+        .unwrap_err()
+        .to_string()
+        .contains("无法安全取消"));
+    let task = store.get_background_task_by_id(queued.id).unwrap();
+    assert_eq!(task.status, "running");
+    assert!(!task.cancel_requested);
+    store
+        .complete_background_task(queued.id, "服务器已接受")
+        .unwrap();
+}
+
+#[test]
 fn active_tasks_remain_visible_after_many_newer_terminal_tasks() {
     let (_dir, first, _, _accounts) = fixture();
     let queued = first

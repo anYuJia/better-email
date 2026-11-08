@@ -102,6 +102,7 @@ export const IPC = {
   ReadAttachmentDataUrl: 'read_attachment_data_url',
   RefreshOauth2Token: 'refresh_oauth2_token',
   ReleaseDueSnoozedMessages: 'release_due_snoozed_messages',
+  ReleaseDueOutboxItems: 'release_due_outbox_items',
   RemoveAccount: 'remove_account',
   RenameCustomFolder: 'rename_custom_folder',
   RenderMessageWithRemoteImagePolicy: 'render_message_with_remote_image_policy',

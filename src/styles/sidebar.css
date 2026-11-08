@@ -543,13 +543,29 @@
   min-width: 0;
 }
 
+.sidebar-task-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
 .sidebar-task-title {
+  flex: 1;
+  min-width: 0;
   color: var(--ui-text-secondary);
   font-size: var(--ui-font-size-meta);
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar-task-percent {
+  flex-shrink: 0;
+  color: var(--ui-text-secondary);
+  font-size: var(--ui-font-size-meta);
+  font-variant-numeric: tabular-nums;
 }
 
 .sidebar-task-status {

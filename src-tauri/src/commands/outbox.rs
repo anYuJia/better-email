@@ -23,6 +23,48 @@ struct OutboxTaskProgress {
     task_id: i64,
 }
 
+fn upload_reporter<'a>(
+    store: &'a MailStore,
+    task: Option<OutboxTaskProgress>,
+    start: i64,
+    end: i64,
+    prefix: String,
+) -> impl FnMut(smtp::UploadProgress) + 'a {
+    let mut last_update: Option<std::time::Instant> = None;
+    move |event| {
+        let Some(task) = task else { return };
+        let (value, text, force) = match event {
+            smtp::UploadProgress::Writing { written, total } => {
+                let percent = if total == 0 {
+                    0
+                } else {
+                    (written as u128 * 100 / total as u128) as i64
+                };
+                let value = start + (end - start).max(0) * percent / 100;
+                (
+                    value,
+                    format!(
+                        "{prefix}SMTP 上传 {percent}% · {} / {}",
+                        format_attachment_progress(written as u64),
+                        format_attachment_progress(total as u64)
+                    ),
+                    written == 0 || written == total,
+                )
+            }
+            smtp::UploadProgress::AwaitingConfirmation { .. } => {
+                (end, format!("{prefix}上传完成，等待服务器确认"), true)
+            }
+        };
+        if force
+            || last_update
+                .is_none_or(|last| last.elapsed() >= std::time::Duration::from_millis(200))
+        {
+            let _ = task.set(store, value, &text);
+            last_update = Some(std::time::Instant::now());
+        }
+    }
+}
+
 impl OutboxTaskProgress {
     fn new(task_id: Option<i64>) -> Option<Self> {
         task_id.filter(|id| *id > 0).map(|task_id| Self { task_id })
@@ -494,12 +536,9 @@ fn send_message_blocking(
                 "正在构建并向服务器提交邮件；此阶段进度由服务器确认",
             )?;
         }
-        let raw_message = smtp::send_outbound_with_attachment_bytes(
-            &account,
-            &message,
-            &secret,
-            attachment_bytes,
-        )?;
+        let mut transport = smtp::ProgressTransport::connect(&account, &secret)?;
+        let mut on_progress = upload_reporter(store, task_progress, 60, 84, String::new());
+        let raw_message = transport.send(&message, attachment_bytes, &mut on_progress)?;
         Ok((message, account, secret, raw_message))
     })();
     let (message, account, secret, raw_message) = match prepared {
@@ -802,13 +841,38 @@ fn flush_outbox_smtp_blocking(
             ensure_outbox_task_not_cancelled(store, task_id)?;
             store.persist_sent_attachment_bytes(&message, &bytes)?;
             ensure_outbox_task_not_cancelled(store, task_id)?;
+            if transports
+                .get_mut(&account.id)
+                .is_some_and(|transport: &mut smtp::ProgressTransport| !transport.is_connected())
+            {
+                transports.remove(&account.id);
+            }
             let transport = match transports.entry(account.id) {
                 std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
                 std::collections::hash_map::Entry::Vacant(entry) => {
-                    entry.insert(smtp::authenticated_transport(&account, &secret)?)
+                    entry.insert(smtp::ProgressTransport::connect(&account, &secret)?)
                 }
             };
-            let raw_message = smtp::send_outbound_with_transport(transport, &message, bytes)?;
+            let upload_start = start + (end - start) / 2;
+            let upload_end = (end - 1).max(upload_start);
+            let subject: String = message.subject.chars().take(32).collect();
+            let mut on_progress = upload_reporter(
+                store,
+                task_progress,
+                upload_start,
+                upload_end,
+                format!(
+                    "第 {}/{} 封（{}）· ",
+                    index + 1,
+                    total,
+                    if subject.trim().is_empty() {
+                        "无主题"
+                    } else {
+                        &subject
+                    }
+                ),
+            );
+            let raw_message = transport.send(&message, bytes, &mut on_progress)?;
             store
                 .mark_outbox_smtp_sent_pending_archive(
                     message.id,
@@ -819,6 +883,17 @@ fn flush_outbox_smtp_blocking(
                         "服务器已接受邮件，但本地状态保存失败；请勿重复发送：{error}"
                     ))
                 })?;
+            if let Some(progress) = task_progress {
+                progress.set(
+                    store,
+                    upload_end,
+                    &format!(
+                        "第 {}/{} 封服务器已接受，正在保存已发送副本",
+                        index + 1,
+                        total
+                    ),
+                )?;
+            }
             if let Err(error) = store.sync_contacts_from_sent_message(message.id) {
                 crate::logging::log_line(format!(
                     "[better-email][send] contact sync deferred message_id={} error={error}",

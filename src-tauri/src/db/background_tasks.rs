@@ -140,10 +140,17 @@ impl MailStore {
                     cancel_requested = CASE WHEN status = 'running' THEN 1 ELSE 0 END,
                     finished_at = CASE WHEN status = 'queued' THEN ?1 ELSE finished_at END
                 WHERE id = ?2 AND status IN ('queued', 'running')
+                  AND NOT (kind = 'outbox-smtp' AND status = 'running')
                 ",
                 params![finished_at, task_id],
             )?;
-            get_background_task_for_conn(conn, task_id)
+            let task = get_background_task_for_conn(conn, task_id)?;
+            if task.kind == "outbox-smtp" && task.status == "running" {
+                return Err(MailError::Smtp(
+                    "邮件正在发送，无法安全取消，请等待服务器确认。".to_string(),
+                ));
+            }
+            Ok(task)
         })
     }
     /// 在安全检查点确认取消请求：已请求取消时把任务落为 cancelled，

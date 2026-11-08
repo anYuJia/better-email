@@ -722,6 +722,23 @@
     border-bottom: 1px solid var(--ui-border);
   }
 
+  .mobile-inbox-send-status {
+    display: grid;
+    gap: 4px;
+    padding: 6px 14px;
+    color: var(--ui-text-secondary);
+    background: var(--ui-surface-muted, var(--quiet-row-hover));
+    border-bottom: 1px solid var(--ui-border);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-inbox-send-status progress {
+    width: 100%;
+    height: 3px;
+    accent-color: var(--ui-text-accent);
+  }
+
   .mobile-inbox-sync-bar.is-error {
     color: var(--ui-text-danger, #dc2626);
     background: color-mix(in srgb, var(--ui-text-danger, #dc2626) 8%, var(--ui-surface));

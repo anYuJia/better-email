@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { isDraftEmpty } from '../app/appConfig';
+import { smtpUploadPercent } from '../app/smtpUploadProgress';
 import type {
   Account,
   ComposerAutosave,
@@ -572,6 +573,7 @@ export default function ComposerWindow({
   const composerBusy = submissionPending || isImportingAttachments || attachmentImports.some((item) => item.status === 'failed')
     || sendIssue?.kind === 'uncertain' || normalizedSendProgress !== null || normalizedAttachmentProgress !== null;
   const uploadingToServer = normalizedSendProgress !== null && normalizedSendProgress >= 60 && normalizedSendProgress < 88;
+  const uploadPercent = smtpUploadPercent(sendProgressMessage);
   const sendWorking = submissionPending || normalizedSendProgress !== null;
   const sendStateLabel = sendWorking ? (normalizedSendProgress !== null ? '发送中…' : '提交中…')
     : isImportingAttachments ? '准备附件…'
@@ -797,17 +799,17 @@ export default function ComposerWindow({
                 {normalizedSendProgress !== null && (
                   <div className="composer-send-progress-wrapper">
                     <div
-                      className={`composer-send-progress${uploadingToServer ? ' is-indeterminate' : ''}`}
+                      className={`composer-send-progress${uploadingToServer && uploadPercent === null ? ' is-indeterminate' : ''}`}
                       role="progressbar"
                       aria-label="发送进度"
                       aria-valuemin={0}
                       aria-valuemax={100}
-                      aria-valuenow={uploadingToServer ? undefined : normalizedSendProgress}
+                      aria-valuenow={uploadPercent ?? (uploadingToServer ? undefined : normalizedSendProgress)}
                       aria-valuetext={sendProgressMessage || '正在准备发送'}
                     >
                       <div
                         className="composer-send-progress-fill"
-                        style={{ transform: `scaleX(${normalizedSendProgress / 100})` }}
+                        style={{ transform: `scaleX(${(uploadPercent ?? normalizedSendProgress) / 100})` }}
                       />
                     </div>
                     {sendProgressMessage ? <span className="composer-send-progress-message">{sendProgressMessage}</span> : null}

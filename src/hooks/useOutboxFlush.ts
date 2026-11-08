@@ -52,7 +52,7 @@ export default function useOutboxFlush({
       if (taskId == null) {
         items = await runDueOutboxSmtp();
       } else {
-        await invoke<OutboxItem[]>(IPC.ReleaseDueSnoozedMessages);
+        await invoke<OutboxItem[]>(IPC.ReleaseDueOutboxItems);
         items = await invoke<OutboxItem[]>(IPC.FlushOutboxSmtp, { taskId });
       }
     } catch (error) {
@@ -62,8 +62,14 @@ export default function useOutboxFlush({
       throw error;
     }
     setOutbox(items);
-    await refreshMailboxContext();
     const message = outboxFlushMessage(items);
+    try {
+      await refreshMailboxContext();
+    } catch (error) {
+      outboxFlowWarn('outbox refreshed but mailbox view failed', { error: String(error) });
+      setStatus(`${message}；邮件列表刷新失败，请手动刷新`);
+      return { message, items };
+    }
     outboxFlowLog('scheduled smtp due done', {
       outboxItems: items.length,
       statuses: outboxStatusCounts(items),

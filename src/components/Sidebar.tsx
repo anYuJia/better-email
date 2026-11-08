@@ -1,4 +1,5 @@
 import React from 'react';
+import { smtpUploadPercent } from '../app/smtpUploadProgress';
 import {
   PenLine,
   Keyboard,
@@ -215,15 +216,21 @@ function Sidebar({
         {activeTasks.length > 0 && (
           <div className="sidebar-task-stack" role="status" aria-live="polite">
             {activeTasks.map((task) => {
-              const label = visibleTaskLabel(task);
-              const progress = Math.min(100, Math.max(0, task.progress));
+              const uploadPercent = smtpUploadPercent(task.message);
+              const separator = task.message.lastIndexOf('· SMTP 上传');
+              const label = uploadPercent === null ? visibleTaskLabel(task)
+                : separator >= 0 ? `发送 ${task.message.slice(0, separator).trim()}` : '正在发送邮件';
+              const progress = uploadPercent ?? Math.min(100, Math.max(0, task.progress));
               return (
                 <div className="sidebar-task-item" key={task.id}>
-                  <span className="sidebar-task-title">{label}</span>
+                  <div className="sidebar-task-heading">
+                    <span className="sidebar-task-title">{label}</span>
+                    {uploadPercent !== null && <span className="sidebar-task-percent" aria-hidden="true">{uploadPercent}%</span>}
+                  </div>
                   <div
                     className="sidebar-task-progress"
                     role="progressbar"
-                    aria-label={`${label}进度`}
+                    aria-label={`${uploadPercent === null ? label : task.message}进度`}
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={progress}

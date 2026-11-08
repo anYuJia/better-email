@@ -1829,6 +1829,7 @@ function MailboxApp({
                 listMode={listMode}
                 isRefreshing={isRefreshing || isBackgroundSyncRunning}
                 refreshNotice={refreshNotice}
+                sendStatus={backgroundTasks.find(task => task.kind === 'outbox-smtp' && (task.status === 'queued' || task.status === 'running'))?.message || null}
                 onOpenMailbox={showNarrowSidebar}
                 onOpenSearch={openMobileSearch}
                 onCloseSearch={closeMobileSearch}

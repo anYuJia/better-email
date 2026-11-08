@@ -7,13 +7,177 @@ use lettre::{
         Mailbox, MultiPart, SinglePart,
     },
     transport::smtp::{
-        authentication::{Credentials, Mechanism},
+        authentication::{Credentials, Mechanism, DEFAULT_MECHANISMS},
+        client::{SmtpConnection, TlsParameters},
+        commands::{Data, Mail, Rcpt},
+        extension::{ClientId, Extension, MailBodyParameter, MailParameter},
         SmtpTransportBuilder,
     },
     Message, SmtpTransport, Transport,
 };
 use std::fs;
 use std::time::Duration;
+
+/// Counts MIME bytes handed to the socket, not remote receipt or delivery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UploadProgress {
+    Writing { written: usize, total: usize },
+    AwaitingConfirmation { total: usize },
+}
+
+pub(crate) struct ProgressTransport {
+    connection: SmtpConnection,
+}
+
+impl ProgressTransport {
+    pub(crate) fn is_connected(&mut self) -> bool {
+        self.connection.test_connected()
+    }
+
+    pub(crate) fn connect(account: &Account, secret: &AccountSecret) -> Result<Self, MailError> {
+        let (host, port) = parse_smtp_endpoint(&account.smtp_host)?;
+        let tls = TlsParameters::new(host.clone())
+            .map_err(|error| MailError::Smtp(format!("SMTP 连接配置失败：{error}")))?;
+        let hello = ClientId::default();
+        let mut connection = SmtpConnection::connect(
+            (host.as_str(), port),
+            Some(Duration::from_secs(20)),
+            &hello,
+            (port == 465).then_some(&tls),
+            None,
+        )
+        .map_err(|error| classify_pre_data_error(error, "连接发送服务器"))?;
+        if port != 465 {
+            connection
+                .starttls(&tls, &hello)
+                .map_err(|error| classify_pre_data_error(error, "建立安全连接"))?;
+        }
+        let (credentials, mechanisms) = match secret {
+            AccountSecret::Password(password) => (
+                Credentials::new(account.email.clone(), password.to_string()),
+                DEFAULT_MECHANISMS.to_vec(),
+            ),
+            AccountSecret::OAuth2(bundle) => (
+                Credentials::new(account.email.clone(), bundle.access_token.clone()),
+                vec![Mechanism::Xoauth2],
+            ),
+        };
+        connection
+            .auth(&mechanisms, &credentials)
+            .map_err(|error| classify_pre_data_error(error, "SMTP 认证"))?;
+        Ok(Self { connection })
+    }
+
+    pub(crate) fn send(
+        &mut self,
+        message: &OutboundMessage,
+        attachment_bytes: Vec<Vec<u8>>,
+        on_progress: &mut impl FnMut(UploadProgress),
+    ) -> Result<Vec<u8>, MailError> {
+        let email = build_outbound_email(message, Some(attachment_bytes))?;
+        let raw = email.formatted();
+        let envelope = email.envelope().clone();
+        drop(email);
+        send_raw_with_progress(&mut self.connection, &envelope, &raw, on_progress)?;
+        Ok(raw)
+    }
+}
+
+/// Advance only after the previous chunk has been written. Lettre's iterator
+/// preserves DATA dot-stuffing across chunks and waits for the final reply.
+struct UploadChunks<'a, F> {
+    chunks: std::slice::Chunks<'a, u8>,
+    pending: usize,
+    written: usize,
+    total: usize,
+    on_progress: &'a mut F,
+}
+
+impl<'a, F: FnMut(UploadProgress)> Iterator for UploadChunks<'a, F> {
+    type Item = &'a [u8];
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pending > 0 {
+            self.written += self.pending;
+            self.pending = 0;
+            (self.on_progress)(UploadProgress::Writing {
+                written: self.written,
+                total: self.total,
+            });
+        }
+        match self.chunks.next() {
+            Some(chunk) => {
+                self.pending = chunk.len();
+                Some(chunk)
+            }
+            None => {
+                (self.on_progress)(UploadProgress::AwaitingConfirmation { total: self.total });
+                None
+            }
+        }
+    }
+}
+
+fn send_raw_with_progress<F: FnMut(UploadProgress)>(
+    connection: &mut SmtpConnection,
+    envelope: &lettre::address::Envelope,
+    raw: &[u8],
+    on_progress: &mut F,
+) -> Result<(), MailError> {
+    let mut options = Vec::new();
+    if envelope
+        .from()
+        .into_iter()
+        .chain(envelope.to().iter())
+        .any(|address| !address.user().is_ascii() || !address.domain().is_ascii())
+    {
+        if !connection
+            .server_info()
+            .supports_feature(Extension::SmtpUtfEight)
+        {
+            return Err(MailError::SmtpPermanent(
+                "发送服务器不支持国际化邮箱地址（SMTPUTF8）。".to_string(),
+            ));
+        }
+        options.push(MailParameter::SmtpUtfEight);
+    }
+    if !raw.is_ascii() {
+        if !connection
+            .server_info()
+            .supports_feature(Extension::EightBitMime)
+        {
+            return Err(MailError::SmtpPermanent(
+                "发送服务器不支持邮件内容所需的 8BITMIME。".to_string(),
+            ));
+        }
+        options.push(MailParameter::Body(MailBodyParameter::EightBitMime));
+    }
+    connection
+        .command(Mail::new(envelope.from().cloned(), options))
+        .map_err(|error| classify_pre_data_error(error, "准备发件人"))?;
+    for recipient in envelope.to() {
+        connection
+            .command(Rcpt::new(recipient.clone(), vec![]))
+            .map_err(|error| classify_pre_data_error(error, "验证收件人"))?;
+    }
+    connection
+        .command(Data)
+        .map_err(|error| classify_pre_data_error(error, "准备上传邮件"))?;
+    on_progress(UploadProgress::Writing {
+        written: 0,
+        total: raw.len(),
+    });
+    let chunks = UploadChunks {
+        chunks: raw.chunks(64 * 1024),
+        pending: 0,
+        written: 0,
+        total: raw.len(),
+        on_progress,
+    };
+    connection
+        .message_iter(chunks)
+        .map_err(classify_send_error)?;
+    Ok(())
+}
 
 #[allow(dead_code)]
 pub fn send_outbound(
@@ -26,18 +190,7 @@ pub fn send_outbound(
     send_prepared_email(&mailer, email)
 }
 
-/// 使用后端在同一次打开中验证并读取出的附件字节发送邮件。生产命令必须走
-/// 这个入口，避免在授权验证完成后再次按路径读取附件。
-pub fn send_outbound_with_attachment_bytes(
-    account: &Account,
-    message: &OutboundMessage,
-    secret: &AccountSecret,
-    attachment_bytes: Vec<Vec<u8>>,
-) -> Result<Vec<u8>, MailError> {
-    let mailer = authenticated_transport(account, secret)?;
-    send_outbound_with_transport(&mailer, message, attachment_bytes)
-}
-
+#[cfg(test)]
 pub(crate) fn send_outbound_with_transport(
     mailer: &SmtpTransport,
     message: &OutboundMessage,
@@ -77,6 +230,21 @@ fn classify_send_error(error: lettre::transport::smtp::Error) -> MailError {
         MailError::SmtpOutcomeUnknown(format!(
             "未收到可靠的发送结果，邮件可能已被服务器接受。已停止自动重发，请先核对已发送文件夹或向收件人确认：{error}"
         ))
+    }
+}
+
+// Before DATA begins no message body has been sent, so a lost connection
+// cannot mean this attempt delivered mail. Do not retry TLS/client errors.
+fn classify_pre_data_error(error: lettre::transport::smtp::Error, stage: &str) -> MailError {
+    if error.status().is_some_and(|code| code.to_string() == "552") {
+        return classify_send_error(error);
+    }
+    if error.is_permanent() || error.is_client() || error.is_tls() {
+        MailError::SmtpPermanent(format!(
+            "{stage}失败，邮件尚未提交；请检查账号、收件人或连接配置：{error}"
+        ))
+    } else {
+        MailError::Smtp(format!("{stage}失败，邮件尚未提交，可稍后重试：{error}"))
     }
 }
 
@@ -910,6 +1078,155 @@ mod delivery_outcome_tests {
     use std::net::TcpListener;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+
+    fn send_progress_to_local_server(
+        response: Option<&'static str>,
+    ) -> (Result<(), MailError>, Vec<UploadProgress>, String) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let (waiting_tx, waiting_rx) = std::sync::mpsc::channel();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut reader = BufReader::new(socket.try_clone().unwrap());
+            socket.write_all(b"220 test ESMTP\r\n").unwrap();
+            let mut data = String::new();
+            let mut in_data = false;
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                    break;
+                }
+                if in_data {
+                    if line == ".\r\n" {
+                        assert!(
+                            waiting_rx.recv_timeout(Duration::from_secs(3)).is_ok(),
+                            "client must report waiting before server reply"
+                        );
+                        if let Some(reply) = response {
+                            socket.write_all(reply.as_bytes()).unwrap();
+                        }
+                        break;
+                    }
+                    data.push_str(&line);
+                } else if line.starts_with("EHLO") {
+                    socket.write_all(b"250 test\r\n").unwrap();
+                } else if line.starts_with("DATA") {
+                    in_data = true;
+                    socket.write_all(b"354 continue\r\n").unwrap();
+                } else {
+                    socket.write_all(b"250 OK\r\n").unwrap();
+                }
+            }
+            data
+        });
+        let mut connection = SmtpConnection::connect(
+            address,
+            Some(Duration::from_secs(5)),
+            &ClientId::default(),
+            None,
+            None,
+        )
+        .unwrap();
+        let envelope = lettre::address::Envelope::new(
+            Some("sender@example.com".parse().unwrap()),
+            vec!["recipient@example.com".parse().unwrap()],
+        )
+        .unwrap();
+        let raw = format!("{}\r\n.dot-stuffed\r\n", "a".repeat(150_000));
+        let mut events = Vec::new();
+        let result =
+            send_raw_with_progress(&mut connection, &envelope, raw.as_bytes(), &mut |event| {
+                events.push(event);
+                if matches!(event, UploadProgress::AwaitingConfirmation { .. }) {
+                    waiting_tx.send(()).unwrap();
+                }
+            });
+        drop(connection);
+        let data = server.join().unwrap();
+        (result, events, data)
+    }
+
+    #[test]
+    fn progress_counts_written_mime_and_waits_for_smtp_confirmation() {
+        let (result, events, data) = send_progress_to_local_server(Some("250 accepted\r\n"));
+        assert!(result.is_ok());
+        let writes: Vec<_> = events
+            .iter()
+            .filter_map(|event| match event {
+                UploadProgress::Writing { written, total } => Some((*written, *total)),
+                _ => None,
+            })
+            .collect();
+        assert!(writes.len() >= 4);
+        assert_eq!(writes[0].0, 0);
+        assert!(writes.windows(2).all(|window| window[0].0 < window[1].0));
+        assert_eq!(writes.last().unwrap().0, writes.last().unwrap().1);
+        assert!(matches!(
+            events.last(),
+            Some(UploadProgress::AwaitingConfirmation { .. })
+        ));
+        assert!(data.contains("\r\n..dot-stuffed\r\n"));
+    }
+
+    #[test]
+    fn uploaded_bytes_do_not_imply_delivery_when_server_rejects_or_disconnects() {
+        let (rejected, events, _) = send_progress_to_local_server(Some("550 rejected\r\n"));
+        assert!(matches!(rejected, Err(MailError::SmtpPermanent(_))));
+        assert!(matches!(
+            events.last(),
+            Some(UploadProgress::AwaitingConfirmation { .. })
+        ));
+        let (disconnected, _, _) = send_progress_to_local_server(None);
+        assert!(matches!(
+            disconnected,
+            Err(MailError::SmtpOutcomeUnknown(_))
+        ));
+    }
+
+    #[test]
+    fn disconnect_before_data_is_safe_to_retry_and_reports_no_upload() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut reader = BufReader::new(socket.try_clone().unwrap());
+            socket.write_all(b"220 test ESMTP\r\n").unwrap();
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            assert!(line.starts_with("EHLO"));
+            socket.write_all(b"250 test\r\n").unwrap();
+            line.clear();
+            reader.read_line(&mut line).unwrap();
+            assert!(line.starts_with("MAIL FROM"));
+        });
+        let mut connection = SmtpConnection::connect(
+            address,
+            Some(Duration::from_secs(5)),
+            &ClientId::default(),
+            None,
+            None,
+        )
+        .unwrap();
+        let envelope = lettre::address::Envelope::new(
+            Some("sender@example.com".parse().unwrap()),
+            vec!["recipient@example.com".parse().unwrap()],
+        )
+        .unwrap();
+        let mut events = Vec::new();
+        let result =
+            send_raw_with_progress(&mut connection, &envelope, b"test\r\n", &mut |event| {
+                events.push(event)
+            });
+        server.join().unwrap();
+        assert!(matches!(result, Err(MailError::Smtp(_))));
+        assert!(events.is_empty());
+    }
 
     fn send_to_local_test_server(
         final_response: Option<&'static str>,

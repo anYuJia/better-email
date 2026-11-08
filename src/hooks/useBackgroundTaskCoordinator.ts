@@ -63,7 +63,7 @@ type UseBackgroundTaskCoordinatorOptions = {
   setNotificationStatus: Dispatch<SetStateAction<string>>;
   setPendingSendUndo: Dispatch<SetStateAction<PendingSendUndo | null>>;
   setStatus: Dispatch<SetStateAction<string>>;
-  showToast: (text: string) => void;
+  showToast: (text: string, tone?: 'success' | 'error' | 'info') => void;
   loadMeta: (
     nextFolderId?: number | null,
     nextScope?: AccountScope,
@@ -550,6 +550,7 @@ export default function useBackgroundTaskCoordinator({
     );
 
     let lastProgress = -1;
+    let lastMessage = '';
     const pollTimer = window.setInterval(async () => {
       try {
         const latest = await invoke<BackgroundTask>(IPC.GetBackgroundTask, { taskId: task.id });
@@ -562,8 +563,9 @@ export default function useBackgroundTaskCoordinator({
           window.clearInterval(pollTimer);
           return;
         }
-        if (latest.progress !== lastProgress && latest.message) {
+        if ((latest.progress !== lastProgress || latest.message !== lastMessage) && latest.message) {
           lastProgress = latest.progress;
+          lastMessage = latest.message;
           setBackgroundSyncStatus(`${latest.message}…`);
         }
       } catch {
@@ -590,13 +592,29 @@ export default function useBackgroundTaskCoordinator({
       return runBackgroundSync(task.source === 'timer' ? 'timer' : 'manual', task.id);
     }
     if (task.kind === 'outbox-smtp' && task.source === 'timer') {
-      return runOutboxSmtpTask(task, async () => (await sendDueOutboxItems(task.id)).message);
+      return runOutboxSmtpTask(task, async () => {
+        const dueIds = new Set(outbox.filter(item => ['queued', 'scheduled', 'retry'].includes(item.status)
+          && (!item.next_attempt_at || Date.parse(item.next_attempt_at) <= Date.now())).map(item => item.id));
+        const result = await sendDueOutboxItems(task.id);
+        const affected = result.items.filter(item => dueIds.has(item.id));
+        if (affected.some(item => item.status === 'send_unknown')) {
+          showToast('发送结果待确认，请在发件箱核对后再操作', 'error');
+        } else if (affected.some(item => ['retry', 'failed'].includes(item.status))) {
+          showToast('部分邮件发送未完成，请在发件箱查看原因', 'error');
+        }
+        if (affected.some(item => ['sent_remote_pending', 'archiving'].includes(item.status))) {
+          showToast('邮件已发送，已发送副本待保存', 'info');
+        } else if (affected.some(item => item.status === 'sent')) {
+          showToast('邮件已发送');
+        }
+        return result.message;
+      });
     }
     if (task.kind === 'outbox-smtp') {
       return runOutboxSmtpTask(task, async () => flushOutboxSmtp(task.id));
     }
     return flushOutboxDryRun();
-  }, [flushOutboxDryRun, flushOutboxSmtp, runAccountSyncTask, runBackgroundSync, runOutboxSmtpTask, sendDueOutboxItems]);
+  }, [flushOutboxDryRun, flushOutboxSmtp, outbox, runAccountSyncTask, runBackgroundSync, runOutboxSmtpTask, sendDueOutboxItems, showToast]);
 
   const drainBackgroundTaskQueue = useCallback(async () => {
     if (backgroundTaskWorkerRef.current) return;
@@ -693,7 +711,7 @@ export default function useBackgroundTaskCoordinator({
     fetchTimerLog('enqueue start', { kind, source });
     const task = await invoke<BackgroundTask>(IPC.EnqueueBackgroundTask, { input: { kind, source } });
     const tasks = await refreshBackgroundTasks();
-    const isReusedActiveTask = task.kind === 'sync' && task.status !== 'queued';
+    const isReusedActiveTask = task.status !== 'queued';
     fetchTimerLog('enqueue done', {
       kind: task.kind,
       source: task.source,
@@ -703,8 +721,8 @@ export default function useBackgroundTaskCoordinator({
     });
     setBackgroundSyncStatus(
       isReusedActiveTask
-        ? '同步任务已在队列中'
-        : `${task.title} 已入队，将在后台分批同步`,
+        ? `${task.title}正在后台进行`
+        : task.kind === 'sync' ? `${task.title} 已入队，将在后台分批同步` : `${task.title}已入队，将在后台处理`,
     );
     if (tasks.some((item) => item.status === 'queued')) void drainBackgroundTaskQueue();
     return task;
@@ -802,8 +820,6 @@ export default function useBackgroundTaskCoordinator({
     setNotificationStatus,
     setBackgroundSyncStatus,
     setStatus,
-    showToast,
-    sendDueOutboxItems,
     enqueueBackgroundTask,
   });
 

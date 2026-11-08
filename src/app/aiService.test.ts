@@ -125,6 +125,23 @@ describe('aiService', () => {
     }));
   });
 
+  it('accepts an MCP endpoint ending in completions for both testing and tool calls', async () => {
+    const config: AiServiceConfig = {
+      ...defaultAiServiceConfig,
+      enabled: true,
+      serviceType: 'mcp',
+      mcpEnabled: true,
+      mcpEndpoint: 'https://example.com/completions',
+      privacyAcknowledged: true,
+    };
+    invokeMock.mockResolvedValueOnce({ ok: true, service_type: 'mcp', message: '连接正常', latency_ms: 1 });
+    await expect(testAiConnection(config)).resolves.toMatchObject({ ok: true });
+    expect(invokeMock).toHaveBeenCalledWith(IPC.TestAiConnection, expect.objectContaining({ endpoint: config.mcpEndpoint }));
+    invokeMock.mockResolvedValueOnce({ operation: 'translate', content: '你好', service_type: 'mcp', truncated: false });
+    await expect(translateMessage('hello', '中文', config)).resolves.toMatchObject({ content: '你好' });
+    expect(invokeMock).toHaveBeenCalledWith(IPC.AiRequest, { input: expect.objectContaining({ endpoint: config.mcpEndpoint }) });
+  });
+
   it('requires privacy acknowledgment before external sends', () => {
     const config: AiServiceConfig = {
       ...defaultAiServiceConfig,

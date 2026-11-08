@@ -5,8 +5,8 @@ use std::time::Duration;
 const MAX_AI_CONTENT_CHARS: usize = 60_000;
 /// AI/MCP HTTP 响应读取上限：防止恶意服务端返回超大响应把应用内存打满。
 const MAX_AI_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
-const MCP_PROTOCOL_VERSION: &str = "2025-06-18";
-const MCP_SUPPORTED_VERSIONS: &[&str] = &["2025-03-26", MCP_PROTOCOL_VERSION];
+const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
+const MCP_SUPPORTED_VERSIONS: &[&str] = &["2025-03-26", "2025-06-18", MCP_PROTOCOL_VERSION];
 
 #[derive(Debug, Deserialize)]
 pub struct AiChatRequest {
@@ -377,7 +377,7 @@ impl McpClient {
             .as_str()
             .ok_or_else(|| "MCP 初始化响应缺少 protocolVersion。".to_string())?;
         if !MCP_SUPPORTED_VERSIONS.contains(&version) {
-            return Err(format!("MCP 服务协议版本 {version} 不受支持；请使用 Streamable HTTP（2025-03-26 或 2025-06-18）。"));
+            return Err(format!("MCP 服务协议版本 {version} 不受支持；请使用 Streamable HTTP（2025-03-26、2025-06-18 或 2025-11-25）。"));
         }
         if !result["capabilities"]["tools"].is_object() {
             return Err("MCP 服务未声明 tools 能力，无法提供邮件处理工具。".to_string());
@@ -516,6 +516,38 @@ impl McpClient {
                 .map_err(|error| format!("MCP 服务响应解析失败：{error}"))?
         };
         validate_rpc_response(payload, expected_id)
+    }
+}
+
+impl Drop for McpClient {
+    fn drop(&mut self) {
+        // Each operation creates its own session. Release server resources when
+        // done, but never replace a successful result or wait for cleanup past
+        // the operation's deadline. Servers may decline DELETE with HTTP 405.
+        let (Some(session), Some(version)) = (&self.session_id, &self.protocol_version) else {
+            return;
+        };
+        let Some(remaining) = self
+            .deadline
+            .checked_duration_since(std::time::Instant::now())
+        else {
+            return;
+        };
+        if remaining.is_zero() {
+            return;
+        }
+        let mut request = self
+            .agent
+            .delete(&self.endpoint)
+            .config()
+            .timeout_global(Some(remaining.min(Duration::from_millis(250))))
+            .build()
+            .header("Mcp-Session-Id", session)
+            .header("MCP-Protocol-Version", version);
+        if !self.api_key.is_empty() {
+            request = request.header("Authorization", format!("Bearer {}", self.api_key));
+        }
+        let _ = request.call();
     }
 }
 
@@ -952,7 +984,11 @@ mod tests {
         let headers = String::from_utf8_lossy(&bytes[..header_end]).to_ascii_lowercase();
         let body_start = header_end + 4;
         let body_end = body_start + content_length;
-        let body = serde_json::from_slice(&bytes[body_start..body_end]).expect("JSON-RPC request");
+        let body = if content_length == 0 {
+            Value::Null
+        } else {
+            serde_json::from_slice(&bytes[body_start..body_end]).expect("JSON-RPC request")
+        };
         (headers, body)
     }
 

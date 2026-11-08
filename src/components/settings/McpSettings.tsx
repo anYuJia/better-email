@@ -239,7 +239,15 @@ function McpConnectionGuide({
                   placeholder="https://example.com/mcp"
                   autoComplete="url"
                   disabled={saving}
-                  onChange={(event) => patchConfig({ mcpEndpoint: event.target.value })}
+                  onChange={(event) => {
+                    const nextEndpoint = event.target.value;
+                    patchConfig({
+                      mcpEndpoint: nextEndpoint,
+                      ...(nextEndpoint.trim() !== endpoint && config.privacyAcknowledged
+                        ? { privacyAcknowledged: false }
+                        : {}),
+                    });
+                  }}
                 />
               </SettingsField>
 
@@ -283,7 +291,7 @@ function McpConnectionGuide({
               <SettingsSwitch
                 className="settings-mcp-privacy-switch"
                 label="允许向此服务发送邮件内容"
-                description="连接测试只验证服务，不代表邮件内容已经发送。"
+                description="连接测试不会发送邮件内容；更改地址后需重新确认。"
                 checked={config.privacyAcknowledged}
                 disabled={saving}
                 onChange={(checked) => patchConfig({ privacyAcknowledged: checked })}

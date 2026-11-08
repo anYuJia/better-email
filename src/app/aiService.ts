@@ -29,9 +29,10 @@ function externalError(message: string): AiRequestError {
 /**
  * Validate endpoint shapes before IPC. Query parameters are intentionally
  * allowed because the Rust URL normalizer preserves them for OpenAI-compatible
- * gateways; URL fragments and legacy `/completions` are not valid targets.
+ * gateways; URL fragments are invalid, and legacy `/completions` is rejected
+ * only for the Chat Completions connector, not for arbitrary MCP paths.
  */
-export function validateAiEndpointForRequest(endpoint: string): string {
+export function validateAiEndpointForRequest(endpoint: string, serviceType: 'http' | 'mcp' = 'http'): string {
   const trimmed = endpoint.trim();
   if (!trimmed) return trimmed;
   let parsed: URL;
@@ -44,7 +45,7 @@ export function validateAiEndpointForRequest(endpoint: string): string {
     throw externalError('AI 服务地址不允许包含 URL 片段（#...）。');
   }
   const path = parsed.pathname.replace(/\/+$/, '');
-  if (path.endsWith('/completions') && !path.endsWith('/chat/completions')) {
+  if (serviceType === 'http' && path.endsWith('/completions') && !path.endsWith('/chat/completions')) {
     throw externalError('当前接入使用 Chat Completions 协议，请填写 /chat/completions 或其上级基础地址，不能使用旧的 /completions。');
   }
   return trimmed;
@@ -134,6 +135,7 @@ async function requestExternal(
   const isMcp = config.serviceType === 'mcp';
   const endpoint = validateAiEndpointForRequest(
     (isMcp ? config.mcpEndpoint ?? '' : config.endpoint).trim(),
+    config.serviceType,
   );
   const input = {
     operation,
@@ -259,6 +261,7 @@ export async function testAiConnection(config: AiServiceConfig): Promise<AiTestC
   try {
     const endpoint = validateAiEndpointForRequest(
       (isMcp ? config.mcpEndpoint ?? '' : config.endpoint).trim(),
+      config.serviceType,
     );
     const report = await invoke<{ ok: boolean; service_type: string; message: string; latency_ms: number }>(
       IPC.TestAiConnection,

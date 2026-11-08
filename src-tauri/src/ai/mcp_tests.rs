@@ -133,6 +133,74 @@ fn connection_test_discovers_tools_without_sending_mail() {
 }
 
 #[test]
+fn latest_handshake_version_is_negotiated_and_used_for_subsequent_requests() {
+    let (endpoint, server) = spawn_mcp_test_server(vec![
+        initialize_response("2025-11-25"),
+        (202, vec![], String::new()),
+        tool_list_response(2, &["summarize"]),
+        (
+            200,
+            vec![("Content-Type", "application/json")],
+            serde_json::json!({
+                "jsonrpc": "2.0", "id": 3,
+                "result": { "content": [{ "type": "text", "text": "摘要" }] }
+            })
+            .to_string(),
+        ),
+    ]);
+    assert_eq!(
+        run_mcp_tool_call(&mcp_input(&endpoint, "summarize"))
+            .unwrap()
+            .content,
+        "摘要"
+    );
+    let requests = server.join().unwrap();
+    assert_eq!(requests[0].1["params"]["protocolVersion"], "2025-11-25");
+    for request in &requests[1..] {
+        assert!(request.0.contains("mcp-protocol-version: 2025-11-25"));
+        assert!(request.0.contains("mcp-session-id: session-123"));
+    }
+    assert_eq!(requests[3].1["method"], "tools/call");
+    assert_eq!(requests[3].1["params"]["name"], "summarize");
+}
+
+#[test]
+fn stateful_session_is_closed_after_connection_test() {
+    let (endpoint, server) = spawn_mcp_test_server(vec![
+        initialize_response(MCP_PROTOCOL_VERSION),
+        (202, vec![], String::new()),
+        tool_list_response(2, &["summarize"]),
+        (204, vec![], String::new()),
+    ]);
+    assert!(
+        test_ai_connection("mcp", &endpoint, "test-token", "", 5)
+            .unwrap()
+            .ok
+    );
+    let requests = server.join().unwrap();
+    assert!(requests[3].0.starts_with("delete /mcp http/1.1"));
+    assert!(requests[3].0.contains("mcp-session-id: session-123"));
+    assert!(requests[3].0.contains("mcp-protocol-version: 2025-11-25"));
+    assert!(requests[3].0.contains("authorization: bearer test-token"));
+    assert!(requests[3].1.is_null());
+}
+
+#[test]
+fn a_server_declining_session_cleanup_does_not_hide_a_successful_result() {
+    let (endpoint, server) = spawn_mcp_test_server(vec![
+        initialize_response(MCP_PROTOCOL_VERSION),
+        (202, vec![], String::new()),
+        tool_list_response(2, &["summarize"]),
+        (405, vec![], String::new()),
+    ]);
+    let result = test_ai_connection("mcp", &endpoint, "", "", 5).unwrap();
+    assert!(result.ok);
+    assert!(server.join().unwrap()[3]
+        .0
+        .starts_with("delete /mcp http/1.1"));
+}
+
+#[test]
 fn unsupported_tools_fail_before_any_mail_is_sent() {
     let (endpoint, server) = spawn_mcp_test_server(vec![
         initialize_response(MCP_PROTOCOL_VERSION),

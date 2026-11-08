@@ -68,6 +68,27 @@ describe('McpSettings', () => {
     expect((screen.getByRole('checkbox', { name: '启用 MCP' }) as HTMLInputElement).checked).toBe(false);
   });
 
+  it('requires renewed mail-content consent when the MCP endpoint changes and restores it on cancel', async () => {
+    seedConfig({
+      enabled: true,
+      serviceType: 'mcp',
+      mcpEnabled: true,
+      mcpEndpoint: 'https://old.example.com/mcp',
+      privacyAcknowledged: true,
+    });
+    render(<McpSettings />);
+    await waitUntilLoaded();
+    fireEvent.click(screen.getByRole('button', { name: '查看连接信息' }));
+    const consent = screen.getByRole('checkbox', { name: /允许向此服务发送邮件内容/ }) as HTMLInputElement;
+    expect(consent.checked).toBe(true);
+    fireEvent.change(screen.getByLabelText('MCP 服务端点'), { target: { value: 'https://new.example.com/mcp' } });
+    expect(consent.checked).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    fireEvent.click(screen.getByRole('button', { name: '查看连接信息' }));
+    expect((screen.getByRole('checkbox', { name: /允许向此服务发送邮件内容/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('MCP 服务端点') as HTMLInputElement).value).toBe('https://old.example.com/mcp');
+  });
+
   it('closes only when the backdrop is clicked and supports Escape', async () => {
     const { container } = render(<McpSettings />);
     await waitUntilLoaded();

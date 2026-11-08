@@ -18,12 +18,18 @@ const checks = [
       'src/hooks/useAiService.test.ts',
       'src/hooks/useMessageTranslation.test.ts',
       'src/components/settings/AiServiceSettings.test.tsx',
+      'src/components/settings/McpSettings.test.tsx',
       'src/mockTauri/aiHandlers.test.ts',
       'src/mockTauri/miscHandlers.test.ts',
       'src/ipc/ipcContract.test.ts',
       'src/ipc/rustIpcContract.test.ts',
       'src/tauriBridge.contract.test.ts',
     ],
+  },
+  {
+    label: 'Rust MCP 协议、分页与流式响应',
+    command: 'cargo',
+    args: ['test', '--manifest-path', 'src-tauri/Cargo.toml', 'ai::mcp_tests'],
   },
   {
     label: 'Rust MCP/AI HTTP 协议与安全边界',

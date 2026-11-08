@@ -147,8 +147,8 @@ export async function runNavigationQuality(cdp, api) {
   await evalInPage(cdp, "document.querySelector('[data-narrow-sidebar-close]').click()");
   await waitForExpression(cdp, "!document.querySelector('.narrow-view-sidebar') && document.activeElement?.hasAttribute('data-narrow-sidebar-open')");
   checks.push('Closing the narrow sidebar returns focus to its opener');
-  // Bulk selection retains a separate avatar and an accessible checkbox at
-  // both desktop and touch breakpoints, including enlarged text.
+  // Bulk selection keeps the compact message text alignment and an accessible
+  // checkbox at desktop and touch breakpoints, including enlarged text.
   for (const [width, height, theme, scale] of [
     [1440, 900, 'light', 1], [1280, 800, 'dark', 1], [1024, 768, 'light', 1],
     [390, 844, 'dark', 1], [393, 852, 'light', 1], [430, 932, 'dark', 1],
@@ -157,7 +157,14 @@ export async function runNavigationQuality(cdp, api) {
     await setUiViewport(cdp, width, height);
     await evalInPage(cdp, `localStorage.setItem('better-email.theme-mode', '${theme}'); location.reload()`);
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length > 1");
-    await evalInPage(cdp, "document.querySelector('.message-card .message-select input').click()");
+    await evalInPage(cdp, `(() => {
+      const row = document.querySelector('.message-card');
+      window.__selectionBaseline = {
+        padding: getComputedStyle(row).paddingLeft,
+        senderLeft: row.querySelector('.sender').getBoundingClientRect().left,
+      };
+      row.querySelector('.message-select input').click();
+    })()`);
     await waitForExpression(cdp, "document.querySelector('.message-card.is-selection-mode .message-select input:checked')");
     if (scale !== 1) await evalInPage(cdp, `(() => {
       for (const el of document.querySelectorAll('.message-card *')) {
@@ -169,15 +176,16 @@ export async function runNavigationQuality(cdp, api) {
       return rows.length === 2 && document.documentElement.scrollWidth <= innerWidth + 1 && rows.every(row => {
         const target = row.querySelector('.message-select').getBoundingClientRect();
         const input = row.querySelector('.message-select input');
-        const checkbox = input.getBoundingClientRect();
-        const avatar = row.querySelector('.message-leading').getBoundingClientRect();
         const sender = row.querySelector('.sender').getBoundingClientRect();
-        return getComputedStyle(row.querySelector('.message-leading')).opacity === '1'
-          && checkbox.right <= avatar.left && avatar.right <= sender.left + 1
+        const avatarOpacity = getComputedStyle(row.querySelector('.message-leading')).opacity;
+        return getComputedStyle(row).paddingLeft === window.__selectionBaseline.padding
+          && Math.abs(sender.left - window.__selectionBaseline.senderLeft) <= 1
           && getComputedStyle(input).borderRadius === '4px'
+          && (innerWidth > 720 ? avatarOpacity === '1' : avatarOpacity === '0')
           && (innerWidth > 720 || (target.width >= 44 && target.height >= 44));
-      }) && getComputedStyle(rows[0].querySelector('input')).backgroundColor !== getComputedStyle(rows[1].querySelector('input')).backgroundColor;
-    })()`, `Checkbox and avatar remain distinct at ${width}x${height}, ${theme}, ${scale * 100}%`);
+      }) && rows[0].querySelector('input').checked && !rows[1].querySelector('input').checked
+        && getComputedStyle(rows[0].querySelector('input'), '::before').transform !== getComputedStyle(rows[1].querySelector('input'), '::before').transform;
+    })()`, `Compact selection stays aligned at ${width}x${height}, ${theme}, ${scale * 100}%`);
     await captureScreenshot(cdp, `selection-${width}-${height}-${theme}-${scale * 100}`);
   }
   if (captureDir) {

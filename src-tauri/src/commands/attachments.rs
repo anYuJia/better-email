@@ -838,6 +838,7 @@ pub fn download_attachment_file(
     }
     let current = store.get_attachment(attachment.id)?;
     let attachment = &current;
+    let remote_part_path = store.get_attachment_remote_part_path(attachment)?;
     // 已发送旧副本仍在本地时优先安全迁移，避免为了修复旧路径再次依赖网络。
     if attachment.is_downloaded && !attachment.local_path.is_empty() {
         match fs::canonicalize(&attachment.local_path) {
@@ -886,6 +887,11 @@ pub fn download_attachment_file(
     identity.update(remote_mailbox.as_bytes());
     identity.update(remote_uid.to_be_bytes());
     identity.update(reference.remote_uid_validity.as_bytes());
+    identity.update((remote_part_path.len() as u64).to_be_bytes());
+    identity.update(remote_part_path.as_bytes());
+    identity.update((attachment.filename.len() as u64).to_be_bytes());
+    identity.update(attachment.filename.as_bytes());
+    identity.update(attachment.content_id.as_bytes());
     let temp_path = temp_dir.join(format!(
         "{}-{}.download",
         attachment.id,
@@ -904,6 +910,7 @@ pub fn download_attachment_file(
             remote_uid_validity: &reference.remote_uid_validity,
             filename: &attachment.filename,
             content_id: &attachment.content_id,
+            remote_part_path: &remote_part_path,
             max_bytes: MAX_ATTACHMENT_DOWNLOAD_BYTES,
             start_offset: resume_offset,
         },
@@ -987,10 +994,11 @@ pub fn download_attachment_file(
     };
     let local_path_string = local_path.to_string_lossy().into_owned();
     let updated = store.mark_remote_attachment_downloaded(
-        attachment.id,
+        attachment,
         &local_path_string,
         decoded_size,
         &reference,
+        &remote_part_path,
     )?;
 
     Ok(AttachmentDownload {

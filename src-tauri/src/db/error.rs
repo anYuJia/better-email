@@ -22,6 +22,8 @@ pub enum MailError {
     Imap(String),
     #[error("附件存在多个匹配项，无法唯一定位；请在其他邮件客户端中下载。")]
     AttachmentAmbiguous,
+    #[error("附件的远端分段身份已变化，请同步后重试。")]
+    AttachmentIdentityChanged,
     /// 系统对话框被用户取消（另存为/选择文件等）：不是失败，调用方应保持现状。
     #[error("操作已取消。")]
     Cancelled,

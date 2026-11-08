@@ -20,7 +20,7 @@ use std::time::Duration;
 
 const HEADER_FETCH_LIMIT: usize = 25;
 const FLAG_RECONCILE_LIMIT: u32 = 50;
-const SINGLE_PART_TEXT_FETCH_QUERY: &str = "BODY.PEEK[TEXT]";
+const SINGLE_PART_TEXT_FETCH_QUERY: &str = "(UID BODY.PEEK[TEXT])";
 const ATTACHMENT_CHUNK_BYTES: usize = 256 * 1024;
 const ATTACHMENT_FETCH_ATTEMPTS: usize = 3;
 const ATTACHMENT_RETRY_BASE_DELAY_MS: u64 = 150;
@@ -669,6 +669,7 @@ fn collect_message_structure_metadata(
                 });
             } else if is_attachment {
                 metadata.attachments.push(RemoteAttachmentMetadata {
+                    remote_part_path: format_attachment_part_path(path),
                     filename: if filename.is_empty() {
                         protocol::inline_attachment_filename(
                             format!("{type_name}/{subtype}").as_str(),
@@ -696,6 +697,7 @@ fn collect_message_structure_metadata(
             }
             let mime_type = format!("{}/{}", common.ty.ty, common.ty.subtype).to_ascii_lowercase();
             metadata.attachments.push(RemoteAttachmentMetadata {
+                remote_part_path: format_attachment_part_path(path),
                 filename: if filename.is_empty() {
                     protocol::inline_attachment_filename(
                         &mime_type,
@@ -713,6 +715,16 @@ fn collect_message_structure_metadata(
             });
         }
     }
+}
+
+fn format_attachment_part_path(path: &[u32]) -> String {
+    if path.is_empty() {
+        return "1".into();
+    }
+    path.iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 fn imap_content_transfer_encoding(encoding: &ContentEncoding<'_>) -> Option<String> {
@@ -799,8 +811,8 @@ fn fetch_structured_message_body(
     ))
 }
 
-fn fetch_message_text_part(
-    session: &mut imap::Session<imap::Connection>,
+fn fetch_message_text_part<T: Read + Write>(
+    session: &mut imap::Session<T>,
     remote_uid: i64,
     path: &[u32],
 ) -> Result<Vec<u8>, MailError> {
@@ -814,6 +826,7 @@ fn fetch_message_text_part(
             .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
         return fetches
             .iter()
+            .filter(|fetch| fetch.uid.map(i64::from) == Some(remote_uid))
             .find_map(|fetch| fetch.text())
             .map(|bytes| bytes.to_vec())
             .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()));
@@ -826,10 +839,14 @@ fn fetch_message_text_part(
         .join(".");
     let section_path = SectionPath::Part(path.to_vec(), None);
     let fetches = session
-        .uid_fetch(remote_uid.to_string(), format!("BODY.PEEK[{section}]"))
+        .uid_fetch(
+            remote_uid.to_string(),
+            format!("(UID BODY.PEEK[{section}])"),
+        )
         .map_err(|error| MailError::Imap(format!("IMAP 拉取正文分段失败：{error}")))?;
     fetches
         .iter()
+        .filter(|fetch| fetch.uid.map(i64::from) == Some(remote_uid))
         .find_map(|fetch| fetch.section(&section_path))
         .map(ToOwned::to_owned)
         .ok_or_else(|| MailError::Imap("IMAP 未返回正文分段。".to_string()))
@@ -884,6 +901,7 @@ pub struct AttachmentDownloadOptions<'a> {
     pub remote_uid_validity: &'a str,
     pub filename: &'a str,
     pub content_id: &'a str,
+    pub remote_part_path: &'a str,
     pub max_bytes: i64,
     pub start_offset: usize,
 }
@@ -1084,6 +1102,7 @@ fn download_attachment_from_selected<T: Read + Write>(
         options.remote_uid,
         options.filename,
         options.content_id,
+        options.remote_part_path,
     ) {
         Ok(part) => download_attachment_part_to_writer(
             session,
@@ -1095,7 +1114,10 @@ fn download_attachment_from_selected<T: Read + Write>(
             part,
         ),
         Err(part_error) => {
-            if matches!(part_error, MailError::AttachmentAmbiguous) {
+            if matches!(
+                part_error,
+                MailError::AttachmentAmbiguous | MailError::AttachmentIdentityChanged
+            ) {
                 return Err(part_error);
             }
             // A tagged-response mismatch means the session is no longer trustworthy. Let the
@@ -1582,10 +1604,11 @@ fn fetch_attachment_payload_from_selected<T: Read + Write>(
     content_id: &str,
 ) -> Result<RemoteAttachmentPayload, MailError> {
     let fetches = session
-        .uid_fetch(remote_uid.to_string(), "BODY.PEEK[]")
+        .uid_fetch(remote_uid.to_string(), "(UID BODY.PEEK[])")
         .map_err(|error| MailError::Imap(format!("IMAP 拉取正文失败：{error}")))?;
     let raw = fetches
         .iter()
+        .filter(|fetch| fetch.uid.map(i64::from) == Some(remote_uid))
         .find_map(|fetch| fetch.body())
         .map(|bytes| bytes.to_vec())
         .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))?;
@@ -1602,17 +1625,29 @@ fn find_attachment_part_metadata<T: Read + Write>(
     remote_uid: i64,
     filename: &str,
     content_id: &str,
+    remote_part_path: &str,
 ) -> Result<AttachmentPartMetadata, MailError> {
     let requested = filename.trim();
     let requested_content_id = protocol::normalize_content_id(Some(content_id));
     let fetches = session
-        .uid_fetch(remote_uid.to_string(), "BODYSTRUCTURE")
+        .uid_fetch(remote_uid.to_string(), "(UID BODYSTRUCTURE)")
         .map_err(|error| MailError::Imap(format!("IMAP 拉取 BODYSTRUCTURE 失败：{error}")))?;
     let bodystructure = fetches
         .iter()
+        .filter(|fetch| fetch.uid.map(i64::from) == Some(remote_uid))
         .find_map(|fetch| fetch.bodystructure())
         .ok_or_else(|| MailError::Imap("IMAP 未返回 BODYSTRUCTURE。".to_string()))?;
-    if matching_attachment_part_paths(bodystructure, requested, &requested_content_id).len() > 1 {
+    let paths = matching_attachment_part_paths(bodystructure, requested, &requested_content_id);
+    if !remote_part_path.is_empty() {
+        let path = parse_attachment_part_path(remote_part_path)
+            .ok_or(MailError::AttachmentIdentityChanged)?;
+        if !paths.contains(&path) {
+            return Err(MailError::AttachmentIdentityChanged);
+        }
+        return attachment_metadata_for_path(bodystructure, path)
+            .ok_or(MailError::AttachmentIdentityChanged);
+    }
+    if paths.len() > 1 {
         return Err(MailError::AttachmentAmbiguous);
     }
     attachment_part_metadata(bodystructure, requested, &requested_content_id).ok_or_else(|| {
@@ -1663,7 +1698,7 @@ fn download_attachment_part_to_writer<T: Read + Write>(
     let mut written = start_offset;
     loop {
         let query = format!(
-            "BODY.PEEK[{section}]<{}.{}>",
+            "(UID BODY.PEEK[{section}]<{}.{}>)",
             offset, ATTACHMENT_CHUNK_BYTES
         );
         let fetches = session
@@ -1671,6 +1706,7 @@ fn download_attachment_part_to_writer<T: Read + Write>(
             .map_err(|error| MailError::Imap(format!("IMAP 分段拉取附件失败：{error}")))?;
         let chunk = fetches
             .iter()
+            .filter(|fetch| fetch.uid.map(i64::from) == Some(remote_uid))
             .find_map(|fetch| fetch.section(&section_path))
             .map(ToOwned::to_owned)
             .ok_or_else(|| MailError::Imap("IMAP 未返回附件分段数据。".to_string()))?;
@@ -1718,7 +1754,13 @@ fn attachment_part_metadata(
     let [path] = paths.as_slice() else {
         return None;
     };
-    let path = path.clone();
+    attachment_metadata_for_path(bodystructure, path.clone())
+}
+
+fn attachment_metadata_for_path(
+    bodystructure: &BodyStructure<'_>,
+    path: Vec<u32>,
+) -> Option<AttachmentPartMetadata> {
     let body = bodystructure_at_path(bodystructure, &path)?;
     let other = match body {
         BodyStructure::Basic { other, .. }
@@ -1794,7 +1836,11 @@ fn find_attachment_part_paths(
             };
             *attachment_index += 1;
             if is_match {
-                matches.push(path.to_vec());
+                matches.push(if path.is_empty() {
+                    vec![1]
+                } else {
+                    path.to_vec()
+                });
             }
         }
     }
@@ -1839,6 +1885,9 @@ fn bodystructure_at_path<'a>(
     bodystructure: &'a BodyStructure<'a>,
     path: &[u32],
 ) -> Option<&'a BodyStructure<'a>> {
+    if !matches!(bodystructure, BodyStructure::Multipart { .. }) && path == [1] {
+        return Some(bodystructure);
+    }
     let mut current = bodystructure;
     for part in path {
         let BodyStructure::Multipart { bodies, .. } = current else {
@@ -1847,6 +1896,24 @@ fn bodystructure_at_path<'a>(
         current = bodies.get(part.checked_sub(1)? as usize)?;
     }
     Some(current)
+}
+
+fn parse_attachment_part_path(value: &str) -> Option<Vec<u32>> {
+    if value.is_empty() || value.len() > 512 {
+        return None;
+    }
+    value
+        .split('.')
+        .map(|part| {
+            if part.is_empty()
+                || !part.bytes().all(|b| b.is_ascii_digit())
+                || (part.len() > 1 && part.starts_with('0'))
+            {
+                return None;
+            }
+            part.parse::<u32>().ok().filter(|part| *part > 0)
+        })
+        .collect()
 }
 
 pub fn decode_attachment_transfer(
@@ -2443,6 +2510,7 @@ fn remote_attachment_metadata_from_message(message: &Message<'_>) -> Vec<RemoteA
         seen_inline_content_ids.insert(content_id.clone());
         let filename = attachment_display_name(part);
         attachments.push(RemoteAttachmentMetadata {
+            remote_part_path: String::new(),
             filename: if filename.is_empty() {
                 protocol::inline_attachment_filename(&mime_type, &content_id, index)
             } else {
@@ -2472,6 +2540,7 @@ fn remote_attachment_metadata_from_part(
     let filename = attachment_display_name(part);
 
     RemoteAttachmentMetadata {
+        remote_part_path: String::new(),
         filename: if filename.is_empty() {
             protocol::inline_attachment_filename(&mime_type, &content_id, index)
         } else {
@@ -2927,7 +2996,7 @@ mod tests {
     fn body_fetch_query_does_not_mark_message_seen() {
         // An empty bodystructure path is a single-part text body. Fetching
         // BODY.PEEK[] here would return the entire raw message instead.
-        assert_eq!(SINGLE_PART_TEXT_FETCH_QUERY, "BODY.PEEK[TEXT]");
+        assert_eq!(SINGLE_PART_TEXT_FETCH_QUERY, "(UID BODY.PEEK[TEXT])");
         assert!(SINGLE_PART_TEXT_FETCH_QUERY.contains("PEEK"));
         assert!(!SINGLE_PART_TEXT_FETCH_QUERY.contains("RFC822"));
     }

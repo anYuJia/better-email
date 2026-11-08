@@ -209,7 +209,7 @@ fn attachment_fallback_peeks_without_marking_message_read() {
     let payload = fetch_attachment_payload_from_selected(&mut session, 41, "note.txt", "").unwrap();
     assert_eq!(payload.bytes, b"data");
     let sent = String::from_utf8(commands.lock().unwrap().clone()).unwrap();
-    assert!(sent.contains("UID FETCH 41 BODY.PEEK[]"), "{sent}");
+    assert!(sent.contains("UID FETCH 41 (UID BODY.PEEK[])"), "{sent}");
     assert!(!sent.contains("UID FETCH 41 RFC822"), "{sent}");
 }
 
@@ -371,6 +371,7 @@ fn ambiguous_bodystructure_never_falls_back_to_first_full_message_match() {
         remote_uid_validity: "100",
         filename: "report.txt",
         content_id: "",
+        remote_part_path: "",
         max_bytes: 1024,
         start_offset: 0,
     };
@@ -402,4 +403,158 @@ fn oversized_resume_is_rejected_before_fetching_or_writing() {
     assert!(output.is_empty());
     let sent = String::from_utf8(commands.lock().unwrap().clone()).unwrap();
     assert!(!sent.contains("UID FETCH"), "{sent}");
+}
+
+#[test]
+fn same_name_attachments_use_verified_mime_sections_and_requested_uid() {
+    let structure = "((\"APPLICATION\" \"OCTET-STREAM\" (\"NAME\" \"report.txt\") NIL NIL \"7BIT\" 5 NIL (\"ATTACHMENT\" (\"FILENAME\" \"report.txt\")) NIL)(\"APPLICATION\" \"OCTET-STREAM\" (\"NAME\" \"report.txt\") NIL NIL \"7BIT\" 6 NIL (\"ATTACHMENT\" (\"FILENAME\" \"report.txt\")) NIL) \"MIXED\" NIL NIL NIL)";
+    for (section, payload) in [("1", "first"), ("2", "second")] {
+        let responses = format!("a1 OK authenticated\r\n* 1 EXISTS\r\n* OK [UIDVALIDITY 100] generation\r\na2 OK selected\r\n* 1 FETCH (UID 41 BODYSTRUCTURE {structure})\r\na3 OK fetched\r\n* 2 FETCH (UID 99 BODY[{section}]<0> {{5}}\r\nwrong)\r\n* 1 FETCH (UID 41 BODY[{section}]<0> {{{}}}\r\n{payload})\r\na4 OK fetched\r\n", payload.len());
+        let commands = Arc::new(Mutex::new(Vec::new()));
+        let mut session = imap::Client::new(ScriptedImap {
+            responses: Cursor::new(responses.into_bytes()),
+            commands: commands.clone(),
+        })
+        .login("fake", "fake")
+        .unwrap();
+        session.select("INBOX").unwrap();
+        let options = AttachmentDownloadOptions {
+            remote_name: "INBOX",
+            remote_uid: 41,
+            remote_uid_validity: "100",
+            filename: "report.txt",
+            content_id: "",
+            remote_part_path: section,
+            max_bytes: 1024,
+            start_offset: 0,
+        };
+        let mut bytes = Vec::new();
+        download_attachment_from_selected(&mut session, options, 0, &mut bytes)
+            .expect("verified section downloads");
+        assert_eq!(bytes, payload.as_bytes());
+        let sent = String::from_utf8(commands.lock().unwrap().clone()).unwrap();
+        assert!(sent.contains(&format!("BODY.PEEK[{section}]")), "{sent}");
+    }
+}
+
+#[test]
+fn wrong_or_malformed_mime_section_never_falls_back() {
+    for section in ["3", "01", "1.0", "1\r\nEXPUNGE"] {
+        let responses = concat!("a1 OK authenticated\r\n* 1 EXISTS\r\n* OK [UIDVALIDITY 100] generation\r\na2 OK selected\r\n", "* 1 FETCH (UID 41 BODYSTRUCTURE ((\"APPLICATION\" \"OCTET-STREAM\" (\"NAME\" \"report.txt\") NIL NIL \"7BIT\" 5 NIL (\"ATTACHMENT\" (\"FILENAME\" \"report.txt\")) NIL) \"MIXED\" NIL NIL NIL))\r\na3 OK fetched\r\n");
+        let commands = Arc::new(Mutex::new(Vec::new()));
+        let mut session = imap::Client::new(ScriptedImap {
+            responses: Cursor::new(responses.as_bytes().to_vec()),
+            commands: commands.clone(),
+        })
+        .login("fake", "fake")
+        .unwrap();
+        session.select("INBOX").unwrap();
+        let options = AttachmentDownloadOptions {
+            remote_name: "INBOX",
+            remote_uid: 41,
+            remote_uid_validity: "100",
+            filename: "report.txt",
+            content_id: "",
+            remote_part_path: section,
+            max_bytes: 1024,
+            start_offset: 0,
+        };
+        let mut bytes = Vec::new();
+        assert!(matches!(
+            download_attachment_from_selected(&mut session, options, 0, &mut bytes),
+            Err(MailError::AttachmentIdentityChanged)
+        ));
+        assert!(bytes.is_empty());
+        let sent = String::from_utf8(commands.lock().unwrap().clone()).unwrap();
+        assert!(!sent.contains("BODY.PEEK"), "{sent}");
+    }
+}
+
+#[test]
+fn body_fetch_ignores_unsolicited_other_message_data() {
+    for (path, section) in [(Vec::<u32>::new(), "TEXT"), (vec![1], "1")] {
+        let responses = format!("a1 OK authenticated\r\n* 1 EXISTS\r\n* OK [UIDVALIDITY 100] generation\r\na2 OK selected\r\n* 2 FETCH (UID 99 BODY[{section}] {{5}}\r\nwrong)\r\n* 1 FETCH (UID 41 BODY[{section}] {{5}}\r\nright)\r\na3 OK fetched\r\n");
+        let commands = Arc::new(Mutex::new(Vec::new()));
+        let mut session = imap::Client::new(ScriptedImap {
+            responses: Cursor::new(responses.into_bytes()),
+            commands,
+        })
+        .login("fake", "fake")
+        .unwrap();
+        session.select("INBOX").unwrap();
+        assert_eq!(
+            fetch_message_text_part(&mut session, 41, &path).unwrap(),
+            b"right"
+        );
+    }
+}
+
+#[test]
+fn single_part_attachment_uses_section_one() {
+    let response = b"* 1 FETCH (UID 41 BODYSTRUCTURE (\"APPLICATION\" \"OCTET-STREAM\" (\"NAME\" \"only.bin\") NIL NIL \"7BIT\" 5 NIL (\"ATTACHMENT\" (\"FILENAME\" \"only.bin\")) NIL))\r\n";
+    let (_, parsed) = imap_proto::parser::parse_response(response).unwrap();
+    let imap_proto::types::Response::Fetch(_, attributes) = parsed else {
+        panic!("expected FETCH")
+    };
+    let structure = attributes
+        .iter()
+        .find_map(|attr| match attr {
+            imap_proto::types::AttributeValue::BodyStructure(value) => Some(value),
+            _ => None,
+        })
+        .unwrap();
+    let metadata = message_structure_metadata(structure);
+    assert_eq!(metadata.attachments[0].remote_part_path, "1");
+    assert_eq!(
+        attachment_part_metadata(structure, "only.bin", "")
+            .unwrap()
+            .path,
+        vec![1]
+    );
+}
+
+#[test]
+fn single_part_attachment_downloads_section_one() {
+    let responses = concat!("a1 OK authenticated\r\n* 1 EXISTS\r\n* OK [UIDVALIDITY 100] generation\r\na2 OK selected\r\n", "* 1 FETCH (UID 41 BODYSTRUCTURE (\"APPLICATION\" \"OCTET-STREAM\" (\"NAME\" \"only.bin\") NIL NIL \"7BIT\" 5 NIL (\"ATTACHMENT\" (\"FILENAME\" \"only.bin\")) NIL))\r\na3 OK fetched\r\n", "* 1 FETCH (UID 41 BODY[1]<0> {5}\r\nhello)\r\na4 OK fetched\r\n");
+    let commands = Arc::new(Mutex::new(Vec::new()));
+    let mut session = imap::Client::new(ScriptedImap {
+        responses: Cursor::new(responses.as_bytes().to_vec()),
+        commands: commands.clone(),
+    })
+    .login("fake", "fake")
+    .unwrap();
+    session.select("INBOX").unwrap();
+    let options = AttachmentDownloadOptions {
+        remote_name: "INBOX",
+        remote_uid: 41,
+        remote_uid_validity: "100",
+        filename: "only.bin",
+        content_id: "",
+        remote_part_path: "1",
+        max_bytes: 1024,
+        start_offset: 0,
+    };
+    let mut bytes = Vec::new();
+    download_attachment_from_selected(&mut session, options, 0, &mut bytes)
+        .expect("single part downloads");
+    assert_eq!(bytes, b"hello");
+    let sent = String::from_utf8(commands.lock().unwrap().clone()).unwrap();
+    assert!(sent.contains("BODY.PEEK[1]"), "{sent}");
+}
+
+#[test]
+fn full_message_attachment_fallback_ignores_other_message_uid() {
+    let raw_wrong = "Content-Type: text/plain; name=note.txt\r\nContent-Disposition: attachment; filename=note.txt\r\n\r\nwrong";
+    let raw_right = "Content-Type: text/plain; name=note.txt\r\nContent-Disposition: attachment; filename=note.txt\r\n\r\nright";
+    let responses = format!("a1 OK authenticated\r\n* 1 EXISTS\r\n* OK [UIDVALIDITY 100] generation\r\na2 OK selected\r\n* 2 FETCH (UID 99 BODY[] {{{}}}\r\n{raw_wrong})\r\n* 1 FETCH (UID 41 BODY[] {{{}}}\r\n{raw_right})\r\na3 OK fetched\r\n", raw_wrong.len(), raw_right.len());
+    let commands = Arc::new(Mutex::new(Vec::new()));
+    let mut session = imap::Client::new(ScriptedImap {
+        responses: Cursor::new(responses.into_bytes()),
+        commands,
+    })
+    .login("fake", "fake")
+    .unwrap();
+    session.select("INBOX").unwrap();
+    let payload = fetch_attachment_payload_from_selected(&mut session, 41, "note.txt", "").unwrap();
+    assert_eq!(payload.bytes, b"right");
 }

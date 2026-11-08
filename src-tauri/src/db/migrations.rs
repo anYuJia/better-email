@@ -120,7 +120,7 @@ impl MailStore {
                 );
 
                 CREATE TABLE IF NOT EXISTS attachments (
-                    id INTEGER PRIMARY KEY,
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
                     filename TEXT NOT NULL,
                     mime_type TEXT NOT NULL,
@@ -129,7 +129,8 @@ impl MailStore {
                     local_path TEXT NOT NULL DEFAULT '',
                     content_sha256 TEXT NOT NULL DEFAULT '',
                     content_id TEXT NOT NULL DEFAULT '',
-                    is_inline INTEGER NOT NULL DEFAULT 0
+                    is_inline INTEGER NOT NULL DEFAULT 0,
+                    remote_part_path TEXT NOT NULL DEFAULT ''
                 );
 
                 CREATE TABLE IF NOT EXISTS remote_image_trusts (
@@ -531,6 +532,42 @@ impl MailStore {
                 "is_inline",
                 "INTEGER NOT NULL DEFAULT 0",
             )?;
+            let needs_part_path = !table_has_column(conn, "attachments", "remote_part_path")?;
+            let attachment_schema: String = conn.query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='attachments'", [], |row| row.get(0))?;
+            let needs_stable_ids = !attachment_schema.to_ascii_uppercase().contains("AUTOINCREMENT");
+            if needs_part_path || needs_stable_ids {
+                let transaction = conn.unchecked_transaction()?;
+                let needs_part_path = !table_has_column(&transaction, "attachments", "remote_part_path")?;
+                let current_schema: String = transaction.query_row("SELECT sql FROM sqlite_master WHERE type='table' AND name='attachments'", [], |row| row.get(0))?;
+                let needs_stable_ids = !current_schema.to_ascii_uppercase().contains("AUTOINCREMENT");
+                add_column_if_missing(&transaction, "attachments", "remote_part_path", "TEXT NOT NULL DEFAULT ''")?;
+                transaction.execute("CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id)", [])?;
+                // Older versions could bind the first of several same-name parts.
+                // Retain the files, but require fresh metadata for ambiguous rows.
+                if needs_part_path { transaction.execute_batch("UPDATE attachments AS a SET is_downloaded=0, local_path='', content_sha256=''
+                    WHERE (a.is_downloaded<>0 OR a.local_path<>'' OR a.content_sha256<>'')
+                      AND EXISTS (SELECT 1 FROM messages m WHERE m.id=a.message_id AND m.remote_uid>0 AND m.remote_mailbox<>'')
+                      AND EXISTS (SELECT 1 FROM attachments b WHERE b.message_id=a.message_id AND b.id<>a.id
+                        AND ((trim(a.content_id)<>'' AND lower(a.content_id)=lower(b.content_id))
+                          OR (trim(a.content_id)='' AND a.filename=b.filename)));
+                    UPDATE messages SET attachment_metadata_synced=0
+                    WHERE remote_uid>0 AND remote_mailbox<>'' AND EXISTS (SELECT 1 FROM attachments a WHERE a.message_id=messages.id);")?; }
+                if needs_stable_ids {
+                    transaction.execute_batch("CREATE TABLE attachments_with_stable_ids (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+                        filename TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes INTEGER NOT NULL,
+                        is_downloaded INTEGER NOT NULL DEFAULT 0, local_path TEXT NOT NULL DEFAULT '',
+                        content_sha256 TEXT NOT NULL DEFAULT '', content_id TEXT NOT NULL DEFAULT '',
+                        is_inline INTEGER NOT NULL DEFAULT 0, remote_part_path TEXT NOT NULL DEFAULT ''
+                    );
+                    INSERT INTO attachments_with_stable_ids(id,message_id,filename,mime_type,size_bytes,is_downloaded,local_path,content_sha256,content_id,is_inline,remote_part_path)
+                    SELECT id,message_id,filename,mime_type,size_bytes,is_downloaded,local_path,content_sha256,content_id,is_inline,remote_part_path FROM attachments;
+                    DROP TABLE attachments;
+                    ALTER TABLE attachments_with_stable_ids RENAME TO attachments;")?;
+                }
+                transaction.commit()?;
+            }
             add_column_if_missing(
                 conn,
                 "outbox_queue",
@@ -610,6 +647,8 @@ impl MailStore {
                 CREATE INDEX IF NOT EXISTS idx_message_labels_label ON message_labels(label_id);
                 CREATE INDEX IF NOT EXISTS idx_mail_identities_account ON mail_identities(account_id, is_default DESC);
                 CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_attachments_remote_part
+                    ON attachments(message_id, remote_part_path) WHERE remote_part_path <> '';
                 CREATE INDEX IF NOT EXISTS idx_sync_runs_started ON sync_runs(started_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_contacts_account_email ON contacts(account_id, email);
                 CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox_queue(status);

@@ -31,6 +31,9 @@ impl MailStore {
                         import_backup_table(conn, table, rows)?;
                     }
                 }
+                // Older backups have no MIME section field; re-fetch structure
+                // instead of guessing when duplicate attachment names exist.
+                conn.execute("UPDATE messages SET attachment_metadata_synced=0 WHERE remote_uid>0 AND remote_mailbox<>'' AND EXISTS (SELECT 1 FROM attachments a WHERE a.message_id=messages.id AND a.remote_part_path='')", [])?;
                 ensure_default_account_for_conn(conn)?;
                 let foreign_key_violations: i64 =
                     conn.query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| {

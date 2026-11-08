@@ -284,6 +284,8 @@ pub struct RemoteAttachmentMetadata {
     pub size_bytes: i64,
     pub content_id: String,
     pub is_inline: bool,
+    /// IMAP MIME section within this exact message UID; empty for non-IMAP data.
+    pub remote_part_path: String,
 }
 
 #[derive(Debug, Clone)]

@@ -3374,6 +3374,7 @@ fn remote_message_body_refreshes_attachment_metadata() {
                 has_attachments: true,
                 attachments_complete: true,
                 attachments: vec![crate::models::RemoteAttachmentMetadata {
+                    remote_part_path: String::new(),
                     filename: "remote.png".to_string(),
                     mime_type: "image/png".to_string(),
                     size_bytes: 42,
@@ -3461,6 +3462,7 @@ fn remote_attachment(
     is_inline: bool,
 ) -> crate::models::RemoteAttachmentMetadata {
     crate::models::RemoteAttachmentMetadata {
+        remote_part_path: String::new(),
         filename: filename.to_string(),
         mime_type: mime_type.to_string(),
         size_bytes,
@@ -5879,6 +5881,7 @@ fn cache_cleanup_removes_remote_files_and_preserves_local_imports() {
                 has_attachments: true,
                 attachments_complete: true,
                 attachments: vec![crate::models::RemoteAttachmentMetadata {
+                    remote_part_path: String::new(),
                     filename: "remote-cache.bin".to_string(),
                     mime_type: "application/octet-stream".to_string(),
                     size_bytes: 64,
@@ -6613,10 +6616,11 @@ fn stale_remote_attachment_results_cannot_attach_to_changed_message() {
     fs::write(file.path(), b"data").unwrap();
     assert!(store
         .mark_remote_attachment_downloaded(
-            attachment.id,
+            &attachment,
             file.path().to_str().unwrap(),
             4,
-            &expected
+            &expected,
+            ""
         )
         .is_err());
     assert!(!store.get_attachment(attachment.id).unwrap().is_downloaded);
@@ -7110,4 +7114,296 @@ fn invalid_rule_folder_cannot_block_loading_message_body() {
     assert_eq!(result.body, "secret");
     assert_eq!(result.folder_role, "inbox");
     assert!(result.is_read);
+}
+
+fn section_metadata(name: &str, path: &str) -> crate::models::RemoteAttachmentMetadata {
+    let mut metadata = remote_attachment(name, "application/octet-stream", 5, "", false);
+    metadata.remote_part_path = path.into();
+    metadata
+}
+
+#[test]
+fn mime_sections_keep_distinct_ids_and_downloads_when_metadata_is_reordered() {
+    let store = test_store();
+    let id = seed_remote_message(&store, "section stable", 241);
+    let reference = store.get_message_remote_reference(id).unwrap();
+    let original = vec![
+        section_metadata("same.txt", "1"),
+        section_metadata("same.txt", "2"),
+    ];
+    store
+        .update_message_attachments_from_remote(id, &original, &reference)
+        .unwrap();
+    let attachments = store.list_attachments(id).unwrap();
+    let first = attachments
+        .iter()
+        .find(|a| store.get_attachment_remote_part_path(a).unwrap() == "1")
+        .unwrap()
+        .clone();
+    let second = attachments
+        .iter()
+        .find(|a| store.get_attachment_remote_part_path(a).unwrap() == "2")
+        .unwrap()
+        .clone();
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("first");
+    fs::write(&file, b"first").unwrap();
+    store
+        .mark_remote_attachment_downloaded(&first, file.to_str().unwrap(), 5, &reference, "1")
+        .unwrap();
+    store
+        .update_message_attachments_from_remote(
+            id,
+            &[original[1].clone(), original[0].clone()],
+            &reference,
+        )
+        .unwrap();
+    assert_eq!(
+        store
+            .get_attachment_remote_part_path(&store.get_attachment(first.id).unwrap())
+            .unwrap(),
+        "1"
+    );
+    assert_eq!(
+        store
+            .get_attachment_remote_part_path(&store.get_attachment(second.id).unwrap())
+            .unwrap(),
+        "2"
+    );
+    assert!(store.get_attachment(first.id).unwrap().is_downloaded);
+    assert!(!store.get_attachment(second.id).unwrap().is_downloaded);
+}
+
+#[test]
+fn old_duplicate_rows_are_not_guessed_when_sections_first_arrive() {
+    let store = test_store();
+    let id = seed_remote_message(&store, "legacy duplicate", 242);
+    let reference = store.get_message_remote_reference(id).unwrap();
+    let old = vec![
+        remote_attachment("same.txt", "text/plain", 5, "", false),
+        remote_attachment("same.txt", "text/plain", 6, "", false),
+    ];
+    store
+        .update_message_attachments_from_remote(id, &old, &reference)
+        .unwrap();
+    let before = store.list_attachments(id).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("old-file");
+    fs::write(&file, b"first").unwrap();
+    store
+        .mark_attachment_downloaded(before[0].id, file.to_str().unwrap(), 5)
+        .unwrap();
+    store
+        .update_message_attachments_from_remote(
+            id,
+            &[
+                section_metadata("same.txt", "1"),
+                section_metadata("same.txt", "2"),
+            ],
+            &reference,
+        )
+        .unwrap();
+    let after = store.list_attachments(id).unwrap();
+    assert_eq!(after.len(), 2);
+    assert!(after
+        .iter()
+        .all(|a| !a.is_downloaded && !before.iter().any(|old| old.id == a.id)));
+    assert_eq!(
+        fs::read(&file).unwrap(),
+        b"first",
+        "user files remain untouched"
+    );
+    assert!(store
+        .mark_remote_attachment_downloaded(&before[0], file.to_str().unwrap(), 5, &reference, "")
+        .is_err());
+}
+
+#[test]
+fn in_flight_attachment_cannot_commit_after_section_identity_changes() {
+    let store = test_store();
+    let id = seed_remote_message(&store, "section changed", 243);
+    let reference = store.get_message_remote_reference(id).unwrap();
+    store
+        .update_message_attachments_from_remote(
+            id,
+            &[section_metadata("same.txt", "1")],
+            &reference,
+        )
+        .unwrap();
+    let old = store.list_attachments(id).unwrap().remove(0);
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("download");
+    fs::write(&file, b"first").unwrap();
+    store
+        .with_conn(|conn| {
+            conn.execute(
+                "UPDATE attachments SET remote_part_path='2' WHERE id=?1",
+                [old.id],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    assert!(store
+        .mark_remote_attachment_downloaded(&old, file.to_str().unwrap(), 5, &reference, "1")
+        .is_err());
+    store
+        .with_conn(|conn| {
+            conn.execute(
+                "UPDATE attachments SET remote_part_path='1' WHERE id=?1",
+                [old.id],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    store
+        .update_message_attachments_from_remote(
+            id,
+            &[section_metadata("same.txt", "2")],
+            &reference,
+        )
+        .unwrap();
+    assert!(store
+        .mark_remote_attachment_downloaded(&old, file.to_str().unwrap(), 5, &reference, "1")
+        .is_err());
+    assert!(!store.list_attachments(id).unwrap()[0].is_downloaded);
+}
+
+#[test]
+fn legacy_attachment_migration_preserves_files_and_rebuilds_stable_ids() {
+    let path = test_database_path("better-email-old-attachment-schema");
+    let store = MailStore::open_at_with_seed(path.clone(), true).unwrap();
+    let id = seed_remote_message(&store, "legacy section upgrade", 244);
+    let reference = store.get_message_remote_reference(id).unwrap();
+    let old = vec![
+        remote_attachment("duplicate.txt", "text/plain", 5, "", false),
+        remote_attachment("duplicate.txt", "text/plain", 5, "", false),
+        remote_attachment("unique.txt", "text/plain", 5, "", false),
+    ];
+    store
+        .update_message_attachments_from_remote(id, &old, &reference)
+        .unwrap();
+    let original = store.list_attachments(id).unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("existing-user-file");
+    fs::write(&file, b"hello").unwrap();
+    store
+        .mark_attachment_downloaded(original[0].id, file.to_str().unwrap(), 5)
+        .unwrap();
+    let unique = original
+        .iter()
+        .find(|a| a.filename == "unique.txt")
+        .unwrap();
+    let unique_file = dir.path().join("unique-file");
+    fs::write(&unique_file, b"other").unwrap();
+    store
+        .mark_attachment_downloaded(unique.id, unique_file.to_str().unwrap(), 5)
+        .unwrap();
+    store.with_conn(|conn| {
+        conn.execute_batch("BEGIN IMMEDIATE;
+            CREATE TABLE attachments_legacy (id INTEGER PRIMARY KEY, message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE, filename TEXT NOT NULL, mime_type TEXT NOT NULL, size_bytes INTEGER NOT NULL, is_downloaded INTEGER NOT NULL DEFAULT 0, local_path TEXT NOT NULL DEFAULT '', content_sha256 TEXT NOT NULL DEFAULT '', content_id TEXT NOT NULL DEFAULT '', is_inline INTEGER NOT NULL DEFAULT 0);
+            INSERT INTO attachments_legacy SELECT id,message_id,filename,mime_type,size_bytes,is_downloaded,local_path,content_sha256,content_id,is_inline FROM attachments;
+            DROP TABLE attachments;
+            ALTER TABLE attachments_legacy RENAME TO attachments;
+            COMMIT;")?;
+        conn.execute("UPDATE messages SET body='', remote_body_fetched=1, attachment_metadata_synced=1 WHERE id=?1", [id])?;
+        Ok(())
+    }).unwrap();
+    drop(store);
+    let reopened = MailStore::open_at_with_seed(path, true).unwrap();
+    let after = reopened.list_attachments(id).unwrap();
+    assert_eq!(after.len(), 3);
+    assert!(after
+        .iter()
+        .filter(|item| item.filename == "duplicate.txt")
+        .all(|item| !item.is_downloaded));
+    let restored_unique = after
+        .iter()
+        .find(|item| item.filename == "unique.txt")
+        .unwrap();
+    assert_eq!(restored_unique.id, unique.id);
+    assert!(restored_unique.is_downloaded);
+    assert_eq!(fs::read(&unique_file).unwrap(), b"other");
+    assert_eq!(fs::read(&file).unwrap(), b"hello");
+    let account = reopened.get_account().unwrap();
+    assert!(reopened
+        .list_messages_missing_attachment_metadata(account.id, "INBOX", 100)
+        .unwrap()
+        .iter()
+        .any(|(message_id, _)| *message_id == id));
+    let previous_max = after.iter().map(|a| a.id).max().unwrap();
+    let new_id = reopened.with_conn(|conn| {
+        conn.execute("DELETE FROM attachments WHERE message_id=?1", [id])?;
+        conn.execute("INSERT INTO attachments(message_id,filename,mime_type,size_bytes) VALUES(?1,'new.bin','application/octet-stream',1)", [id])?;
+        Ok(conn.last_insert_rowid())
+    }).unwrap();
+    assert!(
+        new_id > previous_max,
+        "deleted attachment IDs must not be reused"
+    );
+}
+
+#[test]
+fn old_backup_without_sections_schedules_attachment_metadata_recovery() {
+    let store = test_store();
+    let id = seed_remote_message(&store, "old backup section", 245);
+    let reference = store.get_message_remote_reference(id).unwrap();
+    store
+        .update_message_attachments_from_remote(
+            id,
+            &[
+                section_metadata("same.txt", "1"),
+                section_metadata("same.txt", "2"),
+            ],
+            &reference,
+        )
+        .unwrap();
+    store.with_conn(|conn| {
+        conn.execute("UPDATE messages SET body='', remote_body_fetched=1, attachment_metadata_synced=1 WHERE id=?1", [id])?;
+        Ok(())
+    }).unwrap();
+    let mut backup = store.export_local_backup().unwrap();
+    for row in backup.tables.get_mut("attachments").unwrap() {
+        row.remove("remote_part_path");
+    }
+    let restored = test_store();
+    restored.import_local_backup(&backup).unwrap();
+    let account = restored.get_account().unwrap();
+    assert!(restored
+        .list_messages_missing_attachment_metadata(account.id, "INBOX", 100)
+        .unwrap()
+        .iter()
+        .any(|(message_id, _)| *message_id == id));
+}
+
+#[test]
+fn duplicate_section_metadata_rolls_back_without_losing_existing_attachments() {
+    let store = test_store();
+    let id = seed_remote_message(&store, "duplicate section invalid", 246);
+    let reference = store.get_message_remote_reference(id).unwrap();
+    store
+        .update_message_attachments_from_remote(
+            id,
+            &[section_metadata("original.txt", "1")],
+            &reference,
+        )
+        .unwrap();
+    let original = store.list_attachments(id).unwrap().remove(0);
+    assert!(store
+        .update_message_attachments_from_remote(
+            id,
+            &[
+                section_metadata("a.txt", "2"),
+                section_metadata("b.txt", "2")
+            ],
+            &reference
+        )
+        .is_err());
+    let after = store.list_attachments(id).unwrap();
+    assert_eq!(after.len(), 1);
+    assert_eq!(after[0].id, original.id);
+    assert_eq!(after[0].filename, "original.txt");
+    assert_eq!(
+        store.get_attachment_remote_part_path(&after[0]).unwrap(),
+        "1"
+    );
 }

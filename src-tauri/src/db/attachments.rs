@@ -62,6 +62,16 @@ impl MailStore {
     pub fn get_attachment(&self, attachment_id: i64) -> MailResult<Attachment> {
         self.with_conn(|conn| attachment_for_conn(conn, attachment_id))
     }
+    pub fn get_attachment_remote_part_path(&self, expected: &Attachment) -> MailResult<String> {
+        self.with_conn(|conn| {
+            let path: Option<String> = conn.query_row(
+                "SELECT remote_part_path FROM attachments WHERE id=?1 AND message_id=?2 AND filename=?3 AND content_id=?4",
+                params![expected.id, expected.message_id, expected.filename, expected.content_id],
+                |row| row.get(0),
+            ).optional()?;
+            path.ok_or(MailError::Cancelled)
+        })
+    }
     pub fn mark_attachment_downloaded(
         &self,
         attachment_id: i64,
@@ -73,16 +83,17 @@ impl MailStore {
 
     pub fn mark_remote_attachment_downloaded(
         &self,
-        attachment_id: i64,
+        attachment: &Attachment,
         local_path: &str,
         size_bytes: i64,
         expected: &MessageRemoteRef,
+        expected_part_path: &str,
     ) -> MailResult<Attachment> {
         self.mark_attachment_downloaded_checked(
-            attachment_id,
+            attachment.id,
             local_path,
             size_bytes,
-            Some(expected),
+            Some((expected, attachment, expected_part_path)),
         )
     }
 
@@ -91,7 +102,7 @@ impl MailStore {
         attachment_id: i64,
         local_path: &str,
         size_bytes: i64,
-        expected: Option<&MessageRemoteRef>,
+        expected: Option<(&MessageRemoteRef, &Attachment, &str)>,
     ) -> MailResult<Attachment> {
         // 正常下载/导入路径在调用前已经把文件原子落盘。只有真实存在、大小一致的
         // 常规文件才记录摘要；旧数据或文件已丢失的记录保留为空摘要，后续外发时
@@ -109,12 +120,13 @@ impl MailStore {
             Err(_) => String::new(),
         };
         self.with_conn(|conn| {
-            let changed = if let Some(expected) = expected {
+            let changed = if let Some((expected, attachment, expected_part_path)) = expected {
                 conn.execute(
                     "UPDATE attachments SET is_downloaded = 1, local_path = ?2, size_bytes = ?3, content_sha256 = ?4
-                     WHERE id = ?1 AND EXISTS (SELECT 1 FROM messages m WHERE m.id = attachments.message_id
+                     WHERE id = ?1 AND message_id = ?9 AND filename = ?10 AND content_id = ?11 AND remote_part_path = ?12
+                       AND EXISTS (SELECT 1 FROM messages m WHERE m.id = attachments.message_id
                        AND m.account_id = ?5 AND m.remote_mailbox = ?6 AND m.remote_uid = ?7 AND m.remote_uid_validity = ?8)",
-                    params![attachment_id, local_path, size_bytes, content_sha256, expected.account_id, expected.remote_mailbox, expected.remote_uid, expected.remote_uid_validity],
+                    params![attachment_id, local_path, size_bytes, content_sha256, expected.account_id, expected.remote_mailbox, expected.remote_uid, expected.remote_uid_validity, attachment.message_id, attachment.filename, attachment.content_id, expected_part_path],
                 )?
             } else { conn.execute(
                 "

@@ -12,7 +12,6 @@ use super::search::{
     build_message_filter_clause, build_message_summary_query, thread_order_clause, SearchCriteria,
 };
 use super::*;
-use std::collections::VecDeque;
 
 pub(super) fn queue_remote_intent_for_conn(
     conn: &Connection,
@@ -874,7 +873,7 @@ impl MailStore {
                 WHERE account_id = ?1
                   AND remote_mailbox = ?2
                   AND remote_uid > 0
-                  AND body <> ''
+                  AND (body <> '' OR remote_body_fetched = 1)
                   AND attachment_metadata_synced = 0
                 ORDER BY id ASC
                 LIMIT ?3
@@ -1941,32 +1940,30 @@ pub(super) fn looks_like_html_fragment(value: &str) -> bool {
 }
 /// 附件在数据库中的行快照，用于正文重拉时按稳定身份匹配并保留下载状态。
 pub(super) struct AttachmentRow {
+    pub id: i64,
     pub filename: String,
     pub is_downloaded: bool,
     pub local_path: String,
     pub content_sha256: String,
     pub content_id: String,
+    pub remote_part_path: String,
 }
 
 pub(super) fn attachment_rows_for_conn(
     conn: &Connection,
     message_id: i64,
 ) -> MailResult<Vec<AttachmentRow>> {
-    let mut stmt = conn.prepare(
-        "
-        SELECT filename, is_downloaded, local_path, content_sha256, content_id
-        FROM attachments
-        WHERE message_id = ?1
-        ",
-    )?;
+    let mut stmt = conn.prepare("SELECT id, filename, is_downloaded, local_path, content_sha256, content_id, remote_part_path FROM attachments WHERE message_id = ?1 ORDER BY id")?;
     let rows = stmt
         .query_map(params![message_id], |row| {
             Ok(AttachmentRow {
-                filename: row.get(0)?,
-                is_downloaded: row.get::<_, i64>(1)? != 0,
-                local_path: row.get(2)?,
-                content_sha256: row.get(3)?,
-                content_id: row.get(4)?,
+                id: row.get(0)?,
+                filename: row.get(1)?,
+                is_downloaded: row.get::<_, i64>(2)? != 0,
+                local_path: row.get(3)?,
+                content_sha256: row.get(4)?,
+                content_id: row.get(5)?,
+                remote_part_path: row.get(6)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -1979,61 +1976,106 @@ fn replace_message_attachments_for_conn(
     attachments: &[crate::models::RemoteAttachmentMetadata],
     has_attachments: bool,
 ) -> MailResult<()> {
-    // 先读取既有附件，以便按稳定身份匹配新旧附件并保留已下载状态，
-    // 避免重拉正文或补元数据把已下载附件重置、产生孤儿文件。
-    let old_attachments = attachment_rows_for_conn(conn, message_id)?;
-    let mut old_by_content_id = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
-    let mut old_by_filename = BTreeMap::<String, VecDeque<AttachmentRow>>::new();
-    for old in old_attachments {
-        let target = if old.content_id.trim().is_empty() {
-            &mut old_by_filename
-        } else {
-            &mut old_by_content_id
-        };
-        target
-            .entry(if old.content_id.trim().is_empty() {
-                old.filename.clone()
-            } else {
-                old.content_id.clone()
-            })
-            .or_default()
-            .push_back(old);
-    }
+    let mut unmatched = attachment_rows_for_conn(conn, message_id)?;
     conn.execute(
-        "UPDATE messages
-         SET has_attachments = ?2, attachment_metadata_synced = 1
-         WHERE id = ?1",
+        "UPDATE messages SET has_attachments = ?2, attachment_metadata_synced = 1 WHERE id = ?1",
         params![
             message_id,
             bool_to_int(has_attachments || !attachments.is_empty())
         ],
     )?;
-    conn.execute(
-        "DELETE FROM attachments WHERE message_id = ?1",
-        params![message_id],
-    )?;
     for attachment in attachments {
-        let matched =
-            match_old_attachment(attachment, &mut old_by_content_id, &mut old_by_filename);
+        let exact = if attachment.remote_part_path.is_empty() {
+            None
+        } else {
+            unmatched
+                .iter()
+                .position(|old| old.remote_part_path == attachment.remote_part_path)
+        };
+        // Older rows have no MIME section. Transfer their local binding only if
+        // both old and new metadata identify exactly one candidate; never guess
+        // which of two same-name attachments an old downloaded file contained.
+        let legacy = if exact.is_none() && !attachment.remote_part_path.is_empty() {
+            let cid_matches = unmatched
+                .iter()
+                .enumerate()
+                .filter(|(_, old)| {
+                    old.remote_part_path.is_empty()
+                        && !attachment.content_id.is_empty()
+                        && old.content_id.eq_ignore_ascii_case(&attachment.content_id)
+                })
+                .map(|(i, _)| i)
+                .collect::<Vec<_>>();
+            let new_cid_count = attachments
+                .iter()
+                .filter(|other| {
+                    !attachment.content_id.is_empty()
+                        && other
+                            .content_id
+                            .eq_ignore_ascii_case(&attachment.content_id)
+                })
+                .count();
+            if cid_matches.len() == 1 && new_cid_count == 1 {
+                Some(cid_matches[0])
+            } else if cid_matches.is_empty() {
+                let names = unmatched
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, old)| {
+                        old.remote_part_path.is_empty()
+                            && old.content_id.is_empty()
+                            && old.filename == attachment.filename
+                    })
+                    .map(|(i, _)| i)
+                    .collect::<Vec<_>>();
+                let new_names = attachments
+                    .iter()
+                    .filter(|other| other.filename == attachment.filename)
+                    .count();
+                if names.len() == 1 && new_names == 1 {
+                    Some(names[0])
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        // For local/test data with no remote section, retain the established
+        // ordered matching behavior without touching section-bound rows.
+        let pathless =
+            if exact.is_none() && legacy.is_none() && attachment.remote_part_path.is_empty() {
+                unmatched.iter().position(|old| {
+                    old.remote_part_path.is_empty()
+                        && ((!attachment.content_id.is_empty()
+                            && old.content_id == attachment.content_id)
+                            || (old.content_id.is_empty() && old.filename == attachment.filename))
+                })
+            } else {
+                None
+            };
+        let matched = exact
+            .or(legacy)
+            .or(pathless)
+            .map(|index| unmatched.remove(index));
         let (is_downloaded, local_path, size_bytes, content_sha256) =
             preserve_attachment_download_state(&matched, attachment);
+        if let Some(old) = matched {
+            conn.execute("UPDATE attachments SET filename=?2, mime_type=?3, size_bytes=?4, is_downloaded=?5, local_path=?6, content_sha256=?7, content_id=?8, is_inline=?9, remote_part_path=?10 WHERE id=?1 AND message_id=?11",
+                params![old.id, attachment.filename, attachment.mime_type, size_bytes, bool_to_int(is_downloaded), local_path, content_sha256, attachment.content_id, bool_to_int(attachment.is_inline), attachment.remote_part_path, message_id])?;
+        } else {
+            // Insert before removing stale rows so SQLite cannot reuse an old ID
+            // while an earlier download is still in flight.
+            conn.execute("INSERT INTO attachments(message_id, filename, mime_type, size_bytes, is_downloaded, local_path, content_sha256, content_id, is_inline, remote_part_path) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+                params![message_id, attachment.filename, attachment.mime_type, size_bytes, bool_to_int(is_downloaded), local_path, content_sha256, attachment.content_id, bool_to_int(attachment.is_inline), attachment.remote_part_path])?;
+        }
+    }
+    for old in unmatched {
         conn.execute(
-            "INSERT INTO attachments(
-                message_id, filename, mime_type, size_bytes, is_downloaded,
-                local_path, content_sha256, content_id, is_inline
-             )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            params![
-                message_id,
-                attachment.filename,
-                attachment.mime_type,
-                size_bytes,
-                bool_to_int(is_downloaded),
-                local_path,
-                content_sha256,
-                attachment.content_id,
-                bool_to_int(attachment.is_inline)
-            ],
+            "DELETE FROM attachments WHERE id=?1 AND message_id=?2",
+            params![old.id, message_id],
         )?;
     }
     Ok(())
@@ -2052,34 +2094,6 @@ pub(super) fn has_pending_remote_write_for_conn(
         )
         .optional()?;
     Ok(exists.is_some())
-}
-
-/// 为新的远端附件寻找既有附件作为下载状态来源。
-///
-/// 优先按 content_id（内联图片的稳定标识）精确匹配；无 content_id 时按
-/// filename 匹配，同名附件按稳定顺序配对，避免「先删后插」把已下载附件
-/// 重置为未下载、产生孤儿文件。
-fn match_old_attachment(
-    attachment: &crate::models::RemoteAttachmentMetadata,
-    old_by_content_id: &mut std::collections::BTreeMap<
-        String,
-        std::collections::VecDeque<AttachmentRow>,
-    >,
-    old_by_filename: &mut std::collections::BTreeMap<
-        String,
-        std::collections::VecDeque<AttachmentRow>,
-    >,
-) -> Option<AttachmentRow> {
-    if !attachment.content_id.trim().is_empty() {
-        if let Some(bucket) = old_by_content_id.get_mut(&attachment.content_id) {
-            if let Some(matched) = bucket.pop_front() {
-                return Some(matched);
-            }
-        }
-    }
-    old_by_filename
-        .get_mut(&attachment.filename)
-        .and_then(|bucket| bucket.pop_front())
 }
 
 /// 将既有附件的下载状态迁移到新的附件记录上。
@@ -2730,6 +2744,7 @@ mod attachment_metadata_tests {
         let initial = RemoteMessageBody {
             has_attachments: true,
             attachments: vec![crate::models::RemoteAttachmentMetadata {
+                remote_part_path: String::new(),
                 filename: "large.zip".into(),
                 mime_type: "application/zip".into(),
                 size_bytes: 20_000_000,
@@ -2791,6 +2806,7 @@ mod attachment_metadata_tests {
             body: "original body".into(),
             has_attachments: true,
             attachments: vec![crate::models::RemoteAttachmentMetadata {
+                remote_part_path: String::new(),
                 filename: "original.zip".into(),
                 mime_type: "application/zip".into(),
                 size_bytes: 12,

@@ -415,6 +415,9 @@ jobs:
           - \`latest.json\`：更新清单，URL 全部指向上方重命名后的正式文件。
           EOF
           )
+          if [ -f "docs/releases/${TAG}.md" ]; then
+            BODY="$(cat "docs/releases/${TAG}.md")"
+          fi
           if gh release view "$TAG" --json tagName >/dev/null 2>&1; then
             gh release edit "$TAG" --title "Better Email $TAG" --notes "$BODY"
           else

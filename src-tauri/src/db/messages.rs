@@ -2829,3 +2829,46 @@ mod attachment_metadata_tests {
         assert_eq!(store.list_attachments(id).unwrap()[0].id, attachment_id);
     }
 }
+
+impl MailStore {
+    pub fn list_detached_pending_writes(
+        &self,
+        account_id: i64,
+    ) -> MailResult<Vec<(PendingRemoteWrite, String)>> {
+        self.with_conn(|conn| {
+            let mut stmt = conn.prepare(
+                "SELECT p.message_id, p.kind, p.value, p.created_at, m.subject
+                 FROM pending_remote_writes p JOIN messages m ON m.id=p.message_id
+                 WHERE m.account_id=?1 AND (trim(m.remote_mailbox)='' OR m.remote_uid<=0)
+                 ORDER BY p.created_at, p.message_id, p.kind",
+            )?;
+            let rows = stmt
+                .query_map([account_id], |row| {
+                    Ok((
+                        PendingRemoteWrite {
+                            message_id: row.get(0)?,
+                            kind: row.get(1)?,
+                            value: row.get(2)?,
+                            created_at: row.get(3)?,
+                        },
+                        row.get(4)?,
+                    ))
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(rows)
+        })
+    }
+
+    pub fn discard_detached_pending_write(
+        &self,
+        account_id: i64,
+        pending: &PendingRemoteWrite,
+    ) -> MailResult<bool> {
+        self.with_conn(|conn| Ok(conn.execute(
+            "DELETE FROM pending_remote_writes WHERE message_id=?1 AND kind=?2 AND value=?3 AND created_at=?4
+             AND EXISTS (SELECT 1 FROM messages m WHERE m.id=message_id AND m.account_id=?5
+                 AND (trim(m.remote_mailbox)='' OR m.remote_uid<=0))",
+            params![pending.message_id, pending.kind, pending.value, pending.created_at, account_id],
+        )? == 1))
+    }
+}

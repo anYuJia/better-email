@@ -21,7 +21,28 @@ use rusqlite::{
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Mutex, RwLock, RwLockReadGuard,
+};
+
+// Restore must not replace records while network workers still hold snapshots.
+static RESTORE_GATE: RwLock<()> = RwLock::new(());
+static RESTORE_GENERATION: AtomicU64 = AtomicU64::new(0);
+pub(crate) fn restore_generation() -> u64 {
+    RESTORE_GENERATION.load(Ordering::Acquire)
+}
+pub(crate) fn ensure_restore_generation(expected: u64) -> MailResult<()> {
+    if restore_generation() != expected {
+        return Err(MailError::Imap("本地备份已恢复，请重新执行此操作。".into()));
+    }
+    Ok(())
+}
+pub(crate) fn protect_network_operation() -> MailResult<RwLockReadGuard<'static, ()>> {
+    RESTORE_GATE
+        .read()
+        .map_err(|_| MailError::DatabaseLockPoisoned)
+}
 use tauri::{AppHandle, Manager};
 
 mod account_credentials;
@@ -222,6 +243,10 @@ impl MailStore {
         let _ = store.prune_temp_attachments(std::time::Duration::from_secs(60));
         db_info("[better-email][db] open ok");
         Ok(store)
+    }
+
+    pub(crate) fn database_identity(&self) -> &Path {
+        &self.database_path
     }
 
     fn with_conn<T>(&self, f: impl FnOnce(&Connection) -> MailResult<T>) -> MailResult<T> {

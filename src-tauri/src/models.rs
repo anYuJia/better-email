@@ -604,7 +604,7 @@ pub struct MailboxSyncTransactionResult {
 /// 本地乐观修改未能写回远端时的待处理意图。同步调和时对带待处理写回的
 /// 字段保持本地值，直到写回成功或用户显式放弃，避免下次同步无提示撤销
 /// 本地操作，同时不永久保留所有本地 flags（写回成功即恢复远端权威）。
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PendingRemoteWrite {
     pub message_id: i64,
     pub kind: String,
@@ -877,6 +877,7 @@ pub struct BackgroundTaskInput {
 
 #[derive(Debug, Clone)]
 pub struct OutboundMessage {
+    pub message_id_header: String,
     pub id: i64,
     pub account_id: i64,
     pub sender_name: String,

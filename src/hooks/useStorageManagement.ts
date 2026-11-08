@@ -49,7 +49,7 @@ export default function useStorageManagement({
     setLocalBackupSummary(summary);
     const { folderId: nextFolderId } = await loadMeta(null);
     await loadMessages(nextFolderId);
-    setStatus(`本地备份已恢复：${summary.messages} 封邮件，${summary.accounts} 个账号`);
+    setStatus(`本地备份已恢复：${summary.messages} 封邮件，${summary.accounts} 个账号。服务器配置变化的账号需重新保存凭据。`);
   }
 
   async function refreshStorageUsage(announce = true) {

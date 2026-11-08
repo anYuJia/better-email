@@ -19,9 +19,12 @@ fn task_error(error: impl std::fmt::Display) -> MailError {
 pub(super) async fn database<T: Send + 'static>(
     operation: impl FnOnce() -> MailResult<T> + Send + 'static,
 ) -> MailResult<T> {
+    let generation = crate::db::restore_generation();
     let permit = DATABASE_WORKERS.acquire().await.map_err(task_error)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _permit = permit;
+        let _restore_guard = crate::db::protect_network_operation()?;
+        crate::db::ensure_restore_generation(generation)?;
         operation()
     })
     .await
@@ -69,6 +72,7 @@ pub(super) async fn network<T: Send + 'static>(
     account_id: i64,
     operation: impl FnOnce() -> MailResult<T> + Send + 'static,
 ) -> MailResult<T> {
+    let generation = crate::db::restore_generation();
     let account = account_workers(account_id)
         .acquire_owned()
         .await
@@ -76,6 +80,8 @@ pub(super) async fn network<T: Send + 'static>(
     let global = NETWORK_WORKERS.acquire().await.map_err(task_error)?;
     tauri::async_runtime::spawn_blocking(move || {
         let (_account, _global) = (account, global);
+        let _restore_guard = crate::db::protect_network_operation()?;
+        crate::db::ensure_restore_generation(generation)?;
         operation()
     })
     .await

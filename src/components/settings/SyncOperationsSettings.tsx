@@ -15,6 +15,7 @@ import type {
 } from '../../app/types';
 import type { SettingsAccountValueChange, SettingsAccountValues } from './accountScopeTypes';
 import AccountScopeRequired from './shared/AccountScopeRequired';
+import DetachedPendingSettings from './DetachedPendingSettings';
 import { CustomSelect } from './accounts/CustomSelect';
 import { syncModeOptions } from './accounts/accountSettingsShared';
 import {
@@ -147,6 +148,7 @@ export default function SyncOperationsSettings({
 
   return (
     <div className="settings-sync-stack" data-settings-section="sync">
+      {accountScope !== 'all' && accountForm && <DetachedPendingSettings key={accountForm.id} accountId={accountForm.id} />}
       <SettingsSection
         title="同步偏好"
         description={accountScope === 'all' ? '只修改你主动调整的字段，保存后应用到所有邮箱账号。' : '控制当前账号的后台检查与附件处理。'}

@@ -20,9 +20,14 @@ impl MailStore {
     }
     pub fn import_local_backup(&self, backup: &LocalBackup) -> MailResult<()> {
         validate_local_backup(backup)?;
+        let _restore_guard = RESTORE_GATE
+            .write()
+            .map_err(|_| MailError::DatabaseLockPoisoned)?;
         self.with_conn(|conn| {
             let result = (|| -> MailResult<()> {
                 conn.execute_batch("PRAGMA foreign_keys = OFF; BEGIN IMMEDIATE;")?;
+                // Keep credentials only when their previously trusted endpoint is unchanged.
+                conn.execute_batch("CREATE TEMP TABLE restore_credential_accounts AS SELECT email, auth_type, incoming_protocol, imap_host, smtp_host FROM accounts;")?;
                 for table in LOCAL_BACKUP_TABLES.iter().rev() {
                     conn.execute(&format!("DELETE FROM {}", quote_identifier(table)), [])?;
                 }
@@ -31,6 +36,13 @@ impl MailStore {
                         import_backup_table(conn, table, rows)?;
                     }
                 }
+                conn.execute_batch("DELETE FROM account_credentials WHERE EXISTS (
+                    SELECT 1 FROM accounts a WHERE lower(a.email)=lower(account_credentials.account_email)
+                      AND NOT EXISTS (SELECT 1 FROM restore_credential_accounts old
+                        WHERE lower(old.email)=lower(a.email) AND old.auth_type=a.auth_type
+                          AND old.incoming_protocol=a.incoming_protocol
+                          AND old.imap_host=a.imap_host AND old.smtp_host=a.smtp_host)
+                ); DROP TABLE restore_credential_accounts;")?;
                 // Older backups have no MIME section field; re-fetch structure
                 // instead of guessing when duplicate attachment names exist.
                 conn.execute("UPDATE messages SET attachment_metadata_synced=0 WHERE remote_uid>0 AND remote_mailbox<>'' AND EXISTS (SELECT 1 FROM attachments a WHERE a.message_id=messages.id AND a.remote_part_path='')", [])?;
@@ -47,6 +59,7 @@ impl MailStore {
                 conn.execute_batch(
                     "INSERT INTO message_search(message_search) VALUES('rebuild'); COMMIT;",
                 )?;
+                RESTORE_GENERATION.fetch_add(1, Ordering::Release);
                 Ok(())
             })();
 

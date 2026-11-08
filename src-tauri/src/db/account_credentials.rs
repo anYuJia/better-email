@@ -176,7 +176,12 @@ impl MailStore {
     ) -> MailResult<Option<String>> {
         self.with_conn(|conn| {
             let current = account_for_conn(conn, Some(account.id))?;
-            if current.email != account.email || current.auth_type != account.auth_type {
+            if current.email != account.email
+                || current.auth_type != account.auth_type
+                || current.incoming_protocol != account.incoming_protocol
+                || current.imap_host != account.imap_host
+                || current.smtp_host != account.smtp_host
+            {
                 return Err(MailError::Imap(
                     "账号或认证方式已改变，请重试当前账号。".into(),
                 ));

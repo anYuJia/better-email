@@ -13,6 +13,8 @@ use tauri::State;
 
 static REMOTE_WRITE_LOCKS: Lazy<Mutex<HashMap<i64, Weak<Mutex<()>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+static RETRY_OFFSETS: Lazy<Mutex<HashMap<(std::path::PathBuf, i64), usize>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 static ACCOUNT_SNAPSHOT_LOCKS: Lazy<Mutex<HashMap<i64, Weak<Mutex<()>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
@@ -119,6 +121,40 @@ pub async fn list_muted_thread_keys(
 ) -> MailResult<Vec<String>> {
     let store = store.inner().clone();
     super::executor::database(move || store.list_muted_thread_keys(account_id)).await
+}
+
+#[derive(serde::Serialize)]
+pub struct DetachedPendingWrite {
+    #[serde(flatten)]
+    pending: PendingRemoteWrite,
+    subject: String,
+}
+
+#[tauri::command]
+pub async fn list_detached_pending_writes(
+    store: State<'_, MailStore>,
+    account_id: i64,
+) -> MailResult<Vec<DetachedPendingWrite>> {
+    let store = store.inner().clone();
+    super::executor::database(move || {
+        Ok(store
+            .list_detached_pending_writes(account_id)?
+            .into_iter()
+            .map(|(pending, subject)| DetachedPendingWrite { pending, subject })
+            .collect())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn discard_detached_pending_write(
+    store: State<'_, MailStore>,
+    account_id: i64,
+    pending: PendingRemoteWrite,
+) -> MailResult<bool> {
+    let store = store.inner().clone();
+    super::executor::database(move || store.discard_detached_pending_write(account_id, &pending))
+        .await
 }
 
 #[tauri::command]
@@ -698,8 +734,11 @@ fn retry_pending_remote_writes_with(
     ensure_not_cancelled: &dyn Fn() -> MailResult<()>,
     mut attempt: impl FnMut(&PendingRemoteWrite) -> MailResult<RemoteActionReport>,
 ) -> MailResult<(usize, usize)> {
-    let mut applied = 0;
-    let mut remaining = 0;
+    // Keep a message's writes together and rotate the starting message between
+    // syncs, so a permanently failing operation cannot starve the queue.
+    let mut groups: Vec<Vec<PendingRemoteWrite>> = Vec::new();
+    let mut detached = 0;
+    let mut indexes = HashMap::new();
     for pending in store.list_pending_remote_writes()? {
         ensure_not_cancelled()?;
         let reference = match store.get_message_remote_reference(pending.message_id) {
@@ -709,13 +748,58 @@ fn retry_pending_remote_writes_with(
         if reference.account_id != account_id {
             continue;
         }
-        let result = attempt(&pending);
-        match result {
-            Ok(report) if report.remote_applied => applied += 1,
-            _ => remaining += 1,
+        if reference.remote_mailbox.trim().is_empty() || reference.remote_uid <= 0 {
+            detached += 1;
+            continue;
+        }
+        let index = *indexes.entry(pending.message_id).or_insert_with(|| {
+            groups.push(Vec::new());
+            groups.len() - 1
+        });
+        groups[index].push(pending);
+    }
+    if groups.is_empty() {
+        return Ok((0, detached));
+    }
+    let total: usize = detached + groups.iter().map(Vec::len).sum::<usize>();
+    let retry_scope = (store.database_identity().to_path_buf(), account_id);
+    let start = RETRY_OFFSETS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&retry_scope)
+        .copied()
+        .unwrap_or(0)
+        % groups.len();
+    let mut applied = 0;
+    let mut attempted_groups = 0;
+    let mut failures = 0;
+    for step in 0..groups.len().min(20) {
+        ensure_not_cancelled()?;
+        attempted_groups += 1;
+        let mut group_failed = false;
+        for pending in &groups[(start + step) % groups.len()] {
+            ensure_not_cancelled()?;
+            match attempt(pending) {
+                Ok(report) if report.remote_applied => applied += 1,
+                _ => group_failed = true,
+            }
+        }
+        if group_failed {
+            failures += 1;
+        } else {
+            failures = 0;
+        }
+        // A disconnected server should not delay fetching new mail for every
+        // queued write. The next sync resumes at the next message.
+        if failures >= 3 {
+            break;
         }
     }
-    Ok((applied, remaining))
+    RETRY_OFFSETS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(retry_scope, (start + attempted_groups) % groups.len());
+    Ok((applied, total - applied))
 }
 
 fn local_only_report(message: impl Into<String>) -> RemoteActionReport {
@@ -824,6 +908,48 @@ mod remote_write_tests {
             .set_message_remote_identity(message.id, "INBOX", 41, "<test@example.invalid>", "100")
             .unwrap();
         (dir, store, message.id)
+    }
+
+    #[test]
+    fn failed_retries_are_bounded_and_rotate_to_other_messages() {
+        let (_dir, store, first) = fixture();
+        let account = store.get_message_account(first).unwrap();
+        let mut ids = vec![first];
+        for n in 0..6 {
+            let content =
+                format!("From: sender@example.invalid\r\nSubject: queued-{n}\r\n\r\nbody");
+            let message = store.import_eml_message(None, content.as_bytes()).unwrap();
+            store
+                .set_message_remote_identity(
+                    message.id,
+                    "INBOX",
+                    100 + n,
+                    "<test@example.invalid>",
+                    "100",
+                )
+                .unwrap();
+            ids.push(message.id);
+        }
+        for id in &ids {
+            store.apply_local_remote_intent(*id, "seen", "1").unwrap();
+        }
+        let mut first_round = Vec::new();
+        let first_result =
+            retry_pending_remote_writes_with(&store, account.id, &|| Ok(()), |pending| {
+                first_round.push(pending.message_id);
+                Ok(remote_failed_report("offline"))
+            })
+            .unwrap();
+        let mut second_round = Vec::new();
+        retry_pending_remote_writes_with(&store, account.id, &|| Ok(()), |pending| {
+            second_round.push(pending.message_id);
+            Ok(remote_failed_report("offline"))
+        })
+        .unwrap();
+        assert_eq!(first_result, (0, 7));
+        assert_eq!(first_round.len(), 3);
+        assert_eq!(second_round.len(), 3);
+        assert!(second_round.iter().all(|id| !first_round.contains(id)));
     }
 
     #[test]

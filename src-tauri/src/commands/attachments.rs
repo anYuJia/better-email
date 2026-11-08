@@ -2358,6 +2358,7 @@ mod tests {
         let verified = read_verified_outbound_attachment(&store, &attachment).expect("verified");
         fs::write(&input.local_path, b"evil").unwrap();
         let message = crate::models::OutboundMessage {
+            message_id_header: String::new(),
             id: 7,
             account_id: 1,
             sender_name: "Me".to_string(),

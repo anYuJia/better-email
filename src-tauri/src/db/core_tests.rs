@@ -7407,3 +7407,169 @@ fn duplicate_section_metadata_rolls_back_without_losing_existing_attachments() {
         "1"
     );
 }
+
+#[test]
+fn restoring_changed_endpoint_forgets_only_its_old_credential() {
+    let store = test_store();
+    let account = store.get_account().unwrap();
+    store
+        .store_account_secret(&account.email, "only-a-test-secret")
+        .unwrap();
+    let mut backup = store.export_local_backup().unwrap();
+    store.import_local_backup(&backup).unwrap();
+    assert_eq!(
+        store.get_account_secret_raw(&account).unwrap(),
+        "only-a-test-secret"
+    );
+    let row = backup
+        .tables
+        .get_mut("accounts")
+        .unwrap()
+        .iter_mut()
+        .find(|row| row.get("id").and_then(|v| v.as_i64()) == Some(account.id))
+        .unwrap();
+    row.insert(
+        "imap_host".into(),
+        serde_json::json!("attacker.invalid:993"),
+    );
+    store.import_local_backup(&backup).unwrap();
+    let restored = store.get_account_by_id(Some(account.id)).unwrap();
+    assert!(store.get_account_secret_raw(&restored).is_err());
+    assert!(store.get_account_secret_raw(&account).is_err());
+}
+
+#[test]
+fn outbound_identifier_survives_retries_and_is_not_reused_after_deletion() {
+    let store = test_store();
+    let draft = |subject: &str| DraftInput {
+        draft_id: 0,
+        account_id: 0,
+        identity_id: 0,
+        to: "to@example.invalid".into(),
+        cc: String::new(),
+        bcc: String::new(),
+        subject: subject.into(),
+        body: "test".into(),
+        html_body: String::new(),
+        send_at: String::new(),
+        attachments: vec![],
+    };
+    let first = store.save_draft(draft("first")).unwrap();
+    let id1 = crate::smtp::outbound_message_id(&store.get_outbound_message(first).unwrap());
+    assert_eq!(
+        id1,
+        crate::smtp::outbound_message_id(&store.get_outbound_message(first).unwrap())
+    );
+    store.move_message_to_role(first, "trash").unwrap();
+    store.delete_message_permanently(first).unwrap();
+    let second = store.save_draft(draft("second")).unwrap();
+    assert_eq!(first, second, "exercise SQLite's row id reuse");
+    assert_ne!(
+        id1,
+        crate::smtp::outbound_message_id(&store.get_outbound_message(second).unwrap())
+    );
+}
+
+#[test]
+fn backup_restore_waits_until_network_snapshot_is_released() {
+    let store = test_store();
+    let backup = store.export_local_backup().unwrap();
+    let network = protect_network_operation().unwrap();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        tx.send(store.import_local_backup(&backup)).unwrap();
+    });
+    assert!(matches!(
+        rx.recv_timeout(std::time::Duration::from_millis(100)),
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+    ));
+    drop(network);
+    rx.recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap()
+        .unwrap();
+    worker.join().unwrap();
+}
+
+#[test]
+fn detached_pending_write_requires_exact_state_and_never_clears_attached_writes() {
+    let store = test_store();
+    let id = seed_remote_message(&store, "unresolved operation", 299);
+    let account = store.get_account().unwrap();
+    store.apply_local_remote_intent(id, "seen", "1").unwrap();
+    let pending = store.get_pending_remote_write(id, "seen").unwrap().unwrap();
+    assert!(store
+        .list_detached_pending_writes(account.id)
+        .unwrap()
+        .is_empty());
+    assert!(!store
+        .discard_detached_pending_write(account.id, &pending)
+        .unwrap());
+    store.set_message_remote_ref(id, "", 0).unwrap();
+    assert_eq!(
+        store
+            .list_detached_pending_writes(account.id)
+            .unwrap()
+            .len(),
+        1
+    );
+    let mut outdated = pending.clone();
+    outdated.value = "0".into();
+    assert!(!store
+        .discard_detached_pending_write(account.id, &outdated)
+        .unwrap());
+    assert!(!store
+        .discard_detached_pending_write(account.id + 1000, &pending)
+        .unwrap());
+    assert!(store
+        .discard_detached_pending_write(account.id, &pending)
+        .unwrap());
+    assert!(
+        store.get_message(id).unwrap().is_read,
+        "discard keeps the local edit"
+    );
+    assert!(store
+        .get_pending_remote_write(id, "seen")
+        .unwrap()
+        .is_none());
+}
+
+#[test]
+fn restoring_backup_invalidates_previously_queued_network_work() {
+    let store = test_store();
+    let backup = store.export_local_backup().unwrap();
+    let generation = restore_generation();
+    store.import_local_backup(&backup).unwrap();
+    assert!(ensure_restore_generation(generation).is_err());
+}
+
+#[test]
+fn failed_backup_restore_rolls_back_endpoint_and_credentials() {
+    let store = test_store();
+    let account = store.get_account().unwrap();
+    store
+        .store_account_secret(&account.email, "test-only-rollback")
+        .unwrap();
+    let mut backup = store.export_local_backup().unwrap();
+    let row = backup
+        .tables
+        .get_mut("accounts")
+        .unwrap()
+        .iter_mut()
+        .find(|row| row.get("id").and_then(|v| v.as_i64()) == Some(account.id))
+        .unwrap();
+    row.insert("imap_host".into(), serde_json::json!("changed.invalid:993"));
+    backup.tables.get_mut("messages").unwrap()[0]
+        .insert("folder_id".into(), serde_json::json!(9_999_999));
+    assert!(store.import_local_backup(&backup).is_err());
+    assert_eq!(
+        store.get_account_by_id(Some(account.id)).unwrap().imap_host,
+        account.imap_host
+    );
+    assert_eq!(
+        store.get_account_secret_raw(&account).unwrap(),
+        "test-only-rollback"
+    );
+    // The temporary comparison table must also be removed by rollback.
+    let clean_backup = store.export_local_backup().unwrap();
+    store.import_local_backup(&clean_backup).unwrap();
+}

@@ -241,9 +241,14 @@ pub async fn save_draft(
     threading: Option<MessageThreadingInput>,
 ) -> MailResult<DraftSaveReport> {
     let store = store.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || save_draft_blocking(&store, input, threading))
-        .await
-        .map_err(|error| MailError::Io(std::io::Error::other(error.to_string())))?
+    let generation = crate::db::restore_generation();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _restore_guard = crate::db::protect_network_operation()?;
+        crate::db::ensure_restore_generation(generation)?;
+        save_draft_blocking(&store, input, threading)
+    })
+    .await
+    .map_err(|error| MailError::Io(std::io::Error::other(error.to_string())))?
 }
 
 fn save_draft_blocking(
@@ -415,7 +420,10 @@ pub async fn send_message(
     task_id: Option<i64>,
 ) -> MailResult<i64> {
     let store = store.inner().clone();
+    let generation = crate::db::restore_generation();
     tauri::async_runtime::spawn_blocking(move || {
+        let _restore_guard = crate::db::protect_network_operation()?;
+        crate::db::ensure_restore_generation(generation)?;
         let _worker = OutboxWorkerGuard::acquire()?;
         send_message_blocking(&store, input, threading, task_id)
     })
@@ -743,7 +751,10 @@ pub async fn flush_outbox_smtp(
     task_id: Option<i64>,
 ) -> MailResult<Vec<OutboxItem>> {
     let store = store.inner().clone();
+    let generation = crate::db::restore_generation();
     tauri::async_runtime::spawn_blocking(move || {
+        let _restore_guard = crate::db::protect_network_operation()?;
+        crate::db::ensure_restore_generation(generation)?;
         let _worker = OutboxWorkerGuard::acquire()?;
         flush_outbox_smtp_blocking(&store, task_id)
     })
@@ -1114,6 +1125,7 @@ mod tests {
     #[test]
     fn persisted_message_total_size_limit_is_enforced() {
         let message = crate::models::OutboundMessage {
+            message_id_header: String::new(),
             id: 1,
             account_id: 1,
             sender_name: "Me".to_string(),

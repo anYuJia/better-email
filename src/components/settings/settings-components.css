@@ -157,6 +157,7 @@
 }
 
 .settings-modal .st-row-copy strong {
+  overflow-wrap: anywhere;
   color: var(--st-text);
   font-size: var(--st-font-size-body);
   font-weight: 500;

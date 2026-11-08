@@ -94,6 +94,10 @@ pub fn render_outbound_with_attachment_bytes(
 }
 
 pub fn outbound_message_id(message: &OutboundMessage) -> String {
+    if !message.message_id_header.trim().is_empty() {
+        return message.message_id_header.clone();
+    }
+    // Preserve the identifiers of legacy in-flight messages across upgrades.
     format!(
         "<better-email-{}-{}@better-email.local>",
         message.account_id, message.id
@@ -430,6 +434,7 @@ mod tests {
 
     fn binary_attachment_message(payload: &[u8]) -> OutboundMessage {
         OutboundMessage {
+            message_id_header: String::new(),
             id: 90,
             account_id: 1,
             sender_name: "Sender".into(),
@@ -567,6 +572,7 @@ mod tests {
         fs::write(&path, b"attachment body").unwrap();
 
         let message = OutboundMessage {
+            message_id_header: String::new(),
             id: 7,
             account_id: 1,
             sender_name: "Me".to_string(),
@@ -612,6 +618,7 @@ mod tests {
     #[test]
     fn builds_multipart_alternative_for_html_body() {
         let message = OutboundMessage {
+            message_id_header: String::new(),
             id: 9,
             account_id: 1,
             sender_name: "Me".to_string(),
@@ -647,6 +654,7 @@ mod tests {
     #[test]
     fn rendered_outbound_uses_stable_message_id() {
         let message = OutboundMessage {
+            message_id_header: String::new(),
             id: 42,
             account_id: 7,
             sender_name: "Me".to_string(),
@@ -683,6 +691,7 @@ mod tests {
         fs::write(&path, b"rich attachment").unwrap();
 
         let message = OutboundMessage {
+            message_id_header: String::new(),
             id: 10,
             account_id: 1,
             sender_name: "Me".to_string(),
@@ -736,6 +745,7 @@ mod tests {
         fs::write(&path, b"fake png bytes").unwrap();
 
         let message = OutboundMessage {
+            message_id_header: String::new(),
             id: 11,
             account_id: 1,
             sender_name: "Me".to_string(),
@@ -805,6 +815,7 @@ mod tests {
         fs::write(&path, b"fake png bytes").unwrap();
 
         let message = OutboundMessage {
+            message_id_header: String::new(),
             id: 12,
             account_id: 1,
             sender_name: "Me".to_string(),
@@ -850,6 +861,7 @@ mod tests {
     #[test]
     fn rejects_attachment_without_local_path_before_smtp_send() {
         let message = OutboundMessage {
+            message_id_header: String::new(),
             id: 8,
             account_id: 1,
             sender_name: "Me".to_string(),
@@ -903,6 +915,7 @@ mod delivery_outcome_tests {
         final_response: Option<&'static str>,
     ) -> Result<Vec<u8>, MailError> {
         let message = OutboundMessage {
+            message_id_header: String::new(),
             id: 11,
             account_id: 1,
             sender_name: "Test".into(),
@@ -987,6 +1000,7 @@ mod delivery_outcome_tests {
         const MAX_ATTACHMENT_BYTES: usize = 25 * 1024 * 1024;
         let payload = vec![0x5a_u8; MAX_ATTACHMENT_BYTES];
         let message = OutboundMessage {
+            message_id_header: String::new(),
             id: 12,
             account_id: 1,
             sender_name: "Test".into(),

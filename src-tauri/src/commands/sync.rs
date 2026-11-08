@@ -579,6 +579,17 @@ fn sync_headers_for_account(
     history_only: bool,
     task_progress: Option<SyncTaskProgress>,
 ) -> MailResult<SyncRun> {
+    let current = store.get_account_by_id(Some(account.id))?;
+    if current.email != account.email
+        || current.auth_type != account.auth_type
+        || current.incoming_protocol != account.incoming_protocol
+        || current.imap_host != account.imap_host
+        || current.smtp_host != account.smtp_host
+    {
+        return Err(crate::db::MailError::Imap(
+            "账号配置已改变，请重新同步。".into(),
+        ));
+    }
     if account
         .incoming_protocol
         .trim()

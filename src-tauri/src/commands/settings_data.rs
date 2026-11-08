@@ -135,7 +135,11 @@ pub async fn import_local_backup(
     let Some((backup, path, size_bytes)) = read_backup_from_dialog(app).await? else {
         return Ok(None);
     };
-    store.import_local_backup(&backup)?;
+    let store = store.inner().clone();
+    let restore_backup = backup.clone();
+    tauri::async_runtime::spawn_blocking(move || store.import_local_backup(&restore_backup))
+        .await
+        .map_err(|error| MailError::Io(std::io::Error::other(error.to_string())))??;
     Ok(Some(MailStore::summarize_local_backup(
         &backup, path, size_bytes,
     )))

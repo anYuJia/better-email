@@ -954,6 +954,8 @@ pub fn run() {
             commands::set_threads_muted,
             commands::list_muted_thread_keys,
             commands::list_pending_remote_writes,
+            commands::list_detached_pending_writes,
+            commands::discard_detached_pending_write,
             commands::list_messages_by_ids,
             commands::list_attachments,
             commands::read_attachment_data_url,

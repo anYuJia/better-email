@@ -322,7 +322,7 @@ impl MailStore {
                 "
                 SELECT m.id, m.account_id, m.sender_name, m.sender_email,
                        COALESCE(mi.reply_to, ''), m.recipients, m.cc, m.bcc, m.subject, m.body,
-                       m.sanitized_html, m.in_reply_to_header, m.references_header
+                       m.sanitized_html, m.in_reply_to_header, m.references_header, m.message_id_header
                 FROM outbox_queue q
                 JOIN messages m ON m.id = q.message_id
                 LEFT JOIN mail_identities mi ON mi.account_id = m.account_id AND mi.email = m.sender_email
@@ -349,6 +349,7 @@ impl MailStore {
                         html_body: row.get(10)?,
                         in_reply_to_header: row.get(11)?,
                         references_header: row.get(12)?,
+                        message_id_header: row.get(13)?,
                         attachments: attachments_for_message_conn(conn, message_id)?,
                     })
                 })?
@@ -368,7 +369,7 @@ impl MailStore {
                 "
                 SELECT m.id, m.account_id, m.sender_name, m.sender_email,
                        COALESCE(mi.reply_to, ''), m.recipients, m.cc, m.bcc, m.subject, m.body,
-                       m.sanitized_html, m.in_reply_to_header, m.references_header
+                       m.sanitized_html, m.in_reply_to_header, m.references_header, m.message_id_header
                 FROM outbox_queue q
                 JOIN messages m ON m.id = q.message_id
                 LEFT JOIN mail_identities mi ON mi.account_id = m.account_id AND mi.email = m.sender_email
@@ -395,6 +396,7 @@ impl MailStore {
                         html_body: row.get(10)?,
                         in_reply_to_header: row.get(11)?,
                         references_header: row.get(12)?,
+                        message_id_header: row.get(13)?,
                         attachments: attachments_for_message_conn(conn, message_id)?,
                     })
                 })?
@@ -705,8 +707,8 @@ pub(super) fn create_outbound_message_for_conn(
     let snippet = snippet_from_body(&body);
     let outbound_attachments = input.attachments.iter().collect::<Vec<_>>();
     conn.execute(
-        "INSERT INTO messages(account_id, folder_id, sender_name, sender_email, recipients, cc, bcc, subject, snippet, body, sanitized_html, received_at, is_read, is_starred, has_attachments, thread_key)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 1, 0, ?13, ?14)",
+        "INSERT INTO messages(account_id, folder_id, sender_name, sender_email, recipients, cc, bcc, subject, snippet, body, sanitized_html, received_at, is_read, is_starred, has_attachments, thread_key, message_id_header)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 1, 0, ?13, ?14, ?15)",
         params![
             account.id,
             folder_id,
@@ -721,7 +723,8 @@ pub(super) fn create_outbound_message_for_conn(
             sanitized_html,
             now,
             bool_to_int(!outbound_attachments.is_empty()),
-            thread_key_for_message(&subject, "", "", "")
+            thread_key_for_message(&subject, "", "", ""),
+            format!("<better-email-{}@better-email.local>", uuid::Uuid::new_v4())
         ],
     )?;
     let message_id = conn.last_insert_rowid();
@@ -776,7 +779,8 @@ pub(super) fn update_draft_message_for_conn(
         UPDATE messages
         SET account_id = ?1, folder_id = ?2, sender_name = ?3, sender_email = ?4,
             recipients = ?5, cc = ?6, bcc = ?7, subject = ?8, snippet = ?9,
-            body = ?10, sanitized_html = ?11, received_at = ?12, has_attachments = ?13, thread_key = ?14
+            body = ?10, sanitized_html = ?11, received_at = ?12, has_attachments = ?13, thread_key = ?14,
+            message_id_header = CASE WHEN trim(message_id_header) = '' THEN ?16 ELSE message_id_header END
         WHERE id = ?15
         ",
         params![
@@ -794,7 +798,8 @@ pub(super) fn update_draft_message_for_conn(
             now,
             bool_to_int(!outbound_attachments.is_empty()),
             thread_key_for_message(&subject, "", "", ""),
-            input.draft_id
+            input.draft_id,
+            format!("<better-email-{}@better-email.local>", uuid::Uuid::new_v4())
         ],
     )?;
     replace_outbound_attachments_for_conn(conn, input.draft_id, &outbound_attachments)?;
@@ -907,7 +912,7 @@ pub(super) fn outbound_message_for_conn(
         "
         SELECT m.id, m.account_id, m.sender_name, m.sender_email,
                COALESCE(mi.reply_to, ''), m.recipients, m.cc, m.bcc, m.subject, m.body,
-               m.sanitized_html, m.in_reply_to_header, m.references_header
+               m.sanitized_html, m.in_reply_to_header, m.references_header, m.message_id_header
         FROM messages m
         LEFT JOIN mail_identities mi ON mi.account_id = m.account_id AND mi.email = m.sender_email
         WHERE m.id = ?1
@@ -929,6 +934,7 @@ pub(super) fn outbound_message_for_conn(
                 html_body: row.get(10)?,
                 in_reply_to_header: row.get(11)?,
                 references_header: row.get(12)?,
+                message_id_header: row.get(13)?,
                 attachments: attachments_for_message_conn(conn, id)?,
             })
         },

@@ -1,6 +1,6 @@
 use super::accounts::account_for_conn;
 use super::accounts::map_account;
-use super::contacts_rules::{apply_enabled_rules_for_message, sync_contacts_from_message_headers};
+use super::contacts_rules::{apply_rules_to_imap_headers, sync_contacts_from_message_headers};
 use super::folders::{folder_for_conn, folder_id_for_account_role, is_custom_folder_role};
 use super::messages::{bool_to_int, has_pending_remote_write_for_conn, thread_key_for_message};
 use super::*;
@@ -11,10 +11,11 @@ impl MailStore {
     pub fn mailbox_needs_identity_rebuild(&self, mailbox_id: i64) -> MailResult<bool> {
         self.with_conn(|conn| {
             Ok(conn.query_row(
-                "SELECT EXISTS(SELECT 1 FROM messages m JOIN imap_mailboxes b
-             ON b.account_id=m.account_id AND b.remote_name=m.remote_mailbox
-             WHERE b.id=?1 AND (m.remote_uid<=0 OR m.remote_uid_validity=''
-               OR m.remote_uid_validity<>b.uid_validity))",
+                "SELECT EXISTS(SELECT 1 FROM imap_mailboxes b WHERE b.id=?1 AND (
+                    (trim(b.uid_validity)='' AND (b.highest_uid>0 OR b.lowest_uid>0 OR b.history_complete=1))
+                    OR EXISTS(SELECT 1 FROM messages m WHERE m.account_id=b.account_id
+                        AND m.remote_mailbox=b.remote_name AND (m.remote_uid<=0
+                          OR m.remote_uid_validity='' OR m.remote_uid_validity<>b.uid_validity))))",
                 [mailbox_id],
                 |row| row.get(0),
             )?)
@@ -560,7 +561,7 @@ pub(super) fn import_imap_headers_for_conn(
             // 服务器上的真实修改在没有本地待处理意图时照常应用。
             if !has_pending_remote_write_for_conn(conn, message_id, "move")? {
                 conn.execute(
-                    "UPDATE messages SET folder_id = ?1 WHERE id = ?2 AND folder_id <> ?1",
+                    "UPDATE messages SET folder_id = ?1 WHERE id = ?2 AND folder_id <> ?1 AND snoozed_until = ''",
                     params![folder_id, message_id],
                 )?;
             }
@@ -657,7 +658,7 @@ pub(super) fn import_imap_headers_for_conn(
         )?;
         if changed > 0 {
             let message_id = conn.last_insert_rowid();
-            apply_enabled_rules_for_message(conn, message_id)?;
+            apply_rules_to_imap_headers(conn, message_id)?;
             sync_contacts_from_message_headers(
                 conn,
                 message_id,
@@ -729,6 +730,11 @@ pub(super) fn reconcile_imap_flag_snapshot_for_conn(
         .map(|state| state.remote_uid)
         .filter(|uid| *uid > 0)
         .collect::<BTreeSet<_>>();
+    if remote_uids.len() != snapshot.states.len() {
+        return Err(MailError::Imap(
+            "IMAP 状态快照包含重复或无效 UID，未执行对账。".into(),
+        ));
+    }
 
     for state in &snapshot.states {
         let message_id: Option<i64> = conn

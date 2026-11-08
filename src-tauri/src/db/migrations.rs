@@ -287,6 +287,12 @@ impl MailStore {
                     PRIMARY KEY (message_id, kind)
                 );
 
+                CREATE TABLE IF NOT EXISTS pending_message_rules (
+                    message_id INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+                    rules_json TEXT NOT NULL,
+                    suppressed_actions INTEGER NOT NULL DEFAULT 0
+                );
+
                 CREATE TABLE IF NOT EXISTS outbound_attachment_auths (
                     id INTEGER PRIMARY KEY,
                     canonical_path TEXT NOT NULL UNIQUE,
@@ -296,6 +302,8 @@ impl MailStore {
                 );
                 ",
             )?;
+
+            add_column_if_missing(conn, "pending_message_rules", "suppressed_actions", "INTEGER NOT NULL DEFAULT 0")?;
 
             add_column_if_missing(conn, "accounts", "imap_host", "TEXT NOT NULL DEFAULT ''")?;
             add_column_if_missing(

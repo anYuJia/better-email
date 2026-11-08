@@ -161,6 +161,14 @@ fn legacy_identity_rebuild_overrides_completed_incremental_cursors() {
         },
         "100"
     ));
+    assert!(header_cursor_reset(
+        &ImapHeaderFetchOptions {
+            reset_cursor: false,
+            uid_validity: "",
+            ..options
+        },
+        "100"
+    ));
 }
 
 #[test]
@@ -233,6 +241,76 @@ fn flag_write_requires_matching_generation_and_existing_uid() {
         assert_eq!(sent.contains("UID STORE 41"), should_store, "{sent}");
         if expected != "100" {
             assert!(!sent.contains("UID SEARCH"), "{sent}");
+        }
+    }
+}
+
+#[test]
+fn custom_keywords_do_not_impersonate_system_flags() {
+    let responses = "a1 OK authenticated\r\n* 2 EXISTS\r\n* OK [UIDVALIDITY 100] generation\r\na2 OK selected\r\n* 1 FETCH (UID 41 FLAGS (NotSeen $HasFlagged))\r\n* 2 FETCH (UID 42 FLAGS (\\seen \\FLAGGED))\r\na3 OK fetched\r\n";
+    let commands = Arc::new(Mutex::new(Vec::new()));
+    let mut session = imap::Client::new(ScriptedImap {
+        responses: Cursor::new(responses.as_bytes().to_vec()),
+        commands,
+    })
+    .login("fake", "fake")
+    .unwrap();
+    let count = session.select("INBOX").unwrap().exists;
+    let snapshot = fetch_recent_flag_snapshot(&mut session, count).unwrap();
+    assert_eq!(snapshot.states.len(), 2);
+    assert!(!snapshot.states[0].is_read && !snapshot.states[0].is_starred);
+    assert!(snapshot.states[1].is_read && snapshot.states[1].is_starred);
+}
+
+#[test]
+fn repeated_fetch_responses_do_not_form_a_complete_snapshot() {
+    for fetched in [
+        "* 1 FETCH (UID 41 FLAGS ())\r\n* 1 FETCH (UID 41 FLAGS (\\Seen))\r\n",
+        "* 1 FETCH (UID 41 FLAGS ())\r\n* 2 FETCH (UID 41 FLAGS (\\Seen))\r\n",
+    ] {
+        let responses = format!("a1 OK authenticated\r\n* 2 EXISTS\r\n* OK [UIDVALIDITY 100] generation\r\na2 OK selected\r\n{fetched}a3 OK fetched\r\n");
+        let commands = Arc::new(Mutex::new(Vec::new()));
+        let mut session = imap::Client::new(ScriptedImap {
+            responses: Cursor::new(responses.into_bytes()),
+            commands,
+        })
+        .login("fake", "fake")
+        .unwrap();
+        let count = session.select("INBOX").unwrap().exists;
+        assert!(fetch_recent_flag_snapshot(&mut session, count).is_err());
+    }
+}
+
+#[test]
+fn header_batch_must_include_each_requested_header_before_advancing() {
+    let header_a = "Subject: First\r\n\r\n";
+    let header_b = "Subject: Second\r\n\r\n";
+    for complete in [false, true] {
+        let second = if complete {
+            format!(
+                "* 2 FETCH (UID 42 FLAGS () BODY[HEADER] {{{}}}\r\n{})\r\n",
+                header_b.len(),
+                header_b
+            )
+        } else {
+            "* 2 FETCH (UID 42 FLAGS (\\Seen))\r\n".to_string()
+        };
+        let responses = format!("a1 OK authenticated\r\n* 2 EXISTS\r\n* OK [UIDVALIDITY 100] generation\r\na2 OK selected\r\n* 9 FETCH (UID 999 FLAGS (\\Seen))\r\n* 1 FETCH (UID 41 FLAGS () BODY[HEADER] {{{}}}\r\n{})\r\n{second}a3 OK fetched\r\n", header_a.len(), header_a);
+        let commands = Arc::new(Mutex::new(Vec::new()));
+        let mut session = imap::Client::new(ScriptedImap {
+            responses: Cursor::new(responses.into_bytes()),
+            commands,
+        })
+        .login("fake", "fake")
+        .unwrap();
+        session.select("INBOX").unwrap();
+        let result = fetch_requested_headers(&mut session, &[41, 42]);
+        assert_eq!(result.is_ok(), complete);
+        if let Ok(headers) = result {
+            assert_eq!(
+                headers.iter().map(|h| h.remote_uid).collect::<Vec<_>>(),
+                vec![41, 42]
+            );
         }
     }
 }

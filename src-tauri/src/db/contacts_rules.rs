@@ -1465,10 +1465,69 @@ pub(super) fn apply_enabled_rules_for_message(
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?
         .collect::<Result<Vec<_>, _>>()?;
+    apply_rule_list(conn, message_id, &message, &rules, false, 0)
+}
+
+/// Header-only IMAP imports defer the first body-dependent rule and everything
+/// after it, preserving rule order and stop-processing semantics.
+pub(super) fn apply_rules_to_imap_headers(conn: &Connection, message_id: i64) -> MailResult<i64> {
+    let message = message_for_conn(conn, message_id)?;
+    let mut stmt = conn.prepare("SELECT condition, action FROM mail_rules WHERE enabled = 1 AND account_id = ?1 ORDER BY id")?;
+    let rules = stmt
+        .query_map(params![message.account_id], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    apply_rule_list(conn, message_id, &message, &rules, true, 0)
+}
+
+pub(super) fn apply_deferred_message_rules(conn: &Connection, message_id: i64) -> MailResult<()> {
+    let saved: Option<(String, i64)> = conn
+        .query_row(
+            "SELECT rules_json, suppressed_actions FROM pending_message_rules WHERE message_id = ?1",
+            params![message_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let Some((saved, suppressed)) = saved else {
+        return Ok(());
+    };
+    let rules: Vec<(String, String)> = serde_json::from_str(&saved)
+        .map_err(|error| MailError::Imap(format!("无法恢复待处理邮件规则：{error}")))?;
+    let message = message_for_conn(conn, message_id)?;
+    apply_rule_list(conn, message_id, &message, &rules, false, suppressed)?;
+    conn.execute(
+        "DELETE FROM pending_message_rules WHERE message_id = ?1",
+        params![message_id],
+    )?;
+    Ok(())
+}
+
+fn apply_rule_list(
+    conn: &Connection,
+    message_id: i64,
+    message: &Message,
+    rules: &[(String, String)],
+    defer_body: bool,
+    suppressed: i64,
+) -> MailResult<i64> {
     let mut applied = 0;
-    for (condition, action) in rules {
-        if rule_matches_message(&condition, &message) {
-            let (action_count, should_stop) = apply_rule_actions(conn, message_id, &action)?;
+    for (index, (condition, action)) in rules.iter().enumerate() {
+        if defer_body
+            && condition
+                .trim()
+                .to_lowercase()
+                .split_once(" contains ")
+                .is_some_and(|(field, needle)| field.trim() == "body" && !needle.trim().is_empty())
+        {
+            let saved = serde_json::to_string(&rules[index..])
+                .map_err(|error| MailError::Imap(format!("无法保存待处理邮件规则：{error}")))?;
+            conn.execute("INSERT INTO pending_message_rules(message_id, rules_json) VALUES (?1, ?2) ON CONFLICT(message_id) DO UPDATE SET rules_json = excluded.rules_json", params![message_id, saved])?;
+            break;
+        }
+        if rule_matches_message(condition, message) {
+            let (action_count, should_stop) =
+                apply_rule_actions_filtered(conn, message_id, action, suppressed)?;
             applied += action_count;
             if should_stop {
                 break;
@@ -1482,6 +1541,9 @@ pub(super) fn rule_matches_message(condition: &str, message: &Message) -> bool {
     let Some((field, needle)) = normalized.split_once(" contains ") else {
         return false;
     };
+    if needle.trim().is_empty() {
+        return false;
+    }
     let haystack = match field.trim() {
         "from" | "sender" => format!("{} {}", message.sender_name, message.sender_email),
         "subject" => message.subject.clone(),
@@ -1492,10 +1554,11 @@ pub(super) fn rule_matches_message(condition: &str, message: &Message) -> bool {
     .to_lowercase();
     haystack.contains(needle.trim())
 }
-pub(super) fn apply_rule_actions(
+fn apply_rule_actions_filtered(
     conn: &Connection,
     message_id: i64,
     actions: &str,
+    suppressed: i64,
 ) -> MailResult<(i64, bool)> {
     let mut applied = 0;
     let mut should_stop = false;
@@ -1506,6 +1569,27 @@ pub(super) fn apply_rule_actions(
     {
         if matches!(action.to_lowercase().as_str(), "stop" | "stop processing") {
             should_stop = true;
+            continue;
+        }
+        let normalized = action.to_lowercase();
+        let bit = if normalized.starts_with("move to ") {
+            4
+        } else if matches!(
+            normalized.as_str(),
+            "mark read" | "mark as read" | "mark unread" | "mark as unread"
+        ) {
+            1
+        } else if matches!(
+            normalized.as_str(),
+            "star" | "mark starred" | "unstar" | "clear star" | "mark unstarred"
+        ) {
+            2
+        } else if normalized.starts_with("apply label ") {
+            8
+        } else {
+            0
+        };
+        if bit & suppressed != 0 {
             continue;
         }
         applied += apply_rule_action(conn, message_id, action)?;
@@ -1540,11 +1624,21 @@ pub(super) fn apply_rule_action(
         return Ok(0);
     }
     if let Some(role) = normalized.strip_prefix("move to ") {
-        let folder_id = folder_id_for_message_role(conn, message_id, role.trim())?;
+        let folder_id = match folder_id_for_message_role(conn, message_id, role.trim()) {
+            Ok(folder_id) => folder_id,
+            Err(MailError::MissingFolderRole(_)) => {
+                crate::logging::log_line(
+                    "[better-email][rules] skipped an unavailable folder role",
+                );
+                return Ok(0);
+            }
+            Err(error) => return Err(error),
+        };
         conn.execute(
             "UPDATE messages SET folder_id = ?1, snoozed_until = '' WHERE id = ?2",
             params![folder_id, message_id],
         )?;
+        super::messages::queue_remote_intent_for_conn(conn, message_id, "move", role.trim())?;
         return Ok(1);
     }
     if normalized == "mark read" || normalized == "mark as read" {
@@ -1552,6 +1646,7 @@ pub(super) fn apply_rule_action(
             "UPDATE messages SET is_read = 1 WHERE id = ?1",
             params![message_id],
         )?;
+        super::messages::queue_remote_intent_for_conn(conn, message_id, "seen", "1")?;
         return Ok(1);
     }
     if normalized == "mark unread" || normalized == "mark as unread" {
@@ -1559,6 +1654,7 @@ pub(super) fn apply_rule_action(
             "UPDATE messages SET is_read = 0 WHERE id = ?1",
             params![message_id],
         )?;
+        super::messages::queue_remote_intent_for_conn(conn, message_id, "seen", "0")?;
         return Ok(1);
     }
     if normalized == "star" || normalized == "mark starred" {
@@ -1566,6 +1662,7 @@ pub(super) fn apply_rule_action(
             "UPDATE messages SET is_starred = 1 WHERE id = ?1",
             params![message_id],
         )?;
+        super::messages::queue_remote_intent_for_conn(conn, message_id, "flagged", "1")?;
         return Ok(1);
     }
     if normalized == "unstar" || normalized == "clear star" || normalized == "mark unstarred" {
@@ -1573,6 +1670,7 @@ pub(super) fn apply_rule_action(
             "UPDATE messages SET is_starred = 0 WHERE id = ?1",
             params![message_id],
         )?;
+        super::messages::queue_remote_intent_for_conn(conn, message_id, "flagged", "0")?;
         return Ok(1);
     }
     Ok(0)

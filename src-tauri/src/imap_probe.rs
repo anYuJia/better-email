@@ -217,7 +217,9 @@ pub fn failed_report(account_email: &str, message: String) -> ImapProbeReport {
 
 fn header_cursor_reset(options: &ImapHeaderFetchOptions<'_>, selected_validity: &str) -> bool {
     options.reset_cursor
-        || (!options.uid_validity.is_empty() && options.uid_validity != selected_validity)
+        || (!options.uid_validity.trim().is_empty() && options.uid_validity != selected_validity)
+        || (options.uid_validity.trim().is_empty()
+            && (options.highest_uid > 0 || options.lowest_uid > 0 || options.history_complete))
 }
 
 pub fn fetch_header_page(
@@ -303,23 +305,7 @@ pub fn fetch_header_page(
     let headers = if uids.is_empty() {
         Vec::new()
     } else {
-        let uid_set = uids
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(",");
-        let fetches = session
-            .uid_fetch(uid_set, "(UID FLAGS INTERNALDATE BODY.PEEK[HEADER])")
-            .map_err(|error| MailError::Imap(format!("IMAP 拉取邮件头失败：{error}")))?;
-        fetches
-            .iter()
-            .filter_map(|fetch| {
-                fetch
-                    .uid
-                    .map(i64::from)
-                    .map(|uid| header_from_fetch(uid, fetch))
-            })
-            .collect()
+        fetch_requested_headers(&mut session, &uids)?
     };
     let highest_uid = headers
         .iter()
@@ -354,8 +340,41 @@ pub fn fetch_header_page(
     })
 }
 
-fn fetch_recent_flag_snapshot(
-    session: &mut imap::Session<imap::Connection>,
+fn fetch_requested_headers<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    uids: &[i64],
+) -> Result<Vec<RemoteMessageHeader>, MailError> {
+    let requested = uids.iter().copied().collect::<BTreeSet<_>>();
+    let uid_set = remote_uid_set(uids)?;
+    let fetches = session
+        .uid_fetch(uid_set, "(UID FLAGS INTERNALDATE BODY.PEEK[HEADER])")
+        .map_err(|error| MailError::Imap(format!("IMAP 拉取邮件头失败：{error}")))?;
+    let mut headers = std::collections::BTreeMap::new();
+    for fetch in fetches.iter() {
+        let Some(uid) = fetch.uid.map(i64::from) else {
+            continue;
+        };
+        // Unsolicited flag updates may occur among FETCH responses; only a
+        // requested UID with its actual header may advance the cursor.
+        if !requested.contains(&uid) || fetch.header().is_none() {
+            continue;
+        }
+        if headers.insert(uid, header_from_fetch(uid, fetch)).is_some() {
+            return Err(MailError::Imap(
+                "IMAP 邮件头响应包含重复 UID，本轮未更新同步游标。".into(),
+            ));
+        }
+    }
+    if headers.len() != requested.len() {
+        return Err(MailError::Imap(
+            "IMAP 邮件头响应不完整，本轮未更新同步游标，请重试。".into(),
+        ));
+    }
+    Ok(headers.into_values().collect())
+}
+
+fn fetch_recent_flag_snapshot<T: Read + Write>(
+    session: &mut imap::Session<T>,
     exists: u32,
 ) -> Result<ImapFlagSnapshot, MailError> {
     if exists == 0 {
@@ -372,6 +391,17 @@ fn fetch_recent_flag_snapshot(
     let fetches = session
         .fetch(format!("{first_sequence}:*"), "(UID FLAGS)")
         .map_err(|error| MailError::Imap(format!("IMAP 对账邮件状态失败：{error}")))?;
+    let mut sequences = BTreeSet::new();
+    for fetch in fetches.iter() {
+        if fetch.message < first_sequence
+            || fetch.message > exists
+            || !sequences.insert(fetch.message)
+        {
+            return Err(MailError::Imap(
+                "IMAP 状态快照包含重复或意外的邮件序号；本轮未执行删除对账。".into(),
+            ));
+        }
+    }
     let mut states = fetches
         .iter()
         .filter_map(flag_state_from_fetch)
@@ -383,6 +413,17 @@ fn fetch_recent_flag_snapshot(
             "IMAP 状态快照不完整：预期 {expected_count} 封，实际返回 {} 封；本轮未执行删除对账。",
             states.len()
         )));
+    }
+    if states
+        .iter()
+        .map(|state| state.remote_uid)
+        .collect::<BTreeSet<_>>()
+        .len()
+        != states.len()
+    {
+        return Err(MailError::Imap(
+            "IMAP 状态快照包含重复 UID；本轮未执行删除对账。".into(),
+        ));
     }
     let floor_uid = states
         .first()
@@ -2207,7 +2248,7 @@ fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageH
         .map(|date| date.to_rfc3339())
         .or_else(|| header_field("date"))
         .unwrap_or_else(|| Utc::now().to_rfc3339());
-    let flags = format!("{:?}", fetch.flags());
+    let (is_read, is_starred) = message_flags(fetch.flags());
 
     RemoteMessageHeader {
         remote_uid: uid,
@@ -2222,19 +2263,34 @@ fn header_from_fetch(uid: i64, fetch: &imap::types::Fetch<'_>) -> RemoteMessageH
         bcc,
         snippet: "远端邮件头已同步，正文将在按需读取阶段拉取。".to_string(),
         received_at,
-        is_read: flags.contains("Seen"),
-        is_starred: flags.contains("Flagged"),
+        is_read,
+        is_starred,
     }
 }
 
 fn flag_state_from_fetch(fetch: &imap::types::Fetch<'_>) -> Option<ImapFlagState> {
     let remote_uid = fetch.uid.map(i64::from)?;
-    let flags = format!("{:?}", fetch.flags());
+    let (is_read, is_starred) = message_flags(fetch.flags());
     Some(ImapFlagState {
         remote_uid,
-        is_read: flags.contains("Seen"),
-        is_starred: flags.contains("Flagged"),
+        is_read,
+        is_starred,
     })
+}
+
+fn message_flags(flags: &[imap::types::Flag<'_>]) -> (bool, bool) {
+    use imap::types::Flag;
+    let read = flags.iter().any(|flag| match flag {
+        Flag::Seen => true,
+        Flag::Custom(value) => value.eq_ignore_ascii_case("\\Seen"),
+        _ => false,
+    });
+    let starred = flags.iter().any(|flag| match flag {
+        Flag::Flagged => true,
+        Flag::Custom(value) => value.eq_ignore_ascii_case("\\Flagged"),
+        _ => false,
+    });
+    (read, starred)
 }
 
 fn display_name_from_address(address: &str) -> String {

@@ -6633,3 +6633,481 @@ fn detached_message_keeps_latest_pending_intent() {
     let pending = store.get_pending_remote_write(id, "seen").unwrap().unwrap();
     assert_eq!(pending.value, "0");
 }
+
+#[test]
+fn imap_rule_actions_survive_later_server_snapshots() {
+    let store = test_store();
+    store
+        .upsert_rule(
+            None,
+            MailRuleInput {
+                name: "Rule persistence".into(),
+                condition: "subject contains Rule persistence".into(),
+                action: "mark read; star; move to archive".into(),
+                enabled: true,
+            },
+        )
+        .unwrap();
+    let mailbox = store
+        .save_imap_mailboxes(&[ImapFolderProbe {
+            name: "INBOX".into(),
+            delimiter: "/".into(),
+            attributes: vec!["Inbox".into()],
+        }])
+        .unwrap()
+        .remove(0);
+    let batch = ImapHeaderBatch {
+        remote_name: "INBOX".into(),
+        uid_validity: "1".into(),
+        highest_uid: 201,
+        lowest_uid: 201,
+        history_complete: false,
+        history_scanned: true,
+        cursor_reset: false,
+        headers: vec![crate::models::RemoteMessageHeader {
+            remote_uid: 201,
+            message_id: "<rule@example.com>".into(),
+            in_reply_to: String::new(),
+            references: String::new(),
+            subject: "Rule persistence".into(),
+            sender_name: "Remote".into(),
+            sender_email: "remote@example.com".into(),
+            recipients: "demo@better-email.local".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            snippet: String::new(),
+            received_at: Utc::now().to_rfc3339(),
+            is_read: false,
+            is_starred: false,
+        }],
+    };
+    store.import_imap_headers(mailbox.id, &batch).unwrap();
+    let id: i64 = store
+        .with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT id FROM messages WHERE remote_mailbox='INBOX' AND remote_uid=201",
+                [],
+                |row| row.get(0),
+            )?)
+        })
+        .unwrap();
+    let original = store.get_message(id).unwrap();
+    assert!(original.is_read && original.is_starred);
+    assert_eq!(original.folder_role, "archive");
+    let pending = store.list_pending_remote_writes().unwrap();
+    for kind in ["seen", "flagged", "move"] {
+        assert!(
+            pending.iter().any(|p| p.message_id == id && p.kind == kind),
+            "missing {kind}"
+        );
+    }
+    store
+        .reconcile_imap_flag_snapshot(
+            inbox_mailbox_id(&store),
+            &flag_snapshot(vec![(201, false, false)]),
+        )
+        .unwrap();
+    let current = store.get_message(id).unwrap();
+    assert!(current.is_read && current.is_starred);
+    assert_eq!(current.folder_role, "archive");
+}
+
+#[test]
+fn snoozed_imap_message_survives_header_and_flag_reconciliation() {
+    let store = test_store();
+    let id = seed_remote_message(&store, "Snoozed reconciliation", 202);
+    let until = "2099-01-01T00:00:00Z";
+    store.snooze_message(id, until).unwrap();
+    let batch = ImapHeaderBatch {
+        remote_name: "INBOX".into(),
+        uid_validity: "1".into(),
+        highest_uid: 202,
+        lowest_uid: 202,
+        history_complete: false,
+        history_scanned: true,
+        cursor_reset: false,
+        headers: vec![crate::models::RemoteMessageHeader {
+            remote_uid: 202,
+            message_id: "<Snoozed reconciliation@example.com>".into(),
+            in_reply_to: String::new(),
+            references: String::new(),
+            subject: "Snoozed reconciliation".into(),
+            sender_name: "Remote".into(),
+            sender_email: "remote@example.com".into(),
+            recipients: "demo@better-email.local".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            snippet: "header".into(),
+            received_at: Utc::now().to_rfc3339(),
+            is_read: false,
+            is_starred: false,
+        }],
+    };
+    store
+        .sync_imap_mailbox_into_db(
+            inbox_mailbox_id(&store),
+            &flag_snapshot(vec![(202, false, false)]),
+            &batch,
+        )
+        .unwrap();
+    let message = store.get_message(id).unwrap();
+    assert_eq!(message.folder_role, "snoozed");
+    assert_eq!(message.snoozed_until, until);
+    assert!(message.is_read);
+}
+
+#[test]
+fn duplicate_uid_snapshot_cannot_delete_another_message() {
+    let store = test_store();
+    let first = seed_remote_message(&store, "duplicate snapshot first", 203);
+    let second = seed_remote_message(&store, "duplicate snapshot second", 204);
+    let snapshot = ImapFlagSnapshot {
+        floor_uid: 0,
+        complete: true,
+        states: vec![
+            ImapFlagState {
+                remote_uid: 203,
+                is_read: false,
+                is_starred: false,
+            },
+            ImapFlagState {
+                remote_uid: 203,
+                is_read: true,
+                is_starred: true,
+            },
+        ],
+    };
+    assert!(store
+        .reconcile_imap_flag_snapshot(inbox_mailbox_id(&store), &snapshot)
+        .is_err());
+    assert!(store.get_message(first).is_ok());
+    assert!(store.get_message(second).is_ok());
+}
+
+#[test]
+fn unsnooze_and_scheduled_release_queue_return_to_inbox() {
+    let store = test_store();
+    let manual = seed_remote_message(&store, "manual unsnooze remote", 210);
+    let scheduled = seed_remote_message(&store, "scheduled unsnooze remote", 211);
+    store
+        .snooze_message(manual, "2099-01-01T00:00:00Z")
+        .unwrap();
+    store
+        .snooze_message(scheduled, "2020-01-01T00:00:00Z")
+        .unwrap();
+    store.unsnooze_message(manual).unwrap();
+    assert_eq!(
+        store
+            .release_due_snoozed_messages("2021-01-01T00:00:00Z")
+            .unwrap()
+            .released_count,
+        1
+    );
+    for id in [manual, scheduled] {
+        assert_eq!(store.get_message(id).unwrap().folder_role, "inbox");
+        let write = store.get_pending_remote_write(id, "move").unwrap().unwrap();
+        assert_eq!(write.value, "inbox");
+        assert_eq!(
+            store
+                .get_pending_remote_write(id, "seen")
+                .unwrap()
+                .unwrap()
+                .value,
+            "1"
+        );
+    }
+}
+
+#[test]
+fn empty_mailbox_with_unverified_cursor_requires_identity_rebuild() {
+    let store = test_store();
+    let mailbox = store
+        .save_imap_mailboxes(&[ImapFolderProbe {
+            name: "Unverified".into(),
+            delimiter: "/".into(),
+            attributes: vec![],
+        }])
+        .unwrap()
+        .into_iter()
+        .find(|m| m.remote_name == "Unverified")
+        .unwrap();
+    store.with_conn(|conn| {
+        conn.execute("UPDATE imap_mailboxes SET uid_validity='', highest_uid=999, lowest_uid=1, history_complete=1 WHERE id=?1", [mailbox.id])?;
+        Ok(())
+    }).unwrap();
+    assert!(store.mailbox_needs_identity_rebuild(mailbox.id).unwrap());
+}
+
+#[test]
+fn backup_restores_pending_remote_writes_and_preserves_local_edits() {
+    let store = test_store();
+    let id = seed_remote_message(&store, "backup pending intent", 220);
+    store.apply_local_remote_intent(id, "seen", "1").unwrap();
+    store
+        .apply_local_remote_intent(id, "move", "trash")
+        .unwrap();
+    let backup = store.export_local_backup().unwrap();
+    let restored = test_store();
+    restored.import_local_backup(&backup).unwrap();
+    assert!(restored.get_message(id).unwrap().is_read);
+    assert_eq!(restored.get_message(id).unwrap().folder_role, "trash");
+    let writes = restored.list_pending_remote_writes().unwrap();
+    assert!(writes
+        .iter()
+        .any(|p| p.message_id == id && p.kind == "seen" && p.value == "1"));
+    assert!(writes
+        .iter()
+        .any(|p| p.message_id == id && p.kind == "move" && p.value == "trash"));
+    restored
+        .reconcile_imap_flag_snapshot(
+            inbox_mailbox_id(&restored),
+            &flag_snapshot(vec![(220, false, false)]),
+        )
+        .unwrap();
+    assert!(restored.get_message(id).unwrap().is_read);
+    assert_eq!(restored.get_message(id).unwrap().folder_role, "trash");
+}
+
+#[test]
+fn backup_without_pending_writes_table_remains_importable() {
+    let store = test_store();
+    let mut backup = store.export_local_backup().unwrap();
+    backup.tables.remove("pending_remote_writes");
+    let restored = test_store();
+    restored.import_local_backup(&backup).unwrap();
+    assert_eq!(
+        restored.list_accounts().unwrap().len(),
+        store.list_accounts().unwrap().len()
+    );
+    assert!(restored.list_pending_remote_writes().unwrap().is_empty());
+}
+
+#[test]
+fn imap_body_rules_resume_in_order_after_restore_and_apply_only_once() {
+    let store = test_store();
+    for (name, condition, action) in [
+        ("before body", "from contains remote", "mark read"),
+        (
+            "body and stop",
+            "body contains classified",
+            "star; stop processing",
+        ),
+        (
+            "after stop",
+            "subject contains deferred-order",
+            "move to trash",
+        ),
+    ] {
+        store
+            .upsert_rule(
+                None,
+                MailRuleInput {
+                    name: name.into(),
+                    condition: condition.into(),
+                    action: action.into(),
+                    enabled: true,
+                },
+            )
+            .unwrap();
+    }
+    let id = seed_remote_message(&store, "deferred-order", 230);
+    let before = store.get_message(id).unwrap();
+    assert!(before.is_read);
+    assert!(!before.is_starred);
+    assert_eq!(before.folder_role, "inbox");
+    let backup = store.export_local_backup().unwrap();
+    let restored = test_store();
+    restored.import_local_backup(&backup).unwrap();
+    let reference = restored.get_message_remote_reference(id).unwrap();
+    let body = RemoteMessageBody {
+        body: "classified information".into(),
+        sanitized_html: String::new(),
+        security_warnings: vec![],
+        snippet: "classified information".into(),
+        has_attachments: false,
+        attachments_complete: true,
+        attachments: vec![],
+    };
+    let after = restored
+        .update_message_body_from_remote(id, &body, &reference)
+        .unwrap();
+    assert!(after.is_starred);
+    assert_eq!(
+        after.folder_role, "inbox",
+        "stop processing prevents the later move"
+    );
+    assert_eq!(
+        restored
+            .get_pending_remote_write(id, "flagged")
+            .unwrap()
+            .unwrap()
+            .value,
+        "1"
+    );
+    restored
+        .apply_local_remote_intent(id, "flagged", "0")
+        .unwrap();
+    let after_second_fetch = restored
+        .update_message_body_from_remote(id, &body, &reference)
+        .unwrap();
+    assert!(
+        !after_second_fetch.is_starred,
+        "a second body fetch must not rerun the original rules"
+    );
+}
+
+#[test]
+fn unmatched_deferred_body_rule_allows_later_header_rule() {
+    let store = test_store();
+    for (name, condition, action) in [
+        (
+            "body does not match",
+            "body contains absentword",
+            "star; stop processing",
+        ),
+        (
+            "later header",
+            "subject contains deferred-nomatch",
+            "mark read",
+        ),
+    ] {
+        store
+            .upsert_rule(
+                None,
+                MailRuleInput {
+                    name: name.into(),
+                    condition: condition.into(),
+                    action: action.into(),
+                    enabled: true,
+                },
+            )
+            .unwrap();
+    }
+    let id = seed_remote_message(&store, "deferred-nomatch", 231);
+    assert!(!store.get_message(id).unwrap().is_read);
+    let reference = store.get_message_remote_reference(id).unwrap();
+    let body = RemoteMessageBody {
+        body: "ordinary message".into(),
+        sanitized_html: String::new(),
+        security_warnings: vec![],
+        snippet: "ordinary message".into(),
+        has_attachments: false,
+        attachments_complete: true,
+        attachments: vec![],
+    };
+    let result = store
+        .update_message_body_from_remote(id, &body, &reference)
+        .unwrap();
+    assert!(result.is_read);
+    assert!(!result.is_starred);
+}
+
+#[test]
+fn deferred_body_rules_do_not_override_intervening_user_actions() {
+    let store = test_store();
+    store
+        .upsert_rule(
+            None,
+            MailRuleInput {
+                name: "body race".into(),
+                condition: "body contains secret".into(),
+                action: "mark read; star; move to trash".into(),
+                enabled: true,
+            },
+        )
+        .unwrap();
+    let id = seed_remote_message(&store, "body-race", 232);
+    store.snooze_message(id, "2099-01-01T00:00:00Z").unwrap();
+    store.apply_local_remote_intent(id, "seen", "0").unwrap();
+    let backup = store.export_local_backup().unwrap();
+    let restored = test_store();
+    restored.import_local_backup(&backup).unwrap();
+    let reference = restored.get_message_remote_reference(id).unwrap();
+    let body = RemoteMessageBody {
+        body: "secret".into(),
+        sanitized_html: String::new(),
+        security_warnings: vec![],
+        snippet: "secret".into(),
+        has_attachments: false,
+        attachments_complete: true,
+        attachments: vec![],
+    };
+    let result = restored
+        .update_message_body_from_remote(id, &body, &reference)
+        .unwrap();
+    assert_eq!(result.folder_role, "snoozed");
+    assert!(!result.is_read);
+    assert!(result.is_starred, "unrelated rule actions should still run");
+}
+
+#[test]
+fn empty_rule_condition_neither_matches_nor_blocks_later_rules() {
+    let store = test_store();
+    for (name, condition, action) in [
+        (
+            "empty body",
+            "body contains   ",
+            "move to trash; stop processing",
+        ),
+        ("valid header", "subject contains valid-rule", "mark read"),
+    ] {
+        store
+            .upsert_rule(
+                None,
+                MailRuleInput {
+                    name: name.into(),
+                    condition: condition.into(),
+                    action: action.into(),
+                    enabled: true,
+                },
+            )
+            .unwrap();
+    }
+    let id = seed_remote_message(&store, "valid-rule", 233);
+    let result = store.get_message(id).unwrap();
+    assert_eq!(result.folder_role, "inbox");
+    assert!(result.is_read);
+    let deferred: i64 = store
+        .with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT COUNT(*) FROM pending_message_rules WHERE message_id=?1",
+                [id],
+                |row| row.get(0),
+            )?)
+        })
+        .unwrap();
+    assert_eq!(deferred, 0);
+}
+
+#[test]
+fn invalid_rule_folder_cannot_block_loading_message_body() {
+    let store = test_store();
+    store
+        .upsert_rule(
+            None,
+            MailRuleInput {
+                name: "invalid folder".into(),
+                condition: "body contains secret".into(),
+                action: "move to folder-does-not-exist; mark read".into(),
+                enabled: true,
+            },
+        )
+        .unwrap();
+    let id = seed_remote_message(&store, "invalid-folder-rule", 234);
+    let reference = store.get_message_remote_reference(id).unwrap();
+    let body = RemoteMessageBody {
+        body: "secret".into(),
+        sanitized_html: String::new(),
+        security_warnings: vec![],
+        snippet: "secret".into(),
+        has_attachments: false,
+        attachments_complete: true,
+        attachments: vec![],
+    };
+    let result = store
+        .update_message_body_from_remote(id, &body, &reference)
+        .unwrap();
+    assert_eq!(result.body, "secret");
+    assert_eq!(result.folder_role, "inbox");
+    assert!(result.is_read);
+}

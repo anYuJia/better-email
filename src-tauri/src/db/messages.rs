@@ -1,7 +1,7 @@
 use super::accounts::{account_for_conn, map_account};
 use super::attachments::attachment_count_for_message;
-use super::contacts_rules::apply_enabled_rules_for_message;
 use super::contacts_rules::upsert_contact;
+use super::contacts_rules::{apply_deferred_message_rules, apply_enabled_rules_for_message};
 use super::folders::role_for_virtual_folder_id;
 use super::folders::{folder_id_for_account_role, folder_id_for_message_role};
 use super::outbox::{
@@ -14,7 +14,7 @@ use super::search::{
 use super::*;
 use std::collections::VecDeque;
 
-fn queue_remote_intent_for_conn(
+pub(super) fn queue_remote_intent_for_conn(
     conn: &Connection,
     message_id: i64,
     kind: &str,
@@ -35,6 +35,11 @@ fn queue_remote_intent_for_conn(
          ON CONFLICT(message_id, kind) DO UPDATE SET value = excluded.value, created_at = excluded.created_at",
         params![message_id, kind, value, Utc::now().to_rfc3339()],
     )?;
+    Ok(())
+}
+
+fn suppress_deferred_rule_actions(conn: &Connection, message_id: i64, bits: i64) -> MailResult<()> {
+    conn.execute("UPDATE pending_message_rules SET suppressed_actions = suppressed_actions | ?2 WHERE message_id = ?1", params![message_id, bits])?;
     Ok(())
 }
 
@@ -733,6 +738,7 @@ impl MailStore {
                     body.has_attachments,
                 )?;
             }
+            apply_deferred_message_rules(conn, message_id)?;
             let message = message_for_conn(conn, message_id)?;
             transaction.commit()?;
             Ok(message)
@@ -1217,6 +1223,7 @@ impl MailStore {
             }
 
             for message in &unread_messages {
+                suppress_deferred_rule_actions(conn, message.message_id, 1)?;
                 queue_remote_intent_for_conn(conn, message.message_id, "seen", "1")?;
             }
 
@@ -1274,6 +1281,13 @@ impl MailStore {
                 }
                 _ => return Err(MailError::Imap("不支持的远端操作。".into())),
             }
+            let bits = match kind {
+                "seen" => 1,
+                "flagged" => 2,
+                "move" => 4,
+                _ => 0,
+            };
+            suppress_deferred_rule_actions(&transaction, message_id, bits)?;
             queue_remote_intent_for_conn(&transaction, message_id, kind, value)?;
             transaction.commit()?;
             Ok(())
@@ -1438,12 +1452,17 @@ impl MailStore {
     }
     pub fn snooze_message(&self, message_id: i64, snoozed_until: &str) -> MailResult<Message> {
         self.with_conn(|conn| {
-            let folder_id = folder_id_for_message_role(conn, message_id, "snoozed")?;
-            conn.execute(
+            let transaction = conn.unchecked_transaction()?;
+            let folder_id = folder_id_for_message_role(&transaction, message_id, "snoozed")?;
+            transaction.execute(
                 "UPDATE messages SET folder_id = ?1, snoozed_until = ?2, is_read = 1 WHERE id = ?3",
                 params![folder_id, snoozed_until.trim(), message_id],
             )?;
-            message_for_conn(conn, message_id)
+            suppress_deferred_rule_actions(&transaction, message_id, 1 | 4)?;
+            queue_remote_intent_for_conn(&transaction, message_id, "seen", "1")?;
+            let message = message_for_conn(&transaction, message_id)?;
+            transaction.commit()?;
+            Ok(message)
         })
     }
     /// 批量稍后处理：在单个数据库事务内处理全部目标邮件，保证全成或全不成。
@@ -1462,6 +1481,8 @@ impl MailStore {
                     "UPDATE messages SET folder_id = ?1, snoozed_until = ?2, is_read = 1 WHERE id = ?3",
                     params![folder_id, snoozed_until.trim(), message_id],
                 )?;
+                suppress_deferred_rule_actions(&transaction, *message_id, 1 | 4)?;
+                queue_remote_intent_for_conn(&transaction, *message_id, "seen", "1")?;
                 messages.push(message_for_conn(&transaction, *message_id)?);
             }
             transaction.commit()?;
@@ -1470,17 +1491,23 @@ impl MailStore {
     }
     pub fn unsnooze_message(&self, message_id: i64) -> MailResult<Message> {
         self.with_conn(|conn| {
-            let folder_id = folder_id_for_message_role(conn, message_id, "inbox")?;
-            conn.execute(
+            let transaction = conn.unchecked_transaction()?;
+            let folder_id = folder_id_for_message_role(&transaction, message_id, "inbox")?;
+            transaction.execute(
                 "UPDATE messages SET folder_id = ?1, snoozed_until = '' WHERE id = ?2",
                 params![folder_id, message_id],
             )?;
-            message_for_conn(conn, message_id)
+            suppress_deferred_rule_actions(&transaction, message_id, 4)?;
+            queue_remote_intent_for_conn(&transaction, message_id, "move", "inbox")?;
+            let message = message_for_conn(&transaction, message_id)?;
+            transaction.commit()?;
+            Ok(message)
         })
     }
     pub fn release_due_snoozed_messages(&self, now: &str) -> MailResult<ReleasedSnoozedCount> {
         self.with_conn(|conn| {
-            let mut stmt = conn.prepare(
+            let transaction = conn.unchecked_transaction()?;
+            let mut stmt = transaction.prepare(
                 "
                 SELECT m.id, m.snoozed_until
                 FROM messages m
@@ -1493,17 +1520,21 @@ impl MailStore {
                     Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
+            drop(stmt);
             let due_ids = due_snoozed_message_ids(now, rows);
             if due_ids.is_empty() {
                 return Ok(ReleasedSnoozedCount { released_count: 0 });
             }
             for message_id in &due_ids {
-                let folder_id = folder_id_for_message_role(conn, *message_id, "inbox")?;
-                conn.execute(
+                let folder_id = folder_id_for_message_role(&transaction, *message_id, "inbox")?;
+                transaction.execute(
                     "UPDATE messages SET folder_id = ?1, snoozed_until = '' WHERE id = ?2",
                     params![folder_id, message_id],
                 )?;
+                suppress_deferred_rule_actions(&transaction, *message_id, 4)?;
+                queue_remote_intent_for_conn(&transaction, *message_id, "move", "inbox")?;
             }
+            transaction.commit()?;
             Ok(ReleasedSnoozedCount {
                 released_count: due_ids.len() as i64,
             })
@@ -1549,19 +1580,25 @@ impl MailStore {
     }
     pub fn apply_label_to_message(&self, message_id: i64, label_id: i64) -> MailResult<()> {
         self.with_conn(|conn| {
-            conn.execute(
+            let transaction = conn.unchecked_transaction()?;
+            transaction.execute(
                 "INSERT OR IGNORE INTO message_labels(message_id, label_id) VALUES (?1, ?2)",
                 params![message_id, label_id],
             )?;
+            suppress_deferred_rule_actions(&transaction, message_id, 8)?;
+            transaction.commit()?;
             Ok(())
         })
     }
     pub fn remove_label_from_message(&self, message_id: i64, label_id: i64) -> MailResult<()> {
         self.with_conn(|conn| {
-            conn.execute(
+            let transaction = conn.unchecked_transaction()?;
+            transaction.execute(
                 "DELETE FROM message_labels WHERE message_id = ?1 AND label_id = ?2",
                 params![message_id, label_id],
             )?;
+            suppress_deferred_rule_actions(&transaction, message_id, 8)?;
+            transaction.commit()?;
             Ok(())
         })
     }

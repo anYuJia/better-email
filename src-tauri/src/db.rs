@@ -128,6 +128,8 @@ const LOCAL_BACKUP_TABLES: &[&str] = &[
     "accounts",
     "folders",
     "messages",
+    "pending_remote_writes",
+    "pending_message_rules",
     "muted_threads",
     "labels",
     "message_labels",

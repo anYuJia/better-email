@@ -56,8 +56,6 @@
   flex: 0 0 auto;
   object-fit: contain;
   border-radius: var(--st-radius-sm);
-  background: var(--st-surface-subtle);
-  padding: 4px;
 }
 
 .settings-modal .settings-about-brand strong {

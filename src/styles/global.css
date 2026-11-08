@@ -282,3 +282,7 @@ body [popover] *::-webkit-scrollbar-thumb {
   background: var(--ui-surface);
   color: var(--ui-text);
 }
+/* The supplied light mark is used against dark application surfaces. */
+:root[data-theme="dark"] .brand-glyph {
+  content: url('/brand/v5/mark-light.png');
+}

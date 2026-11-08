@@ -308,10 +308,9 @@ jobs:
       - name: Initialize Android project
         run: npm run tauri -- android init --ci --skip-targets-install
 
-      - name: Generate Android app icons
-        # android init creates Tauri's sample icon. Generate the mobile icon
-        # set after init so the release APK uses the Better Email artwork.
-        run: npm run tauri -- icon src-tauri/icons/icon.png
+      - name: Install Android app icons
+        # Initialization creates sample resources; install our adaptive layers.
+        run: cp -R src-tauri/icons/v5/android/. src-tauri/gen/android/app/src/main/res/
 
       - name: Build Android artifacts
         run: npm run tauri -- android build --ci --target aarch64 --apk --aab

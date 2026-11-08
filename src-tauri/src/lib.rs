@@ -583,12 +583,18 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         ],
     )?;
 
-    let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/v4/tray-icon.png"))
+    // macOS recolors template images for the current menu bar appearance.
+    // Other desktop platforms keep the full-color icon, visible on both themes.
+    #[cfg(target_os = "macos")]
+    let icon_bytes = include_bytes!("../icons/v5/tray-icon.png").as_slice();
+    #[cfg(not(target_os = "macos"))]
+    let icon_bytes = include_bytes!("../icons/v5/icon.png").as_slice();
+    let icon = tauri::image::Image::from_bytes(icon_bytes)
         .map_err(|error| format!("failed to load tray icon: {error}"))?;
 
     let tray = TrayIconBuilder::new()
         .icon(icon)
-        .icon_as_template(false)
+        .icon_as_template(cfg!(target_os = "macos"))
         .menu(&menu)
         .tooltip("Better Email")
         .on_menu_event(move |app_handle, event| {
@@ -867,12 +873,12 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.handle()
                 .set_activation_policy(tauri::ActivationPolicy::Regular)?;
-            // 主窗口图标与 bundle.icon 使用同一份 v4 源资源：
+            // 主窗口图标与 bundle.icon 使用同一份 v5 源资源：
             // 无边框/透明窗口在 Windows 任务栏、Alt+Tab 需要显式设置图标。
             #[cfg(desktop)]
             if let Some(window) = app.get_webview_window("main") {
                 if let Ok(icon) =
-                    tauri::image::Image::from_bytes(include_bytes!("../icons/v4/icon.png"))
+                    tauri::image::Image::from_bytes(include_bytes!("../icons/v5/icon.png"))
                 {
                     let _ = window.set_icon(icon);
                 }

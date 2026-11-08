@@ -17,7 +17,7 @@ export default function StandaloneWindowChrome({
       className="standalone-window-chrome"
       left={(
         <div className="standalone-window-title">
-          <img src="/brand/v4/brand-mark-64.png" alt="" width={22} height={22} draggable={false} />
+          <img className="brand-glyph" src="/brand/v5/mark-dark.png" alt="" width={22} height={22} draggable={false} />
           <span className="standalone-window-title-copy">
             <strong>{title}</strong>
             {subtitle ? <span>{subtitle}</span> : null}

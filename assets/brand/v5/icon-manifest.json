@@ -1,0 +1,8 @@
+{
+  "default": "app-mobile.png",
+  "bg_color": "#eff8f2",
+  "android_bg": "android-background.png",
+  "android_fg": "android-foreground.png",
+  "android_fg_scale": 80,
+  "android_monochrome": "android-monochrome.png"
+}

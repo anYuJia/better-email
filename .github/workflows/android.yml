@@ -94,6 +94,9 @@ jobs:
       - name: Initialize Android project
         run: npm run tauri -- android init --ci --skip-targets-install
 
+      - name: Install Android app icons
+        run: cp -R src-tauri/icons/v5/android/. src-tauri/gen/android/app/src/main/res/
+
       - name: Build Android artifacts
         run: npm run tauri -- android build --ci --target aarch64 --apk --aab
 

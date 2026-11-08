@@ -160,8 +160,8 @@ function Sidebar({
     >
       <div className="brand">
         <img
-          className="brand-mark"
-          src="/brand/v4/brand-mark-64.png"
+          className="brand-mark brand-glyph"
+          src="/brand/v5/mark-dark.png"
           alt=""
           width={28}
           height={28}

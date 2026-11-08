@@ -117,9 +117,9 @@ export default function AboutSettings({ onNotify = () => undefined }: AboutSetti
       >
         <div className="settings-about-brand">
           <img
-            src="/brand/v4/brand-mark-64.png"
+            src="/brand/v5/mark-dark.png"
             alt="Better Email"
-            className="settings-about-brand-mark"
+            className="settings-about-brand-mark brand-glyph"
             width={64}
             height={64}
           />

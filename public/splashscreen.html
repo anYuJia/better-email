@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Better Email</title>
-    <link rel="preload" href="/brand/v4/brand-mark-64.png" as="image" />
+    <link rel="preload" href="/brand/v5/mark-dark.png" as="image" />
     <style>
       :root {
         color-scheme: light;
@@ -53,6 +53,10 @@
         display: block;
         object-fit: contain;
         margin-bottom: 22px;
+      }
+
+      :root[data-theme="dark"] .splash-logo {
+        content: url('/brand/v5/mark-light.png');
       }
 
       .splash-title {
@@ -117,7 +121,7 @@
   </head>
   <body>
     <main class="splash-content" aria-label="Better Email 正在启动">
-      <img class="splash-logo" src="/brand/v4/brand-mark-64.png" alt="" draggable="false" />
+      <img class="splash-logo" src="/brand/v5/mark-dark.png" alt="" draggable="false" />
       <h1 class="splash-title">Better Email</h1>
       <p class="splash-tagline">让邮件，重新变得简单。</p>
     </main>

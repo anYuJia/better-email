@@ -147,6 +147,39 @@ export async function runNavigationQuality(cdp, api) {
   await evalInPage(cdp, "document.querySelector('[data-narrow-sidebar-close]').click()");
   await waitForExpression(cdp, "!document.querySelector('.narrow-view-sidebar') && document.activeElement?.hasAttribute('data-narrow-sidebar-open')");
   checks.push('Closing the narrow sidebar returns focus to its opener');
+  // Bulk selection retains a separate avatar and an accessible checkbox at
+  // both desktop and touch breakpoints, including enlarged text.
+  for (const [width, height, theme, scale] of [
+    [1440, 900, 'light', 1], [1280, 800, 'dark', 1], [1024, 768, 'light', 1],
+    [390, 844, 'dark', 1], [393, 852, 'light', 1], [430, 932, 'dark', 1],
+    [390, 844, 'light', 1.25], [430, 932, 'dark', 1.5],
+  ]) {
+    await setUiViewport(cdp, width, height);
+    await evalInPage(cdp, `localStorage.setItem('better-email.theme-mode', '${theme}'); location.reload()`);
+    await waitForExpression(cdp, "document.querySelectorAll('.message-card').length > 1");
+    await evalInPage(cdp, "document.querySelector('.message-card .message-select input').click()");
+    await waitForExpression(cdp, "document.querySelector('.message-card.is-selection-mode .message-select input:checked')");
+    if (scale !== 1) await evalInPage(cdp, `(() => {
+      for (const el of document.querySelectorAll('.message-card *')) {
+        el.style.fontSize = parseFloat(getComputedStyle(el).fontSize) * ${scale} + 'px';
+      }
+    })()`);
+    await assert(`(() => {
+      const rows = [...document.querySelectorAll('.message-card')].slice(0, 2);
+      return rows.length === 2 && document.documentElement.scrollWidth <= innerWidth + 1 && rows.every(row => {
+        const target = row.querySelector('.message-select').getBoundingClientRect();
+        const input = row.querySelector('.message-select input');
+        const checkbox = input.getBoundingClientRect();
+        const avatar = row.querySelector('.message-leading').getBoundingClientRect();
+        const sender = row.querySelector('.sender').getBoundingClientRect();
+        return getComputedStyle(row.querySelector('.message-leading')).opacity === '1'
+          && checkbox.right <= avatar.left && avatar.right <= sender.left + 1
+          && getComputedStyle(input).borderRadius === '4px'
+          && (innerWidth > 720 || (target.width >= 44 && target.height >= 44));
+      }) && getComputedStyle(rows[0].querySelector('input')).backgroundColor !== getComputedStyle(rows[1].querySelector('input')).backgroundColor;
+    })()`, `Checkbox and avatar remain distinct at ${width}x${height}, ${theme}, ${scale * 100}%`);
+    await captureScreenshot(cdp, `selection-${width}-${height}-${theme}-${scale * 100}`);
+  }
   if (captureDir) {
     mkdirSync(captureDir, { recursive: true });
     writeFileSync(join(captureDir, 'navigation-quality.json'), JSON.stringify({ checks }, null, 2));

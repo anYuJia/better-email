@@ -198,7 +198,7 @@ impl MailStore {
             });
             let fingerprint = Sha256::digest(payload.to_string().as_bytes()).iter().map(|byte| format!("{byte:02x}")).collect::<String>();
             let previous = transaction.query_row(
-                "SELECT id, status FROM outbox_queue WHERE submission_fingerprint = ?1 AND status IN ('sending', 'send_unknown')",
+                "SELECT id, status FROM outbox_queue WHERE (submission_fingerprint = ?1 OR substr(submission_fingerprint, 1, length(?1) + 10) = ?1 || ':restored:') AND status IN ('sending', 'send_unknown')",
                 params![fingerprint],
                 |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
             ).optional()?;

@@ -1,6 +1,6 @@
 use super::accounts::ensure_default_account_for_conn;
 use super::messages::bool_to_int;
-use super::migrations::rebuild_thread_keys_for_conn;
+use super::migrations::rebuild_thread_keys_in_transaction;
 use super::*;
 
 impl MailStore {
@@ -10,12 +10,14 @@ impl MailStore {
             for table in LOCAL_BACKUP_TABLES {
                 tables.insert((*table).to_string(), export_backup_table(conn, table)?);
             }
-            Ok(LocalBackup {
+            let backup = LocalBackup {
                 schema_version: LOCAL_BACKUP_SCHEMA_VERSION,
                 app_version: env!("CARGO_PKG_VERSION").to_string(),
                 exported_at: Utc::now().to_rfc3339(),
                 tables,
-            })
+            };
+            validate_local_backup(&backup)?;
+            Ok(backup)
         })
     }
     pub fn import_local_backup(&self, backup: &LocalBackup) -> MailResult<()> {
@@ -26,6 +28,10 @@ impl MailStore {
         self.with_conn(|conn| {
             let result = (|| -> MailResult<()> {
                 conn.execute_batch("PRAGMA foreign_keys = OFF; BEGIN IMMEDIATE;")?;
+                // The restore gate excludes live send workers. Any remaining
+                // sending row is stale; normalize it inside this transaction so
+                // deletion triggers permit restore and rollback is still atomic.
+                conn.execute("UPDATE outbox_queue SET status='send_unknown' WHERE status='sending'", [])?;
                 // Keep credentials only when their previously trusted endpoint is unchanged.
                 conn.execute_batch("CREATE TEMP TABLE restore_credential_accounts AS SELECT email, auth_type, incoming_protocol, imap_host, smtp_host FROM accounts;")?;
                 for table in LOCAL_BACKUP_TABLES.iter().rev() {
@@ -36,6 +42,19 @@ impl MailStore {
                         import_backup_table(conn, table, rows)?;
                     }
                 }
+                // A backup can predate successful delivery. Never automatically
+                // replay an old queued/retry/scheduled message after restoration.
+                // Keep duplicate fingerprints distinguishable while retaining their
+                // shared identity for the duplicate-submission guard.
+                conn.execute_batch("UPDATE outbox_queue AS q SET submission_fingerprint=q.submission_fingerprint || ':restored:' || q.id
+                    WHERE q.status IN ('queued','retry','scheduled') AND q.submission_fingerprint<>''
+                      AND EXISTS (SELECT 1 FROM outbox_queue other
+                        WHERE other.id<>q.id AND other.submission_fingerprint=q.submission_fingerprint
+                          AND (other.status IN ('sending','send_unknown')
+                            OR (other.status IN ('queued','retry','scheduled') AND other.id<q.id)));
+                    UPDATE outbox_queue SET status='send_unknown', next_attempt_at='',
+                      last_error='恢复的备份可能早于实际发送，请先核对已发送文件夹或收件人，再决定如何处理。'
+                    WHERE status IN ('queued','retry','scheduled','sending');")?;
                 conn.execute_batch("DELETE FROM account_credentials WHERE EXISTS (
                     SELECT 1 FROM accounts a WHERE lower(a.email)=lower(account_credentials.account_email)
                       AND NOT EXISTS (SELECT 1 FROM restore_credential_accounts old
@@ -56,6 +75,10 @@ impl MailStore {
                         "备份恢复失败：检测到 {foreign_key_violations} 个外键不一致项。"
                     )));
                 }
+                if !backup.tables.contains_key("contact_sent_messages") {
+                    super::contacts_rules::rebuild_contact_observations_for_legacy_backup(conn)?;
+                }
+                rebuild_thread_keys_in_transaction(conn)?;
                 conn.execute_batch(
                     "INSERT INTO message_search(message_search) VALUES('rebuild'); COMMIT;",
                 )?;
@@ -67,8 +90,7 @@ impl MailStore {
                 let _ = conn.execute_batch("ROLLBACK;");
             }
             let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
-            result?;
-            rebuild_thread_keys_for_conn(conn)
+            result
         })
     }
     pub fn summarize_local_backup(
@@ -130,7 +152,7 @@ pub(super) fn import_backup_table(
     let columns = table_columns(conn, table)?;
     for row in rows {
         // 不可信备份的安全化：messages 的 sanitized_html/security_warnings 必须
-        // 从原始正文重新生成，绝不信任备份提供的安全派生字段；attachments 的
+        // 对备份正文和 HTML 重新清洗并生成警告，绝不直接信任备份字段；attachments 的
         // local_path/is_downloaded 一律清空，防止借附件路径读取任意文件。
         let mut normalized = row.clone();
         if table == "messages" {
@@ -138,7 +160,12 @@ pub(super) fn import_backup_table(
                 .get("body")
                 .and_then(|value| value.as_str())
                 .unwrap_or_default();
-            let (sanitized_html, security_warnings) = recompute_message_security(body);
+            let backed_html = row
+                .get("sanitized_html")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default();
+            let (sanitized_html, security_warnings) = recompute_message_security(body, backed_html);
+            normalized.insert("sanitizer_version".into(), serde_json::json!(1));
             normalized.insert(
                 "sanitized_html".into(),
                 serde_json::Value::String(sanitized_html),
@@ -193,23 +220,34 @@ pub(super) fn import_backup_table(
     Ok(())
 }
 
-/// 从可信原始正文重新生成 messages 的安全字段：
-/// sanitized_html 用当前 sanitizer 清洗，security_warnings 重新检测。
-fn recompute_message_security(body: &str) -> (String, String) {
-    let sanitized_html = crate::protocol::sanitize_html(body);
+/// 对备份中的正文和 HTML 重新清洗，并重建安全提示。
+fn recompute_message_security(body: &str, backed_html: &str) -> (String, String) {
+    // HTML in a backup is untrusted, but it may be the only copy of the
+    // formatting of an outbound draft. Re-sanitize it instead of discarding it.
+    let safe_html = crate::protocol::sanitize_html(backed_html);
+    let sanitized_html = if safe_html.is_empty() {
+        crate::protocol::sanitize_html(body)
+    } else {
+        safe_html
+    };
     let mut warnings = Vec::new();
-    if body.to_ascii_lowercase().contains("<script") {
-        warnings.push("HTML 正文包含 script 标签，渲染前必须清洗。".to_string());
+    for source in [body, backed_html] {
+        if source.to_ascii_lowercase().contains("<script") {
+            warnings.push("HTML 正文包含 script 标签，渲染前必须清洗。".to_string());
+        }
+        if crate::protocol::html_has_remote_images(source) {
+            warnings.push("检测到远程图片，应默认阻止自动加载。".to_string());
+        }
+        warnings.extend(crate::protocol::link_risk_warnings(source));
     }
-    if crate::protocol::html_has_remote_images(body) {
-        warnings.push("检测到远程图片，应默认阻止自动加载。".to_string());
-    }
-    warnings.extend(crate::protocol::link_risk_warnings(body));
+    warnings.sort();
+    warnings.dedup();
     (
         sanitized_html,
         super::messages::warning_lines_to_text(&warnings),
     )
 }
+
 pub(super) fn table_columns(conn: &Connection, table: &str) -> MailResult<Vec<String>> {
     let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", quote_identifier(table)))?;
     let columns = stmt
@@ -249,6 +287,8 @@ pub(super) fn quote_identifier(value: &str) -> String {
 }
 /// 备份行数与字符串长度上限，防止不可信备份导致资源耗尽。
 const MAX_BACKUP_ROWS_PER_TABLE: usize = 200_000;
+// Each message/contact import can have multiple associated observations.
+const MAX_BACKUP_RELATION_ROWS: usize = 2_000_000;
 const MAX_BACKUP_STRING_CHARS: usize = 1_000_000;
 
 pub(super) fn validate_local_backup(backup: &LocalBackup) -> MailResult<()> {
@@ -266,9 +306,17 @@ pub(super) fn validate_local_backup(backup: &LocalBackup) -> MailResult<()> {
         )));
     }
     for (table, rows) in &backup.tables {
-        if rows.len() > MAX_BACKUP_ROWS_PER_TABLE {
+        let limit = if matches!(
+            table.as_str(),
+            "contact_sent_messages" | "contact_import_entries"
+        ) {
+            MAX_BACKUP_RELATION_ROWS
+        } else {
+            MAX_BACKUP_ROWS_PER_TABLE
+        };
+        if rows.len() > limit {
             return Err(MailError::Imap(format!(
-                "备份表 {table} 包含 {} 行，超过上限 {MAX_BACKUP_ROWS_PER_TABLE} 行，已取消恢复。",
+                "备份表 {table} 包含 {} 行，超过上限 {limit} 行，已取消操作。",
                 rows.len()
             )));
         }

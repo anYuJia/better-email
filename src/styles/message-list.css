@@ -941,7 +941,7 @@
   content: "";
   width: 8px;
   height: 5px;
-  border: solid var(--ui-accent);
+  border: solid var(--ui-text-on-accent);
   border-width: 0 0 2px 2px;
   transform: translateY(-1px) rotate(-45deg) scale(0);
   transform-origin: center;
@@ -950,6 +950,7 @@
 .message-selection-all input:checked,
 .message-date-header-selection input:checked {
   border-color: var(--ui-accent);
+  background: var(--ui-accent);
 }
 
 .message-selection-all input:checked::before,
@@ -960,6 +961,7 @@
 .message-selection-all input:indeterminate,
 .message-date-header-selection input:indeterminate {
   border-color: var(--ui-accent);
+  background: var(--ui-accent);
 }
 
 .message-selection-all input:indeterminate::before,
@@ -968,7 +970,7 @@
   height: 2px;
   border: 0;
   border-radius: 1px;
-  background: var(--ui-accent);
+  background: var(--ui-text-on-accent);
   transform: none;
 }
 
@@ -1148,8 +1150,7 @@
   opacity: 0;
 }
 
-/* The app shell moves the checkbox to the trailing gutter, so hovering or
- * selecting a row no longer needs to replace the sender avatar. */
+/* Keep sender avatars visible while selection controls are shown. */
 .app-shell .message-card .message-leading {
   opacity: 1;
 }
@@ -1241,7 +1242,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--ui-border-strong);
-  border-radius: 50%;
+  border-radius: 4px;
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
@@ -1251,7 +1252,7 @@
   content: "";
   width: 7px;
   height: 4px;
-  border: solid var(--ui-accent);
+  border: solid var(--ui-text-on-accent);
   border-width: 0 0 2px 2px;
   transform: translateY(-1px) rotate(-45deg) scale(0);
   transform-origin: center;
@@ -1259,7 +1260,7 @@
 
 .message-select input:checked {
   border-color: var(--ui-accent);
-  background: var(--ui-surface);
+  background: var(--ui-accent);
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1287,7 +1288,7 @@
 
 .app-shell .message-select input:checked {
   border-color: var(--ui-accent);
-  background: var(--ui-surface);
+  background: var(--ui-accent);
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1324,6 +1325,22 @@
   pointer-events: auto;
 }
 
+/* In bulk selection, keep both the checkbox and sender avatar visible. */
+.app-shell .message-card.is-selection-mode {
+  --mail-row-text-start: 100px;
+  padding-left: var(--mail-row-text-start);
+}
+
+.app-shell .message-card.is-selection-mode .message-leading {
+  left: 56px;
+  opacity: 1;
+}
+
+.app-shell .message-card.is-selection-mode .message-select {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
 /* Unread dot owns the leading slot until a selection control appears. */
 .message-unread-dot {
   position: absolute;
@@ -1342,7 +1359,8 @@
 
 .message-card:hover > .message-unread-dot,
 .message-card:has(.message-card-main:focus-visible) > .message-unread-dot,
-.message-card:has(.message-select input:checked) > .message-unread-dot {
+.message-card:has(.message-select input:checked) > .message-unread-dot,
+.message-card.is-selection-mode > .message-unread-dot {
   opacity: 0;
 }
 
@@ -1619,15 +1637,11 @@
   border-color: transparent;
 }
 
-/* Multi-selected rows (checkbox checked but not the reader-open row): give
- * them a quiet hover-level tint so the user can see which rows belong to the
- * bulk selection. The reader-open (.is-current/.selected) row stays on the
- * stronger --quiet-row-selected surface, so current vs multi-selected stays
- * distinguishable at a glance. */
+/* Multi-selected rows receive a restrained accent tint. */
 .app-shell .message-card.is-selected:not(.is-current),
 .app-shell .message-card.is-selected:not(.is-current):hover,
 .app-shell .message-card:has(.message-select input:checked):not(.is-current) {
-  background: var(--quiet-row-hover);
+  background: color-mix(in srgb, var(--ui-accent) 7%, var(--ui-list));
   box-shadow: var(--ui-box-shadow-none);
 }
 

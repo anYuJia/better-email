@@ -1804,3 +1804,74 @@ mod account_scope_tests {
         assert_eq!(account_two_contact_count, 1);
     }
 }
+
+/// Older backups omitted the per-message contact observation ledger. Rebuild
+/// it from messages that match restored contacts before the next scan, so the
+/// same messages do not inflate their saved interaction counts again.
+pub(super) fn rebuild_contact_observations_for_legacy_backup(conn: &Connection) -> MailResult<()> {
+    let mut addresses = BTreeMap::<(i64, String), i64>::new();
+    {
+        let mut stmt =
+            conn.prepare("SELECT id, account_id, email, aliases FROM contacts ORDER BY id")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })?;
+        for row in rows {
+            let (id, account_id, email, aliases) = row?;
+            for address in std::iter::once(email).chain(contact_aliases_from_text(aliases)) {
+                let normalized = normalize_email(&address);
+                if !normalized.is_empty() {
+                    addresses.entry((account_id, normalized)).or_insert(id);
+                }
+            }
+        }
+    }
+    let own_addresses = own_email_addresses_for_conn(conn)?;
+    let mut counts = BTreeMap::<i64, i64>::new();
+    let mut query =
+        conn.prepare("SELECT id, account_id, sender_email, recipients, cc, bcc FROM messages")?;
+    let mut rows = query.query([])?;
+    let mut insert = conn.prepare("INSERT OR IGNORE INTO contact_sent_messages(message_id,email,scanned_at) VALUES (?1,?2,?3)")?;
+    let scanned_at = Utc::now().to_rfc3339();
+    while let Some(row) = rows.next()? {
+        let message_id: i64 = row.get(0)?;
+        let account_id: i64 = row.get(1)?;
+        let mut participants = BTreeSet::new();
+        let sender = normalize_email(&row.get::<_, String>(2)?);
+        if sender.contains('@') {
+            participants.insert(sender);
+        }
+        for index in 3..=5 {
+            for (_, email) in parse_contact_address_list(&row.get::<_, String>(index)?) {
+                participants.insert(email);
+            }
+        }
+        let mut matched_contacts = BTreeSet::new();
+        for email in participants {
+            if own_addresses.contains(&email) {
+                continue;
+            }
+            if let Some(contact_id) = addresses.get(&(account_id, email.clone())) {
+                insert.execute(params![message_id, email, scanned_at])?;
+                matched_contacts.insert(*contact_id);
+            }
+        }
+        for contact_id in matched_contacts {
+            *counts.entry(contact_id).or_default() += 1;
+        }
+    }
+    drop(rows);
+    drop(query);
+    drop(insert);
+    let mut update =
+        conn.prepare("UPDATE contacts SET message_count=MAX(message_count,?2) WHERE id=?1")?;
+    for (contact_id, count) in counts {
+        update.execute(params![contact_id, count])?;
+    }
+    Ok(())
+}

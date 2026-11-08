@@ -93,6 +93,11 @@ pub async fn export_local_backup(
     let backup = store.export_local_backup()?;
     let payload = serde_json::to_vec_pretty(&backup)
         .map_err(|error| crate::db::MailError::Imap(format!("本地备份序列化失败：{error}")))?;
+    if payload.len() > super::common::MAX_BACKUP_FILE_BYTES {
+        return Err(MailError::Imap(
+            "备份超过 512 MB，无法恢复，已取消导出。".into(),
+        ));
+    }
     let target_path = app
         .dialog()
         .file()

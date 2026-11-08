@@ -1033,12 +1033,20 @@ pub(super) fn migrate_fts_update_trigger_if_needed(conn: &Connection) -> MailRes
     Ok(())
 }
 pub(super) fn rebuild_thread_keys_for_conn(conn: &Connection) -> MailResult<()> {
+    conn.execute_batch("BEGIN IMMEDIATE TRANSACTION")?;
+    if let Err(error) = rebuild_thread_keys_in_transaction(conn) {
+        let _ = conn.execute_batch("ROLLBACK");
+        return Err(error);
+    }
+    conn.execute_batch("COMMIT")?;
+    Ok(())
+}
+
+/// Rebuild within a caller-owned transaction so backup restore remains atomic.
+pub(super) fn rebuild_thread_keys_in_transaction(conn: &Connection) -> MailResult<()> {
     let messages = {
         let mut stmt = conn.prepare(
-            "
-            SELECT id, subject, message_id_header, in_reply_to_header, references_header, thread_key
-            FROM messages
-            ",
+            "SELECT id, subject, message_id_header, in_reply_to_header, references_header, thread_key FROM messages",
         )?;
         let rows = stmt.query_map([], |row| {
             Ok((
@@ -1052,22 +1060,12 @@ pub(super) fn rebuild_thread_keys_for_conn(conn: &Connection) -> MailResult<()> 
         })?;
         rows.collect::<Result<Vec<_>, _>>()?
     };
-
-    conn.execute_batch("BEGIN IMMEDIATE TRANSACTION")?;
-    let migration_result = (|| -> MailResult<()> {
-        let mut update = conn.prepare("UPDATE messages SET thread_key = ?2 WHERE id = ?1")?;
-        for (id, subject, message_id, in_reply_to, references, current_key) in messages {
-            let next_key = thread_key_for_message(&subject, &message_id, &in_reply_to, &references);
-            if next_key != current_key {
-                update.execute(params![id, next_key])?;
-            }
+    let mut update = conn.prepare("UPDATE messages SET thread_key = ?2 WHERE id = ?1")?;
+    for (id, subject, message_id, in_reply_to, references, current_key) in messages {
+        let next_key = thread_key_for_message(&subject, &message_id, &in_reply_to, &references);
+        if next_key != current_key {
+            update.execute(params![id, next_key])?;
         }
-        Ok(())
-    })();
-    if let Err(error) = migration_result {
-        let _ = conn.execute_batch("ROLLBACK");
-        return Err(error);
     }
-    conn.execute_batch("COMMIT")?;
     Ok(())
 }

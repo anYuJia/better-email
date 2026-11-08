@@ -7,7 +7,11 @@
 @media (max-width: 720px) {
   /* Keep sender identity visible in the mobile message list. */
   .app-shell.is-mobile-app .mobile-message-list-panel .message-card {
-    padding: 8px 58px 8px 64px;
+    padding: 8px 58px 8px var(--mail-row-text-start);
+  }
+
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-card.is-selection-mode {
+    padding-right: 16px;
   }
 
   .app-shell.is-mobile-app .mobile-message-list-panel .message-leading {

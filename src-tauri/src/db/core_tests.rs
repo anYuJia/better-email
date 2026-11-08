@@ -7573,3 +7573,432 @@ fn failed_backup_restore_rolls_back_endpoint_and_credentials() {
     let clean_backup = store.export_local_backup().unwrap();
     store.import_local_backup(&clean_backup).unwrap();
 }
+
+#[test]
+fn restored_draft_preserves_safe_html_formatting() {
+    let store = test_store();
+    let id = store
+        .save_draft(DraftInput {
+            draft_id: 0,
+            account_id: 0,
+            identity_id: 0,
+            to: "friend@example.invalid".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "formatted".into(),
+            body: "Hello world".into(),
+            html_body: "<p>Hello <strong>world</strong></p>".into(),
+            send_at: String::new(),
+            attachments: vec![],
+        })
+        .unwrap();
+    let backup = store.export_local_backup().unwrap();
+    store.import_local_backup(&backup).unwrap();
+    assert!(store
+        .get_outbound_message(id)
+        .unwrap()
+        .html_body
+        .contains("<strong>world</strong>"));
+}
+
+#[test]
+fn restore_replaces_dependent_contact_bookkeeping() {
+    let store = test_store();
+    let backup = store.export_local_backup().unwrap();
+    let id = store
+        .save_draft(DraftInput {
+            draft_id: 0,
+            account_id: 0,
+            identity_id: 0,
+            to: "friend@example.invalid".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "post-backup".into(),
+            body: "test".into(),
+            html_body: String::new(),
+            send_at: String::new(),
+            attachments: vec![],
+        })
+        .unwrap();
+    store.with_conn(|conn| {
+        conn.execute("INSERT INTO contact_sent_messages(message_id,email,scanned_at) VALUES (?1,'friend@example.invalid','2026')", [id])?;
+        let account_id: i64 = conn.query_row("SELECT account_id FROM messages WHERE id=?1", [id], |row| row.get(0))?;
+        conn.execute("INSERT INTO contacts(account_id,name,email,last_seen_at) VALUES(?1,'New contact','new-contact@example.invalid','2026')", [account_id])?;
+        let contact_id = conn.last_insert_rowid();
+        conn.execute("INSERT INTO contact_import_batches(account_id,file_name,total_count,created_count,merged_count,skipped_count,scope,created_at) VALUES(?1,'new.vcf',1,1,0,0,'global','2026')", [account_id])?;
+        let batch_id = conn.last_insert_rowid();
+        conn.execute("INSERT INTO contact_import_entries(batch_id,contact_id,email,action) VALUES(?1,?2,'new-contact@example.invalid','create')", params![batch_id,contact_id])?;
+        Ok(())
+    }).unwrap();
+    store.import_local_backup(&backup).unwrap();
+    assert!(store.get_message(id).is_err());
+    store
+        .with_conn(|conn| {
+            let count: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM contact_sent_messages WHERE message_id=?1",
+                [id],
+                |r| r.get(0),
+            )?;
+            assert_eq!(count, 0);
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[test]
+fn failed_thread_rebuild_rolls_back_whole_backup_restore() {
+    let store = test_store();
+    let mut backup = store.export_local_backup().unwrap();
+    let row = backup
+        .tables
+        .get_mut("messages")
+        .unwrap()
+        .first_mut()
+        .unwrap();
+    let id = row.get("id").unwrap().as_i64().unwrap();
+    let before = store.get_message(id).unwrap().subject;
+    row.insert("subject".into(), serde_json::json!("Changed by backup"));
+    row.insert(
+        "thread_key".into(),
+        serde_json::json!("intentionally-incorrect"),
+    );
+    store.with_conn(|conn| {conn.execute_batch("CREATE TRIGGER audit_reject_thread_update BEFORE UPDATE OF thread_key ON messages BEGIN SELECT RAISE(ABORT, 'audit failure'); END;")?; Ok(())}).unwrap();
+    assert!(store.import_local_backup(&backup).is_err());
+    assert_eq!(store.get_message(id).unwrap().subject, before);
+}
+
+#[test]
+fn backup_round_trips_contact_observations_and_import_history() {
+    let store = test_store();
+    let account = store.get_account().unwrap();
+    let message_id = store
+        .with_conn(|c| {
+            Ok(c.query_row(
+                "SELECT id FROM messages WHERE account_id=?1 ORDER BY id LIMIT 1",
+                [account.id],
+                |r| r.get::<_, i64>(0),
+            )?)
+        })
+        .unwrap();
+    store.sync_contacts_from_sent_message(message_id).unwrap();
+    store.with_conn(|c| {
+        c.execute("INSERT INTO contact_import_batches(id,account_id,file_name,total_count,created_count,merged_count,skipped_count,scope,created_at) VALUES(991,?1,'contacts.vcf',0,0,0,0,'global','2026')", [account.id])?;
+        c.execute("INSERT INTO contact_import_entries(batch_id,contact_id,email,action) VALUES(991,NULL,'friend@example.invalid','skip')", [])?;
+        Ok(())
+    }).unwrap();
+    let backup = store.export_local_backup().unwrap();
+    let observations = backup.tables.get("contact_sent_messages").unwrap().clone();
+    assert!(!observations.is_empty());
+    let restored = test_store();
+    restored.import_local_backup(&backup).unwrap();
+    assert_eq!(
+        restored.export_local_backup().unwrap().tables["contact_sent_messages"],
+        observations
+    );
+    assert!(restored
+        .list_contact_import_batches()
+        .unwrap()
+        .iter()
+        .any(|b| b.id == 991));
+}
+
+#[test]
+fn legacy_backup_contact_replay_does_not_double_existing_counts() {
+    let store = test_store();
+    let account = store.get_account().unwrap();
+    let message_id = store
+        .with_conn(|c| {
+            Ok(c.query_row(
+                "SELECT id FROM messages WHERE account_id=?1 ORDER BY id LIMIT 1",
+                [account.id],
+                |r| r.get::<_, i64>(0),
+            )?)
+        })
+        .unwrap();
+    store.sync_contacts_from_sent_message(message_id).unwrap();
+    let mut backup = store.export_local_backup().unwrap();
+    for table in [
+        "contact_sent_messages",
+        "contact_sync_state",
+        "contact_import_batches",
+        "contact_import_entries",
+    ] {
+        backup.tables.remove(table);
+    }
+    store.import_local_backup(&backup).unwrap();
+    let before = store.list_contacts_for_account(Some(account.id)).unwrap();
+    store.sync_contacts_from_sent_message(message_id).unwrap();
+    for contact in before {
+        let after = store
+            .list_contacts_for_account(Some(account.id))
+            .unwrap()
+            .into_iter()
+            .find(|c| c.id == contact.id)
+            .unwrap();
+        assert_eq!(
+            after.message_count, contact.message_count,
+            "{} was counted twice",
+            contact.email
+        );
+    }
+}
+
+#[test]
+fn backup_restores_rich_draft_only_after_resanitizing_untrusted_html() {
+    let store = test_store();
+    let id = store
+        .save_draft(DraftInput {
+            draft_id: 0,
+            account_id: 0,
+            identity_id: 0,
+            to: "to@example.invalid".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "Rich".into(),
+            body: "safe".into(),
+            html_body: "<p>safe</p>".into(),
+            send_at: String::new(),
+            attachments: vec![],
+        })
+        .unwrap();
+    let mut backup = store.export_local_backup().unwrap();
+    let row = backup
+        .tables
+        .get_mut("messages")
+        .unwrap()
+        .iter_mut()
+        .find(|row| row.get("id").and_then(|v| v.as_i64()) == Some(id))
+        .unwrap();
+    row.insert("sanitized_html".into(), serde_json::json!("<p><strong>safe</strong><img src='https://tracker.invalid/pixel' onerror='alert(1)'><script>alert(1)</script></p>"));
+    row.insert("sanitizer_version".into(), serde_json::json!(0));
+    store.import_local_backup(&backup).unwrap();
+    let message = store.get_outbound_message(id).unwrap();
+    assert!(message.html_body.contains("<strong>safe</strong>"));
+    assert!(!message.html_body.contains("<script"));
+    assert!(!message.html_body.contains("onerror"));
+    assert!(!message.html_body.contains("tracker.invalid"));
+    assert!(store
+        .get_message(id)
+        .unwrap()
+        .security_warnings
+        .iter()
+        .any(|w| w.contains("远程图片")));
+}
+
+#[test]
+fn backup_restore_does_not_automatically_resend_old_outbox_entries() {
+    let store = test_store();
+    let draft = DraftInput {
+        draft_id: 0,
+        account_id: 0,
+        identity_id: 0,
+        to: "recipient@example.invalid".into(),
+        cc: String::new(),
+        bcc: String::new(),
+        subject: "scheduled before backup".into(),
+        body: "test".into(),
+        html_body: String::new(),
+        send_at: String::new(),
+        attachments: vec![],
+    };
+    let item = store.queue_outbox_message(draft).unwrap();
+    let backup = store.export_local_backup().unwrap();
+    // The old backup still says queued even if the message later completed.
+    assert!(store.claim_outbox_message(item.message_id).unwrap());
+    store
+        .mark_outbox_smtp_sent_pending_archive(item.message_id, "<accepted@example.invalid>")
+        .unwrap();
+    store.import_local_backup(&backup).unwrap();
+    let restored = store
+        .list_outbox()
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.id == item.id)
+        .unwrap();
+    assert_eq!(restored.status, "send_unknown");
+    assert!(restored.last_error.contains("核对"));
+    assert!(!store.claim_outbox_message(item.message_id).unwrap());
+    assert!(store.pending_outbox_messages().unwrap().is_empty());
+}
+
+#[test]
+fn stale_sending_state_does_not_prevent_backup_restore_after_workers_stop() {
+    let store = test_store();
+    let item = store
+        .prepare_outbox_send(DraftInput {
+            draft_id: 0,
+            account_id: 0,
+            identity_id: 0,
+            to: "to@example.invalid".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "stale send".into(),
+            body: "test".into(),
+            html_body: String::new(),
+            send_at: String::new(),
+            attachments: vec![],
+        })
+        .unwrap();
+    let backup = store.export_local_backup().unwrap();
+    store.import_local_backup(&backup).unwrap();
+    assert_eq!(
+        store
+            .list_outbox()
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.message_id == item)
+            .unwrap()
+            .status,
+        "send_unknown"
+    );
+}
+
+#[test]
+fn backup_restore_handles_duplicate_retry_and_inflight_fingerprints() {
+    let store = test_store();
+    let input = || DraftInput {
+        draft_id: 0,
+        account_id: 0,
+        identity_id: 0,
+        to: "to@example.invalid".into(),
+        cc: String::new(),
+        bcc: String::new(),
+        subject: "duplicate submission".into(),
+        body: "test".into(),
+        html_body: String::new(),
+        send_at: String::new(),
+        attachments: vec![],
+    };
+    let first = store.prepare_outbox_send(input()).unwrap();
+    store
+        .mark_outbox_failed(first, "temporary SMTP failure")
+        .unwrap();
+    let second = store.prepare_outbox_send(input()).unwrap();
+    let backup = store.export_local_backup().unwrap();
+    store.import_local_backup(&backup).unwrap();
+    let items = store.list_outbox().unwrap();
+    for id in [first, second] {
+        assert_eq!(
+            items
+                .iter()
+                .find(|item| item.message_id == id)
+                .unwrap()
+                .status,
+            "send_unknown"
+        );
+    }
+    let retained: i64 = store.with_conn(|conn| Ok(conn.query_row(
+        "SELECT COUNT(*) FROM outbox_queue WHERE message_id IN (?1,?2) AND submission_fingerprint<>''",
+        params![first,second], |row|row.get(0))?)).unwrap();
+    assert_eq!(retained, 2);
+    let original = items.iter().find(|item| item.message_id == second).unwrap();
+    store.resolve_outbox_outcome(original.id, false).unwrap();
+    assert!(
+        matches!(
+            store.prepare_outbox_send(input()),
+            Err(MailError::SmtpOutcomeUnknown(_))
+        ),
+        "the second unresolved copy must still block a repeated submission"
+    );
+}
+
+#[test]
+fn failed_backup_restore_leaves_existing_sending_state_unchanged() {
+    let store = test_store();
+    let message_id = store
+        .prepare_outbox_send(DraftInput {
+            draft_id: 0,
+            account_id: 0,
+            identity_id: 0,
+            to: "to@example.invalid".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "must roll back".into(),
+            body: "test".into(),
+            html_body: String::new(),
+            send_at: String::new(),
+            attachments: vec![],
+        })
+        .unwrap();
+    let mut backup = store.export_local_backup().unwrap();
+    backup.tables.get_mut("messages").unwrap()[0]
+        .insert("folder_id".into(), serde_json::json!(9_999_999));
+    assert!(store.import_local_backup(&backup).is_err());
+    let status: String = store
+        .with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT status FROM outbox_queue WHERE message_id=?1",
+                [message_id],
+                |r| r.get(0),
+            )?)
+        })
+        .unwrap();
+    assert_eq!(status, "sending");
+}
+
+#[test]
+fn legacy_contact_ledger_counts_multiple_aliases_once_per_message() {
+    let store = test_store();
+    let account = store.get_account().unwrap();
+    let contact_id = store.with_conn(|conn| {
+        conn.execute("INSERT INTO contacts(account_id,name,email,aliases,vip,message_count,last_seen_at) VALUES(?1,'Alias test','primary@example.invalid','alias@example.invalid',0,0,'')", [account.id])?;
+        Ok(conn.last_insert_rowid())
+    }).unwrap();
+    let message_id = store
+        .save_draft(DraftInput {
+            draft_id: 0,
+            account_id: account.id,
+            identity_id: 0,
+            to: "primary@example.invalid".into(),
+            cc: "alias@example.invalid".into(),
+            bcc: String::new(),
+            subject: "alias test".into(),
+            body: "test".into(),
+            html_body: String::new(),
+            send_at: String::new(),
+            attachments: vec![],
+        })
+        .unwrap();
+    let mut backup = store.export_local_backup().unwrap();
+    backup.tables.remove("contact_sent_messages");
+    store.import_local_backup(&backup).unwrap();
+    store.sync_contacts_from_sent_message(message_id).unwrap();
+    let contact = store
+        .list_contacts_for_account(Some(account.id))
+        .unwrap()
+        .into_iter()
+        .find(|c| c.id == contact_id)
+        .unwrap();
+    assert_eq!(contact.message_count, 1);
+}
+
+#[test]
+fn restored_scheduled_mail_requires_review_even_when_due_in_the_future() {
+    let store = test_store();
+    let item = store
+        .queue_outbox_message(DraftInput {
+            draft_id: 0,
+            account_id: 0,
+            identity_id: 0,
+            to: "future@example.invalid".into(),
+            cc: String::new(),
+            bcc: String::new(),
+            subject: "future schedule".into(),
+            body: "test".into(),
+            html_body: String::new(),
+            send_at: "2099-01-01T00:00:00Z".into(),
+            attachments: vec![],
+        })
+        .unwrap();
+    assert_eq!(item.status, "scheduled");
+    let backup = store.export_local_backup().unwrap();
+    store.import_local_backup(&backup).unwrap();
+    let restored = store
+        .list_outbox()
+        .unwrap()
+        .into_iter()
+        .find(|entry| entry.id == item.id)
+        .unwrap();
+    assert_eq!(restored.status, "send_unknown");
+    assert!(restored.next_attempt_at.is_empty());
+}

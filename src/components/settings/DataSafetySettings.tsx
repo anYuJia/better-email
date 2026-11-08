@@ -208,7 +208,7 @@ export default function DataSafetySettings({
           </SettingsBadge>
         }
       >
-        <p className="st-field-hint">备份不包含密码和 OAuth Token。</p>
+        <p className="st-field-hint">备份不包含密码、OAuth Token 和附件文件。恢复后，远端附件需重新下载，本地草稿附件需重新添加；待发送邮件需核对后处理。</p>
         <div className="st-actions">
           <SettingsButton icon={<Upload size={14} />} onClick={onImportBackup}>恢复备份</SettingsButton>
           <SettingsButton variant="primary" icon={<Download size={14} />} onClick={onExportBackup}>

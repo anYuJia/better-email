@@ -65,6 +65,12 @@ describe('DataSafetySettings 默认下载位置', () => {
     expect(screen.queryByRole('checkbox', { name: /自动下载新邮件附件/ })).toBeNull();
   });
 
+  it('说明备份不包含凭据和附件文件', () => {
+    renderPage();
+    expect(screen.getByText(/备份不包含密码、OAuth Token 和附件文件/)).not.toBeNull();
+    expect(screen.getByText(/本地草稿附件需重新添加/)).not.toBeNull();
+  });
+
   it('附件自动下载不再混入全局存储设置', () => {
     renderPage();
     expect(screen.queryByText('自动下载新邮件附件')).toBeNull();

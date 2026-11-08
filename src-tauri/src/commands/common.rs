@@ -233,9 +233,10 @@ pub(super) fn read_file_with_limit(path: &Path, max_bytes: usize) -> MailResult<
     Ok(buffer)
 }
 
+pub(super) const MAX_BACKUP_FILE_BYTES: usize = 512 * 1024 * 1024;
+
 pub(super) fn read_local_backup_file(path: PathBuf) -> MailResult<(LocalBackup, String, i64)> {
     // 备份 JSON 是不可信输入：先 metadata 预检，再按上限流式读取，避免资源耗尽。
-    const MAX_BACKUP_FILE_BYTES: usize = 512 * 1024 * 1024;
     let payload = read_file_with_limit(&path, MAX_BACKUP_FILE_BYTES)?;
     let backup = serde_json::from_slice::<LocalBackup>(&payload)
         .map_err(|error| crate::db::MailError::Imap(format!("备份 JSON 解析失败：{error}")))?;

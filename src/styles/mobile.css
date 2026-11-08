@@ -239,13 +239,14 @@
     font-size: var(--ui-font-size-meta);
   }
 
-  .app-shell.is-mobile-app .mobile-message-list-panel .message-card.is-selection-mode .message-leading { opacity: 0; }
+  .app-shell.is-mobile-app .mobile-message-list-panel .message-card.is-selection-mode .message-leading { opacity: 1; }
   .app-shell.is-mobile-app .message-card.is-selection-mode .message-select {
-    width: 52px;
+    top: 0;
+    transform: none;
+    width: 44px;
     height: 100%;
     min-height: 44px;
   }
-  .app-shell.is-mobile-app .message-card.is-selection-mode { padding-right: 16px; }
 
   .mobile-inbox-filter-row {
     min-height: 45px;

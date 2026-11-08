@@ -1073,8 +1073,8 @@ pub fn download_attachment_to_writer(
     })
 }
 
-fn download_attachment_from_selected(
-    session: &mut imap::Session<imap::Connection>,
+fn download_attachment_from_selected<T: Read + Write>(
+    session: &mut imap::Session<T>,
     options: AttachmentDownloadOptions<'_>,
     start_offset: usize,
     writer: &mut impl Write,
@@ -1095,6 +1095,9 @@ fn download_attachment_from_selected(
             part,
         ),
         Err(part_error) => {
+            if matches!(part_error, MailError::AttachmentAmbiguous) {
+                return Err(part_error);
+            }
             // A tagged-response mismatch means the session is no longer trustworthy. Let the
             // outer retry discard it and establish a fresh IMAP connection before continuing.
             if imap_session_is_desynchronized(&part_error) {
@@ -1588,14 +1591,14 @@ fn fetch_attachment_payload_from_selected<T: Read + Write>(
         .ok_or_else(|| MailError::Imap("IMAP 未返回邮件正文。".to_string()))?;
     parse_attachment_payload_from_raw(&raw, filename, content_id).ok_or_else(|| {
         MailError::Imap(format!(
-            "IMAP 正文中未找到附件：{}",
+            "IMAP 正文中无法唯一定位附件：{}",
             attachment_lookup_label(filename, content_id)
         ))
     })
 }
 
-fn find_attachment_part_metadata(
-    session: &mut imap::Session<imap::Connection>,
+fn find_attachment_part_metadata<T: Read + Write>(
+    session: &mut imap::Session<T>,
     remote_uid: i64,
     filename: &str,
     content_id: &str,
@@ -1609,16 +1612,19 @@ fn find_attachment_part_metadata(
         .iter()
         .find_map(|fetch| fetch.bodystructure())
         .ok_or_else(|| MailError::Imap("IMAP 未返回 BODYSTRUCTURE。".to_string()))?;
+    if matching_attachment_part_paths(bodystructure, requested, &requested_content_id).len() > 1 {
+        return Err(MailError::AttachmentAmbiguous);
+    }
     attachment_part_metadata(bodystructure, requested, &requested_content_id).ok_or_else(|| {
         MailError::Imap(format!(
-            "IMAP BODYSTRUCTURE 中未找到附件：{}",
+            "IMAP BODYSTRUCTURE 中无法唯一定位附件：{}",
             attachment_lookup_label(requested, &requested_content_id)
         ))
     })
 }
 
-fn download_attachment_part_to_writer(
-    session: &mut imap::Session<imap::Connection>,
+fn download_attachment_part_to_writer<T: Read + Write>(
+    session: &mut imap::Session<T>,
     remote_uid: i64,
     filename: &str,
     max_bytes: i64,
@@ -1639,6 +1645,11 @@ fn download_attachment_part_to_writer(
             "附件断点超过当前传输安全上限（{} MB）。",
             transfer_limit / 1024 / 1024
         )));
+    }
+    if part.encoded_octets > 0 && start_offset as i64 > part.encoded_octets {
+        return Err(MailError::Imap(
+            "附件的本地续传数据超过服务器声明的大小，请清理附件缓存后重试。".into(),
+        ));
     }
     let section_path = SectionPath::Part(part.path.clone(), None);
     let section = part
@@ -1673,6 +1684,11 @@ fn download_attachment_part_to_writer(
                 transfer_limit / 1024 / 1024
             )));
         }
+        if part.encoded_octets > 0 && written as i64 > part.encoded_octets {
+            return Err(MailError::Imap(
+                "附件分段超过服务器声明的大小，已停止下载。".into(),
+            ));
+        }
         writer.write_all(&chunk)?;
         if chunk.len() < ATTACHMENT_CHUNK_BYTES {
             break;
@@ -1698,16 +1714,11 @@ fn attachment_part_metadata(
     filename: &str,
     content_id: &str,
 ) -> Option<AttachmentPartMetadata> {
-    let requested = filename.trim();
-    let requested_content_id = protocol::normalize_content_id(Some(content_id));
-    let mut attachment_index = 0_usize;
-    let path = find_attachment_part_path(
-        bodystructure,
-        &[],
-        requested,
-        &requested_content_id,
-        &mut attachment_index,
-    )?;
+    let paths = matching_attachment_part_paths(bodystructure, filename, content_id);
+    let [path] = paths.as_slice() else {
+        return None;
+    };
+    let path = path.clone();
     let body = bodystructure_at_path(bodystructure, &path)?;
     let other = match body {
         BodyStructure::Basic { other, .. }
@@ -1722,31 +1733,50 @@ fn attachment_part_metadata(
     })
 }
 
-fn find_attachment_part_path(
+fn matching_attachment_part_paths(
+    bodystructure: &BodyStructure<'_>,
+    filename: &str,
+    content_id: &str,
+) -> Vec<Vec<u32>> {
+    let requested = filename.trim();
+    let requested_content_id = protocol::normalize_content_id(Some(content_id));
+    let mut attachment_index = 0_usize;
+    let mut paths = Vec::new();
+    find_attachment_part_paths(
+        bodystructure,
+        &[],
+        requested,
+        &requested_content_id,
+        &mut attachment_index,
+        &mut paths,
+    );
+    paths
+}
+
+fn find_attachment_part_paths(
     bodystructure: &BodyStructure<'_>,
     path: &[u32],
     requested_filename: &str,
     requested_content_id: &str,
     attachment_index: &mut usize,
-) -> Option<Vec<u32>> {
+    matches: &mut Vec<Vec<u32>>,
+) {
     match bodystructure {
         BodyStructure::Multipart { bodies, .. } => {
             for (index, body) in bodies.iter().enumerate() {
                 let mut child_path = path.to_vec();
                 child_path.push((index + 1) as u32);
-                if let Some(found) = find_attachment_part_path(
+                find_attachment_part_paths(
                     body,
                     &child_path,
                     requested_filename,
                     requested_content_id,
                     attachment_index,
-                ) {
-                    return Some(found);
-                }
+                    matches,
+                );
             }
-            None
         }
-        _ if !bodystructure_is_attachment(bodystructure) => None,
+        _ if !bodystructure_is_attachment(bodystructure) => {}
         _ => {
             let filename = attachment_filename_from_bodystructure(bodystructure);
             let content_id =
@@ -1754,7 +1784,7 @@ fn find_attachment_part_path(
             let mime_type = bodystructure_mime_type(bodystructure);
             let fallback_filename =
                 protocol::inline_attachment_filename(&mime_type, &content_id, *attachment_index);
-            let matches = if !requested_content_id.is_empty() {
+            let is_match = if !requested_content_id.is_empty() {
                 content_id == requested_content_id
             } else if !requested_filename.is_empty() {
                 filename.as_deref() == Some(requested_filename)
@@ -1763,7 +1793,9 @@ fn find_attachment_part_path(
                 true
             };
             *attachment_index += 1;
-            matches.then(|| path.to_vec())
+            if is_match {
+                matches.push(path.to_vec());
+            }
         }
     }
 }
@@ -2372,6 +2404,7 @@ fn parse_body_from_raw(raw: &[u8]) -> RemoteMessageBody {
     }
 }
 
+#[cfg(test)]
 fn attachment_display_name(part: &MessagePart<'_>) -> String {
     part.attachment_name()
         .map(crate::mime::decode_attachment_filename)
@@ -2550,69 +2583,59 @@ fn parse_attachment_payload_from_raw(
     let requested_content_id = protocol::normalize_content_id(Some(content_id));
     let parsed = MessageParser::default().parse(raw)?;
     let attachments = remote_payload_parts(&parsed);
-    if requested.is_empty() && requested_content_id.is_empty() {
-        let (index, part) = attachments.first()?;
-        let mime_type = part_mime_type(part);
-        let part_content_id = protocol::normalize_content_id(part.content_id());
-        let filename = attachment_display_name(part);
-        return Some(RemoteAttachmentPayload {
-            filename: if filename.is_empty() {
-                protocol::inline_attachment_filename(&mime_type, &part_content_id, *index)
-            } else {
-                filename
-            },
-            bytes: part.contents().to_vec(),
-        });
-    }
-
-    let payload = attachments.into_iter().find_map(|(index, part)| {
-        let part_name = part.attachment_name().unwrap_or("");
+    let mut matches = attachments.into_iter().filter_map(|(index, part)| {
+        let raw_name = part.attachment_name().unwrap_or("");
+        let decoded_name = crate::mime::decode_attachment_filename(raw_name);
         let part_content_id = protocol::normalize_content_id(part.content_id());
         let mime_type = part_mime_type(part);
         let fallback_name =
             protocol::inline_attachment_filename(&mime_type, &part_content_id, index);
         let matches = if !requested_content_id.is_empty() {
             part_content_id == requested_content_id
+        } else if requested.is_empty() {
+            true
         } else {
-            part_name == requested || part_name.is_empty() && fallback_name == requested
+            decoded_name == requested || raw_name.is_empty() && fallback_name == requested
         };
-        if matches {
-            let payload_filename = if part_name.is_empty() {
-                fallback_name
-            } else {
-                crate::mime::decode_attachment_filename(part_name)
-            };
-            Some(RemoteAttachmentPayload {
-                filename: payload_filename,
-                bytes: part.contents().to_vec(),
-            })
-        } else {
-            None
-        }
+        matches.then_some({
+            (
+                if raw_name.is_empty() {
+                    fallback_name
+                } else {
+                    decoded_name
+                },
+                part,
+            )
+        })
     });
-    payload
+    let (filename, part) = matches.next()?;
+    if matches.next().is_some() {
+        return None;
+    }
+    Some(RemoteAttachmentPayload {
+        filename,
+        bytes: part.contents().to_vec(),
+    })
 }
 
 fn remote_payload_parts<'a>(message: &'a Message<'a>) -> Vec<(usize, &'a MessagePart<'a>)> {
     let mut parts = Vec::new();
-    let mut seen_inline_content_ids = BTreeSet::new();
 
     for (index, part) in message.attachments().enumerate() {
-        let content_id = protocol::normalize_content_id(part.content_id());
-        if !content_id.is_empty() {
-            seen_inline_content_ids.insert(content_id);
-        }
         parts.push((index, part));
     }
 
     for (index, part) in message.parts.iter().enumerate() {
         let content_id = protocol::normalize_content_id(part.content_id());
-        if content_id.is_empty() || seen_inline_content_ids.contains(&content_id) {
+        if content_id.is_empty()
+            || parts
+                .iter()
+                .any(|(_, existing)| std::ptr::eq(*existing, part))
+        {
             continue;
         }
         let mime_type = part_mime_type(part);
         if mime_type.to_ascii_lowercase().starts_with("image/") && part.is_binary() {
-            seen_inline_content_ids.insert(content_id);
             parts.push((index, part));
         }
     }

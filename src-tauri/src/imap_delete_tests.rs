@@ -314,3 +314,92 @@ fn header_batch_must_include_each_requested_header_before_advancing() {
         }
     }
 }
+
+#[test]
+fn duplicate_attachment_names_without_identity_do_not_return_wrong_part() {
+    let raw = concat!(
+        "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=b\r\n\r\n",
+        "--b\r\nContent-Type: text/plain; name=report.txt\r\nContent-Disposition: attachment; filename=report.txt\r\n\r\nfirst\r\n",
+        "--b\r\nContent-Type: text/plain; name=report.txt\r\nContent-Disposition: attachment; filename=report.txt\r\n\r\nsecond\r\n--b--\r\n"
+    );
+    assert!(parse_attachment_payload_from_raw(raw.as_bytes(), "report.txt", "").is_none());
+    let response = b"* 1 FETCH (BODYSTRUCTURE ((\"APPLICATION\" \"OCTET-STREAM\" (\"NAME\" \"report.txt\") NIL NIL \"BASE64\" 4 NIL (\"ATTACHMENT\" (\"FILENAME\" \"report.txt\")) NIL)(\"APPLICATION\" \"OCTET-STREAM\" (\"NAME\" \"report.txt\") NIL NIL \"BASE64\" 8 NIL (\"ATTACHMENT\" (\"FILENAME\" \"report.txt\")) NIL) \"MIXED\" NIL NIL NIL))\r\n";
+    let (_, parsed) = imap_proto::parser::parse_response(response).unwrap();
+    let imap_proto::types::Response::Fetch(_, attributes) = parsed else {
+        panic!("expected FETCH")
+    };
+    let structure = attributes
+        .iter()
+        .find_map(|attr| match attr {
+            imap_proto::types::AttributeValue::BodyStructure(value) => Some(value),
+            _ => None,
+        })
+        .unwrap();
+    assert!(attachment_part_metadata(structure, "report.txt", "").is_none());
+}
+
+#[test]
+fn duplicate_inline_content_ids_are_not_silently_deduplicated() {
+    let raw = concat!(
+        "MIME-Version: 1.0\r\nContent-Type: multipart/related; boundary=b\r\n\r\n",
+        "--b\r\nContent-Type: text/html\r\n\r\n<img src=cid:duplicate@example.test>\r\n",
+        "--b\r\nContent-Type: image/png\r\nContent-ID: <duplicate@example.test>\r\nContent-Transfer-Encoding: base64\r\n\r\nZmlyc3Q=\r\n",
+        "--b\r\nContent-Type: image/png\r\nContent-ID: <duplicate@example.test>\r\nContent-Transfer-Encoding: base64\r\n\r\nc2Vjb25k\r\n--b--\r\n"
+    );
+    assert!(
+        parse_attachment_payload_from_raw(raw.as_bytes(), "", "duplicate@example.test").is_none()
+    );
+}
+
+#[test]
+fn ambiguous_bodystructure_never_falls_back_to_first_full_message_match() {
+    let responses = concat!(
+        "a1 OK authenticated\r\n* 1 EXISTS\r\n* OK [UIDVALIDITY 100] generation\r\na2 OK selected\r\n",
+        "* 1 FETCH (UID 41 BODYSTRUCTURE ((\"APPLICATION\" \"OCTET-STREAM\" (\"NAME\" \"report.txt\") NIL NIL \"BASE64\" 4 NIL (\"ATTACHMENT\" (\"FILENAME\" \"report.txt\")) NIL)(\"APPLICATION\" \"OCTET-STREAM\" (\"NAME\" \"report.txt\") NIL NIL \"BASE64\" 8 NIL (\"ATTACHMENT\" (\"FILENAME\" \"report.txt\")) NIL) \"MIXED\" NIL NIL NIL))\r\na3 OK fetched\r\n"
+    );
+    let commands = Arc::new(Mutex::new(Vec::new()));
+    let mut session = imap::Client::new(ScriptedImap {
+        responses: Cursor::new(responses.as_bytes().to_vec()),
+        commands: commands.clone(),
+    })
+    .login("fake", "fake")
+    .unwrap();
+    session.select("INBOX").unwrap();
+    let options = AttachmentDownloadOptions {
+        remote_name: "INBOX",
+        remote_uid: 41,
+        remote_uid_validity: "100",
+        filename: "report.txt",
+        content_id: "",
+        max_bytes: 1024,
+        start_offset: 0,
+    };
+    let mut bytes = Vec::new();
+    assert!(matches!(
+        download_attachment_from_selected(&mut session, options, 0, &mut bytes),
+        Err(MailError::AttachmentAmbiguous)
+    ));
+    assert!(bytes.is_empty());
+    let sent = String::from_utf8(commands.lock().unwrap().clone()).unwrap();
+    assert!(sent.contains("BODYSTRUCTURE"));
+    assert!(!sent.contains("BODY.PEEK[]"), "{sent}");
+}
+
+#[test]
+fn oversized_resume_is_rejected_before_fetching_or_writing() {
+    let (mut session, _validity, commands) = delete_session(Some(100));
+    let mut output = Vec::new();
+    let part = AttachmentPartMetadata {
+        path: vec![2],
+        transfer_encoding: AttachmentTransferEncoding::Identity,
+        encoded_octets: 4,
+    };
+    let error =
+        download_attachment_part_to_writer(&mut session, 41, "file.txt", 100, 5, &mut output, part)
+            .err()
+            .expect("oversized partial must be rejected");
+    assert!(error.to_string().contains("超过服务器声明"));
+    assert!(output.is_empty());
+    let sent = String::from_utf8(commands.lock().unwrap().clone()).unwrap();
+    assert!(!sent.contains("UID FETCH"), "{sent}");
+}

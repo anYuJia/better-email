@@ -386,10 +386,25 @@ impl MailStore {
         let attachment_root = self.data_dir.join("attachments");
         let usage_before = self.storage_usage()?;
         let (protected_paths, reclaimable_rows) = self.attachment_storage_index()?;
+        let canonical_attachment_root = canonical_or_normalized_path(&attachment_root);
 
         for (path, _) in collect_regular_files(&attachment_root)? {
-            if !protected_paths.contains(&path) && !self.attachment_path_has_active_writer(&path)? {
-                fs::remove_file(path)?;
+            if !protected_paths.contains(&path) {
+                let message_id = path
+                    .strip_prefix(&canonical_attachment_root)
+                    .ok()
+                    .and_then(|relative| relative.components().next())
+                    .and_then(|part| part.as_os_str().to_str())
+                    .and_then(|id| id.parse::<i64>().ok());
+                if let Some(message_id) = message_id {
+                    self.remove_attachment_cache_file_if_inactive(message_id, &path)?;
+                } else {
+                    match fs::remove_file(&path) {
+                        Ok(()) => {}
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                        Err(error) => return Err(error.into()),
+                    }
+                }
             }
         }
 
@@ -416,7 +431,7 @@ impl MailStore {
         // 不受常规 TTL 宽限约束；仍被引用的文件由 prune 内部保留。
         let _ = self.prune_temp_attachments(std::time::Duration::from_secs(0))?;
 
-        prune_empty_directories(&attachment_root, true)?;
+        self.prune_attachment_cache_directories_if_idle(&attachment_root)?;
         let storage = self.storage_usage()?;
         Ok(CacheClearResult {
             removed_file_count: usage_before.reclaimable_file_count,
@@ -426,20 +441,6 @@ impl MailStore {
                 .saturating_sub(storage.reclaimable_cache_bytes),
             storage,
         })
-    }
-
-    fn attachment_path_has_active_writer(&self, path: &Path) -> MailResult<bool> {
-        let root = canonical_or_normalized_path(&self.attachment_root());
-        let message_id = path
-            .strip_prefix(root)
-            .ok()
-            .and_then(|relative| relative.components().next())
-            .and_then(|part| part.as_os_str().to_str())
-            .and_then(|id| id.parse::<i64>().ok());
-        match message_id {
-            Some(message_id) => self.has_active_outbox_lease(message_id),
-            None => Ok(false),
-        }
     }
 
     fn attachment_storage_index(&self) -> MailResult<AttachmentStorageIndex> {
@@ -839,6 +840,25 @@ mod tests {
         let _ = store
             .get_outbound_message(draft_id)
             .expect("draft still there");
+    }
+
+    #[test]
+    fn cache_clear_preserves_active_attachment_partial_until_writer_finishes() {
+        let store = seeded_store();
+        let message = store
+            .list_messages_for_scope(None, 0, None, None, 1)
+            .unwrap()
+            .remove(0);
+        let directory = store.attachment_dir(message.id);
+        fs::create_dir_all(&directory).unwrap();
+        let partial = directory.join("active.download");
+        fs::write(&partial, b"in progress").unwrap();
+        let lease = store.hold_outbox_lease(message.id).unwrap();
+        store.clear_reclaimable_attachment_cache().unwrap();
+        assert_eq!(fs::read(&partial).unwrap(), b"in progress");
+        drop(lease);
+        store.clear_reclaimable_attachment_cache().unwrap();
+        assert!(!partial.exists());
     }
 
     #[test]

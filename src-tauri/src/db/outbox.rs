@@ -49,6 +49,40 @@ impl MailStore {
         Ok(OutboxLeaseGuard { key })
     }
 
+    /// Coordinate cache cleanup with starting a writer; checking a lease and
+    /// unlinking in separate critical sections could remove an active partial.
+    pub(super) fn remove_attachment_cache_file_if_inactive(
+        &self,
+        message_id: i64,
+        path: &Path,
+    ) -> MailResult<()> {
+        let key = (fs::canonicalize(&self.database_path)?, message_id);
+        let active = ACTIVE_LEASES
+            .get_or_init(Mutex::default)
+            .lock()
+            .map_err(|_| MailError::DatabaseLockPoisoned)?;
+        if !active.contains_key(&key) {
+            match fs::remove_file(path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn prune_attachment_cache_directories_if_idle(&self, root: &Path) -> MailResult<()> {
+        let database = fs::canonicalize(&self.database_path)?;
+        let active = ACTIVE_LEASES
+            .get_or_init(Mutex::default)
+            .lock()
+            .map_err(|_| MailError::DatabaseLockPoisoned)?;
+        if !active.keys().any(|(path, _)| *path == database) {
+            super::attachments::prune_empty_directories(root, true)?;
+        }
+        Ok(())
+    }
+
     /// Persist the exact bytes already verified for this submission before SMTP
     /// starts. The reader and any later archive retry then share a durable,
     /// authorized copy, without depending on temporary composer files.

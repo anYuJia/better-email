@@ -20,6 +20,8 @@ pub enum MailError {
     SmtpOutcomeUnknown(String),
     #[error("{0}")]
     Imap(String),
+    #[error("附件存在多个匹配项，无法唯一定位；请在其他邮件客户端中下载。")]
+    AttachmentAmbiguous,
     /// 系统对话框被用户取消（另存为/选择文件等）：不是失败，调用方应保持现状。
     #[error("操作已取消。")]
     Cancelled,

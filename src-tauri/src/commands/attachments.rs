@@ -9,10 +9,13 @@ use crate::db::{MailResult, MailStore};
 use crate::imap_probe;
 use crate::models::{Attachment, AttachmentDownload, Message, OutboundAttachmentInput};
 use base64::Engine as _;
+use once_cell::sync::Lazy;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufReader, BufWriter, Read, Seek, Write};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, Weak};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_shell::ShellExt;
@@ -23,6 +26,21 @@ use uuid::Uuid;
 /// - 总大小上限：单封邮件附件总量 100 MB，防止一次外发大量数据。
 const MAX_OUTBOUND_ATTACHMENT_BYTES: i64 = 25 * 1024 * 1024;
 pub(crate) const MAX_OUTBOUND_TOTAL_BYTES: i64 = 100 * 1024 * 1024;
+
+static ATTACHMENT_DOWNLOAD_LOCKS: Lazy<Mutex<HashMap<i64, Weak<Mutex<()>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+fn attachment_download_lock(attachment_id: i64) -> Arc<Mutex<()>> {
+    let mut locks = ATTACHMENT_DOWNLOAD_LOCKS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    locks.retain(|_, lock| lock.strong_count() > 0);
+    if let Some(lock) = locks.get(&attachment_id).and_then(Weak::upgrade) {
+        return lock;
+    }
+    let lock = Arc::new(Mutex::new(()));
+    locks.insert(attachment_id, Arc::downgrade(&lock));
+    lock
+}
 
 /// base64 编码长度上限：N 字节解码结果最多需要 4*ceil(N/3) 字符，
 /// 超过该长度即可在解码前安全拒绝，避免恶意输入先被整体解码到内存。
@@ -409,75 +427,141 @@ fn ensure_private_attachment_dir(store: &MailStore, message_id: i64) -> MailResu
     fs::create_dir_all(&temp_dir)?;
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        if let Ok(metadata) = fs::metadata(&temp_dir) {
-            if metadata.permissions().mode() & 0o077 != 0 {
-                let _ = fs::set_permissions(&temp_dir, fs::Permissions::from_mode(0o700));
-            }
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let directory = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+            .open(&temp_dir)?;
+        if directory.metadata()?.permissions().mode() & 0o777 != 0o700 {
+            directory.set_permissions(fs::Permissions::from_mode(0o700))?;
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let metadata = fs::symlink_metadata(&temp_dir)?;
+        if !metadata.is_dir() || metadata.file_type().is_symlink() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "附件临时目录无效。",
+            )
+            .into());
         }
     }
     Ok(temp_dir)
 }
 
-/// 断点续传既有临时文件在打开前的安全检查：必须是受管目录内的常规文件；
-/// 权限过宽时直接收紧为 0600；大小超过传输上限则删除重建（从零开始）。
-fn private_resume_offset(path: &Path) -> MailResult<usize> {
-    let metadata = match fs::metadata(path) {
-        Ok(metadata) => metadata,
-        Err(_) => return Ok(0),
-    };
-    if !metadata.is_file() {
-        // 目录/设备等异常条目：删除后从零开始，绝不 append 写入。
-        let _ = fs::remove_file(path);
-        return Ok(0);
+/// Open a managed partial without following links and check the opened file,
+/// so a replacement between path inspection and opening cannot redirect writes.
+#[cfg(unix)]
+fn validate_private_attachment_file(file: &File) -> MailResult<()> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let metadata = file.metadata()?;
+    if !metadata.is_file() || metadata.nlink() != 1 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "附件临时文件不是独立的普通文件。".to_string(),
+        )
+        .into());
     }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if metadata.permissions().mode() & 0o077 != 0 {
-            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
-        }
+    if metadata.permissions().mode() & 0o777 != 0o600 {
+        file.set_permissions(fs::Permissions::from_mode(0o600))?;
     }
-    Ok(attachment_resume_offset(metadata.len()).unwrap_or_else(|| {
-        let _ = fs::remove_file(path);
-        0
-    }))
+    Ok(())
 }
 
-/// 打开/创建断点续传临时文件：Unix 上创建时直接使用 0600，不以宽权限创建后再 chmod。
+fn private_resume_offset_for_file(file: &File) -> MailResult<usize> {
+    #[cfg(unix)]
+    validate_private_attachment_file(file)?;
+    if !file.metadata()?.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "附件临时文件不是普通文件。",
+        )
+        .into());
+    }
+    match attachment_resume_offset(file.metadata()?.len()) {
+        Some(offset) => Ok(offset),
+        None => {
+            file.set_len(0)?;
+            Ok(0)
+        }
+    }
+}
+
+#[cfg(all(test, unix))]
+fn private_resume_offset(path: &Path) -> MailResult<usize> {
+    let file = open_private_attachment_file(path)?;
+    private_resume_offset_for_file(&file)
+}
+
+/// Open the resumable file without following a substituted symbolic link.
 fn open_private_attachment_file(path: &Path) -> MailResult<File> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-        let mut options = OpenOptions::new();
-        options.create(true).append(true).mode(0o600);
-        if path.exists() {
-            // 既有文件打开前再次收紧权限，防止继承过宽 umask 产生的 0644。
-            let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
-        }
-        options.open(path).map_err(Into::into)
+        use std::os::unix::fs::OpenOptionsExt;
+        let file = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .append(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+            .open(path)?;
+        validate_private_attachment_file(&file)?;
+        Ok(file)
     }
     #[cfg(not(unix))]
     {
-        Ok(OpenOptions::new().create(true).append(true).open(path)?)
+        if let Ok(metadata) = fs::symlink_metadata(path) {
+            if !metadata.is_file() || metadata.file_type().is_symlink() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "附件临时文件不是普通文件。",
+                )
+                .into());
+            }
+        }
+        Ok(OpenOptions::new()
+            .create(true)
+            .read(true)
+            .append(true)
+            .open(path)?)
     }
 }
 
-/// 创建解码临时文件：Unix 上直接以 0600 创建。
+/// Validate the opened file before truncation, including hard-link protection.
 fn create_private_file(path: &Path) -> MailResult<File> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        Ok(OpenOptions::new()
+        let file = OpenOptions::new()
             .create(true)
+            .read(true)
             .write(true)
-            .truncate(true)
             .mode(0o600)
-            .open(path)?)
+            .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+            .open(path)?;
+        validate_private_attachment_file(&file)?;
+        file.set_len(0)?;
+        Ok(file)
     }
     #[cfg(not(unix))]
     {
-        Ok(File::create(path)?)
+        if let Ok(metadata) = fs::symlink_metadata(path) {
+            if !metadata.is_file() || metadata.file_type().is_symlink() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "附件临时文件不是普通文件。",
+                )
+                .into());
+            }
+        }
+        let file = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(path)?;
+        file.set_len(0)?;
+        Ok(file)
     }
 }
 
@@ -730,6 +814,30 @@ pub fn download_attachment_file(
     store: &MailStore,
     attachment: &Attachment,
 ) -> MailResult<AttachmentDownload> {
+    let lock = attachment_download_lock(attachment.id);
+    let _guard = lock.lock().unwrap_or_else(|error| error.into_inner());
+    let _lease = store.hold_outbox_lease(attachment.message_id)?;
+    let current = store.get_attachment(attachment.id)?;
+    if current.message_id != attachment.message_id {
+        return Err(crate::db::MailError::Cancelled);
+    }
+    // A concurrent request may have finished while this one waited. Reuse its
+    // verified result rather than appending to the same resumable file again.
+    if !attachment.is_downloaded && current.is_downloaded {
+        match validated_attachment_read_path(store, &current) {
+            Ok(path) => {
+                return Ok(AttachmentDownload {
+                    attachment: store.get_attachment(current.id)?,
+                    local_path: path.to_string_lossy().into_owned(),
+                    message: "附件已下载。".into(),
+                })
+            }
+            Err(error) if store.get_attachment(current.id)?.is_downloaded => return Err(error),
+            Err(_) => {}
+        }
+    }
+    let current = store.get_attachment(attachment.id)?;
+    let attachment = &current;
     // 已发送旧副本仍在本地时优先安全迁移，避免为了修复旧路径再次依赖网络。
     if attachment.is_downloaded && !attachment.local_path.is_empty() {
         match fs::canonicalize(&attachment.local_path) {
@@ -785,8 +893,8 @@ pub fn download_attachment_file(
     ));
     // 断点续传既有临时文件在打开前检查：受管目录内的常规文件、权限收紧、
     // 大小未超限；异常文件删除后从零开始。
-    let resume_offset = private_resume_offset(&temp_path)?;
     let mut output = open_private_attachment_file(&temp_path)?;
+    let resume_offset = private_resume_offset_for_file(&output)?;
     let download_result = imap_probe::download_attachment_to_writer(
         &account,
         &secret,
@@ -801,11 +909,11 @@ pub fn download_attachment_file(
         },
         &mut output,
     );
-    drop(output);
     let downloaded = match download_result {
         Ok(downloaded) => downloaded,
         Err(error) => {
-            let partial_bytes = fs::metadata(&temp_path)
+            let partial_bytes = output
+                .metadata()
                 .map(|metadata| metadata.len())
                 .unwrap_or_default();
             let progress = format_attachment_progress(partial_bytes);
@@ -814,6 +922,11 @@ pub fn download_attachment_file(
             )));
         }
     };
+    if output.metadata()?.len() != u64::try_from(downloaded.size_bytes).unwrap_or(u64::MAX) {
+        return Err(crate::db::MailError::Imap(
+            "附件临时数据大小发生变化，已停止保存；请清理附件缓存后重试。".into(),
+        ));
+    }
     if store.get_message_remote_reference(attachment.message_id)? != reference {
         return Err(crate::db::MailError::Cancelled);
     }
@@ -823,20 +936,23 @@ pub fn download_attachment_file(
         &downloaded.filename
     });
     let decoded_path = temp_dir.join(format!("{}.decoded", attachment.id));
+    output.rewind()?;
     let (local_path, decoded_size) = match downloaded.transfer_encoding {
         imap_probe::AttachmentTransferEncoding::Identity => {
             if let Err(error) = validate_attachment_download_size(downloaded.size_bytes) {
+                drop(output);
                 let _ = fs::remove_file(&temp_path);
                 return Err(error);
             }
-            let local_path = copy_download_to_user_dir(&temp_path, &final_dir, &filename)?;
+            let local_path = copy_download_reader_to_user_dir(&mut output, &final_dir, &filename)?;
+            drop(output);
             // 已成功落盘到用户目录，清理断点临时文件。
             let _ = fs::remove_file(&temp_path);
             (local_path, downloaded.size_bytes)
         }
         transfer_encoding => {
-            let decode_result = (|| -> MailResult<i64> {
-                let mut source = BufReader::new(File::open(&temp_path)?);
+            let decode_result = (|| -> MailResult<(i64, File)> {
+                let mut source = BufReader::new(&mut output);
                 let decoded_file = create_private_file(&decoded_path)?;
                 let mut target = BufWriter::new(decoded_file);
                 let decoded_size = imap_probe::decode_attachment_transfer(
@@ -847,17 +963,23 @@ pub fn download_attachment_file(
                 )?;
                 target.flush()?;
                 validate_attachment_download_size(decoded_size)?;
-                Ok(decoded_size)
+                let file = target.into_inner().map_err(|error| error.into_error())?;
+                Ok((decoded_size, file))
             })();
-            let decoded_size = match decode_result {
-                Ok(size) => size,
+            let (decoded_size, mut decoded_file) = match decode_result {
+                Ok(result) => result,
                 Err(error) => {
+                    drop(output);
                     let _ = fs::remove_file(&decoded_path);
                     let _ = fs::remove_file(&temp_path);
                     return Err(error);
                 }
             };
-            let local_path = copy_download_to_user_dir(&decoded_path, &final_dir, &filename)?;
+            decoded_file.rewind()?;
+            let local_path =
+                copy_download_reader_to_user_dir(&mut decoded_file, &final_dir, &filename)?;
+            drop(decoded_file);
+            drop(output);
             let _ = fs::remove_file(&temp_path);
             let _ = fs::remove_file(&decoded_path);
             (local_path, decoded_size)
@@ -1533,7 +1655,17 @@ pub(crate) fn unique_download_path(dir: &Path, filename: &str) -> PathBuf {
 /// - 用 create_new(true) 原子占用最终文件名，绝不对已存在的用户文件做截断或覆盖；
 /// - 与已有文件冲突时按「文件名 (1).ext」追加序号重试，消除「先检查再落盘」的并发窗口；
 /// - 失败时只清理本次调用创建的目标文件。
+#[cfg(test)]
 fn copy_download_to_user_dir(source: &Path, dir: &Path, filename: &str) -> MailResult<PathBuf> {
+    let mut src = File::open(source)?;
+    copy_download_reader_to_user_dir(&mut src, dir, filename)
+}
+
+fn copy_download_reader_to_user_dir(
+    source: &mut impl Read,
+    dir: &Path,
+    filename: &str,
+) -> MailResult<PathBuf> {
     use std::io::ErrorKind;
     fs::create_dir_all(dir)?;
     let mut index = 0_u64;
@@ -1552,8 +1684,7 @@ fn copy_download_to_user_dir(source: &Path, dir: &Path, filename: &str) -> MailR
             Err(error) => return Err(error.into()),
         };
         let copy_result = (|| -> std::io::Result<()> {
-            let mut src = File::open(source)?;
-            std::io::copy(&mut src, &mut dest)?;
+            std::io::copy(source, &mut dest)?;
             dest.sync_all()
         })();
         if let Err(error) = copy_result {
@@ -2776,6 +2907,111 @@ mod tests {
             fs::metadata(&download_path).unwrap().permissions().mode() & 0o777,
             0o600,
             "既有断点文件打开前应收紧为 0600"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn attachment_temp_symlinks_and_hardlinks_never_modify_targets() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let dir = tempfile::tempdir().unwrap();
+        let victim = dir.path().join("user-file");
+        fs::write(&victim, b"untouched").unwrap();
+        fs::set_permissions(&victim, fs::Permissions::from_mode(0o644)).unwrap();
+        for hard in [false, true] {
+            let link = dir
+                .path()
+                .join(if hard { "hard-link" } else { "symbolic-link" });
+            if hard {
+                fs::hard_link(&victim, &link).unwrap();
+            } else {
+                symlink(&victim, &link).unwrap();
+            }
+            assert!(private_resume_offset(&link).is_err());
+            assert!(open_private_attachment_file(&link).is_err());
+            assert!(create_private_file(&link).is_err());
+            assert_eq!(fs::read(&victim).unwrap(), b"untouched");
+            assert_eq!(
+                fs::metadata(&victim).unwrap().permissions().mode() & 0o777,
+                0o644
+            );
+            fs::remove_file(&link).unwrap();
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn attachment_temp_directory_symlink_is_rejected_without_chmod_target() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+        let store = MailStore::open_at(unique_test_database_path()).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o755)).unwrap();
+        fs::create_dir_all(store.attachment_root()).unwrap();
+        symlink(dir.path(), store.attachment_dir(99881)).unwrap();
+        assert!(ensure_private_attachment_dir(&store, 99881).is_err());
+        assert_eq!(
+            fs::metadata(dir.path()).unwrap().permissions().mode() & 0o777,
+            0o755
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn completed_download_reads_open_file_even_if_path_is_replaced() {
+        use std::io::{Seek, Write};
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().unwrap();
+        let partial = dir.path().join("partial");
+        let victim = dir.path().join("user-file");
+        fs::write(&victim, b"private").unwrap();
+        let mut file = open_private_attachment_file(&partial).unwrap();
+        file.write_all(b"expected attachment").unwrap();
+        fs::rename(&partial, dir.path().join("original")).unwrap();
+        symlink(&victim, &partial).unwrap();
+        file.rewind().unwrap();
+        let target =
+            super::copy_download_reader_to_user_dir(&mut file, dir.path(), "result.bin").unwrap();
+        assert_eq!(fs::read(target).unwrap(), b"expected attachment");
+        assert_eq!(fs::read(victim).unwrap(), b"private");
+    }
+
+    #[test]
+    fn simultaneous_downloads_for_same_attachment_are_serialized() {
+        let lock = super::attachment_download_lock(123456789);
+        let guard = lock.lock().unwrap();
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let lock = super::attachment_download_lock(123456789);
+            started_tx.send(()).unwrap();
+            let _guard = lock.lock().unwrap();
+            done_tx.send(()).unwrap();
+        });
+        started_rx.recv().unwrap();
+        assert!(done_rx
+            .recv_timeout(std::time::Duration::from_millis(50))
+            .is_err());
+        assert!(super::attachment_download_lock(123456790)
+            .try_lock()
+            .is_ok());
+        drop(guard);
+        done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn waiting_download_reuses_result_that_was_already_completed() {
+        let (store, current) = legacy_sent_attachment_fixture(true, false);
+        let mut stale = current.clone();
+        stale.is_downloaded = false;
+        stale.local_path.clear();
+        let downloaded = super::download_attachment_file(&store, &stale).unwrap();
+        assert!(downloaded.attachment.is_downloaded);
+        assert_eq!(
+            fs::read(downloaded.local_path).unwrap(),
+            b"legacy attachment"
         );
     }
 }

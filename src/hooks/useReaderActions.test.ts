@@ -141,4 +141,25 @@ describe('reader action result ownership', () => {
     expect(view.detail()).toBe(updated);
     expect(view.setStatus).toHaveBeenCalledWith('远端正文已拉取并缓存到本地');
   });
+
+  it('handles exportSelectedMessage success, cancel, and failure gracefully', async () => {
+    const view = setup();
+    mockInvoke.mockResolvedValueOnce('已导出邮件到 /tmp/test.eml');
+    await act(async () => {
+      await view.result.current.exportSelectedMessage();
+    });
+    expect(view.setStatus).toHaveBeenCalledWith('已导出邮件到 /tmp/test.eml');
+
+    mockInvoke.mockRejectedValueOnce(new Error('已取消邮件导出。'));
+    await act(async () => {
+      await view.result.current.exportSelectedMessage();
+    });
+    expect(view.setStatus).toHaveBeenCalledWith('已取消邮件导出。');
+
+    mockInvoke.mockRejectedValueOnce(new Error('磁盘空间不足'));
+    await act(async () => {
+      await view.result.current.exportSelectedMessage();
+    });
+    expect(view.setStatus).toHaveBeenCalledWith('邮件导出失败：磁盘空间不足');
+  });
 });

@@ -273,8 +273,17 @@ export default function useReaderActions({
 
   async function exportSelectedMessage() {
     if (!selected) return;
-    const message = await invoke<string>(IPC.ExportMessageAsEml, { messageId: selected.id });
-    setStatus(message);
+    try {
+      const message = await invoke<string>(IPC.ExportMessageAsEml, { messageId: selected.id });
+      setStatus(message);
+    } catch (error) {
+      const msg = String(error).replace(/^Error:\s*/i, '');
+      if (msg.includes('取消')) {
+        setStatus(msg);
+      } else {
+        setStatus(`邮件导出失败：${msg}`);
+      }
+    }
   }
 
   return {

@@ -48,6 +48,7 @@ impl MailStore {
 
     /// 校验并保存一个用户通过目录选择器选择的下载目录。
     /// 非绝对路径、位于应用数据目录内部或不可写时返回可操作的中文错误，且不写入数据库。
+    #[allow(dead_code)]
     pub fn validate_and_save_download_dir(&self, directory: &str) -> MailResult<()> {
         let trimmed = directory.trim();
         if trimmed.is_empty() {
@@ -127,6 +128,7 @@ pub(crate) fn is_safe_download_dir(candidate: &Path, data_dir: &Path) -> bool {
 /// 确保目录存在并可写：递归创建目录，并以原子方式创建唯一探针文件验证写权限。
 /// 使用 create_new(true) 占用一个带进程号与序号的新名称；名称冲突时重试，
 /// 只删除本次调用成功创建的探针文件，绝不修改或删除目录中原有文件。
+#[allow(dead_code)]
 pub(crate) fn ensure_writable_directory(dir: &Path) -> std::io::Result<()> {
     use std::io::{ErrorKind, Write};
     fs::create_dir_all(dir)?;

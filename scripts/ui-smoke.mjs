@@ -2741,10 +2741,10 @@ async function main() {
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-storage-desktop');
     await clickButton(cdp, '清理缓存', "document.querySelector('.settings-storage-actions')");
-    await waitForExpression(cdp, "document.querySelector('.settings-cache-confirm[role=\"dialog\"]')?.innerText.includes('本地导入且没有远端副本的附件不会被清理') && document.querySelector('.settings-cache-confirm-summary')?.innerText.includes('MB')");
+    await waitForExpression(cdp, "document.querySelector('.dialog-card[role=\"dialog\"]')?.innerText.includes('本地导入且没有远端副本的附件不会被清理') && document.querySelector('.dialog-card-summary')?.innerText.includes('MB')");
     await evalInPage(cdp, `(() => {
-      const backdrop = document.querySelector('.settings-cache-confirm-backdrop');
-      const dialog = backdrop?.querySelector('.settings-cache-confirm[role="dialog"]');
+      const backdrop = document.querySelector('.dialog-backdrop');
+      const dialog = backdrop?.querySelector('.dialog-card[role="dialog"]');
       const workspace = document.querySelector('.settings-workspace');
       if (!backdrop || !dialog || !workspace) {
         throw new Error('Storage confirmation portal is incomplete');
@@ -2765,8 +2765,8 @@ async function main() {
       }
     })()`);
     await captureScreenshot(cdp, 'settings-storage-confirm');
-    await clickButton(cdp, '确认清理', "document.querySelector('.settings-cache-confirm')");
-    await waitForExpression(cdp, "!document.querySelector('.settings-cache-confirm') && document.querySelector('[data-storage-reclaimable]')?.textContent === '0 B' && [...document.querySelectorAll('.settings-storage-actions button')].find((item) => item.textContent.includes('清理缓存'))?.disabled && document.querySelector('.status-line')?.textContent.includes('已释放')");
+    await clickButton(cdp, '确认清理', "document.querySelector('.dialog-card')");
+    await waitForExpression(cdp, "!document.querySelector('.dialog-card') && document.querySelector('[data-storage-reclaimable]')?.textContent === '0 B' && [...document.querySelectorAll('.settings-storage-actions button')].find((item) => item.textContent.includes('清理缓存'))?.disabled && document.querySelector('.status-line')?.textContent.includes('已释放')");
     await clickButton(cdp, '导出本地备份');
     await waitForExpression(cdp, "document.body.innerText.includes('/tmp/better-email-backup.json') && document.body.innerText.includes('凭据未包含')");
 

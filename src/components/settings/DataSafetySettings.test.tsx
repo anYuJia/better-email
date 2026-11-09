@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import DataSafetySettings from './DataSafetySettings';
 import type { AppSettingsReport, StorageUsage } from '../../app/types';
 
@@ -27,6 +27,8 @@ type Overrides = Partial<{
   downloadDirError: string | null;
   onPickDownloadDir: () => void;
   onResetDownloadDir: () => void;
+  storageUsage: StorageUsage;
+  onClearAttachmentCache: () => Promise<void>;
 }>;
 
 function renderPage(overrides: Overrides = {}) {
@@ -35,14 +37,14 @@ function renderPage(overrides: Overrides = {}) {
   render(
     <DataSafetySettings
       localBackupSummary={null}
-      storageUsage={baseStorage}
+      storageUsage={overrides.storageUsage ?? baseStorage}
       storageBusy={false}
       appSettings={overrides.appSettings ?? defaultReport}
       downloadDirBusy={overrides.downloadDirBusy ?? false}
       downloadDirError={overrides.downloadDirError ?? null}
       onImportBackup={vi.fn()}
       onExportBackup={vi.fn()}
-      onClearAttachmentCache={() => Promise.resolve()}
+      onClearAttachmentCache={overrides.onClearAttachmentCache ?? (() => Promise.resolve())}
       onPickDownloadDir={pickDownloadDir}
       onResetDownloadDir={resetDownloadDir}
     />,
@@ -165,5 +167,29 @@ describe('DataSafetySettings 默认下载位置', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: '复制完整路径' }));
     expect(await screen.findByRole('button', { name: '已复制' })).not.toBeNull();
+  });
+
+  it('清理确认显示分隔的统计信息，并支持键盘取消和焦点恢复', () => {
+    renderPage({ storageUsage: { ...baseStorage, reclaimable_cache_bytes: 1024, reclaimable_file_count: 99, partial_download_count: 5 } });
+    const open = screen.getByRole('button', { name: '清理缓存' });
+    open.focus();
+    fireEvent.click(open);
+    const dialog = screen.getByRole('dialog', { name: '清理附件缓存' });
+    expect(within(dialog).getByText(/1 KB · 99 个文件，其中 5 个断点文件/)).not.toBeNull();
+    expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: '取消' }));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(open);
+  });
+
+  it('清理失败时在弹窗中说明原因并允许重试', async () => {
+    const clear = vi.fn().mockRejectedValueOnce(new Error('磁盘不可写')).mockResolvedValueOnce(undefined);
+    renderPage({ storageUsage: { ...baseStorage, reclaimable_cache_bytes: 1024, reclaimable_file_count: 1 }, onClearAttachmentCache: clear });
+    fireEvent.click(screen.getByRole('button', { name: '清理缓存' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认清理' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('磁盘不可写');
+    fireEvent.click(screen.getByRole('button', { name: '确认清理' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(clear).toHaveBeenCalledTimes(2);
   });
 });

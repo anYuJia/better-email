@@ -200,13 +200,13 @@ describe('settings de-AI contract — radius tokens share application geometry',
 });
 
 describe('settings portal contract — confirmation stays above the workspace', () => {
-  it('uses the application dialog layer for the portaled cache confirmation', () => {
-    const rules = findRules(settingsPagesCss, '.settings-cache-confirm-backdrop');
+  it('uses the shared application dialog layer for confirmations', () => {
+    const rules = findRules(sharedDialogsCss, '.dialog-backdrop');
     const portalRule = rules.find((rule) => (
-      rule.selector === '.settings-cache-confirm-backdrop'
+      rule.selector === '.dialog-backdrop'
     ));
     expect(portalRule).toBeDefined();
-    expect(portalRule.body).toMatch(/z-index:\s*var\(--ui-z-dialog,\s*10000\)/);
+    expect(portalRule.body).toMatch(/z-index:\s*10000/);
   });
 });
 
@@ -235,7 +235,6 @@ describe('settings accessibility contract — focus tokens resolve', () => {
 
 describe('settings readability contract — visible copy is at least 12px', () => {
   const readableSelectors = [
-    '.settings-cache-confirm-backdrop > .settings-cache-confirm > header small',
     '.contact-import-identity.edited strong::after',
     '.contact-alias-chips span',
   ];

@@ -39,6 +39,7 @@ import {
 } from './shared';
 import { IPC } from '../../ipc/commands';
 import type { MessageToast } from '../MessageToastStack';
+import ConfirmDialog from '../ConfirmDialog';
 
 type TemplateEditor = {
   id: string;
@@ -543,18 +544,15 @@ export default function TemplateSettings({
         </div>
       )}
 
-      {confirmDeleteId && (
-        <div className="settings-cache-confirm-backdrop">
-          <div className="settings-cache-confirm" role="dialog" aria-modal="true">
-            <strong>删除模板</strong>
-            <p>确定删除该模板吗？此操作不可恢复。</p>
-            <div className="st-actions">
-              <SettingsButton onClick={() => setConfirmDeleteId(null)}>取消</SettingsButton>
-              <SettingsButton variant="danger" onClick={removeTemplate}>确认</SettingsButton>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="删除模板"
+        description="删除后无法恢复此模板。"
+        summaryText={templates.find((template) => template.id === confirmDeleteId)?.name}
+        confirmText="删除模板"
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={removeTemplate}
+      />
     </SettingsSection>
   );
 }

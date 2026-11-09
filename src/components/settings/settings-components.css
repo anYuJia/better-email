@@ -406,12 +406,12 @@
   background: var(--st-surface-pressed);
 }
 
-.settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog, .settings-cache-confirm) .st-btn-secondary {
+.settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog) .st-btn-secondary {
   border-color: var(--st-border-strong);
   background: var(--st-surface);
 }
 
-.settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog, .settings-cache-confirm) .st-btn-secondary:hover:not(:disabled) {
+.settings-modal :is(.settings-confirm-dialog, .settings-contact-dialog) .st-btn-secondary:hover:not(:disabled) {
   color: var(--st-text);
   border-color: var(--st-focus-border);
   background: var(--st-surface-muted);

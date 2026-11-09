@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   Check,
   Copy,
@@ -9,8 +8,8 @@ import {
   RotateCcw,
   Trash2,
   Upload,
-  X,
 } from 'lucide-react';
+import ConfirmDialog from '../ConfirmDialog';
 import type {
   AppSettingsReport,
   LocalBackupSummary,
@@ -60,32 +59,11 @@ export default function DataSafetySettings({
     if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
   }, []);
 
-  useEffect(() => {
-    if (!cacheConfirmationOpen) return undefined;
-    const previouslyFocused = document.activeElement;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !storageBusy) {
-        event.stopPropagation();
-        event.preventDefault();
-        setCacheConfirmationOpen(false);
-        if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
-          previouslyFocused.focus();
-        }
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [cacheConfirmationOpen, storageBusy]);
-
   const effectiveDir = appSettings?.effective_dir ?? '';
 
   async function confirmClearAttachmentCache() {
-    try {
-      await onClearAttachmentCache();
-      setCacheConfirmationOpen(false);
-    } catch {
-      // The parent status surface reports the failure without dismissing this confirmation.
-    }
+    await onClearAttachmentCache();
+    setCacheConfirmationOpen(false);
   }
 
   async function copyDownloadDirPath() {
@@ -229,70 +207,18 @@ export default function DataSafetySettings({
         )}
       </SettingsSection>
 
-      {cacheConfirmationOpen && storageUsage && createPortal((
-        <div
-          className="settings-cache-confirm-backdrop"
-          onClick={(event) => {
-            if (event.target === event.currentTarget && !storageBusy) {
-              setCacheConfirmationOpen(false);
-            }
-          }}
-        >
-          <section
-            className="settings-cache-confirm"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="cache-confirm-title"
-          >
-            <header>
-              <span className="settings-cache-confirm-mark" aria-hidden="true">
-                <Trash2 size={17} />
-              </span>
-              <span>
-                <strong id="cache-confirm-title">清理附件缓存</strong>
-                <small>释放可重新下载的本地文件</small>
-              </span>
-              <button
-                className="icon-only-action"
-                type="button"
-                title="关闭"
-                aria-label="关闭缓存清理确认"
-                disabled={storageBusy}
-                onClick={() => setCacheConfirmationOpen(false)}
-              >
-                <X size={16} />
-              </button>
-            </header>
-            <div className="settings-cache-confirm-summary">
-              <strong>{formatBytes(storageUsage.reclaimable_cache_bytes)}</strong>
-              <span>
-                {storageUsage.reclaimable_file_count} 个文件
-                {storageUsage.partial_download_count > 0
-                  ? `，其中 ${storageUsage.partial_download_count} 个断点文件`
-                  : ''}
-              </span>
-            </div>
-            <p>
-              邮件、账号、标签和附件元数据都会保留。远端附件再次打开时按需下载，
-              本地导入且没有远端副本的附件不会被清理。
-            </p>
-            <footer>
-              <SettingsButton onClick={() => setCacheConfirmationOpen(false)} disabled={storageBusy}>
-                取消
-              </SettingsButton>
-              <SettingsButton
-                variant="danger"
-                disabled={storageBusy}
-                aria-busy={storageBusy}
-                icon={<Trash2 size={14} />}
-                onClick={confirmClearAttachmentCache}
-              >
-                {storageBusy ? '正在清理…' : '确认清理'}
-              </SettingsButton>
-            </footer>
-          </section>
-        </div>
-      ), document.body)}
+      <ConfirmDialog
+        open={cacheConfirmationOpen && storageUsage !== null}
+        title="清理附件缓存"
+        subtitle="释放可重新下载的本地文件"
+        summaryText={storageUsage ? `${formatBytes(storageUsage.reclaimable_cache_bytes)} · ${storageUsage.reclaimable_file_count} 个文件${storageUsage.partial_download_count > 0 ? `，其中 ${storageUsage.partial_download_count} 个断点文件` : ''}` : undefined}
+        description="邮件、账号、标签和附件元数据都会保留。远端附件再次打开时按需下载，本地导入且没有远端副本的附件不会被清理。"
+        confirmText="确认清理"
+        pendingText="正在清理…"
+        busy={storageBusy}
+        onCancel={() => setCacheConfirmationOpen(false)}
+        onConfirm={confirmClearAttachmentCache}
+      />
     </div>
   );
 }

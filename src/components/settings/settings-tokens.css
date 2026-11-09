@@ -6,8 +6,7 @@
  */
 
 .settings-workspace,
-.settings-backdrop,
-.settings-cache-confirm-backdrop {
+.settings-backdrop {
   /* Surfaces */
   --st-canvas: var(--ui-bg);
   --st-surface: var(--ui-surface);
@@ -92,9 +91,5 @@
  * the dark theme is automatic. Only the backdrop needs a explicit dark scrim.
  */
 :root[data-theme="dark"] .settings-backdrop {
-  background: oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.55);
-}
-
-:root[data-theme="dark"] .settings-cache-confirm-backdrop {
   background: oklch(0.05 0.01 var(--primitive-hue-neutral) / 0.55);
 }

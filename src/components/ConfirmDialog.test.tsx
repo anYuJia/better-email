@@ -123,6 +123,19 @@ describe('ConfirmDialog Component robust behaviors', () => {
     unmount();
   });
 
+  it('prevents closing or confirming while an external operation is busy', () => {
+    const onCancel = vi.fn();
+    const onConfirm = vi.fn();
+    render(<ConfirmDialog open busy title="清理缓存" description="将清理缓存。" onConfirm={onConfirm} onCancel={onCancel} />);
+    expect(screen.getByRole('dialog').getAttribute('aria-busy')).toBe('true');
+    expect((screen.getByRole('button', { name: '取消' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: '确认' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(document.querySelector('.dialog-backdrop') as HTMLElement);
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it('blocks button operations and backdrop close when pending', async () => {
     const onCancel = vi.fn();
     let resolveConfirm!: () => void;

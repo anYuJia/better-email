@@ -7,10 +7,13 @@ export interface ConfirmDialogProps {
   open: boolean;
   title: string;
   description: string;
+  subtitle?: string;
   summaryText?: string;
   danger?: boolean;
   confirmText?: string;
   cancelText?: string;
+  pendingText?: string;
+  busy?: boolean;
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
@@ -19,10 +22,13 @@ export default function ConfirmDialog({
   open,
   title,
   description,
+  subtitle = '请仔细核对以下信息',
   summaryText,
   danger = true,
   confirmText = '确认',
   cancelText = '取消',
+  pendingText = '执行中…',
+  busy = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -53,13 +59,13 @@ export default function ConfirmDialog({
     backdropRef,
     initialFocusRef: cancelRef,
     onEscape: handleCancelClick,
-    escapeDisabled: pending,
+    escapeDisabled: pending || busy,
   });
 
   if (!open) return null;
 
   async function handleConfirm() {
-    if (pendingRef.current) return;
+    if (pendingRef.current || busy) return;
     pendingRef.current = true;
     const attempt = generation.current;
     setPending(true);
@@ -75,7 +81,7 @@ export default function ConfirmDialog({
   }
 
   function handleCancelClick() {
-    if (pendingRef.current) return;
+    if (pendingRef.current || busy) return;
     onCancel();
   }
 
@@ -84,7 +90,7 @@ export default function ConfirmDialog({
       ref={backdropRef}
       className="dialog-backdrop"
       onClick={(event) => {
-        if (!pendingRef.current && event.target === event.currentTarget) {
+        if (!pendingRef.current && !busy && event.target === event.currentTarget) {
           onCancel();
         }
       }}
@@ -96,7 +102,7 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descId}
-        aria-busy={pending || undefined}
+        aria-busy={pending || busy || undefined}
         tabIndex={-1}
       >
         <header>
@@ -108,14 +114,14 @@ export default function ConfirmDialog({
           </span>
           <span className="dialog-card-heading">
             <strong id={titleId}>{title}</strong>
-            <small>请仔细核对以下信息</small>
+            <small>{subtitle}</small>
           </span>
           <button
             className="dialog-card-close"
             type="button"
             title="关闭"
             aria-label="关闭确认"
-            disabled={pending}
+            disabled={pending || busy}
             onClick={handleCancelClick}
           >
             <X size={16} />
@@ -141,7 +147,7 @@ export default function ConfirmDialog({
             ref={cancelRef}
             className="dialog-button dialog-button-secondary"
             type="button"
-            disabled={pending}
+            disabled={pending || busy}
             onClick={handleCancelClick}
           >
             {cancelText}
@@ -149,10 +155,10 @@ export default function ConfirmDialog({
           <button
             className={`dialog-button ${danger ? 'dialog-button-danger' : 'dialog-button-primary'}`}
             type="button"
-            disabled={pending}
+            disabled={pending || busy}
             onClick={handleConfirm}
           >
-            {pending ? '执行中...' : confirmText}
+            {pending ? pendingText : confirmText}
           </button>
         </footer>
       </section>

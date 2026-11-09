@@ -105,8 +105,8 @@ describe('TemplateSettings', () => {
     render(<TemplateSettings />);
     fireEvent.click(screen.getByRole('button', { name: /删除 跟进客户/ }));
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText('删除模板')).not.toBeNull();
-    fireEvent.click(within(dialog).getByRole('button', { name: '确认' }));
+    expect(within(dialog).getByText('跟进客户')).not.toBeNull();
+    fireEvent.click(within(dialog).getByRole('button', { name: '删除模板' }));
     expect(screen.queryByText('跟进客户')).toBeNull();
   });
 

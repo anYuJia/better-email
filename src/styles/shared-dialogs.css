@@ -69,6 +69,7 @@
   flex: 1;
   display: grid;
   gap: 2px;
+  overflow-wrap: anywhere;
 }
 
 .dialog-card-heading strong {
@@ -110,6 +111,7 @@
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius-sm);
   background: var(--ui-surface-muted);
+  overflow-wrap: anywhere;
 }
 
 .dialog-card-summary small {
@@ -211,6 +213,7 @@
   color: var(--ui-text-secondary);
   font-size: var(--ui-font-size-secondary);
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 /* The legacy classes keep their look; inside the shared card the gap handles

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./public/brand/v4/brand-mark.png" alt="Better Email" width="96" />
+  <img src="./assets/brand/v5/app-desktop.png" alt="Better Email 图标" width="96" />
 </p>
 
 <h1 align="center">Better Email</h1>
@@ -7,8 +7,8 @@
 <p align="center"><strong>多个邮箱，一个专注的工作区。</strong></p>
 
 <p align="center">
-  本地优先的多账户邮件客户端，使用标准邮件协议连接你的邮箱。<br />
-  收件、阅读、写信和整理，放在一个安静、高效的工作区里。
+  本地优先的多账户邮件客户端。<br />
+  让收件、阅读和写信，回到清晰而专注的节奏。
 </p>
 
 <p align="center">
@@ -18,15 +18,21 @@
   &nbsp;·&nbsp; <a href="./CHANGELOG.md">更新日志</a>
 </p>
 
+<p align="center"><sub>macOS · Windows · Android<br />IMAP · POP3 · SMTP · MIT</sub></p>
+
 <p align="center">
-  <img alt="Latest release" src="https://img.shields.io/github/v/release/anYuJia/better-email?display_name=tag&sort=semver&style=flat-square" />
-  <img alt="macOS Apple Silicon" src="https://img.shields.io/badge/macOS-Apple_Silicon-111111?style=flat-square&logo=apple" />
-  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-111111?style=flat-square&logo=windows11" />
-  <img alt="Android ARM64" src="https://img.shields.io/badge/Android-ARM64-111111?style=flat-square&logo=android" />
-  <img alt="MIT license" src="https://img.shields.io/github/license/anYuJia/better-email?style=flat-square" />
+  <img src="./assets/screenshots/inbox-desktop.png" alt="Better Email 桌面工作区：左侧邮箱导航、中间邮件列表与右侧阅读区域" width="100%" />
+  <br /><sub>桌面工作区 · 使用演示数据</sub>
 </p>
 
-Better Email 面向需要长期处理邮件的人：在统一收件箱与单账号视图之间切换，快速搜索和回复，同时看清当前操作属于哪个账号。邮件由你的服务商收发；本地数据和可选的外部服务有明确边界。
+Better Email 将多个邮箱带入同一个工作区，让你快速搜索、阅读和回复，同时看清当前操作属于哪个账号。邮件由你的服务商收发；AI 和外部工具可以按需配置。
+
+<details>
+<summary>查看移动端阅读界面</summary>
+<br />
+<img src="./assets/screenshots/reader-mobile.png" alt="Better Email 移动端邮件阅读界面" width="320" />
+<br /><sub>移动端阅读界面 · 使用演示数据</sub>
+</details>
 
 ## 功能一览
 

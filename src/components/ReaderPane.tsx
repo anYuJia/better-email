@@ -136,6 +136,7 @@ export type ReaderPaneProps = {
   onSendQuickReply: (message: Message) => void;
   onBackToList?: () => void;
   scrollPositions?: Map<string, number>;
+  onStatus?: (status: string) => void;
 };
 
 function NarrowReaderNavigation({ onBack }: { onBack?: () => void }) {
@@ -229,6 +230,7 @@ function ReaderPane({
   onSendQuickReply,
   onBackToList,
   scrollPositions,
+  onStatus,
 }: ReaderPaneProps) {
   const currentThreadLoadState = threadLoadState?.threadKey === activeThread?.thread_key ? threadLoadState : null;
   const threadUnavailable = Boolean(activeThread && (currentThreadLoadState || threadMessages.length === 0));
@@ -313,6 +315,7 @@ function ReaderPane({
     setImageContextMenu,
     attachmentContextMenu,
     setAttachmentContextMenu,
+    onStatus,
   );
 
   const {

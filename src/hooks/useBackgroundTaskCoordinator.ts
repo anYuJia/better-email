@@ -811,6 +811,10 @@ export default function useBackgroundTaskCoordinator({
   }, [refreshBackgroundTasks, setBackgroundSyncStatus]);
 
 
+  const handleSnoozeReleased = useCallback(() => {
+    void loadMeta(folderId, accountScope, { mode: 'mailbox' });
+  }, [accountScope, folderId, loadMeta]);
+
   useBackgroundScheduler({
     enabled: automaticProcessingEnabled,
     account,
@@ -821,6 +825,7 @@ export default function useBackgroundTaskCoordinator({
     setBackgroundSyncStatus,
     setStatus,
     enqueueBackgroundTask,
+    onSnoozeReleased: handleSnoozeReleased,
   });
 
   return {

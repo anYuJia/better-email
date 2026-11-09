@@ -21,4 +21,25 @@ describe('scheduled outbox progress', () => {
     expect(enqueueBackgroundTask).toHaveBeenCalledWith('outbox-smtp', 'timer');
     unmount();
   });
+
+  it('triggers onSnoozeReleased when due snoozed messages are released', async () => {
+    vi.useFakeTimers();
+    const { invoke } = await import('../tauriBridge');
+    vi.mocked(invoke).mockResolvedValue({ released_count: 2 });
+    const onSnoozeReleased = vi.fn();
+    const { unmount } = renderHook(() => useBackgroundScheduler({
+      account: null,
+      outbox: [],
+      setOutbox: vi.fn(),
+      setPendingSendUndo: vi.fn(),
+      setNotificationStatus: vi.fn(),
+      setBackgroundSyncStatus: vi.fn(),
+      setStatus: vi.fn(),
+      enqueueBackgroundTask: vi.fn(),
+      onSnoozeReleased,
+    }));
+    await act(async () => { await Promise.resolve(); });
+    expect(onSnoozeReleased).toHaveBeenCalled();
+    unmount();
+  });
 });

@@ -1051,6 +1051,16 @@ pub fn auto_download_attachments_for_message(
     outcome
 }
 
+pub(crate) fn is_dangerous_executable_attachment(filename: &str) -> bool {
+    let lower = filename.trim().to_lowercase();
+    const DANGEROUS_EXTS: &[&str] = &[
+        ".exe", ".bat", ".cmd", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".ps1", ".ps1xml",
+        ".ps2", ".psc1", ".psc2", ".msh", ".msh1", ".msh2", ".sh", ".bash", ".zsh", ".scr", ".pif",
+        ".msi", ".msp", ".com", ".hta", ".cpl", ".jar", ".reg", ".app", ".dmg", ".pkg", ".command",
+    ];
+    DANGEROUS_EXTS.iter().any(|ext| lower.ends_with(ext))
+}
+
 #[allow(deprecated)]
 #[tauri::command]
 pub async fn open_attachment(
@@ -1061,7 +1071,19 @@ pub async fn open_attachment(
     let store = store.inner().clone();
     super::executor::database(move || {
         let attachment = store.get_attachment(attachment_id)?;
+        if is_dangerous_executable_attachment(&attachment.filename) {
+            return Err(crate::db::MailError::Imap(format!(
+                "出于安全保护，禁止直接运行可执行文件（{}）。请使用“在文件夹中显示”查看。",
+                attachment.filename
+            )));
+        }
         let path = validated_attachment_read_path(&store, &attachment)?;
+        if is_dangerous_executable_attachment(&path.to_string_lossy()) {
+            return Err(crate::db::MailError::Imap(format!(
+                "出于安全保护，禁止直接运行可执行文件（{}）。请使用“在文件夹中显示”查看。",
+                attachment.filename
+            )));
+        }
         app.shell()
             .open(path.to_string_lossy().into_owned(), None)
             .map_err(|error| crate::db::MailError::Imap(format!("无法打开附件：{error}")))?;
@@ -3022,5 +3044,22 @@ mod tests {
             fs::read(downloaded.local_path).unwrap(),
             b"legacy attachment"
         );
+    }
+
+    #[test]
+    fn dangerous_executable_attachments_are_detected() {
+        assert!(super::is_dangerous_executable_attachment("payload.exe"));
+        assert!(super::is_dangerous_executable_attachment("script.bat"));
+        assert!(super::is_dangerous_executable_attachment("run.cmd"));
+        assert!(super::is_dangerous_executable_attachment("auto.vbs"));
+        assert!(super::is_dangerous_executable_attachment("setup.msi"));
+        assert!(super::is_dangerous_executable_attachment("deploy.sh"));
+        assert!(super::is_dangerous_executable_attachment("powershell.ps1"));
+        assert!(super::is_dangerous_executable_attachment("archive.jar"));
+        assert!(super::is_dangerous_executable_attachment("malware.SCR"));
+        assert!(!super::is_dangerous_executable_attachment("invoice.pdf"));
+        assert!(!super::is_dangerous_executable_attachment("photo.jpg"));
+        assert!(!super::is_dangerous_executable_attachment("document.docx"));
+        assert!(!super::is_dangerous_executable_attachment("data.csv"));
     }
 }

@@ -41,6 +41,34 @@
   line-height: 1.55;
 }
 
+.contact-sync-loading-content {
+  flex: 1 1 auto;
+}
+
+.contact-sync-loading-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.contact-sync-dismiss-button {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ui-text-secondary);
+  background: transparent;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background-color .15s ease;
+}
+
+.contact-sync-dismiss-button:hover {
+  color: var(--ui-text);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-hover);
+}
+
 @keyframes contact-sync-loading-spin {
   to { transform: rotate(360deg); }
 }

@@ -23,6 +23,7 @@ type BackgroundSchedulerOptions = {
   setBackgroundSyncStatus: Dispatch<SetStateAction<string>>;
   setStatus: Dispatch<SetStateAction<string>>;
   enqueueBackgroundTask: (kind: 'sync' | 'outbox-smtp', source: 'manual' | 'timer') => Promise<unknown>;
+  onSnoozeReleased?: () => void;
 };
 
 export default function useBackgroundScheduler({
@@ -35,11 +36,42 @@ export default function useBackgroundScheduler({
   setBackgroundSyncStatus,
   setStatus,
   enqueueBackgroundTask,
+  onSnoozeReleased,
 }: BackgroundSchedulerOptions) {
   const outboxScheduleTimerRef = useRef<number | null>(null);
   const syncScheduleTimerRef = useRef<number | null>(null);
   const enqueueBackgroundTaskRef = useRef(enqueueBackgroundTask);
   enqueueBackgroundTaskRef.current = enqueueBackgroundTask;
+  const onSnoozeReleasedRef = useRef(onSnoozeReleased);
+  onSnoozeReleasedRef.current = onSnoozeReleased;
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+
+    const checkSnoozedMessages = async () => {
+      try {
+        const result = await invoke<{ released_count: number }>(IPC.ReleaseDueSnoozedMessages, {
+          now: new Date().toISOString(),
+        });
+        if (!cancelled && result && result.released_count > 0) {
+          onSnoozeReleasedRef.current?.();
+        }
+      } catch {
+        // Ignored in background polling
+      }
+    };
+
+    void checkSnoozedMessages();
+    const timer = window.setInterval(() => {
+      void checkSnoozedMessages();
+    }, 15_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) return;

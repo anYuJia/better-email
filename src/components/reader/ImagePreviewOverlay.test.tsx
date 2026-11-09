@@ -355,4 +355,95 @@ describe('image preview modal', () => {
       root.remove();
     }
   });
+
+  it('triggers onStatus feedback when copying image source', async () => {
+    const onStatus = vi.fn();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText,
+        write: vi.fn(),
+      },
+    });
+
+    function CopySourceHarness() {
+      const [imageContextMenu, setImageContextMenu] = useState<(PreviewImage & { x: number; y: number }) | null>({
+        src: 'https://example.com/test.png',
+        alt: '测试图',
+        attachmentId: null,
+        x: 10,
+        y: 10,
+      });
+      const [attachmentContextMenu, setAttachmentContextMenu] = useState<AttachmentContextMenu>(null);
+      const hook = useImagePreview(
+        noMessage(),
+        imageContextMenu,
+        setImageContextMenu,
+        attachmentContextMenu,
+        setAttachmentContextMenu,
+        onStatus,
+      );
+
+      return (
+        <button
+          type="button"
+          onClick={() => { void hook.copyPreviewImageSource(); }}
+        >
+          复制图片地址按钮
+        </button>
+      );
+    }
+
+    render(<CopySourceHarness />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '复制图片地址按钮' }));
+    });
+    expect(writeText).toHaveBeenCalledWith('https://example.com/test.png');
+    expect(onStatus).toHaveBeenCalledWith('已复制图片地址');
+  });
+
+  it('triggers onStatus feedback when copying image to clipboard falls back to url', async () => {
+    const onStatus = vi.fn();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText,
+        write: vi.fn().mockRejectedValue(new Error('fail write')),
+      },
+    });
+
+    function CopyImageHarness() {
+      const [imageContextMenu, setImageContextMenu] = useState<(PreviewImage & { x: number; y: number }) | null>({
+        src: 'https://example.com/test.png',
+        alt: '测试图',
+        attachmentId: null,
+        x: 10,
+        y: 10,
+      });
+      const [attachmentContextMenu, setAttachmentContextMenu] = useState<AttachmentContextMenu>(null);
+      const hook = useImagePreview(
+        noMessage(),
+        imageContextMenu,
+        setImageContextMenu,
+        attachmentContextMenu,
+        setAttachmentContextMenu,
+        onStatus,
+      );
+
+      return (
+        <button
+          type="button"
+          onClick={() => { void hook.copyPreviewImageToClipboard(); }}
+        >
+          复制图片按钮
+        </button>
+      );
+    }
+
+    render(<CopyImageHarness />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '复制图片按钮' }));
+    });
+    expect(onStatus).toHaveBeenCalledWith('未能直接复制图片，已复制图片地址');
+  });
 });

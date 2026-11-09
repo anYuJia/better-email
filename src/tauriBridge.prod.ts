@@ -112,7 +112,26 @@ function loadEvent() {
   return eventModule;
 }
 
+let notificationActionListenerRegistered = false;
+export function registerNotificationActionListener() {
+  if (notificationActionListenerRegistered) return;
+  notificationActionListenerRegistered = true;
+  void loadNotification().then(async ({ onAction }) => {
+    try {
+      await onAction(async () => {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const win = getCurrentWindow();
+        await win.unminimize().catch(() => undefined);
+        await win.setFocus().catch(() => undefined);
+      });
+    } catch {
+      // Ignored if onAction is not supported on the target platform
+    }
+  });
+}
+
 export function prodSendNotification(notification: { title: string; body?: string }) {
+  registerNotificationActionListener();
   void loadNotification().then(({ sendNotification: tauriSendNotification }) => tauriSendNotification(notification));
 }
 
@@ -264,10 +283,10 @@ async function ensureSettingsWindow(request: SettingsWindowRequest): Promise<voi
     const child = new WebviewWindow(SETTINGS_WINDOW_LABEL, {
       url: settingsUrl.toString(),
       title: '设置',
-      width: 1040,
-      height: 720,
-      minWidth: 840,
-      minHeight: 600,
+      width: 980,
+      height: 680,
+      minWidth: 780,
+      minHeight: 540,
       center: true,
       resizable: true,
       decorations: true,

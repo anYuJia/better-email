@@ -19,6 +19,7 @@ export default function useImagePreview(
   setImageContextMenu: React.Dispatch<React.SetStateAction<(PreviewImage & { x: number; y: number }) | null>>,
   attachmentContextMenu: AttachmentContextMenu,
   setAttachmentContextMenu: React.Dispatch<React.SetStateAction<AttachmentContextMenu>>,
+  onStatus?: (message: string) => void,
 ) {
   const [imagePreview, setImagePreview] = useState<PreviewImage | null>(null);
   const [imagePreviewZoom, setImagePreviewZoom] = useState(1);
@@ -305,12 +306,13 @@ export default function useImagePreview(
     if (!imageContextMenu) return;
     try {
       await navigator.clipboard?.writeText(imageContextMenu.src);
+      onStatus?.('已复制图片地址');
     } catch {
-      // Clipboard access can be unavailable in some WebView contexts.
+      onStatus?.('复制图片地址失败');
     } finally {
       setImageContextMenu(null);
     }
-  }, [imageContextMenu, setImageContextMenu]);
+  }, [imageContextMenu, onStatus, setImageContextMenu]);
 
   const copyPreviewImageToClipboard = useCallback(async () => {
     if (!imageContextMenu) return;
@@ -325,16 +327,18 @@ export default function useImagePreview(
       const blob = await response.blob();
       const mimeType = blob.type || 'image/png';
       await clipboard.write([new ClipboardItem({ [mimeType]: blob })]);
+      onStatus?.('图片已复制到剪贴板');
     } catch {
       try {
         await navigator.clipboard?.writeText(imageContextMenu.src);
+        onStatus?.('未能直接复制图片，已复制图片地址');
       } catch {
-        // Clipboard access can be unavailable in some WebView contexts.
+        onStatus?.('复制图片失败');
       }
     } finally {
       setImageContextMenu(null);
     }
-  }, [imageContextMenu, setImageContextMenu]);
+  }, [imageContextMenu, onStatus, setImageContextMenu]);
 
   const imageFromEventTarget = useCallback((target: EventTarget | null) => {
     const imageElement = target instanceof Element ? target.closest('img') : null;

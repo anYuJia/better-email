@@ -545,7 +545,7 @@ fn mailbox(name: &str, email: &str) -> Result<Mailbox, MailError> {
 
 fn split_recipients(value: &str) -> Vec<String> {
     value
-        .split([',', ';'])
+        .split([',', ';', '\u{FF0C}', '\u{FF1B}'])
         .map(str::trim)
         .filter(|item| !item.is_empty())
         .map(ToOwned::to_owned)
@@ -1386,5 +1386,19 @@ mod delivery_outcome_tests {
             send_to_local_test_server(Some("552 message exceeds size limit\r\n")).unwrap_err();
         assert!(matches!(error, MailError::SmtpPermanent(_)));
         assert!(error.to_string().contains("附件编码后体积会增大"));
+    }
+
+    #[test]
+    fn split_recipients_supports_chinese_commas_and_semicolons() {
+        assert_eq!(
+            split_recipients("alice@example.com， bob@example.com；charlie@example.com,david@example.com; eve@example.com"),
+            vec![
+                "alice@example.com",
+                "bob@example.com",
+                "charlie@example.com",
+                "david@example.com",
+                "eve@example.com"
+            ]
+        );
     }
 }

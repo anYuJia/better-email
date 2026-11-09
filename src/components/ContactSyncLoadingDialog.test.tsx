@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import ContactSyncLoadingDialog from './ContactSyncLoadingDialog';
 
 afterEach(cleanup);
@@ -17,5 +17,21 @@ describe('ContactSyncLoadingDialog', () => {
     render(<ContactSyncLoadingDialog open={false} />);
 
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('triggers onDismiss when the background button is clicked', () => {
+    const onDismiss = vi.fn();
+    render(<ContactSyncLoadingDialog open onDismiss={onDismiss} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '在后台继续' }));
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('triggers onDismiss when Escape key is pressed', () => {
+    const onDismiss = vi.fn();
+    render(<ContactSyncLoadingDialog open onDismiss={onDismiss} />);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

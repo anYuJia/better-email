@@ -25,9 +25,7 @@ import MobileScreenSurface from './components/mobile/MobileScreenSurface';
 import useMobileNavigation from './hooks/useMobileNavigation';
 import useExitPresence from './hooks/useExitPresence';
 import MobileSettingsRoot from './components/mobile/MobileSettingsRoot';
-import GlobalTooltip from './components/GlobalTooltip';
-import ContactSyncLoadingDialog from './components/ContactSyncLoadingDialog';
-import AppUpdateSurface from './components/AppUpdateSurface';
+import AppModals from './components/AppModals';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
 import type { PendingSendUndo } from './components/UndoSnackbarStack';
@@ -133,9 +131,9 @@ import { snapshotMessageSummaries as snapshotMessages } from './app/messageActio
 import { buildTitlebarViewSummary } from './app/titlebarSummary';
 import { openUnreadInbox } from './app/trayActions';
 import {
-  ComposerWindow, preloadComposerWindow, SnoozePicker, ShortcutHelpModal,
-  FirstRunOnboarding, AccountLoginDialog, ComposerCloseConfirmDialog,
-  ConfirmationDialogs, UndoSnackbarStack, MessageToastStack,
+  ComposerWindow,
+  preloadComposerWindow,
+  SnoozePicker,
 } from './app/lazyMailSurfaces';
 import DeferredSurface from './components/DeferredSurface';
 import useSettingsAccountSelection from './hooks/useSettingsAccountSelection';
@@ -1799,6 +1797,7 @@ function MailboxApp({
         onQuickReplyChange={setQuickReplyBody}
         onSendQuickReply={sendQuickReply}
         onBackToList={showNarrowList}
+        onStatus={setStatus}
       />
     </AppErrorBoundary>
   );
@@ -2252,120 +2251,72 @@ function MailboxApp({
           </AppErrorBoundary>
         </Suspense>
       )}
-      {!isAccountLoginActive && isShortcutsOpen && (
-        <Suspense fallback={<DeferredSurface label="正在打开快捷键帮助" />}>
-          <ShortcutHelpModal
-            open
-            onClose={() => setShortcutsOpen(false)}
-          />
-        </Suspense>
-      )}
-      {!isAccountLoginActive && undoAction && (
-        <Suspense fallback={null}>
-          <UndoSnackbarStack
-            undoAction={undoAction}
-            onUndoAction={() => {
-              restoreUndoAction().catch((error) => setStatus(String(error)));
-            }}
-            onDismissAction={clearUndoAction}
-          />
-        </Suspense>
-      )}
-      {!isAccountLoginActive && (messageToasts.length > 0 || pendingSendUndo) && (
-        <Suspense fallback={null}>
-          <MessageToastStack
-            toasts={messageToasts}
-            pendingSendUndo={pendingSendUndo}
-            onUndoSend={() => {
-              undoPendingSend().catch((error) => setStatus(String(error)));
-            }}
-            onDismissSend={() => setPendingSendUndo(null)}
-          />
-        </Suspense>
-      )}
-      {!isAccountLoginActive && !standaloneSettingsWindow && (
-        <AppUpdateSurface
-          standaloneSettingsWindow={standaloneSettingsWindow}
-          nativePlatform={nativePlatform}
-          nativePlatformResolved={nativePlatformResolved}
-          isMobileApp={isMobileApp}
-          onNotify={showMessageToast}
-        />
-      )}
-      {!isAccountLoginActive && <GlobalTooltip />}
-      <ContactSyncLoadingDialog open={contactScanBusy} />
-      {!isAccountLoginActive && composerCloseConfirmOpen && (
-        <Suspense fallback={<DeferredSurface label="正在打开关闭写信确认" />}>
-          <ComposerCloseConfirmDialog
-            setOpen={setComposerCloseConfirmOpen}
-            onClose={() => setComposerCloseConfirmOpen(false)}
-            onDiscard={() => {
-              setDraft(emptyDraft);
-              clearComposerAutosave();
-              forceCloseComposer();
-            }}
-            onSaveDraft={saveDraft}
-          />
-        </Suspense>
-      )}
-      {!isAccountLoginActive && confirmationDialogsOpen && (
-        <Suspense fallback={<DeferredSurface label="正在打开操作确认" />}>
-          <ConfirmationDialogs
-            confirmDeleteFolder={confirmDeleteFolder}
-            confirmDeleteIdentity={confirmDeleteIdentity}
-            confirmDeleteRule={confirmDeleteRule}
-            confirmDeleteContact={contactToDeleteFromHook}
-            confirmDeleteLabel={confirmDeleteLabel}
-            confirmEmptyTrashState={confirmEmptyTrashState}
-            confirmPermanentlyDelete={confirmPermanentlyDelete}
-            setConfirmDeleteFolder={setConfirmDeleteFolder}
-            setConfirmDeleteIdentity={setConfirmDeleteIdentity}
-            setConfirmDeleteRule={setConfirmDeleteRule}
-            setConfirmDeleteContact={setContactToDeleteFromHook}
-            setConfirmDeleteLabel={setConfirmDeleteLabel}
-            setConfirmEmptyTrashState={setConfirmEmptyTrashState}
-            setConfirmPermanentlyDelete={setConfirmPermanentlyDelete}
-            onDeleteFolderConfirmed={deleteCustomFolderConfirmed}
-            onDeleteIdentityConfirmed={deleteIdentityConfirmed}
-            onDeleteRuleConfirmed={removeRuleConfirmed}
-            onDeleteContactConfirmed={deleteManagedContact}
-            onDeleteLabelConfirmed={handleDeleteLabelConfirmed}
-            onEmptyTrashConfirmed={emptyCurrentTrashConfirmed}
-            onPermanentlyDeleteConfirmed={permanentlyDeleteMessageConfirmed}
-          />
-        </Suspense>
-      )}
-      {isAccountLoginActive && (
-        <Suspense fallback={<DeferredSurface label="正在准备账号登录" />}>
-          <AccountLoginDialog
-            form={newAccountForm}
-            onFormChange={setNewAccountForm}
-            onSubmit={async (secret, onProgress) => {
-              setSettingsOpen(false);
-              setAccountLoginProvisioning(true);
-              try {
-                return await createNewAccount(secret, onProgress);
-              } finally {
-                setAccountLoginProvisioning(false);
-              }
-            }}
-          />
-        </Suspense>
-      )}
-      {!isAccountLoginActive && pendingOnboardingAccount && (
-        <Suspense fallback={<DeferredSurface label="正在准备首次设置" />}>
-          <FirstRunOnboarding
-            accountId={pendingOnboardingAccount.id}
-            account={pendingOnboardingAccount}
-            sendUndoDelaySeconds={sendUndoDelaySeconds}
-            onAccountSettingsChange={(patch) => handleOnboardingAccountPatch(pendingOnboardingAccount.id, patch)}
-            onSendUndoDelayChange={setSendUndoDelaySeconds}
-            onComplete={() => completeOnboarding(pendingOnboardingAccount.id)}
-            onSkipAll={() => completeOnboarding(pendingOnboardingAccount.id)}
-            onStatus={setStatus}
-          />
-        </Suspense>
-      )}
+      <AppModals
+        isAccountLoginActive={isAccountLoginActive}
+        isShortcutsOpen={isShortcutsOpen}
+        onCloseShortcuts={() => setShortcutsOpen(false)}
+        undoAction={undoAction}
+        onUndoAction={restoreUndoAction}
+        onDismissUndoAction={clearUndoAction}
+        messageToasts={messageToasts}
+        pendingSendUndo={pendingSendUndo}
+        onUndoSend={undoPendingSend}
+        onDismissSendUndo={() => setPendingSendUndo(null)}
+        standaloneSettingsWindow={standaloneSettingsWindow}
+        nativePlatform={nativePlatform}
+        nativePlatformResolved={nativePlatformResolved}
+        isMobileApp={isMobileApp}
+        onNotifyUpdate={showMessageToast}
+        contactScanBusy={contactScanBusy}
+        onDismissContactScan={() => setStatus('联系人同步已转入后台运行')}
+        composerCloseConfirmOpen={composerCloseConfirmOpen}
+        setComposerCloseConfirmOpen={setComposerCloseConfirmOpen}
+        onDiscardComposer={() => {
+          setDraft(emptyDraft);
+          clearComposerAutosave();
+          forceCloseComposer();
+        }}
+        onSaveComposerDraft={saveDraft}
+        confirmationDialogsOpen={confirmationDialogsOpen}
+        confirmDeleteFolder={confirmDeleteFolder}
+        confirmDeleteIdentity={confirmDeleteIdentity}
+        confirmDeleteRule={confirmDeleteRule}
+        confirmDeleteContact={contactToDeleteFromHook}
+        confirmDeleteLabel={confirmDeleteLabel}
+        confirmEmptyTrashState={confirmEmptyTrashState}
+        confirmPermanentlyDelete={confirmPermanentlyDelete}
+        setConfirmDeleteFolder={setConfirmDeleteFolder}
+        setConfirmDeleteIdentity={setConfirmDeleteIdentity}
+        setConfirmDeleteRule={setConfirmDeleteRule}
+        setConfirmDeleteContact={setContactToDeleteFromHook}
+        setConfirmDeleteLabel={setConfirmDeleteLabel}
+        setConfirmEmptyTrashState={setConfirmEmptyTrashState}
+        setConfirmPermanentlyDelete={setConfirmPermanentlyDelete}
+        onDeleteFolderConfirmed={deleteCustomFolderConfirmed}
+        onDeleteIdentityConfirmed={deleteIdentityConfirmed}
+        onDeleteRuleConfirmed={removeRuleConfirmed}
+        onDeleteContactConfirmed={deleteManagedContact}
+        onDeleteLabelConfirmed={handleDeleteLabelConfirmed}
+        onEmptyTrashConfirmed={emptyCurrentTrashConfirmed}
+        onPermanentlyDeleteConfirmed={permanentlyDeleteMessageConfirmed}
+        newAccountForm={newAccountForm}
+        onNewAccountFormChange={setNewAccountForm}
+        onSubmitNewAccount={async (secret, onProgress) => {
+          setSettingsOpen(false);
+          setAccountLoginProvisioning(true);
+          try {
+            return await createNewAccount(secret, onProgress);
+          } finally {
+            setAccountLoginProvisioning(false);
+          }
+        }}
+        pendingOnboardingAccount={pendingOnboardingAccount}
+        sendUndoDelaySeconds={sendUndoDelaySeconds}
+        onOnboardingAccountPatch={handleOnboardingAccountPatch}
+        onSendUndoDelayChange={setSendUndoDelaySeconds}
+        onCompleteOnboarding={completeOnboarding}
+        onStatus={setStatus}
+      />
       <div className="status-line status-live-region" role="status" aria-live="polite">{status}</div>
     </main>
   );

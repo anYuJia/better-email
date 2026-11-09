@@ -4,159 +4,120 @@
 
 <h1 align="center">Better Email</h1>
 
+<p align="center"><strong>多个邮箱，一个专注的工作区。</strong></p>
+
 <p align="center">
-  <strong>多个邮箱，一个真正属于你的收件箱。</strong>
+  本地优先的多账户邮件客户端，使用标准邮件协议连接你的邮箱。<br />
+  收件、阅读、写信和整理，放在一个安静、高效的工作区里。
 </p>
 
 <p align="center">
-  本地优先的多账户邮件客户端。<br />
-  不托管你的邮箱，不强迫你使用 AI，也不把标准邮件协议藏在黑盒后面。
-</p>
-
-<p align="center">
-  <a href="https://github.com/anYuJia/better-email/releases/latest"><strong>下载 Better Email</strong></a>
-  &nbsp;&nbsp;·&nbsp;&nbsp;
-  <a href="./CHANGELOG.md">更新日志</a>
-  &nbsp;&nbsp;·&nbsp;&nbsp;
-  <a href="https://github.com/anYuJia/better-email/issues">Issues</a>
+  <a href="https://github.com/anYuJia/better-email/releases/latest"><strong>下载安装</strong></a>
+  &nbsp;·&nbsp; <a href="#开始使用">开始使用</a>
+  &nbsp;·&nbsp; <a href="#本地开发">本地开发</a>
+  &nbsp;·&nbsp; <a href="./CHANGELOG.md">更新日志</a>
 </p>
 
 <p align="center">
   <img alt="Latest release" src="https://img.shields.io/github/v/release/anYuJia/better-email?display_name=tag&sort=semver&style=flat-square" />
-  <img alt="macOS" src="https://img.shields.io/badge/macOS-Apple_Silicon-111111?style=flat-square&logo=apple" />
-  <img alt="Windows" src="https://img.shields.io/badge/Windows-x64-111111?style=flat-square&logo=windows11" />
-  <img alt="Android" src="https://img.shields.io/badge/Android-ARM64-111111?style=flat-square&logo=android" />
-  <img alt="MIT" src="https://img.shields.io/github/license/anYuJia/better-email?style=flat-square" />
+  <img alt="macOS Apple Silicon" src="https://img.shields.io/badge/macOS-Apple_Silicon-111111?style=flat-square&logo=apple" />
+  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-111111?style=flat-square&logo=windows11" />
+  <img alt="Android ARM64" src="https://img.shields.io/badge/Android-ARM64-111111?style=flat-square&logo=android" />
+  <img alt="MIT license" src="https://img.shields.io/github/license/anYuJia/better-email?style=flat-square" />
 </p>
 
----
+Better Email 面向需要长期处理邮件的人：在统一收件箱与单账号视图之间切换，快速搜索和回复，同时看清当前操作属于哪个账号。邮件由你的服务商收发；本地数据和可选的外部服务有明确边界。
 
-Better Email 面向真正需要长期处理邮件的人：多个账号、大量往来、频繁搜索、持续回复，以及对“当前到底在操作哪个账号”的敏感。
+## 功能一览
 
-它把 **收件、阅读、搜索、写信、联系人、规则和同步** 放进一个紧凑的工作区，同时尽量让数据和决策留在你的设备上。
+- **管理多个邮箱**：统一收件箱、单账号视图、文件夹、会话、标签和星标。
+- **快速处理邮件**：搜索、筛选、快捷键、批量操作、规则和稍后处理。
+- **阅读与写信**：富文本、附件、内嵌图片、草稿、模板、回复和快速回复。
+- **掌握发送状态**：定时发送、发件箱队列、发送进度、撤销发送和失败处理。
+- **整理工作资料**：联系人、VIP、别名、联系人导入、本地备份和恢复。
+- **按需扩展**：连接自己配置的 AI 服务或 MCP 工具，普通邮件功能无需启用 AI。
 
-> **不是 Webmail 外壳，也不是 AI 邮箱。**
-> Better Email 首先是一款完整的邮件客户端；AI 只是你可以选择开启的一层能力。
+## 下载与安装
 
-## 它解决什么问题
+从 [GitHub Releases](https://github.com/anYuJia/better-email/releases/latest) 下载最新正式版本：
 
-<table>
-<tr>
-<td width="33%" valign="top">
-<strong>一个工作区，多个邮箱</strong><br /><br />
-统一收件箱与单账号视图并存。工作邮箱、个人邮箱和其他账号可以放在一起处理，又不会丢失账号上下文。
-</td>
-<td width="33%" valign="top">
-<strong>为高频处理而设计</strong><br /><br />
-搜索、快捷键、批量操作、规则、稍后处理、快速回复和发件队列都围绕“少打断、快处理”展开。
-</td>
-<td width="33%" valign="top">
-<strong>清楚的数据边界</strong><br /><br />
-邮件仍由你的邮箱服务商收发。本地索引、联系人、规则等工作数据主要保存在本机，而不是上传到 Better Email 的云端。
-</td>
-</tr>
-</table>
-
-## 你会用到的核心能力
-
-**收件与阅读**
-
-- 多账户统一收件箱 / 单账号视图
-- 文件夹、会话、标签、星标、附件与状态筛选
-- 本地全文搜索与全局搜索
-- 归档、移动、删除、垃圾邮件、稍后处理等批量操作
-- 远程图片默认受控，降低追踪像素与外部资源自动加载
-
-**写信与发送**
-
-- 富文本、附件与内嵌图片
-- 草稿、模板、定时发送
-- 回复、回复全部、转发、快速回复
-- 多账号发件身份与别名
-- 发件箱队列、失败重试、发送进度与撤销窗口
-
-**联系人与自动化**
-
-- 联系人、VIP、别名与重复联系人整理
-- vCard / CSV / Excel 导入
-- 自动处理规则
-- 后台同步、系统通知与连接诊断
-- 本地备份导入 / 导出
-
-## 下载
-
-前往 **[Latest Release](https://github.com/anYuJia/better-email/releases/latest)** 下载当前正式版本。
-
-| 平台 | 架构 | 安装包 |
+| 平台 | 架构 | 选择的文件 |
 | --- | --- | --- |
 | macOS | Apple Silicon | `.dmg` |
 | Windows | x64 | `.msi` |
-| Android | ARM64 | `.apk` / `.aab` |
+| Android | ARM64 | `.apk` |
 
-`.sig`、`.app.tar.gz`、`latest.json` 等文件主要用于自动更新与发布流程，普通用户无需手动下载。
+Android 的 `.aab` 面向应用分发；`.app.tar.gz`、`.sig` 和 `latest.json` 用于更新或发布流程。当前没有正式的 Linux 或 iOS 安装包。
 
-当前没有正式的 Linux / iOS 安装包。
+> README 描述当前仓库代码；正式安装包可能尚未包含最新提交，请以 [Release](https://github.com/anYuJia/better-email/releases) 和 [更新日志](./CHANGELOG.md) 为准。
 
-## 标准协议，而不是封闭后端
+## 开始使用
 
-Better Email 使用 **IMAP / POP3 + SMTP**，因此不仅能连接内置服务商，也可以接入支持标准邮件协议的自定义邮箱。
+1. 安装并打开 Better Email，选择添加邮箱账号。
+2. 选择服务商，或手动填写收件服务器（IMAP / POP3）和 SMTP 发件服务器。
+3. 按服务商要求完成 OAuth2 授权，或输入客户端授权码 / 应用专用密码。
+4. 在账号设置中验证连接。验证会检查登录，不会发送邮件；完成后同步邮箱。
+5. 首次使用时，可以给自己发送一封不含敏感信息的测试邮件，并检查收件箱和已发送文件夹。
 
-| 服务 | 常见认证方式 |
+| 邮箱 | 接入提示 |
 | --- | --- |
-| Gmail | OAuth2 / 应用专用密码 |
-| Outlook / Microsoft 365 | OAuth2 / 租户允许的认证方式 |
-| QQ 邮箱 | 客户端授权码 |
-| 网易 163 / 126 / Yeah | 客户端授权码 |
-| 自定义邮箱 | 手动配置 IMAP / POP3 / SMTP |
+| QQ 邮箱 | 在邮箱设置中开启 IMAP / SMTP，使用客户端授权码。 |
+| 网易 163 / 126 / Yeah | 开启对应邮件协议，使用客户端授权码。 |
+| Gmail | 可使用 OAuth2 或服务商允许的应用专用密码。 |
+| Outlook / Microsoft 365 | 可使用 OAuth2；实际权限取决于账号和组织策略。 |
+| 自定义邮箱 | 按服务商提供的信息配置服务器、端口和认证方式。 |
 
-实际可用性取决于服务商当前的 OAuth、端口、安全策略与企业租户配置。
+IMAP 适合需要同步文件夹和邮件状态的场景；应用中的 POP3 只同步收件箱。协议、认证和端口是否可用，取决于邮箱服务商及组织策略。
 
-## AI 是可选项
+## 发送与常见问题
 
-不开启 AI，Better Email 仍然是一款完整的邮件客户端。
+**点击发送后会发生什么？**
 
-需要时，你可以分别配置：
+开启撤销发送延迟时，邮件先进入发件箱，倒计时内可以撤回；倒计时结束后由后台队列处理。关闭延迟时直接开始发送。发送进度反映处理阶段或实际上传进度，服务器确认接收后才表示提交成功。
 
-- **AI 接入**：使用你自己的 OpenAI 兼容 API 服务
-- **MCP**：通过 JSON-RPC 调用你配置的外部工具
+**发件箱提示 SMTP 认证失败，或 QQ 邮箱返回 535？**
 
-目前 AI 主要用于 **翻译、摘要和模板生成**。涉及外部服务时，应用会明确提示相关邮件内容可能发送到你配置的服务。
+邮件尚未提交。请检查发件账号是否正确、服务商是否允许 SMTP，以及客户端授权码是否有效。QQ / 网易邮箱通常需要授权码，而不是网页登录密码；账号风控或登录频率限制也可能导致拒绝。修复账号后，可将邮件退回草稿再检查和发送。
 
-## 隐私边界
+**发送结果待确认怎么办？**
 
-| 数据 / 行为 | 默认处理方式 |
+连接中断时，服务器可能已经接收邮件。应用会停止自动重发；请先检查服务商的已发送文件夹或向收件人确认，再在发件箱处理结果，避免重复发送。已发送但远端副本留档失败时，留档重试不会再次发送邮件。
+
+**为什么需要保持应用运行？**
+
+发送队列和同步由应用处理。定时发送需要应用在到期时运行；如果应用当时未运行，请重新打开并检查发件箱和发送状态。
+
+## 隐私与数据
+
+| 数据或操作 | 处理方式 |
 | --- | --- |
-| 邮件、文件夹、搜索索引、规则、联系人、发件箱 | 本机 SQLite |
-| 密码、授权码、OAuth Token、已保存 AI 密钥 | 本机应用层加密存储 |
-| 本地备份 | 不包含已保存账号凭据 |
-| 远程图片 | 默认阻止自动加载，可显式放行 |
-| 外部 AI | 仅在你主动配置并确认后调用 |
+| 邮件、文件夹、索引、规则、联系人、发件箱 | 主要保存在本机 SQLite；邮件收发与同步仍会连接你的邮箱服务商。 |
+| 密码、授权码、OAuth Token、已保存 AI 密钥 | 本机应用层加密存储。 |
+| 本地备份 | 不包含已保存的账号凭据。 |
+| 远程图片 | 默认受控，可按需允许加载。 |
+| AI / MCP | 需自行配置；使用外部服务时，相关内容可能发送给该服务。 |
 
-Better Email **不提供云端邮箱托管服务**。凭据保护属于应用层加密，不等同于整库或全磁盘加密；请同时保护系统账户和应用数据目录。
+Better Email 不提供云端邮箱托管服务。应用层凭据加密不等同于整库或全磁盘加密，请同时保护系统账户和应用数据目录。提交 Issue 或诊断信息前，请移除邮箱地址、邮件内容、授权码和 Token 等敏感信息。
 
-提交 Issue 或诊断信息前，请移除邮箱地址、主题、正文、授权码和 Token 等敏感内容。
-
-## 键盘效率
+## 常用快捷键
 
 | 快捷键 | 操作 |
 | --- | --- |
-| `/` | 搜索 |
-| `C` | 新建邮件 |
+| `/` 或 `Cmd/Ctrl + K` | 搜索 |
+| `C` | 写邮件 |
 | `J` / `K` | 下一封 / 上一封 |
-| `R` / `Shift + R` | 回复 / 回复全部 |
+| `R` / `A` | 回复 / 回复全部 |
 | `F` | 转发 |
-| `S` | 星标 |
-| `M` | 已读 / 未读 |
-| `E` | 归档 |
+| `S` / `M` / `E` | 星标 / 已读或未读 / 归档 |
 | `Delete` / `Backspace` | 移至废纸篓 |
-| `Cmd/Ctrl + Z` | 撤销 |
-| `?` 或 `Cmd/Ctrl + /` | 快捷键帮助 |
+| `Cmd/Ctrl + Z` | 撤销上一步邮件操作 |
+| `?` 或 `Cmd/Ctrl + /` | 打开快捷键帮助 |
 
-## 开发
+## 本地开发
 
-技术栈：**Tauri 2 · Rust · React 18 · TypeScript · Vite · SQLite**
+技术栈：**Tauri 2 · Rust · React 18 · TypeScript · Vite · SQLite**。
 
-需要 Node.js 20 LTS、Rust stable，以及对应平台的 [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/)。
+准备 Node.js 22、Rust stable 和对应平台的 [Tauri 2 开发依赖](https://v2.tauri.app/start/prerequisites/)。然后运行：
 
 ```bash
 git clone https://github.com/anYuJia/better-email.git
@@ -165,52 +126,25 @@ npm ci
 npm run tauri:dev
 ```
 
-构建正式安装包：
+`npm run tauri:dev` 启动带原生后端的桌面应用；仅运行 `npm run dev` 不会提供真实邮箱后端。构建安装包使用 `npm run tauri:build`。
+
+### 检查与测试
 
 ```bash
-npm run tauri:build
-```
-
-项目同时维护类型检查、架构边界、CSS 图谱、性能预算、UI smoke、前端测试与 Rust 检查。
-
-<details>
-<summary><strong>完整质量检查命令</strong></summary>
-
-```bash
-npm run lint
-npm test
-npm run check:architecture
-npm run check:css
-npm run check:performance
-npm run test:services
-npm run build
+npm run lint                 # TypeScript 和 ESLint
+npm test                     # 前端测试
+npm run build:verify         # 构建、架构、CSS 和性能预算
+npm run test:services        # AI / MCP 服务契约
+npm run test:ui:workflow     # 模拟后端的浏览器工作流检查
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 ```
 
-</details>
+更多产品定义与设计约束见 [PRODUCT.md](./PRODUCT.md) 和 [UI/UX 规范](./docs/design/UI_UX_SPEC.md)。
 
-## 设计原则
+## 参与项目
 
-Better Email 的界面目标不是“更炫”，而是 **更快、更稳、更清楚**：
+欢迎通过 [Issues](https://github.com/anYuJia/better-email/issues) 报告问题或提出建议。报告发送问题时，提供操作步骤、邮箱服务商和经过脱敏的错误信息，有助于定位问题；请勿提交凭据或邮件正文。
 
-- 邮件内容优先于装饰
-- 账号、文件夹、同步状态与操作目标始终可见
-- 高信息密度，但减少卡片堆叠与视觉噪音
-- 优先保证启动、滚动、缩放、读信与写信的响应
-- 核心流程支持键盘操作、可见焦点和合理语义
-
-更多产品定义见 [PRODUCT.md](./PRODUCT.md)。
-
----
-
-<p align="center">
-  <a href="https://github.com/anYuJia/better-email/releases/latest"><strong>Download</strong></a>
-  &nbsp;&nbsp;·&nbsp;&nbsp;
-  <a href="https://github.com/anYuJia/better-email/issues">Report an issue</a>
-  &nbsp;&nbsp;·&nbsp;&nbsp;
-  <a href="./CONTRIBUTORS.md">Contributors</a>
-  &nbsp;&nbsp;·&nbsp;&nbsp;
-  <a href="./LICENSE">MIT License</a>
-</p>
+感谢所有[贡献者](./CONTRIBUTORS.md)。项目采用 [MIT License](./LICENSE)。

@@ -13,13 +13,13 @@ function deferred<T>() {
   const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
   return { promise, resolve, reject };
 }
-function setup(getAttachmentSendBlockReason = () => null as string | null) {
+function setup(getAttachmentSendBlockReason = () => null as string | null, delay: 0 | 10 = 0, onQueuedSend?: (item: import('../app/types').OutboxItem, undo: import('../components/UndoSnackbarStack').PendingSendUndo) => Promise<void>) {
   const options = {
     getDraftSnapshot: () => ({ draft: { ...emptyDraft, to: 'test@example.com', body: '正文不能丢失' }, revision: 1 }),
     clearSubmittedDraft: vi.fn(() => true),
     getQuickReplySnapshot: vi.fn(), clearSubmittedQuickReply: vi.fn(),
     submissionInFlight: { current: false }, getAttachmentSendBlockReason,
-    account: null, pendingSendUndo: null, sendUndoDelaySeconds: 0 as const,
+    account: null, pendingSendUndo: null, sendUndoDelaySeconds: delay, onQueuedSend,
     setOutbox: vi.fn(), setPendingSendUndo: vi.fn(), setStatus: vi.fn(), showToast: vi.fn(),
     draftInputForCurrentAccount: (draft: typeof emptyDraft) => draft,
     threadingForDraft: () => null,
@@ -42,6 +42,20 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe('attachment-safe composer submission', () => {
+  it('hands the queued send to the main window before closing the composer', async () => {
+    const handoff = deferred<void>();
+    const item = { id: 3, message_id: 8, status: 'scheduled' };
+    mockInvoke.mockImplementation(async (command) => command === 'queue_outbox_message' ? item : {});
+    const onQueuedSend = vi.fn(() => handoff.promise);
+    const { result, options } = setup(undefined, 10, onQueuedSend);
+    let pending!: Promise<void>;
+    await act(async () => { pending = result.current.sendDraft(); });
+    expect(onQueuedSend).toHaveBeenCalledWith(item, expect.objectContaining({ outboxId: 3, delaySeconds: 10 }));
+    expect(options.clearSubmittedDraft).not.toHaveBeenCalled();
+    await act(async () => { handoff.resolve(); await pending; });
+    expect(options.clearSubmittedDraft).toHaveBeenCalledOnce();
+  });
+
   it.each([false, true])('clears a transferred inline snapshot only after confirmed direct-send success (failure: %s)', async (fail) => {
     const send = deferred<number>();
     mockInvoke.mockImplementation(async (command) => {

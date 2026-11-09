@@ -74,6 +74,7 @@ import useAutoHideScrollbars from './hooks/useAutoHideScrollbars';
 import useFirstMessageRowPaint from './hooks/useFirstMessageRowPaint';
 import useAccountScopedSettings from './hooks/useAccountScopedSettings';
 import useSettingsAccountScope from './hooks/useSettingsAccountScope';
+import useComposerQueuedHandoff from './hooks/useComposerQueuedHandoff';
 import {
   type NotificationPolicy,
 } from './mailUtils';
@@ -426,6 +427,7 @@ function MailboxApp({
     queueUndoAction,
   } = useUndoQueue();
   const [pendingSendUndo, setPendingSendUndo] = useState<PendingSendUndo | null>(null);
+  useComposerQueuedHandoff(!standaloneSettingsWindow, setOutbox, setPendingSendUndo, setStatus);
   const {
     loadMeta,
     releaseDueSnoozedMessages,
@@ -993,6 +995,7 @@ function MailboxApp({
     crossAccountRisks,
     sendQuickReply,
     queueDraft,
+    cancelOutboxItem,
     undoPendingSend,
     composeToContact,
   } = useComposerController({
@@ -1727,6 +1730,7 @@ function MailboxApp({
         scrollPositions={readerScrollPositions.current}
         deliveryStatus={outbox.find((item) => item.message_id === selected?.id)}
         onResolveDelivery={resolveDelivery}
+        onCancelDelivery={cancelOutboxItem}
         activeThread={activeThread}
         threadMessages={threadMessages}
         activeThreadSelected={activeThreadSelected}

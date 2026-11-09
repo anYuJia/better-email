@@ -1,24 +1,56 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { OutboxItem } from '../../app/types';
-import { outboxStatusLabel, outboxTimingLabel } from '../../app/uiConfig';
+import { canCancelOutboxItem, outboxStatusLabel, outboxTimingLabel } from '../../app/uiConfig';
 import ConfirmDialog from '../ConfirmDialog';
 
 type Props = {
   item: OutboxItem;
   onResolve?: (outboxId: number, delivered: boolean) => Promise<void>;
+  onCancel?: (item: OutboxItem) => Promise<void>;
+  onRepairCredentials?: () => void;
 };
 
-export default function ReaderDeliveryStatus({ item, onResolve }: Props) {
+export default function ReaderDeliveryStatus({ item, onResolve, onCancel, onRepairCredentials }: Props) {
   const [confirmation, setConfirmation] = useState<boolean | null>(null);
+  const [now, setNow] = useState(Date.now);
+  const [cancelling, setCancelling] = useState(false);
+  const [actionError, setActionError] = useState('');
+  useEffect(() => {
+    if (item.status !== 'scheduled') return undefined;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [item.status, item.next_attempt_at]);
   if (item.status === 'sent' || item.status === 'cancelled') return null;
   const uncertain = item.status === 'send_unknown';
+  const authenticationFailure = /(?:SMTP 认证|authentication|auth).*(?:535|login fail)|(?:535).*(?:login fail|auth)/i.test(item.last_error);
+  const secondsLeft = Math.ceil((Date.parse(item.next_attempt_at) - now) / 1000);
+  const countdown = item.status === 'scheduled' && secondsLeft > 0 && secondsLeft <= 30;
   return (
     <section className="reader-delivery-status" aria-label="邮件发送状态">
       <div role={uncertain || item.status === 'failed' ? 'alert' : 'status'}>
         <strong>{outboxStatusLabel(item.status)}</strong>
-        <p>{outboxTimingLabel(item)}</p>
-        {item.last_error && <p>{item.last_error}</p>}
+        <p>{countdown ? `${secondsLeft} 秒后发送，可在发送前撤回` : outboxTimingLabel(item)}</p>
+        {authenticationFailure ? (
+          <>
+            <p>发送服务器拒绝了账号认证，邮件尚未提交。请检查邮箱的 SMTP 服务和授权码，或稍后再试。</p>
+            <details><summary>查看服务器详情</summary><p>{item.last_error}</p></details>
+          </>
+        ) : item.last_error && <p>{item.last_error}</p>}
       </div>
+      {(authenticationFailure && onRepairCredentials || canCancelOutboxItem(item.status) && onCancel) && (
+        <div className="reader-delivery-actions">
+          {authenticationFailure && onRepairCredentials && <button type="button" onClick={onRepairCredentials}>检查账号设置</button>}
+          {canCancelOutboxItem(item.status) && onCancel && <button type="button" disabled={cancelling} onClick={async () => {
+            setCancelling(true);
+            setActionError('');
+            try { await onCancel(item); }
+            catch (error) { setActionError(`无法退回草稿：${error instanceof Error ? error.message : String(error)}`); }
+            finally { setCancelling(false); }
+          }}>{cancelling ? '正在退回…' : '退回草稿'}</button>}
+        </div>
+      )}
+      {actionError && <p role="alert">{actionError}</p>}
       {uncertain && onResolve && (
         <div className="reader-delivery-actions">
           <button type="button" onClick={() => setConfirmation(true)}>我已核对，邮件已发出</button>

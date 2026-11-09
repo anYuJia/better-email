@@ -55,10 +55,10 @@ type ComposerSendOptions = {
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
   refreshAll: () => Promise<void>;
   refreshContacts?: () => Promise<unknown>;
-  loadMeta: (folderId?: number | null) => Promise<unknown>;
   setSendProgress?: (progress: number | null) => void;
   setSendProgressMessage?: (message: string | null) => void;
   setAttachmentProgress?: (progress: number | null) => void;
+  onQueuedSend?: (item: OutboxItem, undo: PendingSendUndo) => Promise<void>;
 };
 
 function composerFlowLog(event: string, details: Record<string, unknown> = {}) {
@@ -89,10 +89,10 @@ export default function useComposerSend({
   focusMailboxRole,
   refreshAll,
   refreshContacts,
-  loadMeta,
   setSendProgress,
   setSendProgressMessage,
   setAttachmentProgress,
+  onQueuedSend,
 }: ComposerSendOptions) {
   const [submissionKind, setSubmissionKind] = useState<'save' | 'send' | 'queue' | 'quick-reply' | null>(null);
   const [sendIssue, setSendIssue] = useState<ComposerSendIssue | null>(null);
@@ -393,12 +393,18 @@ export default function useComposerSend({
       threading: threadingForDraft(draft),
     });
     setOutbox((current) => [item, ...current.filter((entry) => entry.id !== item.id)]);
-    setPendingSendUndo({
+    const undo: PendingSendUndo = {
       outboxId: item.id,
       subject,
       expiresAt,
       delaySeconds: sendUndoDelaySeconds,
-    });
+    };
+    setPendingSendUndo(undo);
+    try {
+      await onQueuedSend?.(item, undo);
+    } catch (error) {
+      composerFlowWarn('queued send handoff failed', { outboxId: item.id, error: String(error) });
+    }
     if (draft.quick_reply_source) clearSubmittedQuickReply(draft.quick_reply_source);
     const cleared = clearSubmittedDraft(revision);
     setStatus(`邮件将在 ${sendUndoDelaySeconds} 秒后发送，可立即撤回${cleared ? '' : '；新增编辑已保留在写信窗口'}`);
@@ -408,7 +414,7 @@ export default function useComposerSend({
       accountId: input.account_id,
       targetRole: 'current',
     });
-  }, [getDraftSnapshot, clearSubmittedDraft, clearSubmittedQuickReply, draftInputForCurrentAccount, threadingForDraft, sendUndoDelaySeconds, account, setOutbox, setPendingSendUndo, setStatus, showToast, refreshContacts, runDirectSendWithProgress, beforeSubmitDraft]);
+  }, [getDraftSnapshot, clearSubmittedDraft, clearSubmittedQuickReply, draftInputForCurrentAccount, threadingForDraft, sendUndoDelaySeconds, account, setOutbox, setPendingSendUndo, setStatus, showToast, refreshContacts, runDirectSendWithProgress, beforeSubmitDraft, onQueuedSend]);
 
   const sendQuickReply = useCallback(async (message: Message) => {
     const snapshot = getQuickReplySnapshot();
@@ -556,18 +562,26 @@ export default function useComposerSend({
     const updated = await invoke<OutboxItem>(IPC.CancelOutboxItem, { outboxId: item.id });
     setOutbox((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
     setPendingSendUndo((current) => (current?.outboxId === item.id ? null : current));
-    await loadMeta();
-    setStatus('已撤回到草稿箱');
-  }, [setOutbox, setPendingSendUndo, loadMeta, setStatus]);
+    try {
+      await refreshAll();
+      setStatus('已撤回到草稿箱');
+    } catch {
+      setStatus('已退回草稿，但邮件列表刷新失败，请手动刷新');
+    }
+  }, [setOutbox, setPendingSendUndo, refreshAll, setStatus]);
 
   const undoPendingSend = useCallback(async () => {
     const pending = pendingSendUndo;
     if (!pending) return;
-    setPendingSendUndo(null);
     const updated = await invoke<OutboxItem>(IPC.CancelOutboxItem, { outboxId: pending.outboxId });
+    setPendingSendUndo((current) => current?.outboxId === pending.outboxId ? null : current);
     setOutbox((current) => current.map((entry) => (entry.id === updated.id ? updated : entry)));
-    await refreshAll();
-    setStatus(`已撤回发送：${pending.subject}`);
+    try {
+      await refreshAll();
+      setStatus(`已撤回发送：${pending.subject}`);
+    } catch {
+      setStatus('已撤回发送，但邮件列表刷新失败，请手动刷新');
+    }
   }, [pendingSendUndo, setPendingSendUndo, setOutbox, refreshAll, setStatus]);
 
   const submitOnce = useCallback(async <T,>(kind: NonNullable<typeof submissionKind>, submit: () => Promise<T>): Promise<

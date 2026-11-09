@@ -22,6 +22,7 @@ import type { FolderRole } from '../app/types';
 import {
   closeCurrentWindow,
   COMPOSER_CLOSED_EVENT,
+  COMPOSER_QUEUED_EVENT,
   COMPOSER_CONTACTS_SETTINGS_EVENT,
   COMPOSER_OPEN_EVENT,
   COMPOSER_READY_EVENT,
@@ -274,6 +275,7 @@ export default function StandaloneComposerApp() {
     setSendProgress: setComposerSendProgress,
     setSendProgressMessage: setComposerSendProgressMessage,
     setAttachmentProgress: setComposerAttachmentProgress,
+    onQueuedSend: (item, undo) => emitToMain(COMPOSER_QUEUED_EVENT, { item, undo }),
   });
 
   closeComposerRef.current = closeComposer;

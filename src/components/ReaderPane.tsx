@@ -60,6 +60,7 @@ type ComposeNewFields = {
 export type ReaderPaneProps = {
   deliveryStatus?: OutboxItem;
   onResolveDelivery?: (outboxId: number, delivered: boolean) => Promise<void>;
+  onCancelDelivery?: (item: OutboxItem) => Promise<void>;
   activeThread: ThreadSummary | null;
   threadLoadState?: ThreadLoadState;
   onRetryThread?: () => void;
@@ -152,6 +153,7 @@ function NarrowReaderNavigation({ onBack }: { onBack?: () => void }) {
 function ReaderPane({
   deliveryStatus,
   onResolveDelivery,
+  onCancelDelivery,
   activeThread,
   threadLoadState = null,
   onRetryThread,
@@ -580,7 +582,7 @@ function ReaderPane({
           )}
         />
 
-        {deliveryStatus?.message_id === selected.id && <ReaderDeliveryStatus key={deliveryStatus.id} item={deliveryStatus} onResolve={onResolveDelivery} />}
+        {deliveryStatus?.message_id === selected.id && <ReaderDeliveryStatus key={deliveryStatus.id} item={deliveryStatus} onResolve={onResolveDelivery} onCancel={onCancelDelivery} onRepairCredentials={onRepairCredentials ? () => onRepairCredentials(selected.account_id) : undefined} />}
 
         {regularAttachments.length > 0 && (
           <AttachmentList

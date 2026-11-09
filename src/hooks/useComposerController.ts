@@ -66,6 +66,7 @@ type UseComposerControllerOptions = {
   setSendProgress?: (progress: number | null) => void;
   setSendProgressMessage?: (message: string | null) => void;
   setAttachmentProgress?: (progress: number | null) => void;
+  onQueuedSend?: (item: OutboxItem, undo: PendingSendUndo) => Promise<void>;
 };
 
 export default function useComposerController({
@@ -80,7 +81,6 @@ export default function useComposerController({
   setPendingSendUndo,
   setStatus,
   showToast,
-  loadMeta,
   refreshAll,
   refreshContacts,
   focusMailboxRole,
@@ -88,6 +88,7 @@ export default function useComposerController({
   setSendProgress,
   setSendProgressMessage,
   setAttachmentProgress,
+  onQueuedSend,
 }: UseComposerControllerOptions) {
   const [draft, setDraftState] = useState<DraftInput>(emptyDraft);
   const draftRef = useRef(draft);
@@ -273,10 +274,10 @@ export default function useComposerController({
     focusMailboxRole,
     refreshAll,
     refreshContacts,
-    loadMeta,
     setSendProgress,
     setSendProgressMessage,
     setAttachmentProgress,
+    onQueuedSend,
   });
 
   const openComposer = useCallback((nextDraft?: DraftInput, options: OpenComposerOptions = {}) => {

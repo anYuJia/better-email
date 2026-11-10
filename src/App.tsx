@@ -80,8 +80,6 @@ import {
   COMPOSER_CLOSED_EVENT,
   COMPOSER_CONTACTS_SETTINGS_EVENT,
   SETTINGS_CLOSED_EVENT,
-  closeCurrentWindow,
-  emitToMain,
   invoke,
   listen,
   mockMode,
@@ -137,6 +135,7 @@ import {
 } from './app/lazyMailSurfaces';
 import DeferredSurface from './components/DeferredSurface';
 import useSettingsAccountSelection from './hooks/useSettingsAccountSelection';
+import useStandaloneSettingsLifecycle from './hooks/useStandaloneSettingsLifecycle';
 const NARROW_SHELL_MEDIA_QUERY = '(max-width: 1040px)';
 
 import {
@@ -409,6 +408,8 @@ function MailboxApp({
   } = useOAuthFlow({ accountForm, setStatus });
   const {
     appLayout,
+    isSidebarCollapsed,
+    toggleSidebarCollapse,
     beginLayoutResize,
     beginLayoutMouseResize,
     moveLayoutResize,
@@ -756,37 +757,16 @@ function MailboxApp({
     if (isMobileApp) setMobileScreen('settings');
   }, [isMobileApp, resetSaveAndVerifyReport]);
 
-  const standaloneSettingsBootstrappedRef = useRef(false);
-  useEffect(() => {
-    if (!standaloneSettingsWindow) return;
-    setActiveSettingsSection(requestedSettingsSection);
-  }, [requestedSettingsSection, standaloneSettingsWindow]);
-
-  useEffect(() => {
-    if (!standaloneSettingsWindow) return;
-    if (standaloneSettingsBootstrappedRef.current) return;
-    standaloneSettingsBootstrappedRef.current = true;
-    loadMeta(folderId, accountScope, { mode: 'full' })
-      .catch((error) => setStatus(String(error)));
-  }, [
-    accountScope,
+  useStandaloneSettingsLifecycle({
+    standalone: standaloneSettingsWindow,
+    isOpen: isSettingsOpen,
+    requestedSection: requestedSettingsSection,
     folderId,
+    accountScope,
     loadMeta,
-    standaloneSettingsWindow,
-  ]);
-
-  const standaloneSettingsCloseStartedRef = useRef(false);
-  useEffect(() => {
-    if (!standaloneSettingsWindow || isSettingsOpen || standaloneSettingsCloseStartedRef.current) return;
-    standaloneSettingsCloseStartedRef.current = true;
-    void emitToMain(SETTINGS_CLOSED_EVENT)
-      .catch(() => undefined)
-      .then(() => closeCurrentWindow())
-      .catch((error) => {
-        standaloneSettingsCloseStartedRef.current = false;
-        setStatus(`无法关闭设置窗口：${String(error)}`);
-      });
-  }, [isSettingsOpen, standaloneSettingsWindow]);
+    setSection: setActiveSettingsSection,
+    setStatus,
+  });
 
   useMailboxBootstrap({
     enabled: !standaloneSettingsWindow,
@@ -1444,6 +1424,7 @@ function MailboxApp({
     toggleStar,
     toggleRead,
     moveSelected,
+    toggleSidebarCollapse,
   });
 
   const { handleRefresh, handleRefreshAction, resolveDelivery } = useMailFeedback({
@@ -1804,7 +1785,7 @@ function MailboxApp({
 
   return (
     <main
-      className={`app-shell narrow-view-${narrowView}${isMobileApp ? ' is-mobile-app' : ''}${standaloneSettingsWindow ? ' standalone-settings-window' : ''}`}
+      className={`app-shell narrow-view-${narrowView}${isSidebarCollapsed && !isMobileApp ? ' sidebar-collapsed' : ''}${isMobileApp ? ' is-mobile-app' : ''}${standaloneSettingsWindow ? ' standalone-settings-window' : ''}`}
       style={{
         '--app-sidebar-width-preferred': `${appLayout.sidebar}px`,
         '--app-list-width-preferred': `${appLayout.list}px`,
@@ -1882,6 +1863,8 @@ function MailboxApp({
       ) : (
         <>
           <AppTitlebar
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebarCollapse={toggleSidebarCollapse}
         searchInputRef={searchInputRef}
         query={queryDraft}
         appliedQuery={appliedQuery}

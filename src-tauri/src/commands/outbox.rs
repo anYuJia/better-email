@@ -1052,6 +1052,50 @@ mod tests {
             .all(|message| message.id != unknown_id));
     }
 
+    #[test]
+    fn local_smtp_disconnect_persists_unknown_outcome_across_restart() {
+        // Exercise the real MIME/SMTP transport over a loopback socket, then
+        // apply the same production failure handler to a real SQLite outbox.
+        let dir = tempfile::tempdir().unwrap();
+        let database = dir.path().join("mail.sqlite3");
+        let store = MailStore::open_at(database.clone()).unwrap();
+        create_test_account(&store);
+        let id = store.prepare_outbox_send(draft_input(Vec::new())).unwrap();
+        let message = store.get_outbound_message(id).unwrap();
+        let (result, received_bytes) =
+            crate::smtp::delivery_outcome_tests::send_to_local_test_server_with_message(
+                message,
+                Vec::new(),
+                None,
+            );
+        let error =
+            result.expect_err("server closes after receiving DATA without an acknowledgement");
+        assert!(matches!(error, crate::db::MailError::SmtpOutcomeUnknown(_)));
+        assert!(
+            received_bytes > 0,
+            "the server must receive the submitted MIME"
+        );
+        super::record_outbox_failure(&store, id, &error).unwrap();
+        drop(store);
+
+        let reopened = MailStore::open_at(database).unwrap();
+        let item = reopened
+            .list_outbox()
+            .unwrap()
+            .into_iter()
+            .find(|item| item.message_id == id)
+            .unwrap();
+        assert_eq!(item.status, "send_unknown");
+        assert!(
+            reopened
+                .pending_outbox_messages_due_at("2099-01-01T00:00:00Z")
+                .unwrap()
+                .iter()
+                .all(|message| message.id != id),
+            "uncertain delivery must never auto-retry"
+        );
+    }
+
     fn unique_test_database_path() -> std::path::PathBuf {
         let unique = TEST_DATABASE_COUNTER.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!(

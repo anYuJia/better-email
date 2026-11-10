@@ -23,9 +23,11 @@ coverage/
 playwright-report/
 test-results/
 
-# Internal reports belong outside the product repository
-docs/
-docs/design/reference/
+# Internal reports remain local; the reference index is shared with contributors.
+docs/*
+!docs/design/
+docs/design/*
+!docs/design/reference/
 /论文/
 
 # Local secrets and interpreter caches

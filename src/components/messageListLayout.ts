@@ -6,7 +6,7 @@ export type LayoutItem = { top: number; height: number };
  * 默认桌面邮件行保持 68px；放大文字后由内容自然增高，ResizeObserver
  * 测量实际高度更新虚拟位置与滚动锚点。日期分组标题固定 30px。
  */
-export const MESSAGE_ROW_HEIGHT = 68;
+export const MESSAGE_ROW_HEIGHT = 76;
 /** Mobile keeps a comfortable touch target with mature typography hierarchy. */
 export const MOBILE_MESSAGE_ROW_HEIGHT = 80;
 export const GROUP_HEADER_HEIGHT = 30;

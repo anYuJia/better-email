@@ -129,7 +129,7 @@ describe('message list de-AI contract — rows are flat lines, not cards', () =>
 });
 
 describe('message list avatar behavior', () => {
-  it('keeps the sender avatar visible in the app shell when the trailing checkbox appears', () => {
+  it('keeps the sender avatar visible in the app shell by default', () => {
     const blocks = extractBlock(messageListCss, '.app-shell .message-card .message-leading');
     expect(blocks.length).toBeGreaterThan(0);
     expect(blocks[0]).toMatch(/opacity:\s*1/);
@@ -230,7 +230,7 @@ describe('message list de-AI contract — CSS/TS row-height chain', () => {
     expect(cssHeight).not.toBeNull();
     expect(tsHeight).not.toBeNull();
     expect(cssHeight).toBe(tsHeight);
-    expect(cssHeight).toBe(68);
+    expect(cssHeight).toBe(76);
   });
 
   it('message-date-header CSS height === GROUP_HEADER_HEIGHT TS constant', () => {

@@ -142,10 +142,15 @@ npm test                     # 前端测试
 npm run build:verify         # 构建、架构、CSS 和性能预算
 npm run test:services        # AI / MCP 服务契约
 npm run test:ui:workflow     # 模拟后端的浏览器工作流检查
+npm run test:ui:quality      # 模拟后端的布局矩阵及交互采样
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 ```
+
+Rust 测试包含隔离 SQLite 与本地环回协议服务：IMAP 测试验证邮件头导入和重启后读取，SMTP 测试验证提交后丢失确认时不会自动重发。这些测试使用脚本化服务，不能代替真实服务商、TLS 和原生窗口的端到端验收。
+
+浏览器质量测试默认将结果写入 `/tmp/better-email-ui-quality/quality-report.json`。可用 `node scripts/check-interaction-budget.mjs /tmp/better-email-ui-quality/quality-report.json` 检查缓存邮件切换的 p95。该指标是模拟数据下点击到两次动画帧回调的时间，并非原生窗口或真实服务商的用户输入延迟；目前 500 ms 的宽松阈值只用于发现严重回退。CI 保存报告及截图，便于在同类运行环境中比较。
 
 更多产品定义与设计约束见 [PRODUCT.md](./PRODUCT.md) 和 [UI/UX 规范](./docs/design/UI_UX_SPEC.md)。
 

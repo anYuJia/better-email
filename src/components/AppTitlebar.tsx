@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Copy, Minus, RefreshCw, Square, X } from 'lucide-react';
+import { Copy, Minus, PanelLeft, PanelLeftClose, RefreshCw, Square, X } from 'lucide-react';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
 import { logError } from '../app/logger';
@@ -48,6 +48,8 @@ type AppTitlebarProps = Omit<GlobalSearchProps, 'shortcutLabel'> & {
   isRefreshing?: boolean;
   refreshNotice?: string | null;
   onRefresh: () => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebarCollapse?: () => void;
   /** Used only by component tests; production platform comes from Rust. */
   testPlatform?: DesktopPlatform;
 };
@@ -121,6 +123,8 @@ export default function AppTitlebar({
   isRefreshing = false,
   refreshNotice = null,
   onRefresh,
+  isSidebarCollapsed = false,
+  onToggleSidebarCollapse,
   testPlatform,
 }: AppTitlebarProps) {
   const testPlatformOverride = import.meta.env.MODE === 'test' ? testPlatform : undefined;
@@ -207,9 +211,25 @@ export default function AppTitlebar({
       role="banner"
     >
       <div className="app-titlebar-grid">
-        <div className="titlebar-left" aria-hidden="true">
+        <div className="titlebar-left">
           {isNativeTitlebar && (
             <TitlebarDragRegion platform={platform} onToggleMaximize={() => { void toggleMaximize(); }} className="titlebar-left-drag" />
+          )}
+          {onToggleSidebarCollapse && (
+            <button
+              type="button"
+              className="titlebar-sidebar-toggle"
+              title={isSidebarCollapsed ? '展开侧边栏 (⌘B)' : '折叠侧边栏 (⌘B)'}
+              aria-label={isSidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+              aria-pressed={isSidebarCollapsed}
+              onClick={onToggleSidebarCollapse}
+            >
+              {isSidebarCollapsed ? (
+                <PanelLeft size={16} strokeWidth={1.75} aria-hidden="true" />
+              ) : (
+                <PanelLeftClose size={16} strokeWidth={1.75} aria-hidden="true" />
+              )}
+            </button>
           )}
         </div>
 

@@ -190,6 +190,7 @@ function Sidebar({
         onChange={onAccountScopeChange}
         onSetDefault={onSetDefaultAccount}
         onAddAccount={onOpenSettings}
+        onManageAccounts={onOpenSettings}
       />
       <button type="button" className="compose-button" onClick={onCompose} onPointerEnter={onComposeIntent} onFocus={onComposeIntent}>
         <PenLine size={18} strokeWidth={1.75} aria-hidden="true" /> <span>写邮件</span>

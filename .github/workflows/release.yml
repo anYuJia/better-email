@@ -39,7 +39,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.event.pull_request.head.sha || github.sha }}
+          # On pull_request github.sha is GitHub's synthetic merge commit.
+          # Release builds still use the exact validated tag or push commit.
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.sha }}
           persist-credentials: false
 
       - name: Pin validated source
@@ -112,6 +114,17 @@ jobs:
 
       - name: Record list algorithm benchmark
         run: npm run bench:list -- quality-evidence/list-benchmark.json
+
+      - name: Browser interaction and layout quality
+        timeout-minutes: 45
+        run: |
+          set -o pipefail
+          npm run test:ui:quality 2>&1 | tee quality-evidence/browser-quality.log
+          node scripts/check-interaction-budget.mjs quality-evidence/quality/quality-report.json
+        env:
+          CHROME_PATH: /usr/bin/google-chrome-stable
+          BETTER_EMAIL_UI_CAPTURE_DIR: quality-evidence/quality
+          TZ: Asia/Shanghai
 
       - name: Preserve browser and benchmark evidence
         if: always()

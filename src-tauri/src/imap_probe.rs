@@ -231,6 +231,16 @@ pub fn fetch_header_page(
     let (host, port) = parse_imap_endpoint(&account.imap_host)?;
     let client = crate::imap_transport::connect(host.as_str(), port, SessionPolicy::Transfer)?;
     let mut session = login_imap(client, account, secret)?;
+    let result = fetch_header_page_from_session(&mut session, remote_name, options)?;
+    let _ = session.logout();
+    Ok(result)
+}
+
+fn fetch_header_page_from_session<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    remote_name: &str,
+    options: ImapHeaderFetchOptions<'_>,
+) -> Result<ImapFetchResult, MailError> {
     let mailbox = session
         .select(remote_name)
         .map_err(|error| MailError::Imap(format!("IMAP 选择文件夹失败：{error}")))?;
@@ -305,7 +315,7 @@ pub fn fetch_header_page(
     let headers = if uids.is_empty() {
         Vec::new()
     } else {
-        fetch_requested_headers(&mut session, &uids)?
+        fetch_requested_headers(session, &uids)?
     };
     let highest_uid = headers
         .iter()
@@ -322,8 +332,7 @@ pub fn fetch_header_page(
         (0, value) | (value, 0) => value,
         (current, page) => current.min(page),
     };
-    let flags = fetch_recent_flag_snapshot(&mut session, mailbox.exists)?;
-    let _ = session.logout();
+    let flags = fetch_recent_flag_snapshot(session, mailbox.exists)?;
 
     Ok(ImapFetchResult {
         headers: ImapHeaderBatch {
@@ -2711,6 +2720,10 @@ fn remote_payload_parts<'a>(message: &'a Message<'a>) -> Vec<(usize, &'a Message
 
     parts
 }
+
+#[cfg(test)]
+#[path = "imap_integration_tests.rs"]
+mod integration_tests;
 
 #[cfg(test)]
 mod tests {

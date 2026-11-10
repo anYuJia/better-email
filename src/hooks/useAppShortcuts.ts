@@ -41,6 +41,7 @@ type UseAppShortcutsOptions = {
   toggleStar: (message: MessageSummary) => Promise<void>;
   toggleRead: (message: MessageSummary) => Promise<void>;
   moveSelected: (role: 'archive' | 'trash') => Promise<void>;
+  toggleSidebarCollapse?: () => void;
 };
 
 export default function useAppShortcuts(options: UseAppShortcutsOptions) {
@@ -187,6 +188,12 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         } else {
           setStatus(`已选择当前列表 ${messages.length} 封邮件`);
         }
+        return;
+      }
+
+      if (commandModifier && !event.shiftKey && key === 'b') {
+        event.preventDefault();
+        optionsRef.current.toggleSidebarCollapse?.();
         return;
       }
 

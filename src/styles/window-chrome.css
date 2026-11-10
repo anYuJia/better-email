@@ -63,8 +63,40 @@ body[data-image-preview-modal='1'] .window-chrome {
 }
 
 .titlebar-left {
+  display: flex;
+  align-items: center;
   overflow: hidden;
   padding-inline: 12px 14px;
+}
+
+.titlebar-sidebar-toggle {
+  position: relative;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: var(--ui-transition-control);
+}
+
+.titlebar-sidebar-toggle:hover {
+  color: var(--ui-text);
+  background: var(--quiet-row-hover);
+  border-color: var(--ui-border);
+}
+
+.titlebar-sidebar-toggle:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 1px;
 }
 
 .app-titlebar-macos .titlebar-left {
@@ -179,20 +211,22 @@ body[data-image-preview-modal='1'] .window-chrome {
   align-items: center;
   width: 100%;
   max-width: var(--global-search-width);
-  height: 36px;
-  min-height: 36px;
-  padding: 0 5px 0 11px;
-  gap: 6px;
+  height: 38px;
+  min-height: 38px;
+  padding: 0 6px 0 12px;
+  gap: 8px;
   overflow: visible;
-  border: 1px solid transparent;
-  border-radius: var(--ui-radius-sm);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: var(--workspace-search);
   box-shadow: var(--ui-box-shadow-none);
+  transition: var(--ui-transition-control);
 }
 
 .app-titlebar .global-search-box:hover {
-  border-color: var(--ui-border);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-muted);
 }
 
 .app-titlebar .global-search-box:focus-within {
@@ -301,16 +335,18 @@ body[data-image-preview-modal='1'] .window-chrome {
   padding: 0;
   display: grid;
   place-items: center;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
+  transition: var(--ui-transition-control);
 }
 
 .titlebar-refresh:hover:not(:disabled),
 .titlebar-refresh:focus-visible {
   color: var(--ui-text);
+  border-color: var(--ui-border);
   background: var(--quiet-row-hover);
 }
 

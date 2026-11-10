@@ -166,6 +166,7 @@ export async function runNavigationQuality(cdp, api) {
       row.querySelector('.message-select input').click();
     })()`);
     await waitForExpression(cdp, "document.querySelector('.message-card.is-selection-mode .message-select input:checked')");
+    await waitForExpression(cdp, "getComputedStyle(document.querySelector('.message-card.is-selection-mode .message-leading')).opacity === '0'");
     if (scale !== 1) await evalInPage(cdp, `(() => {
       for (const el of document.querySelectorAll('.message-card *')) {
         el.style.fontSize = parseFloat(getComputedStyle(el).fontSize) * ${scale} + 'px';
@@ -181,7 +182,7 @@ export async function runNavigationQuality(cdp, api) {
         return getComputedStyle(row).paddingLeft === window.__selectionBaseline.padding
           && Math.abs(sender.left - window.__selectionBaseline.senderLeft) <= 1
           && getComputedStyle(input).borderRadius === '4px'
-          && (innerWidth > 720 ? avatarOpacity === '1' : avatarOpacity === '0')
+          && (innerWidth > 720 ? (row.querySelector('input').checked ? avatarOpacity === '0' : avatarOpacity === '1') : avatarOpacity === '0')
           && (innerWidth > 720 || (target.width >= 44 && target.height >= 44));
       }) && rows[0].querySelector('input').checked && !rows[1].querySelector('input').checked
         && getComputedStyle(rows[0].querySelector('input'), '::before').transform !== getComputedStyle(rows[1].querySelector('input'), '::before').transform;

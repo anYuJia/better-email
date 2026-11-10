@@ -1,7 +1,10 @@
 const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 const BEARER_PATTERN = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const ASSIGNMENT_PATTERN = /\b(password|passwd|secret|token|access_token|refresh_token|api[_-]?key|client[_-]?secret|authorization[_-]?code|credential)\s*[:=]\s*([^\s,;]+)/gi;
-const SENSITIVE_KEY_PATTERN = /^(authorization|password|passwd|secret|token|access[_-]?token|refresh[_-]?token|api[_-]?key|client[_-]?secret|authorization[_-]?code|credential)$/i;
+// Search terms can contain private mail content even when they do not look like
+// an address or a credential. Apply this at the output boundary, including to
+// nested request objects and production warning logs.
+const SENSITIVE_KEY_PATTERN = /^(authorization|password|passwd|secret|token|access[_-]?token|refresh[_-]?token|api[_-]?key|client[_-]?secret|authorization[_-]?code|credential|query)$/i;
 
 export function redactSensitiveText(value: string) {
   return value

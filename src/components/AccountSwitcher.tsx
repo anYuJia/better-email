@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, ChevronsUpDown, Layers3, Plus, Star } from 'lucide-react';
+import { ChevronDown, ChevronsUpDown, Layers3, Plus, Settings, Star } from 'lucide-react';
 import type { Account, AccountScope } from '../app/types';
 import ContextMenu, { type ContextMenuItem } from './ContextMenu';
 import './account-switcher.css';
@@ -10,6 +10,7 @@ type AccountSwitcherProps = {
   onChange: (value: string) => void;
   onSetDefault: (accountId: number) => void;
   onAddAccount: () => void;
+  onManageAccounts?: () => void;
   disabled?: boolean;
   className?: string;
   variant?: 'compact' | 'identity';
@@ -38,6 +39,7 @@ export default function AccountSwitcher({
   onChange,
   onSetDefault,
   onAddAccount,
+  onManageAccounts,
   disabled = false,
   className = '',
   variant = 'compact',
@@ -126,6 +128,12 @@ export default function AccountSwitcher({
     icon: <Plus size={15} />,
     separatorBefore: true,
     onSelect: onAddAccount,
+  });
+  items.push({
+    id: 'manage-accounts',
+    label: '账号管理',
+    icon: <Settings size={15} />,
+    onSelect: onManageAccounts ?? onAddAccount,
   });
 
   return (

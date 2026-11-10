@@ -81,23 +81,24 @@
  * Full-width action anchors the account identity above folder navigation. */
 
 .compose-button {
-  min-height: 40px;
+  min-height: 44px;
+  height: 44px;
   flex-shrink: 0;
   align-self: stretch;
   width: 100%;
   min-width: 0;
   margin: 0;
-  padding: 0 14px;
+  padding: 0 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid transparent;
-  border-radius: var(--ui-radius-sm);
-  color: var(--ui-text);
-  background: var(--quiet-row-selected);
+  border: 1px solid color-mix(in oklab, var(--ui-accent) 20%, transparent);
+  border-radius: var(--ui-radius-control);
+  color: var(--ui-text-accent);
+  background: var(--ui-accent-soft);
   box-shadow: var(--ui-box-shadow-none);
-  font-size: var(--ui-font-size-secondary);
+  font-size: var(--ui-font-size-body);
   font-weight: 600;
   transition: var(--ui-transition-control);
 }
@@ -109,14 +110,14 @@
 }
 
 .compose-button:hover:not(:disabled) {
-  color: var(--ui-text);
-  background: color-mix(in oklab, var(--quiet-row-selected) 90%, var(--ui-text-accent));
+  color: var(--ui-text-accent);
+  background: color-mix(in oklab, var(--ui-accent-soft) 85%, var(--ui-accent));
   box-shadow: var(--ui-box-shadow-none);
 }
 
 .compose-button:is(:active:where(:not([data-ui-pressed])), [data-ui-pressed="true"]):not(:disabled) {
-  color: var(--ui-text);
-  background: color-mix(in oklab, var(--quiet-row-selected) 82%, var(--ui-text-accent));
+  color: var(--ui-text-accent);
+  background: color-mix(in oklab, var(--ui-accent-soft) 70%, var(--ui-accent));
 }
 
 .compose-button:disabled {
@@ -132,16 +133,16 @@
 /* Section label -------------------------------------------------------------- */
 
 .sidebar-label {
-  margin: 0 0 4px;
-  padding: 0 10px;
+  margin: 4px 0 2px;
+  padding: 0 12px;
   color: var(--ui-text-tertiary);
-  font-size: var(--ui-font-size-meta);
-  font-weight: 500;
+  font-size: var(--ui-font-size-aux);
+  font-weight: 600;
   line-height: 1.4;
 }
 
 /* Folder navigation ----------------------------------------------------------
- * scanability first: flat 36px rows, icon + label + spacer + count. */
+ * scanability first: flat 44px rows, icon + label + spacer + count. */
 
 .folder-list {
   display: flex;
@@ -173,9 +174,9 @@
   flex-shrink: 0;
   align-items: center;
   gap: 2px;
-  min-height: 36px;
+  min-height: 44px;
   border: 0;
-  border-radius: var(--ui-radius-sm);
+  border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
@@ -184,12 +185,12 @@
 .folder-main {
   flex: 1;
   min-width: 0;
-  min-height: 36px;
-  padding: 0 10px;
+  min-height: 44px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   border: 0;
   border-radius: var(--ui-radius-control);
   color: inherit;

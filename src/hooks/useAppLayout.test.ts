@@ -32,7 +32,7 @@ describe('workspace pane preferences', () => {
   });
 
   it('protects reading space while retaining manually saved widths for a larger window', () => {
-    const preferred = { sidebar: 300, list: 540 };
+    const preferred = { sidebar: 280, list: 540 };
     localStorage.setItem(appLayoutStorageKey, JSON.stringify(preferred));
     const { result } = renderHook(useAppLayout);
     act(() => resizeTo(1280));
@@ -63,10 +63,21 @@ describe('workspace pane preferences', () => {
   });
 
   it('fits both maximum preferences at the edge of the resizable layout', () => {
-    const fitted = fitAppLayout({ sidebar: 320, list: 560 }, 1181);
+    const fitted = fitAppLayout({ sidebar: 280, list: 560 }, 1181);
     expect(fitted.sidebar).toBeGreaterThanOrEqual(218);
     expect(fitted.list).toBeGreaterThanOrEqual(340);
     expect(1181 - fitted.sidebar - fitted.list - 2).toBeGreaterThanOrEqual(560);
+  });
+
+  it('supports toggling sidebar collapse and persists the preference', () => {
+    const { result } = renderHook(useAppLayout);
+    expect(result.current.isSidebarCollapsed).toBe(false);
+    act(() => result.current.toggleSidebarCollapse());
+    expect(result.current.isSidebarCollapsed).toBe(true);
+    expect(localStorage.getItem('better-email.sidebar-collapsed.v1')).toBe('true');
+    act(() => result.current.toggleSidebarCollapse());
+    expect(result.current.isSidebarCollapsed).toBe(false);
+    expect(localStorage.getItem('better-email.sidebar-collapsed.v1')).toBe('false');
   });
 });
 

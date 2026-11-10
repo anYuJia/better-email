@@ -1072,7 +1072,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod delivery_outcome_tests {
+pub(crate) mod delivery_outcome_tests {
     use super::*;
     use std::io::{BufRead, BufReader, Write};
     use std::net::TcpListener;
@@ -1251,7 +1251,7 @@ mod delivery_outcome_tests {
         send_to_local_test_server_with_message(message, Vec::new(), final_response).0
     }
 
-    fn send_to_local_test_server_with_message(
+    pub(crate) fn send_to_local_test_server_with_message(
         message: OutboundMessage,
         attachment_bytes: Vec<Vec<u8>>,
         final_response: Option<&'static str>,

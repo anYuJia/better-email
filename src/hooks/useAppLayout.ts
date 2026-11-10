@@ -31,12 +31,37 @@ type LayoutResize = {
 export default function useAppLayout() {
   const [preferredLayout, setPreferredLayout] = useState<AppLayout | null>(loadAppLayoutPreference);
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem('better-email.sidebar-collapsed.v1') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const appLayout = fitAppLayout(preferredLayout ?? getDefaultAppLayout(viewportWidth), viewportWidth);
   const preferenceChangedRef = useRef(false);
   const resizeRef = useRef<LayoutResize | null>(null);
   const resizeRafRef = useRef<number | null>(null);
   const resizeActiveRef = useRef(false);
   const latestClientXRef = useRef(0);
+
+  const toggleSidebarCollapse = useCallback(() => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem('better-email.sidebar-collapsed.v1', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const setSidebarCollapsed = useCallback((collapsed: boolean) => {
+    setIsSidebarCollapsed(collapsed);
+    try {
+      window.localStorage.setItem('better-email.sidebar-collapsed.v1', String(collapsed));
+    } catch {}
+  }, []);
 
   useEffect(() => {
     const onResize = () => setViewportWidth(window.innerWidth);
@@ -198,6 +223,9 @@ export default function useAppLayout() {
 
   return {
     appLayout,
+    isSidebarCollapsed,
+    toggleSidebarCollapse,
+    setSidebarCollapsed,
     beginLayoutResize,
     beginLayoutMouseResize,
     moveLayoutResize,

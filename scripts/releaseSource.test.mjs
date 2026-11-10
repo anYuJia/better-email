@@ -14,8 +14,15 @@ test('release validation rejects tags from another version and shell fragments',
 test('release validation is mandatory and builds pin the validated commit', () => {
   const yaml = readFileSync('.github/workflows/release.yml', 'utf8');
   assert.match(yaml, /npm run build:verify/);
+  assert.doesNotMatch(yaml, /github\.event\.pull_request\.head\.sha/);
+  assert.match(yaml, /inputs\.tag\) \|\| github\.sha/);
   assert.match(yaml, /ref: \$\{\{ needs.validate.outputs.commit \}\}/);
   assert.doesNotMatch(yaml, /- name: UI smoke\s+if:/);
   assert.match(yaml, /npm run test:ui/);
+  assert.match(yaml, /npm run test:ui:quality/);
+  assert.match(yaml, /node scripts\/check-interaction-budget\.mjs/);
   assert.match(yaml, /needs: \[validate, build, build-android\]/);
+  const android = readFileSync('.github/workflows/android.yml', 'utf8');
+  assert.match(android, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(android, /github\.event\.pull_request\.head\.sha/);
 });

@@ -38,4 +38,9 @@ describe('log redaction', () => {
     expect(JSON.stringify(output.error)).not.toContain('user@example.com');
     expect(JSON.stringify(output.error)).not.toContain('token=abc');
   });
+
+  it('removes search text from nested request diagnostics', () => {
+    const output = redactLogValue({ query: '机密合同', requestMessages: { query: '机密合同', limit: 41 } });
+    expect(output).toEqual({ query: '[redacted]', requestMessages: { query: '[redacted]', limit: 41 } });
+  });
 });

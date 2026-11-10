@@ -294,7 +294,7 @@
 :root[data-theme="dark"] .app-shell .message-select input:checked,
 :root[data-theme="dark"] .app-shell .message-selection-all input:checked,
 :root[data-theme="dark"] .app-shell .message-date-header-selection input:checked {
-  background: var(--ui-surface);
+  background: var(--ui-accent);
   border-color: var(--ui-accent);
 }
 

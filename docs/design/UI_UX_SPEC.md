@@ -1268,11 +1268,13 @@ If the answer to #10 is yes, prefer simplification.
 
 # 44. Reference implementation rule
 
-Approved screenshots stored under:
+The status and location of available visual references are recorded under:
 
 `docs/design/reference/`
 
-are visual references, not pixel-perfect templates.
+Approved screenshots are visual references, not pixel-perfect templates. The
+reference index identifies any currently missing approved material; do not
+assume that demonstration screenshots have been approved as design references.
 
 They define:
 
@@ -1341,6 +1343,7 @@ surface, and establishes the following shared implementation choices:
 * Keep the shared 80ms press, 120ms fast and 180ms surface motion rhythm. Respect
   reduced motion and preserve interruptible menu / surface transitions.
 
-Implementation screenshots and verification results are recorded under
-`docs/quality/visual-redesign-2026-10-30/`. These are regression evidence, not a
-replacement for product behavior or accessibility requirements.
+The original implementation screenshots and verification results referenced
+for this refinement are not present in the repository. New regression evidence
+should record its commit, viewport, platform, and test conditions; it does not
+replace product behavior or accessibility requirements.

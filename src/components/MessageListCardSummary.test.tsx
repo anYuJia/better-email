@@ -172,10 +172,10 @@ describe('message list summary single-line rendering', () => {
     expect(card.classList.contains('is-selected')).toBe(true);
     expect(checkbox.tabIndex).toBe(0);
     expect(checkbox.checked).toBe(true);
-    expect(getComputedStyle(selection).left).toBe('0px');
-    expect(getComputedStyle(selection).top).toBe('0px');
-    expect(getComputedStyle(selection).width).toBe('40px');
-    expect(getComputedStyle(selection).height).toBe('40px');
+    expect(getComputedStyle(selection).left).toBe('16px');
+    expect(getComputedStyle(selection).top).toBe('50%');
+    expect(getComputedStyle(selection).width).toBe('36px');
+    expect(getComputedStyle(selection).height).toBe('36px');
     expect(getComputedStyle(checkbox).borderRadius).toBe('4px');
     fireEvent.click(checkbox);
     expect(onToggleMessageSelection).toHaveBeenCalledWith(1, false);

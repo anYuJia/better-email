@@ -35,15 +35,22 @@ const legacyStorageKeyByCurrent: Record<string, string> = {
 
 /* Navigation stays compact; the reader receives the remaining space. */
 export const appLayoutBounds = {
-  sidebar: { min: 218, max: 320 },
-  list: { min: 340, max: 560 },
+  sidebar: { min: 220, max: 280 },
+  list: { min: 360, max: 680 },
 } as const;
 
 export function getDefaultAppLayout(viewportWidth = typeof window === 'undefined' ? 1440 : window.innerWidth): AppLayout {
   const width = Number.isFinite(viewportWidth) ? viewportWidth : 1440;
+  if (width >= 1440) {
+    return { sidebar: 252, list: 500 };
+  }
+  if (width <= 1180) {
+    return { sidebar: 220, list: 388 };
+  }
+  const progress = (width - 1180) / (1440 - 1180);
   return {
-    sidebar: clampNumber(Math.round(width * 0.1 + 92), 220, 244),
-    list: clampNumber(Math.round(width * 0.15 + 180), 360, 410),
+    sidebar: clampNumber(Math.round(220 + progress * 32), 220, 252),
+    list: clampNumber(Math.round(388 + progress * 112), 360, 500),
   };
 }
 

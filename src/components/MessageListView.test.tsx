@@ -317,7 +317,7 @@ describe('MessageListView virtual geometry', () => {
     const messages = Array.from({ length: 100 }, (_, index) => ({ ...message, id: index + 1, subject: `Mail ${index + 1}` }));
     render(<MessageListView {...propsFor(messages)} mobile={false} />);
     const list = screen.getByRole('list', { name: '邮件列表' });
-    fireEvent.scroll(list, { target: { scrollTop: 1500 } });
+    fireEvent.scroll(list, { target: { scrollTop: 22 * MESSAGE_ROW_HEIGHT + 4 } });
     act(() => vi.advanceTimersByTime(20));
     const focusedRow = screen.getByRole('button', { name: /，Mail 23。/ });
     focusedRow.focus();

@@ -133,9 +133,9 @@ export const searchShortcuts = [
 ];
 
 export const searchScopeOptions: { id: SearchScope; label: string; shortLabel: string }[] = [
-  { id: 'folder', label: '当前文件夹', shortLabel: '文件夹' },
-  { id: 'account', label: '当前账号', shortLabel: '账号' },
-  { id: 'all', label: '全部账号', shortLabel: '全部' },
+  { id: 'folder', label: '当前文件夹', shortLabel: '当前文件夹' },
+  { id: 'account', label: '当前账号', shortLabel: '当前账号' },
+  { id: 'all', label: '全部账号', shortLabel: '全部账号' },
 ];
 
 export const emptyAccountCreateForm: AccountCreateInput = {

@@ -86,6 +86,13 @@ describe('logger', () => {
       expect(first).toContain('[app-flow] syncAndRefresh failed');
     });
 
+    it('does not expose nested search terms in warning logs', () => {
+      const warnSpy = spyOnConsole('warn');
+      flowWarn('mailbox-flow', 'loadMessages failed', { requestMessages: { query: '机密合同', limit: 41 } });
+      expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('机密合同');
+      expect(warnSpy.mock.calls[0][1]).toEqual({ requestMessages: { query: '[redacted]', limit: 41 } });
+    });
+
     it('timestamps info and warn through their unified entries', () => {
       const infoSpy = spyOnConsole('info');
       const warnSpy = spyOnConsole('warn');

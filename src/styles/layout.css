@@ -15,8 +15,8 @@
  */
 
 .app-shell {
-  --app-sidebar-width: var(--app-sidebar-width-preferred, 244px);
-  --app-list-width: var(--app-list-width-preferred, 388px);
+  --app-sidebar-width: var(--app-sidebar-width-preferred, 252px);
+  --app-list-width: var(--app-list-width-preferred, 500px);
   display: grid;
   grid-template-rows: var(--app-titlebar-height) minmax(0, 1fr);
   grid-template-columns: var(--app-sidebar-width) 1px var(--app-list-width) 1px minmax(0, 1fr);
@@ -27,6 +27,16 @@
   background: var(--ui-bg);
   color: var(--ui-text);
   font-size: 13.5px;
+}
+
+.app-shell.sidebar-collapsed {
+  --app-sidebar-width: 0px;
+  grid-template-columns: 0px 0px var(--app-list-width) 1px minmax(0, 1fr);
+}
+
+.app-shell.sidebar-collapsed > .sidebar,
+.app-shell.sidebar-collapsed > .pane-resizer:first-of-type {
+  display: none;
 }
 
 .app-shell > .app-titlebar {

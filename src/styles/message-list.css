@@ -1047,7 +1047,7 @@
 
 .message-list-item {
   box-sizing: border-box;
-  height: 68px;
+  height: 76px;
   padding: 0;
 }
 
@@ -1067,10 +1067,10 @@
   box-sizing: border-box;
   position: relative;
   height: auto;
-  min-height: 68px;
+  min-height: 76px;
   overflow: hidden;
   margin: 0;
-  padding: 6px 16px 6px 64px;
+  padding: 10px 16px 10px 64px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   border: 0;
@@ -1133,54 +1133,59 @@
 /* Selection controls share the leading slot so the left edge never shifts. */
 .message-leading {
   position: absolute;
-  left: 20px;
+  left: 16px;
   top: 50%;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   transform: translateY(-50%);
+  display: grid;
+  place-items: center;
   pointer-events: none;
+  opacity: 1;
+  transition: opacity 140ms ease;
+  z-index: 2;
 }
 
 .message-card:hover .message-leading,
 .message-card:has(.message-card-main:focus-visible) .message-leading,
 .message-card:has(.message-select:focus-within) .message-leading,
-.message-card:has(.message-select input:checked) .message-leading {
+.message-card:has(.message-select input:checked) .message-leading,
+.message-card.is-selected .message-leading {
   opacity: 0;
+  pointer-events: none;
 }
 
-/* The app shell moves the checkbox to the trailing gutter, so hovering or
- * selecting a row no longer needs to replace the sender avatar. */
 .app-shell .message-card .message-leading {
   opacity: 1;
 }
 
-.app-shell .message-card:has(.message-select input:checked) .message-leading {
-  opacity: 1;
-}
-
+.app-shell .message-card:hover .message-leading,
 .app-shell .message-card:has(.message-card-main:focus-visible) .message-leading,
-.app-shell .message-card:has(.message-select:focus-within) .message-leading {
-  opacity: 1;
+.app-shell .message-card:has(.message-select:focus-within) .message-leading,
+.app-shell .message-card:has(.message-select input:checked) .message-leading,
+.app-shell .message-card.is-selected .message-leading {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Avatar — muted, flat, no ring/shadow/gradient. */
 .message-avatar {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  min-height: 32px;
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
-  flex: 0 0 32px;
+  flex: 0 0 36px;
   overflow: hidden;
   border-radius: 50%;
   color: var(--ui-text-secondary);
   background: var(--ui-surface-muted);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   line-height: 1;
   opacity: 1;
@@ -1197,69 +1202,77 @@
 }
 
 .message-avatar.avatar-initial {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   line-height: 1;
   user-select: none;
 }
 
-/* Keep the selection control at the message row component's upper-left corner
- * without changing the message content column or row height. */
+/* Checkbox swaps into the exact same leading slot as the avatar */
 .message-select {
   position: absolute;
-  left: 0;
-  top: 0;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
   z-index: 3;
   opacity: 0;
-  transform: none;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
   pointer-events: none;
+  transition: opacity 140ms ease;
 }
 
 .message-card:hover .message-select,
 .message-card:has(.message-card-main:focus-visible) .message-select,
 .message-card:has(.message-select:focus-within) .message-select,
 .message-card:has(.message-select input:checked) .message-select,
-.message-card.is-selection-mode .message-select {
+.message-card.is-selected .message-select {
   opacity: 1;
   pointer-events: auto;
 }
 
 .message-select input {
   box-sizing: border-box;
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
-  min-height: 16px;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  max-width: 18px;
+  max-height: 18px;
   margin: 0;
   padding: 0;
   -webkit-appearance: none;
   appearance: none;
   display: grid;
   place-items: center;
-  border: 1px solid var(--ui-border-strong);
-  border-radius: 50%;
+  border: 1.5px solid var(--ui-border-strong);
+  border-radius: 4px;
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.message-select input:hover:not(:checked) {
+  border-color: var(--ui-accent);
 }
 
 .message-select input::before {
   content: "";
-  width: 7px;
-  height: 4px;
-  border: solid var(--ui-accent);
+  width: 8px;
+  height: 4.5px;
+  border: solid var(--ui-text-on-accent, white);
   border-width: 0 0 2px 2px;
   transform: translateY(-1px) rotate(-45deg) scale(0);
   transform-origin: center;
+  transition: transform 120ms ease;
 }
 
 .message-select input:checked {
   border-color: var(--ui-accent);
-  background: var(--ui-surface);
+  background: var(--ui-accent);
   box-shadow: var(--ui-box-shadow-none);
 }
 
@@ -1273,22 +1286,70 @@
   box-shadow: var(--ui-focus-ring);
 }
 
+.app-shell .message-select {
+  position: absolute;
+  left: 16px;
+  right: auto;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.app-shell .message-card:hover .message-select,
+.app-shell .message-card:has(.message-card-main:focus-visible) .message-select,
+.app-shell .message-card:has(.message-select:focus-within) .message-select,
+.app-shell .message-card:has(.message-select input:checked) .message-select,
+.app-shell .message-card.is-selected .message-select {
+  display: grid;
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .app-shell .message-select input {
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
-  min-height: 16px;
-  max-width: 16px;
-  max-height: 16px;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  max-width: 18px;
+  max-height: 18px;
   border-radius: 4px;
+  border: 1.5px solid var(--ui-border-strong);
   background: var(--ui-surface);
   box-shadow: var(--ui-box-shadow-none);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.app-shell .message-select input:hover:not(:checked) {
+  border-color: var(--ui-accent);
+}
+
+.app-shell .message-select input::before {
+  content: "";
+  width: 8px;
+  height: 4.5px;
+  border: solid var(--ui-text-on-accent, white);
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+  transform-origin: center;
+  transition: transform 120ms ease;
 }
 
 .app-shell .message-select input:checked {
   border-color: var(--ui-accent);
-  background: var(--ui-surface);
+  background: var(--ui-accent);
   box-shadow: var(--ui-box-shadow-none);
+}
+
+.app-shell .message-select input:checked::before {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
 }
 
 .app-shell .message-select input:focus-visible {
@@ -1303,41 +1364,18 @@
   padding-right: 16px;
 }
 
-.app-shell .message-select {
-  left: 0;
-  right: auto;
-  top: 0;
-  z-index: 5;
-  display: grid;
-  opacity: 0;
-  transform: none;
-  pointer-events: none;
-}
-
-.app-shell .message-card:hover .message-select,
-.app-shell .message-card:has(.message-card-main:focus-visible) .message-select,
-.app-shell .message-card:has(.message-select:focus-within) .message-select,
-.app-shell .message-card:has(.message-select input:checked) .message-select,
-.app-shell .message-card.is-selection-mode .message-select {
-  display: grid;
-  opacity: 1;
-  pointer-events: auto;
-}
-
 /* Unread dot owns the leading slot until a selection control appears. */
 .message-unread-dot {
   position: absolute;
-  left: 8px;
-  top: 16px;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 4;
   width: 6px;
   height: 6px;
-  border: 1px solid var(--ui-list);
   border-radius: 50%;
   background: var(--ui-accent);
-  box-shadow: 0 0 0 1px var(--ui-list);
   pointer-events: none;
-  transform: none;
 }
 
 .message-card:hover > .message-unread-dot,

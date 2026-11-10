@@ -12,6 +12,7 @@ import { runAttachmentQuality } from './ui-attachment-quality.mjs';
 import { runWorkflowQuality } from './ui-workflow-quality.mjs';
 import { testInitialHeaderLayout } from './ui-header-layout.mjs';
 import { testMcpGuideLayouts } from './ui-mcp-settings.mjs';
+import { runEvidenceCapture } from './ui-evidence-capture.mjs';
 
 function resolveCdpWebSocket() {
   if (typeof globalThis.WebSocket === 'function') {
@@ -1623,6 +1624,11 @@ async function main() {
       console.log('[ui-smoke] ALL_ASSERTIONS_PASSED');
       return;
     }
+    if (process.env.BETTER_EMAIL_UI_EVIDENCE === '1') {
+      await runEvidenceCapture(cdp, { evalInPage, setUiViewport, waitForExpression, captureScreenshot, clickButton, fillInput, url, captureDir });
+      console.log('[ui-smoke] ALL_ASSERTIONS_PASSED');
+      return;
+    }
     await withStep('credential recovery lifecycle', () => testCredentialRecovery({
       cdp, evaluate: evalInPage, wait: waitForExpression, screenshot: captureScreenshot,
       fill: fillInput, click: clickButton, openAccountSwitcher: openAccountSwitcherMenu,
@@ -1731,8 +1737,8 @@ async function main() {
         return { sidebar, list };
       })()`,
     );
-    const expectedSidebar = Math.min(320, Math.max(228, initialLayout.sidebar + 34));
-    const expectedList = Math.min(500, Math.max(340, initialLayout.list - 44));
+    const expectedSidebar = Math.min(280, Math.max(220, initialLayout.sidebar + 34));
+    const expectedList = Math.min(680, Math.max(360, initialLayout.list - 44));
 
     await dragElement(cdp, '.sidebar-resizer', 34);
     await waitForExpression(cdp, `getComputedStyle(document.querySelector('.app-shell')).getPropertyValue('--app-sidebar-width').trim() === '${expectedSidebar}px'`);

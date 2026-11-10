@@ -29,6 +29,9 @@ function listSharedNames() {
     'icon.ico',
     'icon.png',
     'tray-icon.png',
+    'tray-icon@2x.png',
+    'tray-icon-light.png',
+    'tray-icon-dark.png',
     'Square30x30Logo.png',
     'Square44x44Logo.png',
     'Square71x71Logo.png',
@@ -89,7 +92,24 @@ describe('Windows 图标资源契约', () => {
     }
   });
 
-  it('托盘和主窗口使用当前版本，macOS 托盘使用模板图标', () => {
+  it('统一 SVG 主源及托盘矢量文件存在且有效', () => {
+    const brandDir = join(repoRoot, 'assets', 'brand');
+    const svgNames = [
+      'better-email-symbol.svg',
+      'app-icon.svg',
+      'tray-icon-dark.svg',
+      'tray-icon-light.svg',
+    ];
+    for (const name of svgNames) {
+      const path = join(brandDir, name);
+      expect(existsSync(path), `缺少矢量主源 ${name}`).toBe(true);
+      const content = readFileSync(path, 'utf8');
+      expect(content).toContain('<svg');
+      expect(content).toContain('</svg>');
+    }
+  });
+
+  it('托盘和主窗口使用当前版本，macOS 托盘使用模板图标，Windows 托盘适配主题', () => {
     const libSource = readFileSync(join(repoRoot, 'src-tauri', 'src', 'lib.rs'), 'utf8');
     const trayInclude = libSource.match(/include_bytes!\("\.\.\/icons\/([^"]+tray-icon[^"]*)"\)/);
     expect(trayInclude, 'lib.rs 中未找到托盘图标 include_bytes').not.toBeNull();
@@ -102,6 +122,8 @@ describe('Windows 图标资源契约', () => {
     expect(sha256(trayPath)).toBe(sha256(join(iconsDir, 'tray-icon.png')));
     expect(sha256(join(iconsDir, 'v5', 'icon.png'))).toBe(sha256(join(iconsDir, 'icon.png')));
     expect(libSource).toContain('.icon_as_template(cfg!(target_os = "macos"))');
+    expect(libSource).toContain('tray-icon-dark.png');
+    expect(libSource).toContain('tray-icon-light.png');
   });
 
   it('Android 构建安装自适应图标及单色图层', () => {

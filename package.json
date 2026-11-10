@@ -22,6 +22,7 @@
     "test:ui:navigation": "node scripts/run-ui-navigation.mjs",
     "test:ui:motion": "node scripts/run-ui-motion.mjs",
     "test:ui:workflow": "node scripts/run-ui-workflow.mjs",
+    "test:ui:evidence": "node scripts/run-ui-evidence.mjs",
     "tauri:dev": "node scripts/tauri-dev.mjs",
     "tauri:build": "tauri build",
     "tauri": "tauri",

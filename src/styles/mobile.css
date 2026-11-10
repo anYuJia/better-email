@@ -239,13 +239,34 @@
     font-size: var(--ui-font-size-meta);
   }
 
-  .app-shell.is-mobile-app .mobile-message-list-panel .message-card.is-selection-mode .message-leading { opacity: 0; }
-  .app-shell.is-mobile-app .message-card.is-selection-mode .message-select {
-    width: 52px;
-    height: 100%;
-    min-height: 44px;
+  .app-shell.is-mobile-app .message-card.is-selection-mode .message-leading,
+  .mobile-app-surface .message-card.is-selection-mode .message-leading,
+  .mobile-message-list-panel .message-card.is-selection-mode .message-leading {
+    opacity: 0;
+    pointer-events: none;
   }
-  .app-shell.is-mobile-app .message-card.is-selection-mode { padding-right: 16px; }
+
+  .app-shell.is-mobile-app .message-card.is-selection-mode .message-select,
+  .mobile-app-surface .message-card.is-selection-mode .message-select,
+  .mobile-message-list-panel .message-card.is-selection-mode .message-select {
+    display: grid;
+    opacity: 1;
+    pointer-events: auto;
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    z-index: 5;
+  }
+
+  .app-shell.is-mobile-app .message-card.is-selection-mode,
+  .mobile-app-surface .message-card.is-selection-mode,
+  .mobile-message-list-panel .message-card.is-selection-mode {
+    padding-right: 16px;
+  }
 
   .mobile-inbox-filter-row {
     min-height: 45px;

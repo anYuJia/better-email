@@ -64,8 +64,8 @@ describe('workspace pane preferences', () => {
 
   it('fits both maximum preferences at the edge of the resizable layout', () => {
     const fitted = fitAppLayout({ sidebar: 280, list: 560 }, 1181);
-    expect(fitted.sidebar).toBeGreaterThanOrEqual(218);
-    expect(fitted.list).toBeGreaterThanOrEqual(340);
+    expect(fitted.sidebar).toBeGreaterThanOrEqual(220);
+    expect(fitted.list).toBeGreaterThanOrEqual(360);
     expect(1181 - fitted.sidebar - fitted.list - 2).toBeGreaterThanOrEqual(560);
   });
 
@@ -115,6 +115,6 @@ describe('direct pane resize feedback', () => {
     const narrower = fitAppLayout({ sidebar: 244, list: 410 }, 1180);
     expect(Math.abs(wider.sidebar - narrower.sidebar)).toBeLessThanOrEqual(1);
     expect(Math.abs(wider.list - narrower.list)).toBeLessThanOrEqual(1);
-    expect(narrower.list).toBeGreaterThanOrEqual(340);
+    expect(narrower.list).toBeGreaterThanOrEqual(360);
   });
 });

@@ -584,11 +584,24 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     // macOS recolors template images for the current menu bar appearance.
-    // Other desktop platforms keep the full-color icon, visible on both themes.
+    // Windows notification tray uses dedicated icons adapted to system theme (light/dark).
     #[cfg(target_os = "macos")]
     let icon_bytes = include_bytes!("../icons/v5/tray-icon.png").as_slice();
-    #[cfg(not(target_os = "macos"))]
-    let icon_bytes = include_bytes!("../icons/v5/icon.png").as_slice();
+    #[cfg(target_os = "windows")]
+    let icon_bytes = {
+        let is_dark = app
+            .get_webview_window("main")
+            .and_then(|w| w.theme().ok())
+            .map(|t| t == tauri::Theme::Dark)
+            .unwrap_or(false);
+        if is_dark {
+            include_bytes!("../icons/v5/tray-icon-dark.png").as_slice()
+        } else {
+            include_bytes!("../icons/v5/tray-icon-light.png").as_slice()
+        }
+    };
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let icon_bytes = include_bytes!("../icons/v5/tray-icon.png").as_slice();
     let icon = tauri::image::Image::from_bytes(icon_bytes)
         .map_err(|error| format!("failed to load tray icon: {error}"))?;
 

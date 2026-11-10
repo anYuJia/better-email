@@ -28,6 +28,7 @@ docs/*
 !docs/design/
 docs/design/*
 !docs/design/reference/
+!docs/design/evidence/
 /论文/
 
 # Local secrets and interpreter caches

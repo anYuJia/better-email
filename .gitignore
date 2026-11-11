@@ -25,6 +25,7 @@ test-results/
 
 # Internal reports remain local; the reference index is shared with contributors.
 docs/*
+!docs/releases/
 !docs/design/
 docs/design/*
 !docs/design/reference/

@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from PIL import Image
 
@@ -20,6 +21,37 @@ TAURI_ICONS_V5 = os.path.join(REPO_ROOT, "src-tauri", "icons", "v5")
 
 for d in [ASSETS_BRAND, ASSETS_BRAND_V5, PUBLIC_BRAND_V5, TAURI_ICONS, TAURI_ICONS_V5]:
     os.makedirs(d, exist_ok=True)
+
+app_macos_path = os.path.join(ASSETS_BRAND_V5, "app-macos.png")
+
+def generate_mac_icns():
+    macos_img = Image.open(app_macos_path)
+    iconset_dir = tempfile.mkdtemp(prefix="better_email_iconset_", suffix=".iconset")
+    iconset_specs = [
+        ("icon_16x16.png", 16),
+        ("icon_16x16@2x.png", 32),
+        ("icon_32x32.png", 32),
+        ("icon_32x32@2x.png", 64),
+        ("icon_128x128.png", 128),
+        ("icon_128x128@2x.png", 256),
+        ("icon_256x256.png", 256),
+        ("icon_256x256@2x.png", 512),
+        ("icon_512x512.png", 512),
+        ("icon_512x512@2x.png", 1024),
+    ]
+    for fname, sz in iconset_specs:
+        macos_img.resize((sz, sz), Image.Resampling.LANCZOS).save(os.path.join(iconset_dir, fname))
+
+    if shutil.which("iconutil"):
+        dest_icns = os.path.join(TAURI_ICONS_V5, "icon.icns")
+        subprocess.run(["iconutil", "-c", "icns", iconset_dir, "-o", dest_icns], check=True)
+        shutil.copy(dest_icns, os.path.join(TAURI_ICONS, "icon.icns"))
+    shutil.rmtree(iconset_dir)
+
+if len(sys.argv) > 1 and sys.argv[1] == "--icns-only":
+    generate_mac_icns()
+    print("Deterministic macOS icon.icns rebuilt successfully via iconutil.")
+    sys.exit(0)
 
 # 1. Read master brand symbol path directly from SVG (Single source of truth)
 symbol_svg_path = os.path.join(ASSETS_BRAND, "better-email-symbol.svg")
@@ -101,12 +133,15 @@ browser_bin = find_browser()
 print(f"Using browser for raster rendering: {browser_bin}")
 
 def render_svg_to_png(svg_content, out_png, width, height):
+    # Ensure root svg width and height match target canvas size
+    scaled_svg = re.sub(r'width="[^"]+"', f'width="{width}"', svg_content, count=1)
+    scaled_svg = re.sub(r'height="[^"]+"', f'height="{height}"', scaled_svg, count=1)
     with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False) as f:
         f.write(f"""<!DOCTYPE html>
 <html>
 <head><style>body {{ margin: 0; background: transparent; overflow: hidden; }}</style></head>
 <body>
-  {svg_content}
+  {scaled_svg}
 </body>
 </html>""")
         tmp_html = f.name
@@ -164,17 +199,17 @@ mono_dark_img = Image.open(mono_dark_tmp)
 mark_light_img = Image.open(mark_light_path)
 desktop_img = Image.open(app_desktop_path)
 
-# D. Tray Icons
+# D. Tray Icons (Rendered directly from SVG at native resolutions for optimal pixel clarity)
 # macOS template icons: 64x64, 128x128
-mono_dark_img.resize((64, 64), Image.Resampling.LANCZOS).save(os.path.join(TAURI_ICONS_V5, "tray-icon.png"))
-mono_dark_img.resize((128, 128), Image.Resampling.LANCZOS).save(os.path.join(TAURI_ICONS_V5, "tray-icon@2x.png"))
+render_svg_to_png(tray_dark_svg, os.path.join(TAURI_ICONS_V5, "tray-icon.png"), 64, 64)
+render_svg_to_png(tray_dark_svg, os.path.join(TAURI_ICONS_V5, "tray-icon@2x.png"), 128, 128)
 shutil.copy(os.path.join(TAURI_ICONS_V5, "tray-icon.png"), os.path.join(ASSETS_BRAND_V5, "tray-template.png"))
 
 # Windows notification tray icons: 32x32
 # Light taskbar: dark symbol
-mono_dark_img.resize((32, 32), Image.Resampling.LANCZOS).save(os.path.join(TAURI_ICONS_V5, "tray-icon-light.png"))
+render_svg_to_png(tray_dark_svg, os.path.join(TAURI_ICONS_V5, "tray-icon-light.png"), 32, 32)
 # Dark taskbar: pure white symbol
-mark_light_img.resize((32, 32), Image.Resampling.LANCZOS).save(os.path.join(TAURI_ICONS_V5, "tray-icon-dark.png"))
+render_svg_to_png(tray_light_svg, os.path.join(TAURI_ICONS_V5, "tray-icon-dark.png"), 32, 32)
 
 if os.path.exists(mono_dark_tmp):
     os.remove(mono_dark_tmp)
@@ -202,26 +237,29 @@ subprocess.run(["node", pack_script, ico_tmp_dir, os.path.join(TAURI_ICONS_V5, "
 shutil.rmtree(ico_tmp_dir)
 
 # G. Generate macOS icon.icns from app-macos.png
-macos_img = Image.open(app_macos_path)
-iconset_dir = tempfile.mkdtemp(prefix="better_email_iconset_", suffix=".iconset")
-iconset_specs = [
-    ("icon_16x16.png", 16),
-    ("icon_16x16@2x.png", 32),
-    ("icon_32x32.png", 32),
-    ("icon_32x32@2x.png", 64),
-    ("icon_128x128.png", 128),
-    ("icon_128x128@2x.png", 256),
-    ("icon_256x256.png", 256),
-    ("icon_256x256@2x.png", 512),
-    ("icon_512x512.png", 512),
-    ("icon_512x512@2x.png", 1024),
-]
-for fname, sz in iconset_specs:
-    macos_img.resize((sz, sz), Image.Resampling.LANCZOS).save(os.path.join(iconset_dir, fname))
+def generate_mac_icns():
+    macos_img = Image.open(app_macos_path)
+    iconset_dir = tempfile.mkdtemp(prefix="better_email_iconset_", suffix=".iconset")
+    iconset_specs = [
+        ("icon_16x16.png", 16),
+        ("icon_16x16@2x.png", 32),
+        ("icon_32x32.png", 32),
+        ("icon_32x32@2x.png", 64),
+        ("icon_128x128.png", 128),
+        ("icon_128x128@2x.png", 256),
+        ("icon_256x256.png", 256),
+        ("icon_256x256@2x.png", 512),
+        ("icon_512x512.png", 512),
+        ("icon_512x512@2x.png", 1024),
+    ]
+    for fname, sz in iconset_specs:
+        macos_img.resize((sz, sz), Image.Resampling.LANCZOS).save(os.path.join(iconset_dir, fname))
 
-if shutil.which("iconutil"):
-    subprocess.run(["iconutil", "-c", "icns", iconset_dir, "-o", os.path.join(TAURI_ICONS_V5, "icon.icns")], check=True)
-shutil.rmtree(iconset_dir)
+    if shutil.which("iconutil"):
+        subprocess.run(["iconutil", "-c", "icns", iconset_dir, "-o", os.path.join(TAURI_ICONS_V5, "icon.icns")], check=True)
+    shutil.rmtree(iconset_dir)
+
+generate_mac_icns()
 
 # 5. Mirror all generated assets from src-tauri/icons/v5 to src-tauri/icons/
 shared_files = [

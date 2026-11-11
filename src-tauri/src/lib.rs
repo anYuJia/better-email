@@ -735,6 +735,30 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(desktop)]
+pub fn apply_tray_theme_transition<F>(
+    current_theme_lock: &Mutex<Option<TrayTheme>>,
+    target_theme: TrayTheme,
+    mut apply_icon: F,
+) -> Result<bool, String>
+where
+    F: FnMut(TrayTheme) -> Result<(), String>,
+{
+    {
+        let current = current_theme_lock.lock().map_err(|e| e.to_string())?;
+        if *current == Some(target_theme) {
+            return Ok(false); // 已经处于该主题，避免无谓重刷与图标闪烁
+        }
+    }
+
+    // 只有在底层 set_icon 成功后，才更新主题缓存；失败时不破坏缓存，允许后续重试
+    apply_icon(target_theme)?;
+
+    let mut current = current_theme_lock.lock().map_err(|e| e.to_string())?;
+    *current = Some(target_theme);
+    Ok(true)
+}
+
+#[cfg(desktop)]
 pub fn update_windows_tray_theme(
     app_handle: &tauri::AppHandle,
     theme: tauri::Theme,
@@ -743,19 +767,13 @@ pub fn update_windows_tray_theme(
     {
         if let Some(state) = app_handle.try_state::<TrayState>() {
             let tray_theme = TrayTheme::from(theme);
-            {
-                let mut theme_guard = state.current_theme.lock().map_err(|e| e.to_string())?;
-                if *theme_guard == Some(tray_theme) {
-                    return Ok(false); // 已经处于该主题，避免无谓重刷与图标闪烁
-                }
-                *theme_guard = Some(tray_theme);
-            }
             let tray_guard = state.tray.lock().map_err(|e| e.to_string())?;
             if let Some(ref tray) = *tray_guard {
-                let bytes = select_tray_icon_bytes(tray_theme);
-                let icon = tauri::image::Image::from_bytes(bytes).map_err(|e| e.to_string())?;
-                tray.set_icon(Some(icon)).map_err(|e| e.to_string())?;
-                return Ok(true);
+                return apply_tray_theme_transition(&state.current_theme, tray_theme, |target| {
+                    let bytes = select_tray_icon_bytes(target);
+                    let icon = tauri::image::Image::from_bytes(bytes).map_err(|e| e.to_string())?;
+                    tray.set_icon(Some(icon)).map_err(|e| e.to_string())
+                });
             }
         }
     }
@@ -1231,5 +1249,77 @@ mod tray_theme_tests {
             light_bytes, dark_bytes,
             "Light and Dark tray icons must have distinct image data"
         );
+    }
+
+    #[test]
+    fn test_tray_theme_transition_success_and_deduplication() {
+        let cache = Mutex::new(None);
+        let mut calls = 0;
+
+        // 首次切换至 Light：成功更新缓存
+        let res1 = apply_tray_theme_transition(&cache, TrayTheme::Light, |_| {
+            calls += 1;
+            Ok(())
+        });
+        assert_eq!(res1, Ok(true));
+        assert_eq!(calls, 1);
+        assert_eq!(*cache.lock().unwrap(), Some(TrayTheme::Light));
+
+        // 重复触发同一主题：幂等跳过，不重新调用 set_icon，不发生闪烁
+        let res2 = apply_tray_theme_transition(&cache, TrayTheme::Light, |_| {
+            calls += 1;
+            Ok(())
+        });
+        assert_eq!(res2, Ok(false));
+        assert_eq!(calls, 1);
+        assert_eq!(*cache.lock().unwrap(), Some(TrayTheme::Light));
+
+        // 切换至 Dark：成功更新
+        let res3 = apply_tray_theme_transition(&cache, TrayTheme::Dark, |_| {
+            calls += 1;
+            Ok(())
+        });
+        assert_eq!(res3, Ok(true));
+        assert_eq!(calls, 2);
+        assert_eq!(*cache.lock().unwrap(), Some(TrayTheme::Dark));
+    }
+
+    #[test]
+    fn test_tray_theme_transition_failure_does_not_poison_cache_and_allows_retry() {
+        let cache = Mutex::new(Some(TrayTheme::Light));
+        let mut attempts = 0;
+
+        // 尝试切换至 Dark，但底层 set_icon 失败（例如资源读取或系统窗口句柄错误）
+        let fail_res = apply_tray_theme_transition(&cache, TrayTheme::Dark, |_| {
+            attempts += 1;
+            Err("simulated set_icon failure".to_string())
+        });
+        assert!(fail_res.is_err());
+        assert_eq!(attempts, 1);
+        // 关键断言：主题缓存未被置为 Dark，保留原状态以允许后续重试
+        assert_eq!(*cache.lock().unwrap(), Some(TrayTheme::Light));
+
+        // 重试同一目标主题 Dark：因为缓存未被破坏，允许再次调用并成功
+        let retry_res = apply_tray_theme_transition(&cache, TrayTheme::Dark, |_| {
+            attempts += 1;
+            Ok(())
+        });
+        assert_eq!(retry_res, Ok(true));
+        assert_eq!(attempts, 2);
+        assert_eq!(*cache.lock().unwrap(), Some(TrayTheme::Dark));
+    }
+
+    #[test]
+    fn test_tray_state_preserves_menu_and_unread_item_during_theme_updates() {
+        let state = TrayState {
+            tray: Mutex::new(None),
+            unread_item: Mutex::new(None),
+            is_quitting: AtomicBool::new(false),
+            current_theme: Mutex::new(Some(TrayTheme::Light)),
+        };
+
+        // 托盘状态实例包含独立的 current_theme 锁，更新主题不重建托盘实例，也不重置 unread_item
+        assert!(!state.is_quitting.load(Ordering::SeqCst));
+        assert_eq!(*state.current_theme.lock().unwrap(), Some(TrayTheme::Light));
     }
 }

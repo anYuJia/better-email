@@ -133,8 +133,8 @@
 /* Section label -------------------------------------------------------------- */
 
 .sidebar-label {
-  margin: 4px 0 2px;
-  padding: 0 12px;
+  margin: 6px 0 2px;
+  padding: 0 10px;
   color: var(--ui-text-tertiary);
   font-size: var(--ui-font-size-aux);
   font-weight: 600;
@@ -142,15 +142,15 @@
 }
 
 /* Folder navigation ----------------------------------------------------------
- * scanability first: flat 44px rows, icon + label + spacer + count. */
+ * scanability first: flat 36px rows, icon + label + spacer + count. */
 
 .folder-list {
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  gap: 16px;
-  padding-top: 12px;
+  gap: 12px;
+  padding-top: 10px;
   border-top: 1px solid var(--ui-border);
   overflow: auto;
   overscroll-behavior: contain;
@@ -174,7 +174,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: 2px;
-  min-height: 44px;
+  min-height: 36px;
   border: 0;
   border-radius: var(--ui-radius-control);
   color: var(--ui-text-secondary);
@@ -185,12 +185,12 @@
 .folder-main {
   flex: 1;
   min-width: 0;
-  min-height: 44px;
-  padding: 0 12px;
+  min-height: 36px;
+  padding: 0 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   border: 0;
   border-radius: var(--ui-radius-control);
   color: inherit;
@@ -212,8 +212,8 @@
 
 .folder-name svg {
   flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   stroke-width: 1.75;
   color: currentColor;
 }
@@ -230,13 +230,15 @@
   min-width: auto;
   height: auto;
   padding: 0;
+  margin-left: auto;
   border-radius: 0;
   color: var(--ui-text-tertiary);
   background: transparent;
   box-shadow: var(--ui-box-shadow-none);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 /* Hover / selected: one or two signals only.

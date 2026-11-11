@@ -176,8 +176,10 @@ export default function AccountSwitcher({
             : <Layers3 size={18} strokeWidth={1.75} />}
         </span>}
         <span className="account-switcher-copy">
-          <strong>{primaryLabel}</strong>
-          <span>{variant === 'identity' && !selectedAccount ? accountCountLabel : secondaryLabel}</span>
+          <strong title={primaryLabel}>{primaryLabel}</strong>
+          <span title={selectedAccount ? selectedAccount.email : (variant === 'identity' && !selectedAccount ? accountCountLabel : secondaryLabel)}>
+            {variant === 'identity' && !selectedAccount ? accountCountLabel : secondaryLabel}
+          </span>
         </span>
         {variant === 'identity'
           ? <ChevronsUpDown className="account-switcher-chevron" size={16} aria-hidden="true" />

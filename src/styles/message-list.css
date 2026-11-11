@@ -1201,6 +1201,18 @@
   border-radius: inherit;
 }
 
+.message-avatar.is-brand-avatar {
+  background: var(--ui-surface-muted);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-border) 60%, transparent);
+}
+
+.message-avatar > img.avatar-brand-image {
+  width: 68%;
+  height: 68%;
+  object-fit: contain;
+  margin: auto;
+}
+
 .message-avatar.avatar-initial {
   font-size: 13px;
   font-weight: 600;

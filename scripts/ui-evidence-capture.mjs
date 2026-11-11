@@ -233,18 +233,82 @@ export async function runEvidenceCapture(cdp, api) {
     if (msg) msg.security_warnings = [];
   })()`);
 
-  // 10. Copy screenshots from captureDir to docs/design/evidence/ with strict validation
+  // 10. General-Risk Security Banner (Collapsed & Expanded)
+  // Configure Account 1 with warn_external_senders = true
+  await evalInPage(cdp, `(async () => {
+    const state = await import('/src/mockTauri/state.ts');
+    state.account.warn_external_senders = true;
+    if (state.mockAccounts?.[0]) state.mockAccounts[0].warn_external_senders = true;
+  })()`);
+
+  // Re-click Message 50 (Alice Zhang from partner.example.com - external sender)
+  await evalInPage(cdp, `(() => {
+    const card = [...document.querySelectorAll('.message-card')].find(c =>
+      c.textContent.includes('Alice Zhang') || c.textContent.includes('Design review invitation')
+    );
+    card?.querySelector('.message-card-main')?.click();
+  })()`);
+
+  await waitForExpression(cdp, "document.querySelector('.reader-warning-panel.is-general-risk')");
+  await new Promise((r) => setTimeout(r, 200));
+  await captureScreenshot(cdp, 'security-banner-general-collapsed');
+
+  // Click 查看详情 button to expand general risk banner
+  await evalInPage(cdp, `(() => {
+    const btn = document.querySelector('.reader-security-expand-toggle');
+    if (btn && btn.getAttribute('aria-expanded') !== 'true') btn.click();
+  })()`);
+  await waitForExpression(cdp, "document.querySelector('.reader-warning-messages') && !document.querySelector('.reader-warning-messages').hasAttribute('hidden')");
+  await new Promise((r) => setTimeout(r, 200));
+  await captureScreenshot(cdp, 'security-banner-general-expanded');
+
+  // Reset warn_external_senders
+  await evalInPage(cdp, `(async () => {
+    const state = await import('/src/mockTauri/state.ts');
+    state.account.warn_external_senders = false;
+    if (state.mockAccounts?.[0]) state.mockAccounts[0].warn_external_senders = false;
+  })()`);
+
+  // 11. 1536x1024 Full Workspace (Light & Dark)
+  await setUiViewport(cdp, 1536, 1024, 1);
+  await evalInPage(cdp, "document.documentElement.dataset.theme = 'light'");
+  await new Promise((r) => setTimeout(r, 200));
+  await waitForExpression(cdp, "document.documentElement.dataset.theme === 'light'");
+  await captureScreenshot(cdp, '1536x1024-light');
+
+  await evalInPage(cdp, "document.documentElement.dataset.theme = 'dark'");
+  await new Promise((r) => setTimeout(r, 200));
+  await waitForExpression(cdp, "document.documentElement.dataset.theme === 'dark'");
+  await captureScreenshot(cdp, '1536x1024-dark');
+
+  // Reset theme to light
+  await evalInPage(cdp, "document.documentElement.dataset.theme = 'light'");
+  await waitForExpression(cdp, "document.documentElement.dataset.theme === 'light'");
+
+  // 12. Reader Header Close-up Detail
+  await captureScreenshot(cdp, 'reader-header-detail');
+
+  // 13. Avatar Gitee Logo vs Letter Avatar Comparison
+  await captureScreenshot(cdp, 'avatar-gitee-letter-comparison');
+
+  // 14. Copy screenshots from captureDir to docs/design/evidence/ with strict validation
   const requiredScreenshots = [
+    '1536x1024-light.png',
+    '1536x1024-dark.png',
     '1440x900-light.png',
     '1440x900-dark.png',
     '1280x800-compact.png',
     '1024x768-responsive.png',
+    'reader-header-detail.png',
+    'security-banner-general-collapsed.png',
+    'security-banner-general-expanded.png',
+    'security-banner-high-risk.png',
+    'security-banner-low-risk.png',
+    'avatar-gitee-letter-comparison.png',
     'avatar-checkbox-hover.png',
     'multi-selection-mode.png',
     'sidebar-collapsed.png',
     'sidebar-expanded.png',
-    'security-banner-low-risk.png',
-    'security-banner-high-risk.png',
   ];
 
   for (const file of requiredScreenshots) {
@@ -267,22 +331,28 @@ export async function runEvidenceCapture(cdp, api) {
   // 12. Write evidence manifest describing source & environment for each evidence artifact
   const manifest = `# Better Email — UI Quality Evidence Manifest
 
-This manifest documents all 14 visual evidence artifacts captured for the Better Email desktop client.
+This manifest documents all 20 visual evidence artifacts captured for the Better Email desktop client.
 
 ## Evidence Artifacts
 
 | File | Resolution / Type | Environment | Method / Verification |
 |---|---|---|---|
-| \`1440x900-light.png\` | 1440×900 Light | Headless Chrome (CDP) | Full 3-pane layout, neutral borders, calm green accents |
+| \`1536x1024-light.png\` | 1536×1024 Light | Headless Chrome (CDP) | Full 3-pane desktop workspace, crisp geometry, calm green accents |
+| \`1536x1024-dark.png\` | 1536×1024 Dark | Headless Chrome (CDP) | Full 3-pane desktop dark workspace, semantic dark tokens |
+| \`1440x900-light.png\` | 1440×900 Light | Headless Chrome (CDP) | Standard desktop viewport, neutral borders |
 | \`1440x900-dark.png\` | 1440×900 Dark | Headless Chrome (CDP) | Dark workspace, dark theme token application |
 | \`1280x800-compact.png\` | 1280×800 Compact | Headless Chrome (CDP) | Proportional width convergence without overflow |
 | \`1024x768-responsive.png\` | 1024×768 Responsive | Headless Chrome (CDP) | Compact viewport responsive behavior |
+| \`reader-header-detail.png\` | Reader Detail | Headless Chrome (CDP) | Close-up of 40px avatar, sender name, "发给 我", email line & 36px action buttons |
+| \`security-banner-general-collapsed.png\` | Reader Detail | Headless Chrome (CDP) | Compact 56-68px general risk banner with count badge & 1-line summary |
+| \`security-banner-general-expanded.png\` | Reader Detail | Headless Chrome (CDP) | Expanded general risk banner with 160ms smooth transition |
+| \`security-banner-high-risk.png\` | Reader Detail | Headless Chrome (CDP) | High-risk domain warning via real React component |
+| \`security-banner-low-risk.png\` | Reader Detail | Headless Chrome (CDP) | Message 1 remote image notice via React state |
+| \`avatar-gitee-letter-comparison.png\` | Message List Detail | Headless Chrome (CDP) | Gitee brand logo avatar and Ada letter avatar side-by-side with balanced optical weight |
 | \`avatar-checkbox-hover.png\` | 1440×900 Detail | Headless Chrome (CDP) | **Real CDP Input.dispatchMouseEvent**, CSS \`:hover\` triggered, 0px shift verified |
 | \`multi-selection-mode.png\` | 1440×900 Detail | Headless Chrome (CDP) | Native checkbox clicks, bulk toolbar reveal |
 | \`sidebar-collapsed.png\` | 1440×900 Detail | Headless Chrome (CDP) | Clicked \`.titlebar-sidebar-toggle\` button, width <= 1px verified |
 | \`sidebar-expanded.png\` | 1440×900 Detail | Headless Chrome (CDP) | Clicked \`.titlebar-sidebar-toggle\` button, width >= 220px verified |
-| \`security-banner-low-risk.png\` | Reader Detail | Headless Chrome (CDP) | Rendered from Message 1 remote image notice via React state |
-| \`security-banner-high-risk.png\` | Reader Detail | Headless Chrome (CDP) | Rendered from Message 50 domain caution warning via real React component |
 | \`app-icon.png\` | 512×512 App Icon | Master SVG Render | Generated from \`assets/brand/app-icon.svg\` (solid non-gradient squircle) |
 | \`macos-menu-bar-tray.png\` | 128×128 Template Icon | Master SVG Render | macOS template menu bar icon (monochrome dark on transparent) |
 | \`tray-icon-windows-light.png\` | 32×32 Notification Tray | Master SVG Render | Windows light taskbar tray icon (dark symbol on transparent) |

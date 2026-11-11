@@ -77,18 +77,26 @@ export default function Avatar({ email, name, src, className, fallbackInitial }:
   const initial = fallbackInitial || senderInitial(name, email);
   const altText = name.trim() || email.trim() || initial;
 
+  const emailDomain = email.trim().toLowerCase().split('@')[1]?.trim() || '';
+  const isBrandAvatar = Boolean(!rawUrl && emailDomain && serviceAvatarDomains[emailDomain]);
+
   React.useEffect(() => {
     setCandidateIndex(0);
   }, [avatarKey]);
 
   if (avatarUrl) {
+    const combinedClassName = [className, isBrandAvatar ? 'is-brand-avatar' : '']
+      .filter(Boolean)
+      .join(' ');
+
     return (
-      <span className={className}>
+      <span className={combinedClassName}>
         <img
           src={avatarUrl}
           alt={altText}
           loading="lazy"
           referrerPolicy="no-referrer"
+          className={isBrandAvatar ? 'avatar-brand-image' : undefined}
           onLoad={(event) => {
             const image = event.currentTarget;
             if (
@@ -102,13 +110,23 @@ export default function Avatar({ email, name, src, className, fallbackInitial }:
           onError={() => {
             setCandidateIndex((current) => current + 1);
           }}
-          style={{
-            width: '100%',
-            height: '100%',
-            borderRadius: 'inherit',
-            objectFit: 'cover',
-            display: 'block',
-          }}
+          style={
+            isBrandAvatar
+              ? {
+                  width: '68%',
+                  height: '68%',
+                  objectFit: 'contain',
+                  margin: 'auto',
+                  display: 'block',
+                }
+              : {
+                  width: '100%',
+                  height: '100%',
+                  borderRadius: 'inherit',
+                  objectFit: 'cover',
+                  display: 'block',
+                }
+          }
         />
       </span>
     );

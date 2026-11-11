@@ -46,32 +46,26 @@ export default function SenderIdentity({ message, onComposeNew }: SenderIdentity
           className={`reader-avatar avatar-tone-${senderAvatarTone(message.sender_name, message.sender_email)}`}
         />
         <span className="reader-sender-copy">
-          <strong title={senderLabel}>
-            {!hasDistinctName && senderEmail && onComposeNew ? (
-              <button type="button" className="reader-sender-email" title={`写信给 ${senderEmail}`}
-                onClick={(event) => { event.stopPropagation(); onComposeNew({ to: senderEmail }); }}>
-                {senderLabel}
-              </button>
-            ) : senderLabel}
-          </strong>
-          <span className="reader-sender-email-line">
-            {hasDistinctName && senderEmail && onComposeNew ? (
-              <button
-                type="button"
-                className="reader-sender-email"
-                title={`写信给 ${senderEmail}`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onComposeNew({ to: senderEmail });
-                }}
-              >
-                {senderEmail}
-              </button>
-            ) : hasDistinctName && senderEmail ? (
-              <span className="reader-sender-email-text">{message.sender_email}</span>
-            ) : null}
+          <div className="reader-sender-primary-line">
+            <strong className="reader-sender-name" title={senderLabel}>
+              {!hasDistinctName && senderEmail && onComposeNew ? (
+                <button
+                  type="button"
+                  className="reader-sender-email"
+                  title={`写信给 ${senderEmail}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onComposeNew({ to: senderEmail });
+                  }}
+                >
+                  {senderLabel}
+                </button>
+              ) : senderLabel}
+            </strong>
             {recipientSummary && (
-              <span className="reader-recipient-summary" title={allRecipientText}>{recipientSummary}</span>
+              <span className="reader-recipient-summary" title={allRecipientText}>
+                {recipientSummary}
+              </span>
             )}
             {hasRecipientOverflow && (
               <button
@@ -87,7 +81,26 @@ export default function SenderIdentity({ message, onComposeNew }: SenderIdentity
                 展开
               </button>
             )}
-          </span>
+          </div>
+          {hasDistinctName && senderEmail ? (
+            <div className="reader-sender-email-line">
+              {onComposeNew ? (
+                <button
+                  type="button"
+                  className="reader-sender-email"
+                  title={`写信给 ${senderEmail}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onComposeNew({ to: senderEmail });
+                  }}
+                >
+                  {senderEmail}
+                </button>
+              ) : (
+                <span className="reader-sender-email-text">{message.sender_email}</span>
+              )}
+            </div>
+          ) : null}
         </span>
       </div>
       {recipientDetailsOpen && (

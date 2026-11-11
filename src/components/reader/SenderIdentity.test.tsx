@@ -75,4 +75,47 @@ describe('SenderIdentity recipient summary', () => {
     fireEvent.click(screen.getByRole('button', { name: '关闭收件人详情' }));
     expect(screen.queryByRole('dialog', { name: '收件人详情' })).toBeNull();
   });
+
+  it('places sender name and "发给 我" together on the primary line, separating email on secondary line', () => {
+    const { container } = render(
+      <SenderIdentity
+        message={message({
+          sender_name: 'Google',
+          sender_email: 'no-reply@accounts.google.com',
+          recipients: 'me@example.com',
+        })}
+        onComposeNew={vi.fn()}
+      />,
+    );
+
+    const primaryLine = container.querySelector('.reader-sender-primary-line');
+    expect(primaryLine).not.toBeNull();
+    expect(primaryLine?.textContent).toContain('Google');
+    expect(primaryLine?.textContent).toContain('发给 我');
+
+    const emailLine = container.querySelector('.reader-sender-email-line');
+    expect(emailLine).not.toBeNull();
+    expect(emailLine?.textContent).toContain('no-reply@accounts.google.com');
+    expect(emailLine?.textContent).not.toContain('发给 我');
+  });
+
+  it('handles extremely long email addresses without displacing recipient summary from primary line', () => {
+    const veryLongEmail = 'super-long-team-notifications-system-bot-dispatcher-service@corporate-domain-enterprise-solution.example.com';
+    const { container } = render(
+      <SenderIdentity
+        message={message({
+          sender_name: 'Enterprise System Dispatcher',
+          sender_email: veryLongEmail,
+          recipients: 'me@example.com',
+        })}
+      />,
+    );
+
+    const primaryLine = container.querySelector('.reader-sender-primary-line');
+    expect(primaryLine?.textContent).toContain('Enterprise System Dispatcher');
+    expect(primaryLine?.textContent).toContain('发给 我');
+
+    const emailLine = container.querySelector('.reader-sender-email-line');
+    expect(emailLine?.textContent).toContain(veryLongEmail);
+  });
 });

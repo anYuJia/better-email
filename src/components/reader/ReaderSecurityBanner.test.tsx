@@ -82,4 +82,30 @@ describe('ReaderSecurityBanner', () => {
     expect(screen.queryByRole('button', { name: '请核对邮件内容' })).toBeNull();
     expect(screen.getByRole('button', { name: '显示图片' })).toBeDefined();
   });
+
+  it('一般风险展示紧凑横幅与提醒条数并支持展开收起', () => {
+    render(
+      <ReaderSecurityBanner
+        {...props({
+          warnings: [],
+          selectedWarnExternalSender: true,
+          showRemoteImageNote: false,
+          showLinkAction: false,
+        })}
+      />,
+    );
+
+    const banner = screen.getByLabelText('安全提示');
+    expect(banner.classList.contains('is-caution')).toBe(true);
+    expect(banner.classList.contains('is-general-risk')).toBe(true);
+    expect(screen.getByText('请核对外部发件人')).toBeDefined();
+    expect(screen.getByText('1 项提醒')).toBeDefined();
+    expect(screen.getAllByText('这封邮件来自其他邮箱 / 外部发件人，请注意核对发件人身份。').length).toBeGreaterThanOrEqual(1);
+
+    const expandBtn = screen.getByRole('button', { name: '查看详情' });
+    expect(expandBtn.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(expandBtn);
+    expect(expandBtn.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('收起详情')).toBeDefined();
+  });
 });

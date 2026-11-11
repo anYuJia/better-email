@@ -57,6 +57,25 @@ describe('Avatar', () => {
     );
   });
 
+  it('applies brand avatar classes and restrained scaling for service domain avatars like Gitee', () => {
+    render(
+      <Avatar
+        email="noreply@gitee.com"
+        name="Gitee"
+        className="message-avatar avatar-tone-1"
+      />,
+    );
+
+    const img = screen.getByRole('img', { name: 'Gitee' });
+    const shell = img.parentElement;
+
+    expect(shell?.className).toContain('is-brand-avatar');
+    expect(img.className).toContain('avatar-brand-image');
+    expect(img.style.objectFit).toBe('contain');
+    expect(img.style.width).toBe('68%');
+    expect(img.style.height).toBe('68%');
+  });
+
   it('renders an explicit avatar src inside the fixed-size avatar shell', () => {
     render(
       <Avatar

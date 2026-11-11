@@ -152,4 +152,29 @@ describe('AccountSwitcher', () => {
     expect(selected.getAttribute('title')).toContain('second@example.com');
     expect(selected.querySelector('.account-switcher-mark')?.textContent).toBe('S');
   });
+
+  it('账号名称与邮箱地址包含完整 title 提示且下拉箭头不挤压文本', () => {
+    const longAccount: Account = {
+      ...accounts[0],
+      id: 3,
+      email: '3506211713@long-domain-company-solution.example.com',
+      display_name: '企业工作主账号',
+    };
+    render(
+      <AccountSwitcher
+        variant="identity"
+        accountScope={3}
+        accounts={[longAccount]}
+        onChange={vi.fn()}
+        onSetDefault={vi.fn()}
+        onAddAccount={vi.fn()}
+      />,
+    );
+
+    const trigger = screen.getByRole('button', { name: /企业工作主账号/ });
+    const nameEl = trigger.querySelector('.account-switcher-copy strong');
+    const emailEl = trigger.querySelector('.account-switcher-copy span');
+    expect(nameEl?.getAttribute('title')).toBe('企业工作主账号');
+    expect(emailEl?.getAttribute('title')).toBe('3506211713@long-domain-company-solution.example.com');
+  });
 });

@@ -34,10 +34,38 @@ use tauri::Emitter;
 use tauri::Wry;
 
 #[cfg(desktop)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrayTheme {
+    Light,
+    Dark,
+}
+
+#[cfg(desktop)]
+impl From<tauri::Theme> for TrayTheme {
+    fn from(theme: tauri::Theme) -> Self {
+        match theme {
+            tauri::Theme::Light => TrayTheme::Light,
+            _ => TrayTheme::Dark,
+        }
+    }
+}
+
+#[cfg(desktop)]
+pub fn select_tray_icon_bytes(theme: TrayTheme) -> &'static [u8] {
+    match theme {
+        // Windows 浅色模式：任务栏浅色，使用深色符号保证对比度
+        TrayTheme::Light => include_bytes!("../icons/v5/tray-icon-light.png"),
+        // Windows 深色模式：任务栏深色，使用白色符号保证对比度
+        TrayTheme::Dark => include_bytes!("../icons/v5/tray-icon-dark.png"),
+    }
+}
+
+#[cfg(desktop)]
 pub struct TrayState {
     pub tray: Mutex<Option<tauri::tray::TrayIcon>>,
     pub unread_item: Mutex<Option<MenuItem<Wry>>>,
     pub is_quitting: AtomicBool,
+    pub current_theme: Mutex<Option<TrayTheme>>,
 }
 
 /// The main window places the next compose request here before opening the
@@ -442,6 +470,22 @@ fn dirs_app_data_dir() -> Option<std::path::PathBuf> {
 
 #[cfg(desktop)]
 #[tauri::command]
+fn set_tray_theme(theme_str: String, app: tauri::AppHandle) -> Result<bool, String> {
+    let theme = match theme_str.to_lowercase().as_str() {
+        "light" => tauri::Theme::Light,
+        _ => tauri::Theme::Dark,
+    };
+    update_windows_tray_theme(&app, theme)
+}
+
+#[cfg(not(desktop))]
+#[tauri::command]
+fn set_tray_theme(_theme_str: String) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
 fn set_tray_unread_count(
     unread_count: u64,
     state: tauri::State<'_, TrayState>,
@@ -586,22 +630,25 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // macOS recolors template images for the current menu bar appearance.
     // Windows notification tray uses dedicated icons adapted to system theme (light/dark).
     #[cfg(target_os = "macos")]
-    let icon_bytes = include_bytes!("../icons/v5/tray-icon.png").as_slice();
+    let (icon_bytes, initial_theme) =
+        (include_bytes!("../icons/v5/tray-icon.png").as_slice(), None);
     #[cfg(target_os = "windows")]
-    let icon_bytes = {
+    let (icon_bytes, initial_theme) = {
         let is_dark = app
             .get_webview_window("main")
             .and_then(|w| w.theme().ok())
             .map(|t| t == tauri::Theme::Dark)
             .unwrap_or(false);
-        if is_dark {
-            include_bytes!("../icons/v5/tray-icon-dark.png").as_slice()
+        let theme = if is_dark {
+            TrayTheme::Dark
         } else {
-            include_bytes!("../icons/v5/tray-icon-light.png").as_slice()
-        }
+            TrayTheme::Light
+        };
+        (select_tray_icon_bytes(theme), Some(theme))
     };
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    let icon_bytes = include_bytes!("../icons/v5/tray-icon.png").as_slice();
+    let (icon_bytes, initial_theme) =
+        (include_bytes!("../icons/v5/tray-icon.png").as_slice(), None);
     let icon = tauri::image::Image::from_bytes(icon_bytes)
         .map_err(|error| format!("failed to load tray icon: {error}"))?;
 
@@ -681,9 +728,40 @@ fn setup_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         tray: Mutex::new(Some(tray)),
         unread_item: Mutex::new(Some(unread_item)),
         is_quitting: AtomicBool::new(false),
+        current_theme: Mutex::new(initial_theme),
     });
 
     Ok(())
+}
+
+#[cfg(desktop)]
+pub fn update_windows_tray_theme(
+    app_handle: &tauri::AppHandle,
+    theme: tauri::Theme,
+) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(state) = app_handle.try_state::<TrayState>() {
+            let tray_theme = TrayTheme::from(theme);
+            {
+                let mut theme_guard = state.current_theme.lock().map_err(|e| e.to_string())?;
+                if *theme_guard == Some(tray_theme) {
+                    return Ok(false); // 已经处于该主题，避免无谓重刷与图标闪烁
+                }
+                *theme_guard = Some(tray_theme);
+            }
+            let tray_guard = state.tray.lock().map_err(|e| e.to_string())?;
+            if let Some(ref tray) = *tray_guard {
+                let bytes = select_tray_icon_bytes(tray_theme);
+                let icon = tauri::image::Image::from_bytes(bytes).map_err(|e| e.to_string())?;
+                tray.set_icon(Some(icon)).map_err(|e| e.to_string())?;
+                return Ok(true);
+            }
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = (app_handle, theme);
+    Ok(false)
 }
 
 fn record_page_load(startup: &StartupState, label: &str, event: tauri::webview::PageLoadEvent) {
@@ -935,11 +1013,16 @@ pub fn run() {
                     }
                 }
             }
+            #[cfg(desktop)]
+            if let tauri::WindowEvent::ThemeChanged(theme) = event {
+                let _ = update_windows_tray_theme(window.app_handle(), *theme);
+            }
             #[cfg(not(desktop))]
             let _ = (window, event);
         })
         .invoke_handler(tauri::generate_handler![
             set_tray_unread_count,
+            set_tray_theme,
             get_platform,
             get_startup_status,
             get_startup_timeline,
@@ -1113,4 +1196,40 @@ pub fn run() {
             }
             _ => {}
         });
+}
+
+#[cfg(all(test, desktop))]
+mod tray_theme_tests {
+    use super::*;
+
+    #[test]
+    fn test_tray_theme_mapping() {
+        assert_eq!(TrayTheme::from(tauri::Theme::Light), TrayTheme::Light);
+        assert_eq!(TrayTheme::from(tauri::Theme::Dark), TrayTheme::Dark);
+    }
+
+    #[test]
+    fn test_tray_theme_icon_payloads() {
+        let light_bytes = select_tray_icon_bytes(TrayTheme::Light);
+        let dark_bytes = select_tray_icon_bytes(TrayTheme::Dark);
+
+        assert!(light_bytes.len() > 100, "light tray icon bytes too small");
+        assert!(dark_bytes.len() > 100, "dark tray icon bytes too small");
+        assert_eq!(
+            &light_bytes[0..8],
+            b"\x89PNG\r\n\x1a\n",
+            "light tray icon must be valid PNG"
+        );
+        assert_eq!(
+            &dark_bytes[0..8],
+            b"\x89PNG\r\n\x1a\n",
+            "dark tray icon must be valid PNG"
+        );
+
+        // Light mode uses dark symbol and Dark mode uses white symbol; payloads must be distinct
+        assert_ne!(
+            light_bytes, dark_bytes,
+            "Light and Dark tray icons must have distinct image data"
+        );
+    }
 }

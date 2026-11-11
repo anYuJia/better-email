@@ -92,7 +92,7 @@ describe('Windows 图标资源契约', () => {
     }
   });
 
-  it('统一 SVG 主源及托盘矢量文件存在且有效', () => {
+  it('统一 SVG 主源及托盘矢量文件存在且有效（无渐变、克制色调）', () => {
     const brandDir = join(repoRoot, 'assets', 'brand');
     const svgNames = [
       'better-email-symbol.svg',
@@ -106,12 +106,29 @@ describe('Windows 图标资源契约', () => {
       const content = readFileSync(path, 'utf8');
       expect(content).toContain('<svg');
       expect(content).toContain('</svg>');
+      // 严格遵循 Better Email 克制、无渐变设计规范
+      expect(content.includes('<linearGradient'), `${name} 不应包含渐变色定义`).toBe(false);
     }
+  });
+
+  it('应用主图标与旧版 Git Blob SHA 相比已真实更新，且与 evidence 一致', () => {
+    const iconPath = join(iconsDir, 'icon.png');
+    const icoPath = join(iconsDir, 'icon.ico');
+    const evidencePath = join(repoRoot, 'docs', 'design', 'evidence', 'app-icon.png');
+
+    expect(existsSync(evidencePath), '缺少 docs/design/evidence/app-icon.png').toBe(true);
+    expect(sha256(evidencePath), 'evidence/app-icon.png 必须与最新生成的 icon.png 一致').toBe(sha256(iconPath));
+
+    // 旧版遗留占位图 SHA（Commit 04d804b 之前长期未更新的 blob）
+    const legacyIconSha = '639da2784cf2916b7189d533b3d2b2c9383685642d6c66cf174eec7f53a1a9e8';
+    const legacyIcoSha = '3671a4f107ee628bf0bb130bf7b5b542e0573bead5ba2a7d45f62df944f9c614';
+    expect(sha256(iconPath)).not.toBe(legacyIconSha);
+    expect(sha256(icoPath)).not.toBe(legacyIcoSha);
   });
 
   it('托盘和主窗口使用当前版本，macOS 托盘使用模板图标，Windows 托盘适配主题', () => {
     const libSource = readFileSync(join(repoRoot, 'src-tauri', 'src', 'lib.rs'), 'utf8');
-    const trayInclude = libSource.match(/include_bytes!\("\.\.\/icons\/([^"]+tray-icon[^"]*)"\)/);
+    const trayInclude = libSource.match(/include_bytes!\("\.\.\/icons\/([^"]*tray-icon\.png)"\)/);
     expect(trayInclude, 'lib.rs 中未找到托盘图标 include_bytes').not.toBeNull();
     const windowIconInclude = libSource.match(/include_bytes!\("\.\.\/icons\/v5\/icon\.png"\)/);
     expect(windowIconInclude, 'lib.rs 中未找到主窗口图标 include_bytes').not.toBeNull();

@@ -100,6 +100,17 @@ describe('GlobalSearch keyboard and focus continuity', () => {
     expect(screen.getByRole('listbox').textContent).toContain('搜索方式');
     expect(screen.getByRole('listbox').textContent).not.toContain('0 封');
   });
+
+  it('displays quick filter chips when focusing an empty query and applies syntax on click', () => {
+    const applyShortcut = vi.fn();
+    render(<SearchHarness query="" onApplySearchShortcut={applyShortcut} />);
+    const input = screen.getByRole('combobox');
+    fireEvent.focus(input);
+    expect(screen.getByRole('region', { name: '快速筛选' })).toBeDefined();
+    const unreadChip = screen.getByRole('button', { name: /未读邮件/ });
+    fireEvent.click(unreadChip);
+    expect(applyShortcut).toHaveBeenCalledWith('is:unread ');
+  });
 });
 
 describe('GlobalSearch cold-start accessibility styles', () => {

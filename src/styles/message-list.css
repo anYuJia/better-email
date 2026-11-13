@@ -420,6 +420,49 @@
   font-weight: 500;
 }
 
+.search-quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px 8px;
+}
+
+.search-suggestion-panel button.search-quick-chip {
+  display: inline-flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-muted);
+  color: var(--ui-text);
+  font-size: var(--ui-font-size-meta);
+  cursor: pointer;
+  transition: var(--ui-transition-fast);
+}
+
+.search-suggestion-panel button.search-quick-chip:hover,
+.search-suggestion-panel button.search-quick-chip:focus-visible {
+  background: var(--quiet-row-hover);
+  border-color: var(--ui-border-strong);
+}
+
+.search-chip-label {
+  font-weight: 500;
+}
+
+.search-chip-syntax {
+  font-size: 11px;
+  color: var(--ui-text-tertiary);
+  font-family: var(--ui-font-mono, monospace);
+  background: var(--ui-surface);
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--ui-border-subtle);
+}
+
 
 /* ---------------------------------------------------------------------------
  * 4 · List control strip

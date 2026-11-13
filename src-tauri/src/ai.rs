@@ -108,12 +108,15 @@ pub fn call_chat_completion(
         messages,
         temperature: 0.2,
     };
-    let agent = ureq::Agent::config_builder()
+    let is_loopback = is_loopback_endpoint(&url);
+    let mut config = ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
         .http_status_as_error(false)
-        .max_redirects(0)
-        .build()
-        .new_agent();
+        .max_redirects(0);
+    if is_loopback {
+        config = config.proxy(None);
+    }
+    let agent = config.build().new_agent();
     let mut request = agent.post(&url).header("Content-Type", "application/json");
     if !api_key.trim().is_empty() {
         request = request.header("Authorization", format!("Bearer {}", api_key.trim()));
@@ -177,6 +180,14 @@ fn is_loopback_host(host: &str) -> bool {
         normalized.as_str(),
         "localhost" | "127.0.0.1" | "::1" | "0:0:0:0:0:0:0:1"
     )
+}
+
+/// 端点是否指向本机回环地址（用于判断是否必须显式跳过代理）。
+fn is_loopback_endpoint(endpoint: &str) -> bool {
+    url::Url::parse(endpoint.trim())
+        .ok()
+        .and_then(|u| u.host_str().map(is_loopback_host))
+        .unwrap_or(false)
 }
 
 /// 校验 AI/MCP endpoint 的安全策略。
@@ -332,15 +343,19 @@ struct McpClient {
 impl McpClient {
     fn new(endpoint: &str, api_key: &str, timeout_seconds: u64) -> Result<Self, String> {
         let validated = validate_ai_endpoint(endpoint)?;
+        let is_loopback = is_loopback_endpoint(&validated);
+        let mut config = ureq::Agent::config_builder()
+            .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
+            .http_status_as_error(false)
+            .max_redirects(0);
+        if is_loopback {
+            config = config.proxy(None);
+        }
+        let agent = config.build().new_agent();
         Ok(Self {
             endpoint: validated,
             api_key: api_key.trim().to_string(),
-            agent: ureq::Agent::config_builder()
-                .timeout_global(Some(Duration::from_secs(timeout_seconds.clamp(5, 300))))
-                .http_status_as_error(false)
-                .max_redirects(0)
-                .build()
-                .new_agent(),
+            agent,
             next_id: 1,
             session_id: None,
             protocol_version: None,
@@ -1071,6 +1086,17 @@ mod tests {
         assert!(validate_ai_endpoint("http://127.0.0.1:11434/v1").is_ok());
         assert!(validate_ai_endpoint("http://localhost:3000").is_ok());
         assert!(validate_ai_endpoint("http://[::1]:8080").is_ok());
+    }
+
+    #[test]
+    fn loopback_endpoints_are_detected_for_proxy_bypass() {
+        assert!(super::is_loopback_endpoint("http://127.0.0.1:11434/v1"));
+        assert!(super::is_loopback_endpoint("https://127.0.0.1:8443/chat"));
+        assert!(super::is_loopback_endpoint("http://localhost:8000/mcp"));
+        assert!(super::is_loopback_endpoint("http://[::1]:9000/sse"));
+        assert!(!super::is_loopback_endpoint("https://api.openai.com/v1"));
+        assert!(!super::is_loopback_endpoint("http://192.168.1.100:8000"));
+        assert!(!super::is_loopback_endpoint("not a url"));
     }
 
     #[test]

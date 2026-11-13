@@ -241,6 +241,41 @@ describe('useAppShortcuts text selection boundary', () => {
     expect(options.setSelectedId).not.toHaveBeenCalled();
   });
 
+  it('moves conversation selection using j/k and ArrowDown/ArrowUp in thread mode', () => {
+    const threadA = {
+      thread_key: 'thread-1',
+      subject: '会话 1',
+      participants: 'Alice',
+      message_count: 2,
+      unread_count: 0,
+      latest_at: '2026-11-13T10:00:00Z',
+      latest_preview: '测试预览 1',
+    };
+    const threadB = {
+      thread_key: 'thread-2',
+      subject: '会话 2',
+      participants: 'Bob',
+      message_count: 3,
+      unread_count: 1,
+      latest_at: '2026-11-13T11:00:00Z',
+      latest_preview: '测试预览 2',
+    };
+    const onOpenThread = vi.fn();
+    const options = makeOptions();
+    options.listMode = 'threads';
+    options.threads = [threadA, threadB];
+    options.activeThread = threadA;
+    options.onOpenThread = onOpenThread;
+    render(<ShortcutHarness options={options} />);
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+    expect(onOpenThread).toHaveBeenCalledWith(threadB);
+
+    options.activeThread = threadB;
+    fireEvent.keyDown(window, { key: 'k' });
+    expect(onOpenThread).toHaveBeenCalledWith(threadA);
+  });
+
   it('clears a selection when only closed anchored menu surfaces exist', () => {
     const options = makeOptions();
     options.selectedMessageIds = [1];

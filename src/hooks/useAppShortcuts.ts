@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import type { ListMode, MessageSummary, UndoAction } from '../app/types';
+import type { ListMode, MessageSummary, ThreadSummary, UndoAction } from '../app/types';
 import {
   canArchiveMessageRole,
   canChangeMessageReadStateRole,
@@ -42,6 +42,9 @@ type UseAppShortcutsOptions = {
   toggleRead: (message: MessageSummary) => Promise<void>;
   moveSelected: (role: 'archive' | 'trash') => Promise<void>;
   toggleSidebarCollapse?: () => void;
+  threads?: ThreadSummary[];
+  activeThread?: ThreadSummary | null;
+  onOpenThread?: (thread: ThreadSummary) => void | Promise<MessageSummary[]>;
 };
 
 export default function useAppShortcuts(options: UseAppShortcutsOptions) {
@@ -65,6 +68,19 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       const currentIndex = selectedId ? messages.findIndex((message) => message.id === selectedId) : -1;
       const nextIndex = Math.min(Math.max(currentIndex + offset, 0), messages.length - 1);
       setSelectedId(messages[nextIndex].id);
+    }
+
+    function selectRelativeThread(offset: number) {
+      const { threads = [], activeThread, onOpenThread } = optionsRef.current;
+      if (threads.length === 0 || !onOpenThread) return;
+      const currentIndex = activeThread
+        ? threads.findIndex((thread) => thread.thread_key === activeThread.thread_key)
+        : -1;
+      const nextIndex = Math.min(Math.max(currentIndex + offset, 0), threads.length - 1);
+      const nextThread = threads[nextIndex];
+      if (nextThread && (!activeThread || nextThread.thread_key !== activeThread.thread_key)) {
+        void onOpenThread(nextThread);
+      }
     }
 
     function runSafely(action: Promise<void>) {
@@ -221,14 +237,22 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         composeNew();
         return;
       }
-      if (listMode === 'messages' && (key === 'j' || key === 'arrowdown')) {
+      if (key === 'j' || key === 'arrowdown') {
         event.preventDefault();
-        selectRelativeMessage(1);
+        if (listMode === 'threads') {
+          selectRelativeThread(1);
+        } else {
+          selectRelativeMessage(1);
+        }
         return;
       }
-      if (listMode === 'messages' && (key === 'k' || key === 'arrowup')) {
+      if (key === 'k' || key === 'arrowup') {
         event.preventDefault();
-        selectRelativeMessage(-1);
+        if (listMode === 'threads') {
+          selectRelativeThread(-1);
+        } else {
+          selectRelativeMessage(-1);
+        }
         return;
       }
 

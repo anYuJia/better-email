@@ -224,6 +224,21 @@ pub fn build_token_exchange_request(
     })
 }
 
+fn is_loopback_host(host: &str) -> bool {
+    let normalized = host.trim_matches(['[', ']']).to_ascii_lowercase();
+    matches!(
+        normalized.as_str(),
+        "localhost" | "127.0.0.1" | "::1" | "0:0:0:0:0:0:0:1"
+    )
+}
+
+fn is_loopback_endpoint(endpoint: &str) -> bool {
+    url::Url::parse(endpoint.trim())
+        .ok()
+        .and_then(|u| u.host_str().map(is_loopback_host))
+        .unwrap_or(false)
+}
+
 /// 发送 application/x-www-form-urlencoded 表单请求，并对响应做有上限读取。
 /// 成功与失败响应都先受大小限制再返回；错误信息不含响应正文。
 fn post_form_capped(
@@ -231,11 +246,14 @@ fn post_form_capped(
     form: &[(String, String)],
     max_bytes: u64,
 ) -> Result<(u16, String), String> {
-    let agent = ureq::Agent::config_builder()
+    let is_loopback = is_loopback_endpoint(endpoint);
+    let mut config = ureq::Agent::config_builder()
         .timeout_global(Some(std::time::Duration::from_secs(30)))
-        .max_redirects(0)
-        .build()
-        .new_agent();
+        .max_redirects(0);
+    if is_loopback {
+        config = config.proxy(None);
+    }
+    let agent = config.build().new_agent();
     let mut response = agent
         .post(endpoint)
         .send_form(

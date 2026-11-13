@@ -24,6 +24,13 @@ export type GlobalSearchProps = {
   onApplySearchShortcut: (query: string) => void;
 };
 
+const QUICK_FILTER_CHIPS = [
+  { id: 'has-attachment', label: '含附件', syntax: 'has:attachment' },
+  { id: 'is-unread', label: '未读邮件', syntax: 'is:unread' },
+  { id: 'is-starred', label: '星标邮件', syntax: 'is:starred' },
+  { id: 'from', label: '发件人', syntax: 'from:' },
+];
+
 export default function GlobalSearch({
   searchInputRef,
   query,
@@ -64,8 +71,10 @@ export default function GlobalSearch({
     () => buildMessageSearchSuggestions(searchEntries, trimmedQuery),
     [searchEntries, trimmedQuery],
   );
+  const showQuickChips = searchFocused && trimmedQuery.length === 0;
   const showSearchSuggestions = searchFocused && trimmedQuery.length >= 1 && searchSuggestions.length > 0;
-  useWheelContainment(searchSuggestionPanelRef, showSearchSuggestions);
+  const showSearchPanel = showSearchSuggestions || showQuickChips;
+  useWheelContainment(searchSuggestionPanelRef, showSearchPanel);
   const activeSearchSuggestion = showSearchSuggestions && activeSearchSuggestionIndex >= 0
     ? searchSuggestions[activeSearchSuggestionIndex]
     : null;
@@ -221,6 +230,31 @@ export default function GlobalSearch({
       </details>
       <span className="sr-only" id={scopeHintId}>{activeSearchScope.label}，仅搜索已同步到本机的邮件。</span>
       <span className="global-search-shortcut" aria-hidden="true">{shortcutLabel}</span>
+      {showQuickChips && (
+        <div
+          ref={searchSuggestionPanelRef}
+          className="search-suggestion-panel search-quick-chips-panel"
+          role="region"
+          aria-label="快速筛选"
+        >
+          <span className="search-suggestion-title" aria-hidden="true">快捷语法过滤</span>
+          <div className="search-quick-chips" role="group" aria-label="快捷语法过滤">
+            {QUICK_FILTER_CHIPS.map((chip) => (
+              <button
+                type="button"
+                key={chip.id}
+                className="search-quick-chip"
+                tabIndex={-1}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => applySuggestedSearch(chip.syntax.endsWith(':') ? chip.syntax : `${chip.syntax} `)}
+              >
+                <span className="search-chip-label">{chip.label}</span>
+                <code className="search-chip-syntax">{chip.syntax}</code>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {showSearchSuggestions && (
         <div
           ref={searchSuggestionPanelRef}

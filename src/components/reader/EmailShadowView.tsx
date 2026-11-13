@@ -84,6 +84,8 @@ export default function EmailShadowView({
           overflow-wrap: anywhere;
           -webkit-user-select: text;
           user-select: text;
+          color: var(--ui-text);
+          color-scheme: light dark;
         }
         * {
           box-sizing: border-box;
@@ -123,6 +125,23 @@ export default function EmailShadowView({
           border-radius: 0 7px 7px 0;
           color: var(--ui-text-secondary);
           background: var(--ui-surface-muted);
+        }
+        /* 暗色主题下的对比度保护：防止未声明背景的纯黑字邮件在暗色模式下不可读 */
+        :host-context([data-theme="dark"]) .reader-shadow-content {
+          color-scheme: dark;
+          color: var(--ui-text);
+        }
+        :host-context([data-theme="dark"]) .reader-shadow-content :is(
+          [style*="color: #000"],
+          [style*="color:#000"],
+          [style*="color: black"],
+          [style*="color:black"],
+          [style*="color: rgb(0, 0, 0)"],
+          [style*="color:rgb(0,0,0)"],
+          font[color="#000000"],
+          font[color="#000"]
+        ):not([style*="background"]) {
+          color: var(--ui-text);
         }
       `;
       const style = document.createElement('style');

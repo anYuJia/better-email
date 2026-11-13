@@ -89,6 +89,23 @@ export default function ThreadListView({
     });
   }, [layout, viewportHeight]);
 
+  // 当活动会话变化时（如通过键盘导航切换），保持其在视口可见
+  useLayoutEffect(() => {
+    if (!activeThread || !listRef.current) return;
+    const index = threads.findIndex((t) => t.thread_key === activeThread.thread_key);
+    if (index === -1) return;
+    const row = layout[index];
+    if (!row) return;
+    const list = listRef.current;
+    const currentScrollTop = list.scrollTop;
+    const clientHeight = list.clientHeight || viewportHeight;
+    if (row.top < currentScrollTop) {
+      list.scrollTop = row.top;
+    } else if (row.top + row.height > currentScrollTop + clientHeight) {
+      list.scrollTop = row.top + row.height - clientHeight;
+    }
+  }, [activeThread?.thread_key, layout, threads, viewportHeight]);
+
   useLayoutEffect(() => {
     const listElement = listRef.current;
     if (!listElement) return;

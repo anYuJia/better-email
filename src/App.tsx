@@ -1425,6 +1425,9 @@ function MailboxApp({
     toggleRead,
     moveSelected,
     toggleSidebarCollapse,
+    threads: mailboxView.unavailable ? [] : threads,
+    activeThread: mailboxView.unavailable ? null : activeThread,
+    onOpenThread: openThread,
   });
 
   const { handleRefresh, handleRefreshAction, resolveDelivery } = useMailFeedback({

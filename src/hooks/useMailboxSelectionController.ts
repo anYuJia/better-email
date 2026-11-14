@@ -88,6 +88,7 @@ export default function useMailboxSelectionController({
     setSelectedIdState(value);
   }, []);
   const [readerSelectionRevision, setReaderSelectionRevision] = useState(0);
+  const [explicitlySelectedMessageId, setExplicitlySelectedMessageId] = useState<number | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<Message | null>(null);
   const [detailLoadState, setDetailLoadState] = useState<MessageDetailLoadState>({ status: 'idle' });
   const [detailRetryRevision, setDetailRetryRevision] = useState(0);
@@ -248,6 +249,7 @@ export default function useMailboxSelectionController({
 
   const selectMessageForReading = useCallback((messageId: number) => {
     clearManualUnreadSuppression([messageId]);
+    setExplicitlySelectedMessageId(messageId);
     setSelectedId(messageId);
     setReaderSelectionRevision((current) => current + 1);
   }, [clearManualUnreadSuppression, setSelectedId]);
@@ -264,6 +266,7 @@ export default function useMailboxSelectionController({
     retrySelectedDetail,
     readerDisplayedId,
     readerSelectionRevision,
+    explicitlySelectedMessageId,
     selected,
     selectedDetail,
     setSelectedDetail,

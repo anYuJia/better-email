@@ -2,7 +2,7 @@ import { lazy, useState } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SettingsFrame from './SettingsFrame';
-import type { SettingsSectionId } from './settingsNavigation';
+import type { SettingsSearchEntry, SettingsSectionId } from './settingsNavigation';
 
 vi.mock('./settingsPageLoaders', () => ({ preloadSettingsSection: vi.fn() }));
 const scrollIntoView = vi.fn();
@@ -17,14 +17,14 @@ afterEach(() => {
   if (originalScroll) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScroll);
   else delete (HTMLElement.prototype as unknown as { scrollIntoView?: unknown }).scrollIntoView;
 });
-function setup() {
+function setup(initialSearchTarget?: SettingsSearchEntry) {
   let finish!: (value: { default: () => React.JSX.Element }) => void;
   const pending = new Promise<{ default: () => React.JSX.Element }>((resolve) => { finish = resolve; });
   const Content = () => <details data-settings-section="ai-advanced"><summary>高级连接</summary><input aria-label="API 地址" /></details>;
   const ColdAi = lazy(() => pending);
   function Harness() {
-    const [section, setSection] = useState<SettingsSectionId>('general');
-    return <SettingsFrame title="设置" activeSection={section} onNavigate={setSection} onTestConnection={() => undefined} onSave={() => undefined} onClose={() => undefined}>
+    const [section, setSection] = useState<SettingsSectionId>(initialSearchTarget?.section ?? 'general');
+    return <SettingsFrame title="设置" activeSection={section} initialSearchTarget={initialSearchTarget} onNavigate={setSection} onTestConnection={() => undefined} onSave={() => undefined} onClose={() => undefined}>
       {section === 'ai' ? <ColdAi /> : <p>{section} 内容</p>}
     </SettingsFrame>;
   }
@@ -36,6 +36,18 @@ function setup() {
   return { ...view, search, finish: () => finish({ default: Content }) };
 }
 describe('settings search waits for its own committed content', () => {
+  it('focuses a detail opened directly from the mobile Settings root', async () => {
+    const target: SettingsSearchEntry = {
+      label: 'AI 连接参数', path: 'AI 服务 › 高级连接', section: 'ai',
+      target: 'ai-advanced', keywords: [],
+    };
+    const view = setup(target);
+    await act(async () => view.finish());
+    const detail = document.querySelector<HTMLDetailsElement>('[data-settings-section="ai-advanced"]')!;
+    expect(detail.open).toBe(true);
+    expect(document.activeElement).toBe(detail);
+  });
+
   it('opens and focuses a target after a cold chunk exceeds the previous delay without waiting for animation', async () => {
     const view = setup(); view.search();
     expect(screen.queryByLabelText('设置搜索结果')).toBeNull();

@@ -97,6 +97,7 @@ export type MessageListPaneProps = {
   onLoadMore: () => Promise<MessageSummary[]>;
   loadMoreStatus?: string | null;
   onOpenNavigation?: () => void;
+  onCompose?: () => void;
 };
 
 function MessageListPane({
@@ -161,6 +162,7 @@ function MessageListPane({
   onLoadMore,
   loadMoreStatus,
   onOpenNavigation,
+  onCompose,
 }: MessageListPaneProps) {
   const paneRef = React.useRef<HTMLElement | null>(null);
   const handleExpandSearch = React.useCallback(() => {
@@ -385,6 +387,7 @@ function MessageListPane({
       {!mobile && (
         <MessageListToolbar
           onOpenNavigation={onOpenNavigation}
+          onCompose={onCompose}
           filter={filter}
           listMode={listMode}
           listSort={listSort}

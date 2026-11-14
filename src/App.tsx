@@ -28,6 +28,7 @@ import MobileSettingsRoot from './components/mobile/MobileSettingsRoot';
 import AppModals from './components/AppModals';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import type { SettingsSectionId } from './components/settings/SettingsFrame';
+import type { SettingsSearchEntry } from './components/settings/settingsNavigation';
 import type { PendingSendUndo } from './components/UndoSnackbarStack';
 import useAppLayout from './hooks/useAppLayout';
 import { logError } from './app/logger';
@@ -227,6 +228,7 @@ function MailboxApp({
   const themeMode = useThemeMode();
   useAutoHideScrollbars();
   const [activeSettingsSection, setActiveSettingsSection] = useState<SettingsSectionId>(requestedSettingsSection);
+  const [initialSettingsSearchTarget, setInitialSettingsSearchTarget] = useState<SettingsSearchEntry | null>(null);
   const [status, setStatus] = useState('本地原型已就绪');
   const { toasts: messageToasts, showToast: showMessageToast } = useMessageToastQueue();
   const [composerSendProgress, setComposerSendProgress] = useState<number | null>(null);
@@ -467,6 +469,7 @@ function MailboxApp({
     readerSelectedDetail,
     readerDisplayedId,
     readerSelectionRevision,
+    explicitlySelectedMessageId,
     detailLoadState,
     retrySelectedDetail,
     selected,
@@ -717,6 +720,7 @@ function MailboxApp({
   }, [isMobileApp, navigateMobileScreen, openDesktopSettingsWindow, openSettingsHome, useNativeSettingsWindow]);
 
   const openMobileSettingsSection = useCallback((section: SettingsSectionId) => {
+    setInitialSettingsSearchTarget(null);
     if (!useNativeSettingsWindow) preloadSettingsOverlay(section);
     if (useNativeSettingsWindow) {
       openDesktopSettingsWindow(section);
@@ -745,9 +749,15 @@ function MailboxApp({
     setActiveSettingsSection(section);
     setSettingsOpen(true);
     loadMeta(folderId, accountScope, { mode: 'full' }).catch((error) => setStatus(String(error)));
-  }, [accountScope, folderId, isMobileApp, loadMeta, openDesktopSettingsWindow, setStatus, useNativeSettingsWindow]);
+  }, [accountScope, folderId, isMobileApp, loadMeta, openDesktopSettingsWindow, setStatus, setInitialSettingsSearchTarget, useNativeSettingsWindow]);
+
+  const openMobileSettingsSearchResult = useCallback((section: SettingsSectionId, target?: SettingsSearchEntry) => {
+    openMobileSettingsSection(section);
+    setInitialSettingsSearchTarget(target ?? null);
+  }, [openMobileSettingsSection]);
 
   const closeSettingsSurface = useCallback(() => {
+    setInitialSettingsSearchTarget(null);
     resetSaveAndVerifyReport();
     if (isMobileApp && window.history.state?.betterEmailSettingsSection) {
       window.history.back();
@@ -1650,6 +1660,7 @@ function MailboxApp({
         accountSourceLabels={accountSourceLabels}
         appliedQuery={appliedQuery}
         onOpenNavigation={isMobileApp ? undefined : showNarrowSidebar}
+        onCompose={isMobileApp ? undefined : () => handleComposeNew(undefined)}
         filter={filter}
         listMode={listMode}
         listSort={listSort}
@@ -1719,6 +1730,7 @@ function MailboxApp({
         selected={readerSelectedDetail}
         selectedId={readerDisplayedId}
         activeSelectedId={selectedId}
+        canAutomaticallyMarkRead={explicitlySelectedMessageId === selectedId}
         detailLoadState={detailLoadState}
         onRetryDetail={retrySelectedDetail}
         attachmentsLoaded={attachmentsLoaded}
@@ -1811,6 +1823,7 @@ function MailboxApp({
                 mailboxUnavailable={mailboxView.unavailable}
                 {...headerSelectionProps}
                 appliedQuery={appliedQuery}
+                searchScope={searchScope}
                 query={queryDraft}
                 filter={filter}
                 listMode={listMode}
@@ -1824,6 +1837,7 @@ function MailboxApp({
                 onSearchSubmit={runSearch}
                 onQueryChange={handleQueryChange}
                 onClearSearch={handleClearSearch}
+                onSearchScopeChange={handleSearchScopeChange}
                 onFilterChange={setFilter}
                 onShowMessages={handleShowMessages}
                 onShowThreads={handleShowThreads}
@@ -1858,8 +1872,9 @@ function MailboxApp({
             <MobileSettingsRoot
               account={account}
               accounts={accounts}
+              accountScope={accountScope}
               onBack={backMobileScreen}
-              onOpenSection={openMobileSettingsSection}
+              onOpenSection={openMobileSettingsSearchResult}
             />
           </MobileScreenSurface>
         </div>
@@ -2063,6 +2078,7 @@ function MailboxApp({
             themeMode={themeMode.mode}
             onThemeModeChange={themeMode.setMode}
             activeSettingsSection={activeSettingsSection}
+            initialSearchTarget={initialSettingsSearchTarget}
             accountSettingsDirty={accountSettingsDirty}
             accountSettingsSaving={accountSettingsSaving}
             saveAndVerifyRunning={saveAndVerifyRunning}

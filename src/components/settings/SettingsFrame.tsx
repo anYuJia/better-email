@@ -39,6 +39,7 @@ type SettingsFrameProps = {
   onReady?: () => void;
   title: string;
   activeSection: SettingsSectionId;
+  initialSearchTarget?: SettingsSearchEntry | null;
   children: React.ReactNode;
   onNavigate: (section: SettingsSectionId) => void;
   onTestConnection: () => void;
@@ -107,6 +108,7 @@ export default function SettingsFrame({
   onReady,
   title,
   activeSection,
+  initialSearchTarget = null,
   children,
   onNavigate,
   onTestConnection,
@@ -156,6 +158,9 @@ export default function SettingsFrame({
     setSearchTarget((current) => current?.section === activeSection ? current : null);
   }, [activeSection]);
   useEffect(() => { setSearchTarget(null); }, [accountScope, isClosing]);
+  useEffect(() => {
+    if (initialSearchTarget) setSearchTarget({ ...initialSearchTarget });
+  }, [initialSearchTarget]);
 
   useModalAccessibility({
     dialogRef: shellRef,

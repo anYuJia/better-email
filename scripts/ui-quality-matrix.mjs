@@ -115,6 +115,31 @@ export async function runQualityMatrix(cdp, api) {
     if (!mobile && (!inboxGeometry.folderTitleVisible || (w > 1180 && inboxGeometry.readerPaneWidth < 559))) {
       throw new Error(`Mailbox context or reading space: ${label}: ${JSON.stringify(inboxGeometry)}`);
     }
+    if (!mobile && w === 1024) {
+      await evalInPage(cdp, "document.querySelector('.app-shell').classList.add('sidebar-collapsed')");
+      await captureScreenshot(cdp, `quality-${label}-inbox-sidebar-collapsed`);
+      const collapsedGeometry = await evalInPage(cdp, `(() => {
+        const shell = document.querySelector('.app-shell');
+        const sidebar = shell.querySelector(':scope > .sidebar');
+        const list = shell.querySelector(':scope > .message-list-panel').getBoundingClientRect();
+        const reader = shell.querySelector(':scope > .reader-panel').getBoundingClientRect();
+        const titlebarToggle = shell.querySelector('.titlebar-sidebar-toggle');
+        const listNavigation = shell.querySelector('.list-narrow-navigation');
+        const compose = shell.querySelector('.list-narrow-compose');
+        return {
+          sidebarHidden: getComputedStyle(sidebar).display === 'none',
+          listVisible: list.width >= 300 && list.height > 0,
+          readerVisible: reader.width >= 300 && reader.height > 0 && reader.left >= list.right - 1,
+          titlebarToggleHidden: !titlebarToggle || getComputedStyle(titlebarToggle).display === 'none',
+          listNavigationVisible: Boolean(listNavigation && getComputedStyle(listNavigation).display !== 'none'),
+          compactComposeVisible: Boolean(compose && getComputedStyle(compose).display !== 'none'),
+        };
+      })()`);
+      await evalInPage(cdp, "document.querySelector('.app-shell').classList.remove('sidebar-collapsed')");
+      if (Object.values(collapsedGeometry).some((value) => value !== true)) {
+        throw new Error(`Collapsed compact desktop layout: ${label}: ${JSON.stringify(collapsedGeometry)}`);
+      }
+    }
     if (!mobile && w === 1280) {
       await evalInPage(cdp, "document.querySelector('.filter-menu > summary').click()");
       await waitForExpression(cdp, "document.querySelector('.filter-menu[open] [role=menu]')");
@@ -152,6 +177,11 @@ export async function runQualityMatrix(cdp, api) {
       await clickButton(cdp, '附件', "document.querySelector('[role=\"menu\"][aria-label=\"邮件筛选和列表模式\"]')");
       await waitForExpression(cdp, "document.querySelector('.mobile-clear-filter') && document.querySelectorAll('.message-card').length === 1");
       await clickButton(cdp, '搜索邮件', "document.querySelector('.mobile-inbox-header')");
+      await evalInPage(cdp, "document.querySelector('.mobile-search-scope > summary').click()");
+      await waitForExpression(cdp, "document.querySelector('[role=\"menu\"][aria-label=\"搜索范围\"]')");
+      await check('search-scope-open');
+      await clickButton(cdp, '当前文件夹', "document.querySelector('.mobile-search-scope')");
+      await waitForExpression(cdp, "!document.querySelector('.mobile-search-scope[open]')");
       await fillInput(cdp, '.mobile-search-form input', 'Security');
       await evalInPage(cdp, "document.querySelector('.mobile-search-form').requestSubmit()");
       await waitForExpression(cdp, "document.querySelector('.status-line')?.textContent.includes('已搜索：Security') && document.querySelectorAll('.message-card').length === 1");
@@ -167,7 +197,7 @@ export async function runQualityMatrix(cdp, api) {
       await waitForExpression(cdp, "document.querySelector('.quick-reply-entry') && !document.querySelector('.quick-reply textarea')");
       await check('reader');
       await checkLabels();
-      await clickButton(cdp, '开始快速回复', "document.querySelector('.quick-reply')");
+      await clickButton(cdp, '回复 Security Team', "document.querySelector('.quick-reply')");
       await waitForExpression(cdp, "document.activeElement === document.querySelector('.quick-reply textarea') && !document.querySelector('.composer')");
       await fillInput(cdp, '.quick-reply textarea', '切换阅读后继续这份回复');
       await check('reader-reply');
@@ -222,8 +252,12 @@ export async function runQualityMatrix(cdp, api) {
       await clickButton(cdp, '设置', "document.querySelector('.mobile-mailbox-footer')");
       await waitForExpression(cdp, "document.querySelector('.mobile-settings-root') && !document.querySelector('.mobile-mailbox-sheet') && !document.querySelector('.settings-modal')");
       await check('settings-root');
-      await evalInPage(cdp, "document.querySelector('.mobile-settings-row').click()");
+      await fillInput(cdp, '.mobile-settings-search input', '撤销发送');
+      await waitForExpression(cdp, "document.querySelector('.mobile-settings-search-results button')?.innerText.includes('撤销发送')");
+      await check('settings-search-results');
+      await clickButton(cdp, '撤销发送', "document.querySelector('.mobile-settings-search-results')");
       await waitForExpression(cdp, "document.querySelector('.settings-page')");
+      await waitForExpression(cdp, "document.activeElement?.getAttribute('data-settings-section') === 'sending'");
     } else {
       await clickButton(cdp, '设置', "document.querySelector('.sidebar-footer, .narrow-navigation')");
       await waitForExpression(cdp, "document.querySelector('.settings-page')");

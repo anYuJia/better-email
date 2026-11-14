@@ -24,6 +24,7 @@ function props(overrides: Partial<ReaderPaneProps> = {}): ReaderPaneProps {
   return {
     activeThread: null, threadMessages: [], activeThreadSelected: null, selected: message,
     selectedId: 1, activeSelectedId: 1, attachmentsLoaded: true, accountScope: 1,
+    canAutomaticallyMarkRead: true,
     folders: [], labels: [], attachments: [], selectedSenderTrusted: true, selectedSenderDomain: 'example.com',
     selectedHasRemoteImageWarning: false, selectedSenderIsExternal: false, selectedExternalBlocked: false,
     selectedWarnExternalSender: false, selectedInterceptsHttps: false, quickReplyBody: '', readTriggerKey: 0,
@@ -42,6 +43,19 @@ function props(overrides: Partial<ReaderPaneProps> = {}): ReaderPaneProps {
 describe('ReaderPane content lifecycle', () => {
   const conversation = (key: string): ThreadSummary => ({ thread_key: key, subject: `会话 ${key}`, participants: 'Ada',
     message_count: 2, unread_count: 1, latest_at: '2026-10-01T09:00:00Z', latest_preview: '摘要', is_muted: false });
+
+  it('keeps a cold-start preview unread until the message is explicitly opened', () => {
+    vi.useFakeTimers();
+    const input = props({ canAutomaticallyMarkRead: false });
+    input.selected = { ...input.selected!, is_read: false };
+    const view = render(<ReaderPane {...input} />);
+    act(() => vi.advanceTimersByTime(2500));
+    expect(input.onReadComplete).not.toHaveBeenCalled();
+
+    view.rerender(<ReaderPane {...input} canAutomaticallyMarkRead />);
+    act(() => vi.advanceTimersByTime(2000));
+    expect(input.onReadComplete).toHaveBeenCalledOnce();
+  });
 
   it('shows the requested thread immediately without old body, actions or read completion while loading', () => {
     vi.useFakeTimers();
@@ -154,7 +168,7 @@ describe('ReaderPane content lifecycle', () => {
     view.rerender(<ReaderPane {...input} selected={{ ...input.selected!, body: '已恢复的正文' }} />);
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByText('已恢复的正文')).toBeDefined();
-    expect(screen.getByRole('button', { name: '开始快速回复' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '回复 Ada…' })).toBeDefined();
   });
 
   it('does not mark headers, reload skeletons, or failures as read from scrolling or elapsed time', () => {
@@ -208,7 +222,7 @@ describe('ReaderPane content lifecycle', () => {
     expect(screen.queryByRole('textbox', { name: '输入回复' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '加载完整邮件' }));
     expect(input.onReadComplete).toHaveBeenCalledOnce();
-    expect(screen.getByRole('button', { name: '开始快速回复' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '回复 Ada…' })).toBeDefined();
   });
 
   it('does not treat the conversation summary scroll container as the message body read boundary', async () => {

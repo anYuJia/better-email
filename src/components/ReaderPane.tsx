@@ -29,6 +29,7 @@ import AttachmentList from './reader/AttachmentList';
 import ReaderLabelMenu from './reader/ReaderLabelMenu';
 import ReaderSecurityBanner from './reader/ReaderSecurityBanner';
 import ReaderToolbar from './reader/ReaderToolbar';
+import ReaderSubject from './reader/ReaderSubject';
 import SenderIdentity from './reader/SenderIdentity';
 import ReaderTranslationPanel from './reader/ReaderTranslationPanel';
 import useMessageTranslation from '../hooks/useMessageTranslation';
@@ -73,6 +74,7 @@ export type ReaderPaneProps = {
   onRepairCredentials?: (accountId: number) => void;
   selectedId: number | null;
   activeSelectedId: number | null;
+  canAutomaticallyMarkRead?: boolean;
   detailLoadState?: MessageDetailLoadState;
   onRetryDetail?: () => void;
   attachmentsLoaded: boolean;
@@ -167,6 +169,7 @@ function ReaderPane({
   onRepairCredentials,
   selectedId,
   activeSelectedId,
+  canAutomaticallyMarkRead = false,
   detailLoadState = { status: 'idle' },
   onRetryDetail,
   attachmentsLoaded,
@@ -249,7 +252,7 @@ function ReaderPane({
     : selected && invalidBody
       ? { messageId: selected.id, status: 'error', errorKind: 'invalid-content', error: '已保存的正文格式无法解析。邮件和附件仍保留在本机。' } : null;
   const isActiveMessage = Boolean(selected && selected.id === activeSelectedId);
-  const canCompleteReading = isActiveMessage && !activeThread && activeBodyFetchState == null;
+  const canCompleteReading = isActiveMessage && canAutomaticallyMarkRead && !activeThread && activeBodyFetchState == null;
   useEffect(() => setExpandedBody(null), [selected?.id]);
   const {
     readerRef,
@@ -487,7 +490,7 @@ function ReaderPane({
         <NarrowReaderNavigation onBack={onBackToList} />
         <article className="reader">
           <header className="reader-header">
-            <h1 className="reader-title-block">{summary.subject || '(无主题)'}</h1>
+            <ReaderSubject subject={summary.subject} />
             <SenderIdentity message={summary} onComposeNew={onComposeNew} />
             <div className="reader-actions-placeholder" aria-hidden="true" />
             <div className="reader-context-row">

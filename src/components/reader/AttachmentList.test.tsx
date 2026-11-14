@@ -31,7 +31,9 @@ describe('AttachmentList compact summary', () => {
     const input = props();
     const view = render(<AttachmentList {...input} />);
     expect(view.container.querySelector('.attachments')).toBeNull();
-    expect(screen.getByRole('button', { name: '查看附件：安全检查清单.pdf' }).getAttribute('aria-expanded')).toBe('false');
+    const summary = screen.getByRole('button', { name: /查看附件：安全检查清单\.pdf，.*KB/ });
+    expect(summary.getAttribute('aria-expanded')).toBe('false');
+    expect(summary.getAttribute('aria-label')).toContain('2 KB');
     const download = screen.getByRole('button', { name: `下载：${pdf.filename}` });
     download.focus();
     fireEvent.click(download);
@@ -47,7 +49,7 @@ describe('AttachmentList compact summary', () => {
     const input = props({ errors: { 1: '下载中断，已保留 64 KB' } });
     const view = render(<AttachmentList {...input} />);
     expect(view.container.querySelector('.attachment-transfer-status')?.textContent).toContain('下载中断');
-    fireEvent.click(screen.getByRole('button', { name: '收起附件：安全检查清单.pdf' }));
+    fireEvent.click(screen.getByRole('button', { name: /收起附件：安全检查清单\.pdf，.*KB/ }));
     expect(view.container.querySelector('.attachments')).toBeNull();
     expect(screen.getByRole('status').textContent).toContain('下载中断');
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: `重试：${pdf.filename}` })); });
@@ -81,7 +83,7 @@ describe('AttachmentList compact summary', () => {
     const transfer = deferred<Attachment | null>();
     const input = props({ attachments: [pdf, photo], pendingAttachmentCount: 2, onDownload: vi.fn(() => transfer.promise) });
     const view = render(<AttachmentList {...input} />);
-    fireEvent.click(screen.getByRole('button', { name: '查看附件（2 个）' }));
+    fireEvent.click(screen.getByRole('button', { name: /查看附件：2 个附件，.*KB/ }));
     const download = screen.getByRole('button', { name: `下载：${pdf.filename}` });
     act(() => {
       fireEvent.click(download);
@@ -101,7 +103,7 @@ describe('AttachmentList compact summary', () => {
     const attachment = { ...pdf, is_downloaded: true, local_path: '/private/internal/file.pdf' };
     const input = props({ attachments: [attachment, photo], pendingAttachmentCount: 1 });
     render(<AttachmentList {...input} />);
-    fireEvent.click(screen.getByRole('button', { name: '查看附件（2 个）' }));
+    fireEvent.click(screen.getByRole('button', { name: /查看附件：2 个附件，.*KB/ }));
     const open = screen.getByRole('button', { name: `打开：${pdf.filename}` });
     await act(async () => { fireEvent.click(open, { detail: 1 }); });
     await act(async () => {
@@ -166,7 +168,7 @@ describe('AttachmentList compact summary', () => {
       </>;
     }
     render(<Harness />);
-    fireEvent.click(screen.getByRole('button', { name: '查看附件（2 个）' }));
+    fireEvent.click(screen.getByRole('button', { name: /查看附件：2 个附件，.*KB/ }));
     const more = screen.getByRole('button', { name: `更多附件操作：${photo.filename}` });
     expect(more.getAttribute('aria-haspopup')).toBe('menu');
     fireEvent.click(more);

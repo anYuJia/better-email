@@ -98,7 +98,7 @@ describe('MessageListView mobile viewport policy', () => {
     render(<MessageListView {...props} />);
     resizeTo(932);
     expect(screen.queryByRole('checkbox', { name: '选择当前筛选结果中的全部邮件' })).toBeNull();
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     armPull(list);
     releasePull(list);
     expect(props.onRefresh).toHaveBeenCalledTimes(1);
@@ -139,7 +139,7 @@ describe('MessageListView pull gesture cancellation', () => {
   it('does not refresh when the browser cancels a pull above the threshold', () => {
     const props = makeProps();
     render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     armPull(list);
     fireEvent.touchCancel(list, { touches: [], changedTouches: [touch(160)] });
     expect(screen.queryByText('释放立即刷新')).toBeNull();
@@ -154,7 +154,7 @@ describe('MessageListView pull gesture cancellation', () => {
   it('refreshes once for a completed single-finger pull', () => {
     const props = makeProps();
     render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     armPull(list);
     releasePull(list);
     releasePull(list);
@@ -165,7 +165,7 @@ describe('MessageListView pull gesture cancellation', () => {
   it('does not refresh when a pull is released below the threshold', () => {
     const props = makeProps();
     render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     fireEvent.touchStart(list, { touches: [touch(10)] });
     fireEvent.touchMove(list, { touches: [touch(25)] });
     releasePull(list);
@@ -176,7 +176,7 @@ describe('MessageListView pull gesture cancellation', () => {
   it.each(['touchStart', 'touchMove'] as const)('cancels an armed pull on multi-touch %s', (phase) => {
     const props = makeProps();
     render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     armPull(list);
     fireEvent[phase](list, { touches: [touch(160), touch(180, 2)] });
     fireEvent.touchMove(list, { touches: [touch(200)] });
@@ -188,7 +188,7 @@ describe('MessageListView pull gesture cancellation', () => {
   it.each(['touchStart', 'touchMove'] as const)('handles an empty touch list during %s', (phase) => {
     const props = makeProps();
     render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     armPull(list);
     fireEvent[phase](list, { touches: [] });
     releasePull(list);
@@ -200,7 +200,7 @@ describe('MessageListView pull gesture cancellation', () => {
     const props = makeProps();
     const onNextRefresh = vi.fn();
     const view = render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     armPull(list);
     view.rerender(<MessageListView {...props} listStateKey="account-2-inbox" onRefresh={onNextRefresh} />);
     releasePull(list);
@@ -212,7 +212,7 @@ describe('MessageListView pull gesture cancellation', () => {
   it('does not resurrect a pending pull after leaving and reentering the mobile layout', () => {
     const props = makeProps();
     render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     armPull(list);
     resizeTo(1024);
     resizeTo(430);
@@ -224,7 +224,7 @@ describe('MessageListView pull gesture cancellation', () => {
   it('rechecks that the list is at the top before refreshing', () => {
     const props = makeProps();
     render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     armPull(list);
     list.scrollTop = 50;
     releasePull(list);
@@ -235,7 +235,7 @@ describe('MessageListView pull gesture cancellation', () => {
   it('does not cancel the feedback for an already submitted refresh', () => {
     const props = makeProps();
     render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     armPull(list);
     releasePull(list);
     fireEvent.touchCancel(list, { touches: [] });

@@ -20,6 +20,7 @@ import {
 } from '../../app/messageActionState';
 import type { Folder, Message } from '../../app/types';
 import SenderIdentity from './SenderIdentity';
+import ReaderSubject from './ReaderSubject';
 import ReaderAiContextActions from './ReaderAiContextActions';
 import { useDetailsMenu } from '../../hooks/useDetailsMenu';
 import { memo, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -272,7 +273,7 @@ function ReaderToolbar({
 
   return (
     <header className="reader-header">
-      <h1 className="reader-title-block">{selected.subject || '(无主题)'}</h1>
+      <ReaderSubject subject={selected.subject} />
       <SenderIdentity message={selected} onComposeNew={onComposeNew} />
       <div className="reader-actions" aria-label="邮件操作">
         {isTrash ? (

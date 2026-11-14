@@ -177,7 +177,7 @@ export default function AttachmentList({
           type="button"
           aria-expanded={expanded}
           aria-controls={listId}
-          aria-label={`${expanded ? '收起' : '查看'}附件${singleAttachment ? `：${singleAttachment.filename}` : `（${attachments.length} 个）`}`}
+          aria-label={`${expanded ? '收起' : '查看'}附件：${singleAttachment?.filename ?? `${attachments.length} 个附件`}，${formatBytes(totalSize)}`}
           title={singleAttachment?.filename}
           onClick={() => setExpanded((value) => !value)}
         >

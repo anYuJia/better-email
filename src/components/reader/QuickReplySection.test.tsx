@@ -70,7 +70,7 @@ describe('QuickReplySection mobile reveal', () => {
     const { animations } = mobileReveal();
     const change = vi.fn();
     const view = render(<QuickReplySection {...emptyReplyProps} onQuickReplyChange={change} />);
-    fireEvent.click(screen.getByRole('button', { name: '开始快速回复' }));
+    fireEvent.click(screen.getByRole('button', { name: '回复 Ada…' }));
     const editor = screen.getByRole('textbox');
     const section = editor.closest('section')!;
     expect(document.activeElement).toBe(editor);
@@ -103,7 +103,7 @@ describe('QuickReplySection mobile reveal', () => {
   it('skips reduced motion while still opening and focusing the editor immediately', () => {
     const { animations } = mobileReveal(true);
     render(<QuickReplySection {...emptyReplyProps} />);
-    fireEvent.click(screen.getByRole('button', { name: '开始快速回复' }));
+    fireEvent.click(screen.getByRole('button', { name: '回复 Ada…' }));
     expect(document.activeElement).toBe(screen.getByRole('textbox'));
     expect(animations).toHaveLength(0);
   });
@@ -111,7 +111,7 @@ describe('QuickReplySection mobile reveal', () => {
   it('settles in place when reduced motion changes and cleans up the listener', () => {
     const { animations, listeners } = mobileReveal();
     render(<QuickReplySection {...emptyReplyProps} />);
-    fireEvent.click(screen.getByRole('button', { name: '开始快速回复' }));
+    fireEvent.click(screen.getByRole('button', { name: '回复 Ada…' }));
     const editor = screen.getByRole('textbox');
     for (const listener of [...listeners]) listener({ matches: true } as MediaQueryListEvent);
     expect(animations[0].cancel).toHaveBeenCalledOnce();
@@ -123,13 +123,13 @@ describe('QuickReplySection mobile reveal', () => {
   it('cancels the old reveal on message navigation without expanding the next empty reply', () => {
     const { animations, listeners } = mobileReveal();
     const view = render(<QuickReplySection {...emptyReplyProps} />);
-    fireEvent.click(screen.getByRole('button', { name: '开始快速回复' }));
+    fireEvent.click(screen.getByRole('button', { name: '回复 Ada…' }));
     view.rerender(<QuickReplySection {...emptyReplyProps} selected={{ ...selected, id: 8 }} />);
     expect(animations[0].cancel).toHaveBeenCalledOnce();
     expect(animations[0].onfinish).toBeNull();
     expect(listeners.size).toBe(0);
     expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.getByRole('button', { name: '开始快速回复' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '回复 Ada…' })).toBeTruthy();
     vi.advanceTimersByTime(500);
     expect(animations[0].cancel).toHaveBeenCalledOnce();
   });
@@ -141,7 +141,7 @@ describe('QuickReplySection focus and draft handoff', () => {
     const onComposeFromMessage = vi.fn();
     render(<QuickReplySection selected={selected} quickReplyBody="" onQuickReplyChange={vi.fn()} onComposeFromMessage={onComposeFromMessage} onSendQuickReply={vi.fn()} />);
     expect(screen.queryByRole('textbox')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '开始快速回复' }));
+    fireEvent.click(screen.getByRole('button', { name: '回复 Ada…' }));
     const editor = screen.getByRole('textbox');
     expect(document.activeElement).toBe(editor);
     fireEvent.blur(editor);
@@ -160,7 +160,7 @@ describe('QuickReplySection focus and draft handoff', () => {
     expect(screen.getByRole('textbox')).toBeDefined();
     view.rerender(<QuickReplySection {...input} selected={{ ...selected, id: 8 }} quickReplyBody="" />);
     expect(screen.queryByRole('textbox')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '开始快速回复' }));
+    fireEvent.click(screen.getByRole('button', { name: '回复 Ada…' }));
     view.rerender(<QuickReplySection {...input} selected={{ ...selected, id: 8, account_id: 2 }} quickReplyBody="" />);
     expect(screen.queryByRole('textbox')).toBeNull();
     view.rerender(<QuickReplySection {...input} />);
@@ -175,7 +175,7 @@ describe('QuickReplySection focus and draft handoff', () => {
     expect(screen.getByRole('alert').textContent).toContain('未保存');
     view.rerender(<QuickReplySection {...input} submissionPending />);
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).readOnly).toBe(true);
-    expect(screen.queryByRole('button', { name: '开始快速回复' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '回复 Ada…' })).toBeNull();
   });
 
   it('starts collapsed on desktop and keeps the explicitly opened editor stable after blur', () => {
@@ -190,7 +190,7 @@ describe('QuickReplySection focus and draft handoff', () => {
     );
 
     expect(screen.queryByRole('textbox')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '开始快速回复' }));
+    fireEvent.click(screen.getByRole('button', { name: '回复 Ada…' }));
     const editor = screen.getByRole('textbox', { name: '输入回复' });
     fireEvent.focus(editor);
     fireEvent.blur(editor);

@@ -418,6 +418,12 @@ body[data-image-preview-modal='1'] .window-chrome {
   }
 }
 
+@media (max-width: 1040px) {
+  .titlebar-sidebar-toggle {
+    display: none;
+  }
+}
+
 @media (max-width: 820px) {
   /* Keep the current mailbox identity readable until the mobile titlebar
    * takes over. The secondary count yields first, so the identity does not

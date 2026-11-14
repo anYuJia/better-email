@@ -141,7 +141,7 @@ describe('MessageListView virtual geometry', () => {
     const messages = Array.from({ length: 1000 }, (_, index) => ({ ...message, id: index + 1, subject: `Mail ${index + 1}` }));
     const props = propsFor(messages);
     const view = render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     anchor.mockClear();
     fireEvent.scroll(list, { target: { scrollTop: 1500 } });
     act(() => vi.advanceTimersByTime(20));
@@ -172,7 +172,7 @@ describe('MessageListView virtual geometry', () => {
     const rowsBefore = new Set(view.container.querySelectorAll('.message-list-item, .message-date-header'));
     const reads = vi.mocked(HTMLElement.prototype.getBoundingClientRect);
     reads.mockClear();
-    fireEvent.scroll(screen.getByRole('list', { name: '邮件列表' }), { target: { scrollTop: MESSAGE_ROW_HEIGHT } });
+    fireEvent.scroll(screen.getByRole('region', { name: '邮件列表' }), { target: { scrollTop: MESSAGE_ROW_HEIGHT } });
     act(() => vi.advanceTimersByTime(20));
     const entering = Array.from(view.container.querySelectorAll('.message-list-item, .message-date-header'))
       .filter((node) => !rowsBefore.has(node));
@@ -191,7 +191,7 @@ describe('MessageListView virtual geometry', () => {
     reads.mockClear();
     view.rerender(<MessageListView {...props} selectedId={2} selectedMessageIds={[2]} />);
     expect(reads).not.toHaveBeenCalled();
-    fireEvent.scroll(screen.getByRole('list', { name: '邮件列表' }), { target: { scrollTop: 1500 } });
+    fireEvent.scroll(screen.getByRole('region', { name: '邮件列表' }), { target: { scrollTop: 1500 } });
     act(() => vi.advanceTimersByTime(20));
     expect(changedRow.isConnected).toBe(false);
     reads.mockClear();
@@ -236,7 +236,7 @@ describe('MessageListView virtual geometry', () => {
     mockGeometry(() => rowHeight, () => visible);
     const messages = Array.from({ length: 20 }, (_, index) => ({ ...message, id: index + 1 }));
     const view = render(<MessageListView {...propsFor(messages)} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     const wrapper = view.container.querySelector('.message-list-viewport-wrapper') as HTMLElement;
     const beforeHide = wrapper.style.height;
     visible = false;
@@ -265,7 +265,7 @@ describe('MessageListView virtual geometry', () => {
     const messages = Array.from({ length: 100 }, (_, index) => ({ ...message, id: index + 1 }));
     const props = propsFor(messages);
     const view = render(<MessageListView {...props} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     fireEvent.scroll(list, { target: { scrollTop: 1500 } });
     act(() => vi.advanceTimersByTime(20));
     visible = false;
@@ -316,7 +316,7 @@ describe('MessageListView virtual geometry', () => {
     mockGeometry(() => rowHeight);
     const messages = Array.from({ length: 100 }, (_, index) => ({ ...message, id: index + 1, subject: `Mail ${index + 1}` }));
     render(<MessageListView {...propsFor(messages)} mobile={false} />);
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     fireEvent.scroll(list, { target: { scrollTop: 22 * MESSAGE_ROW_HEIGHT + 4 } });
     act(() => vi.advanceTimersByTime(20));
     const focusedRow = screen.getByRole('button', { name: /，Mail 23。/ });
@@ -373,6 +373,7 @@ describe('MessageListView theme-safe separators', () => {
     expect(footer.style.borderTop).toBe('');
     expect(footer.style.background).toBe('');
     expect(footer.style.fontSize).toBe('12px');
+    expect(footer.closest('[role="list"]')).toBeNull();
   });
 
   it('keeps the current reader row checkbox available for bulk selection', () => {
@@ -405,7 +406,8 @@ describe('MessageListView theme-safe separators', () => {
     const checkbox = container.querySelector('.message-select input') as HTMLInputElement;
     const list = container.querySelector('[role="list"]');
     const listItem = container.querySelector('[role="listitem"]');
-    expect(list?.getAttribute('aria-label')).toBe('邮件列表');
+    expect(list?.getAttribute('aria-label')).toBe('邮件项目');
+    expect(container.querySelector('[role="region"][aria-label="邮件列表"]')).not.toBeNull();
     expect(listItem?.getAttribute('aria-current')).toBe('true');
     expect(listItem?.getAttribute('aria-posinset')).toBe('1');
     expect(listItem?.getAttribute('aria-setsize')).toBe('1');
@@ -442,11 +444,11 @@ describe('MessageListView theme-safe separators', () => {
     );
 
     const view = render(renderList([]));
-    const list = view.container.querySelector('[role="list"]') as HTMLDivElement;
+    const list = view.container.querySelector('.message-list') as HTMLDivElement;
     list.scrollTop = 136;
     view.rerender(renderList([message.id]));
 
-    expect(view.container.querySelector('[role="list"]')).toBe(list);
+    expect(view.container.querySelector('.message-list')).toBe(list);
     expect(list.scrollTop).toBe(136);
   });
 
@@ -591,7 +593,7 @@ describe('MessageListView theme-safe separators', () => {
         onLoadMore={vi.fn()}
       />,
     );
-    const list = container.querySelector('[role="list"]') as HTMLDivElement;
+    const list = container.querySelector('.message-list') as HTMLDivElement;
     Object.defineProperties(list, {
       clientHeight: { configurable: true, value: 100 },
       scrollHeight: { configurable: true, value: 736 },
@@ -640,7 +642,7 @@ describe('MessageListView theme-safe separators', () => {
         onLoadMore={vi.fn()}
       />,
     );
-    const list = container.querySelector('[role="list"]') as HTMLDivElement;
+    const list = container.querySelector('.message-list') as HTMLDivElement;
     Object.defineProperties(list, {
       clientHeight: { configurable: true, value: 100 },
       scrollHeight: { configurable: true, value: 736 },
@@ -864,7 +866,7 @@ describe('MessageListView theme-safe separators', () => {
       />,
     );
 
-    const list = screen.getByRole('list', { name: '邮件列表' });
+    const list = screen.getByRole('region', { name: '邮件列表' });
     fireEvent.scroll(list, { target: { scrollTop: 1800 } });
     expect(onLoadMore).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: '加载更多' }));

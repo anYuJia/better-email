@@ -59,4 +59,41 @@ describe('MobileSettingsRoot', () => {
     const disabledRows = Array.from(document.querySelectorAll<HTMLButtonElement>('.mobile-settings-row:disabled'));
     expect(disabledRows.length).toBeGreaterThan(0);
   });
+
+  it('searches settings destinations and preserves the selected detail target', () => {
+    const onOpenSection = vi.fn();
+    render(
+      <MobileSettingsRoot
+        account={account}
+        accounts={[account]}
+        accountScope={account.id}
+        onBack={vi.fn()}
+        onOpenSection={onOpenSection}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('searchbox', { name: '搜索设置' }), { target: { value: '撤销发送' } });
+    fireEvent.click(screen.getByRole('button', { name: /撤销发送/ }));
+
+    expect(onOpenSection).toHaveBeenCalledWith('general', expect.objectContaining({
+      label: '撤销发送',
+      section: 'general',
+      target: 'sending',
+    }));
+  });
+
+  it('labels the account summary with the same all-account scope used by settings', () => {
+    render(
+      <MobileSettingsRoot
+        account={account}
+        accounts={[account]}
+        accountScope="all"
+        onBack={vi.fn()}
+        onOpenSection={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '打开账号设置' }).textContent).toContain('所有邮箱账号');
+    expect(screen.getByRole('button', { name: '打开账号设置' }).textContent).toContain('1 个邮箱账号');
+  });
 });

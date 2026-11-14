@@ -159,9 +159,6 @@ export const SettingsSearch = memo(function SettingsSearch({
           ref={searchInputRef}
           type="search"
           aria-label="搜索设置"
-          aria-autocomplete="list"
-          aria-expanded={Boolean(normalizedQuery)}
-          aria-controls={normalizedQuery ? resultId : undefined}
           value={query}
           placeholder="搜索设置"
           onInput={(event) => setQuery(event.currentTarget.value)}
@@ -200,9 +197,10 @@ export const SettingsSearch = memo(function SettingsSearch({
           ref={searchPopoverRef}
           id={resultId}
           className="settings-search-popover"
+          role="region"
           aria-label="设置搜索结果"
         >
-          <span className="settings-nav-match-count">
+          <span className="settings-nav-match-count" role="status" aria-live="polite">
             {searchResults.length > 0 ? `${searchResults.length} 个匹配` : '没有匹配'}
           </span>
           {searchResults.map((entry) => {

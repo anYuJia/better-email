@@ -3058,7 +3058,7 @@ async function main() {
       "(() => { const card = [...document.querySelectorAll('.message-card')].find((item) => item.textContent.includes('安全检查清单')); if (!card) throw new Error('安全检查清单 card not found for reader refresh'); card.click(); })()",
     );
     await waitForExpression(cdp, "document.querySelector('.quick-reply-entry')");
-    await clickButton(cdp, '开始快速回复', "document.querySelector('.quick-reply')");
+    await clickButton(cdp, '回复 Security Team', "document.querySelector('.quick-reply')");
     await waitForExpression(cdp, "document.activeElement === document.querySelector('.quick-reply textarea')");
     await fillInput(cdp, '.quick-reply textarea', '收到，我会继续跟进。');
     await clickButton(cdp, '发送回复', "document.querySelector('.quick-reply')");

@@ -244,7 +244,6 @@ export default function GlobalSearch({
                 type="button"
                 key={chip.id}
                 className="search-quick-chip"
-                tabIndex={-1}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => applySuggestedSearch(chip.syntax.endsWith(':') ? chip.syntax : `${chip.syntax} `)}
               >

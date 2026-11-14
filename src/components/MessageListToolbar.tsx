@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowDownWideNarrow, ArrowUpWideNarrow, ListFilter, Menu, X } from 'lucide-react';
+import { ArrowDownWideNarrow, ArrowUpWideNarrow, ListFilter, Menu, PenLine, X } from 'lucide-react';
 import { filters, listSortOptions } from '../app/appConfig';
 import type {
   FilterMode,
@@ -33,6 +33,7 @@ type MessageListToolbarProps = {
   onMoveBulkToFolder: (folder: Folder) => void;
   onToggleBulkLabel: (label: Label) => void;
   onOpenNavigation?: () => void;
+  onCompose?: () => void;
   selectionControls?: React.ReactNode;
   onClearSelection?: () => void;
 };
@@ -65,6 +66,7 @@ function MessageListToolbar({
   onMoveBulkToFolder,
   onToggleBulkLabel,
   onOpenNavigation,
+  onCompose,
   selectionControls,
   onClearSelection,
 }: MessageListToolbarProps) {
@@ -94,6 +96,17 @@ function MessageListToolbar({
             onClick={onOpenNavigation}
           >
             <Menu size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        )}
+        {onCompose && (
+          <button
+            type="button"
+            className="narrow-navigation-button list-narrow-compose"
+            aria-label="写邮件"
+            title="写邮件"
+            onClick={onCompose}
+          >
+            <PenLine size={17} strokeWidth={1.75} aria-hidden="true" />
           </button>
         )}
         <div className="list-summary">

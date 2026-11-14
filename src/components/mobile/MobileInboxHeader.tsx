@@ -2,6 +2,7 @@ import useCompositionGuard from '../../hooks/useCompositionGuard';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   ArrowLeft,
+  ChevronDown,
   ListChecks,
   Menu,
   RefreshCw,
@@ -10,8 +11,10 @@ import {
   X,
 } from 'lucide-react';
 import { filters } from '../../app/appConfig';
-import type { FilterMode, ListMode } from '../../app/types';
+import type { FilterMode, ListMode, SearchScope } from '../../app/types';
+import { searchScopeOptions } from '../../app/appConfig';
 import { smtpUploadPercent } from '../../app/smtpUploadProgress';
+import { useDetailsMenu } from '../../hooks/useDetailsMenu';
 import ContextMenu, { type ContextMenuItem } from '../ContextMenu';
 
 type MobileInboxHeaderProps = {
@@ -20,6 +23,7 @@ type MobileInboxHeaderProps = {
   visibleListSummary: string;
   query: string;
   appliedQuery?: string;
+  searchScope: SearchScope;
   mailboxPending?: boolean;
   mailboxUnavailable?: boolean;
   selectionMode?: boolean;
@@ -39,6 +43,7 @@ type MobileInboxHeaderProps = {
   onSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onQueryChange: (value: string) => void;
   onClearSearch: () => void;
+  onSearchScopeChange: (scope: SearchScope) => void;
   onFilterChange: (filter: FilterMode) => void;
   onShowMessages: () => void;
   onShowThreads: () => void;
@@ -51,6 +56,7 @@ export default function MobileInboxHeader({
   visibleListSummary,
   query,
   appliedQuery = '',
+  searchScope,
   mailboxPending = false,
   mailboxUnavailable = false,
   selectionMode = false,
@@ -70,6 +76,7 @@ export default function MobileInboxHeader({
   onSearchSubmit,
   onQueryChange,
   onClearSearch,
+  onSearchScopeChange,
   onFilterChange,
   onShowMessages,
   onShowThreads,
@@ -82,6 +89,8 @@ export default function MobileInboxHeader({
   const selectionExitRef = useRef<HTMLButtonElement | null>(null);
   const restoreSelectionFocusRef = useRef(false);
   const filterMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const searchScopeMenuRef = useRef<HTMLDetailsElement | null>(null);
+  const searchScopeMenu = useDetailsMenu(searchScopeMenuRef, { floating: true });
   const [filterMenu, setFilterMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -120,6 +129,8 @@ export default function MobileInboxHeader({
   }
 
   const activeFilter = filters.find((item) => item.id === filter) ?? filters[0];
+  const activeSearchScope = searchScopeOptions.find((option) => option.id === searchScope)
+    ?? searchScopeOptions[0];
   const hasFilter = filter !== 'all';
   const resultSummary = mailboxUnavailable ? (mailboxPending ? '正在加载…' : '加载未完成') : visibleListSummary;
   const secondarySummary = [
@@ -209,6 +220,37 @@ export default function MobileInboxHeader({
               closeSearch();
             }}
           />
+          <details
+            className="compact-menu search-scope-menu mobile-search-scope"
+            ref={searchScopeMenuRef}
+            data-floating-menu="true"
+          >
+            <summary
+              aria-label={`搜索范围：${activeSearchScope.label}`}
+              title={`搜索范围：${activeSearchScope.label}`}
+            >
+              <span>{activeSearchScope.shortLabel}</span>
+              <ChevronDown size={13} aria-hidden="true" />
+            </summary>
+            <div data-floating-menu-panel="true" role="menu" aria-label="搜索范围">
+              <span className="menu-section-title">搜索范围</span>
+              {searchScopeOptions.map((option) => (
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={option.id === searchScope}
+                  className={option.id === searchScope ? 'active' : ''}
+                  key={option.id}
+                  onClick={() => {
+                    onSearchScopeChange(option.id);
+                    searchScopeMenu.closeMenu();
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </details>
           {query && (
             <button
               type="button"

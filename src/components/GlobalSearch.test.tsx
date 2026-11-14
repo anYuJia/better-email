@@ -108,6 +108,9 @@ describe('GlobalSearch keyboard and focus continuity', () => {
     fireEvent.focus(input);
     expect(screen.getByRole('region', { name: '快速筛选' })).toBeDefined();
     const unreadChip = screen.getByRole('button', { name: /未读邮件/ });
+    expect(unreadChip.tabIndex).toBe(0);
+    unreadChip.focus();
+    expect(document.activeElement).toBe(unreadChip);
     fireEvent.click(unreadChip);
     expect(applyShortcut).toHaveBeenCalledWith('is:unread ');
   });

@@ -1,6 +1,7 @@
 import type { ThreadSummary } from '../../app/types';
 import { EmailBodySkeleton } from '../EmailReaderSkeleton';
 import { EmptyMessageBody } from './PlainMessageBody';
+import ReaderSubject from './ReaderSubject';
 
 export default function ThreadReaderPlaceholder({ thread, state = 'loading', onRetry }: {
   thread: ThreadSummary;
@@ -9,7 +10,7 @@ export default function ThreadReaderPlaceholder({ thread, state = 'loading', onR
 }) {
   return <>
     <header className="reader-header">
-      <h1 className="reader-title-block">{thread.subject || '(无主题)'}</h1>
+      <ReaderSubject subject={thread.subject} />
       <p>{thread.participants} · {state === 'empty' ? 0 : thread.message_count} 封邮件</p>
       <div className="reader-actions" aria-hidden="true" />
     </header>

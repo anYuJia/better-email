@@ -54,7 +54,7 @@ function renderSearch() {
   return { ...view, onQueryChange, onApplySearchShortcut };
 }
 
-function renderToolbar(selectedMessageIds: number[] = [], filter: FilterMode = 'all') {
+function renderToolbar(selectedMessageIds: number[] = [], filter: FilterMode = 'all', onCompose?: () => void) {
   const onToggleAllVisible = vi.fn();
   const onClearSelection = vi.fn();
   const onSelectMessageDateRange = vi.fn();
@@ -80,6 +80,7 @@ function renderToolbar(selectedMessageIds: number[] = [], filter: FilterMode = '
       onMoveBulkToFolder={vi.fn()}
       onToggleBulkLabel={vi.fn()}
       onClearSelection={onClearSelection}
+      onCompose={onCompose}
       selectionControls={(
         <MessageSelectionControls
           compact
@@ -131,6 +132,13 @@ describe('GlobalSearch search combobox', () => {
 });
 
 describe('Inbox toolbar selection mode', () => {
+  it('provides a compact compose entry when the folder sidebar is replaced by navigation', () => {
+    const onCompose = vi.fn();
+    renderToolbar([], 'all', onCompose);
+    fireEvent.click(screen.getByRole('button', { name: '写邮件' }));
+    expect(onCompose).toHaveBeenCalledOnce();
+  });
+
   it('keeps all-selection and the date dialog in the existing toolbar before bulk selection', () => {
     const view = renderToolbar();
     expect(screen.getByRole('heading', { level: 2, name: '收件箱' }).className).toBe('list-folder-title');

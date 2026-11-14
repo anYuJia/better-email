@@ -9,6 +9,7 @@ const baseProps: ComponentProps<typeof MobileInboxHeader> = {
   currentViewLabel: '收件箱',
   visibleListSummary: '12 封',
   query: '',
+  searchScope: 'folder',
   filter: 'attachments',
   listMode: 'messages',
   isRefreshing: false,
@@ -19,6 +20,7 @@ const baseProps: ComponentProps<typeof MobileInboxHeader> = {
   onSearchSubmit: vi.fn(),
   onQueryChange: vi.fn(),
   onClearSearch: vi.fn(),
+  onSearchScopeChange: vi.fn(),
   onFilterChange: vi.fn(),
   onShowMessages: vi.fn(),
   onShowThreads: vi.fn(),
@@ -128,6 +130,16 @@ function MobileSearchHarness() {
 }
 
 describe('MobileInboxHeader search focus', () => {
+  it('shows and changes the active search scope on the mobile search screen', () => {
+    const onSearchScopeChange = vi.fn();
+    render(<MobileInboxHeader {...baseProps} searchOpen onSearchScopeChange={onSearchScopeChange} />);
+    const scope = screen.getByRole('button', { name: '搜索范围：当前文件夹' });
+    fireEvent.click(scope);
+    expect(screen.getByRole('menuitemradio', { name: '当前文件夹' }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '全部账号' }));
+    expect(onSearchScopeChange).toHaveBeenCalledWith('all');
+  });
+
   it('returns focus to an existing search input after leaving touch selection', () => {
     const view = render(<MobileInboxHeader {...baseProps} searchOpen selectionMode />);
     expect(document.activeElement).toBe(screen.getByRole('button', { name: '退出选择' }));

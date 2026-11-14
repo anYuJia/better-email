@@ -86,6 +86,10 @@
   overflow-wrap: anywhere;
 }
 
+.reader-subject-toggle {
+  display: none;
+}
+
 .reader-header p {
   margin: 0;
   color: var(--ui-text-tertiary);
@@ -2567,6 +2571,31 @@
 }
 
 @media (max-width: 720px) {
+  .app-shell .reader-title-block--clamped {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .app-shell .reader-subject-toggle {
+    width: fit-content;
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    color: var(--ui-text-accent);
+    background: transparent;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .app-shell .reader-subject-toggle:focus-visible {
+    outline: var(--ui-focus-outline);
+    outline-offset: 2px;
+  }
+
   .app-shell .empty-reader {
     padding: 24px 16px;
   }

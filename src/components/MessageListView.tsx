@@ -629,7 +629,7 @@ export default function MessageListView({
       <div
         className="message-list"
         ref={listRef}
-        role="list"
+        role="region"
         aria-label="邮件列表"
         aria-busy={Boolean(loadMoreStatus) || pullRefreshing}
         tabIndex={-1}
@@ -686,6 +686,12 @@ export default function MessageListView({
             width: '100%',
           }}
         >
+          <div
+            className="message-list-items"
+            role="list"
+            aria-label="邮件项目"
+            style={{ position: 'relative', height: totalHeight, width: '100%' }}
+          >
           {visibleItems.map(({ index, item, style }) => {
             const itemKey = item.key;
             if (item.type === 'header') {
@@ -777,6 +783,7 @@ export default function MessageListView({
               );
             }
           })}
+          </div>
           {showFooter && <div
             ref={footerRef}
             className="message-list-footer"

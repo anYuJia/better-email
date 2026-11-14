@@ -22,6 +22,7 @@ import {
 } from '../messageContextMenu';
 import { ContextMenuContent, type ContextMenuItem } from '../ContextMenu';
 import SenderIdentity from './SenderIdentity';
+import ReaderSubject from './ReaderSubject';
 import { useDetailsMenu } from '../../hooks/useDetailsMenu';
 import { memo, useMemo, useRef } from 'react';
 
@@ -119,7 +120,7 @@ function ThreadReaderList({
   return (
     <>
       <header className="reader-header">
-        <h1 className="reader-title-block">{activeThread.subject || '(无主题)'}</h1>
+        <ReaderSubject subject={activeThread.subject} />
         <p>{activeThread.participants} · {threadMessages.length} 封邮件{activeThread.unread_count > 0 ? ` · ${activeThread.unread_count} 封未读` : ''}</p>
         <div className="reader-actions">
           <div className="reader-action-group reader-response-actions" role="group" aria-label="回复操作">

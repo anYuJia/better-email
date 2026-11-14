@@ -148,7 +148,6 @@ const QuickReplySection = forwardRef<QuickReplyHandle, QuickReplySectionProps>(f
         <button
           className="quick-reply-entry"
           type="button"
-          aria-label="开始快速回复"
           aria-expanded={false}
           aria-controls={editorId}
           onClick={revealEditor}

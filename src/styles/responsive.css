@@ -56,6 +56,10 @@
     overflow: hidden;
   }
 
+  .app-shell.sidebar-collapsed {
+    grid-template-columns: clamp(300px, 38vw, 360px) minmax(0, 1fr);
+  }
+
   .app-shell > .message-list-panel {
     grid-column: 1;
     display: flex;
@@ -115,6 +119,10 @@
     width: 100%;
     height: 100dvh;
     overflow: hidden;
+  }
+
+  .app-shell.sidebar-collapsed {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .app-shell > .sidebar,

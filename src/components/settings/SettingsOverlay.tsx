@@ -39,6 +39,7 @@ import type { AccountProviderPreset } from '../../providerCatalog';
 import type { NotificationPolicy } from '../../mailUtils';
 import type { ThemeMode } from '../../hooks/useThemeMode';
 import type { SettingsSectionId } from './SettingsFrame';
+import type { SettingsSearchEntry } from './settingsNavigation';
 import type { SettingsAccountValueChange, SettingsAccountValues } from './accountScopeTypes';
 import type { MessageToast } from '../MessageToastStack';
 import { settingsPageLoaders } from './settingsPageLoaders';
@@ -74,6 +75,7 @@ export type SettingsOverlayProps = {
   themeMode: ThemeMode;
   onThemeModeChange: (mode: ThemeMode) => void;
   activeSettingsSection: SettingsSectionId;
+  initialSearchTarget?: SettingsSearchEntry | null;
   accountSettingsDirty: boolean;
   accountSettingsSaving: boolean;
   saveAndVerifyRunning: boolean;
@@ -387,6 +389,7 @@ export default function SettingsOverlay(props: SettingsOverlayProps) {
   return (
       <SettingsFrame
         title="设置"
+        initialSearchTarget={props.initialSearchTarget}
         standalone={props.standalone}
         nativeCloseRequestVersion={props.nativeCloseRequestVersion}
         onReady={props.onReady}

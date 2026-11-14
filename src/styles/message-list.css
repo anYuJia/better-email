@@ -2195,6 +2195,10 @@
   gap: 6px;
 }
 
+.list-narrow-compose {
+  display: none;
+}
+
 .app-shell .list-summary {
   width: 100%;
   min-width: 0;
@@ -2668,6 +2672,10 @@
 
 @media (max-width: 1040px) {
   .list-summary-row > .narrow-navigation-button {
+    display: grid;
+  }
+
+  .list-summary-row > .list-narrow-compose {
     display: grid;
   }
 }

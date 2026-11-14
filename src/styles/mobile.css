@@ -362,6 +362,61 @@
     display: none;
   }
 
+  .mobile-search-scope {
+    position: relative;
+    min-width: 0;
+    max-width: 104px;
+    flex: 0 1 auto;
+  }
+
+  .mobile-search-scope > summary {
+    min-width: 0;
+    min-height: 40px;
+    justify-content: flex-end;
+    padding-inline: 8px 2px;
+    border-left: 1px solid var(--ui-border);
+    border-radius: 0;
+    font-size: 12px;
+  }
+
+  .mobile-search-scope > summary > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-search-scope > [data-floating-menu-panel] {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 60;
+    min-width: 168px;
+    display: grid;
+    gap: 2px;
+    padding: 6px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-control);
+    background: var(--ui-surface);
+    box-shadow: var(--ui-shadow-float);
+  }
+
+  .mobile-search-scope > [data-floating-menu-panel] > button {
+    min-height: 40px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--ui-radius-control);
+    color: var(--ui-text-secondary);
+    background: transparent;
+    text-align: left;
+  }
+
+  .mobile-search-scope > [data-floating-menu-panel] > button.active,
+  .mobile-search-scope > [data-floating-menu-panel] > button:hover,
+  .mobile-search-scope > [data-floating-menu-panel] > button:focus-visible {
+    color: var(--ui-text);
+    background: var(--quiet-row-hover);
+    outline: none;
+  }
+
   .mobile-search-clear {
     width: 36px;
     min-width: 36px;
@@ -1201,6 +1256,46 @@
   .mobile-settings-account-summary span:not(.mobile-settings-account-avatar) {
     color: var(--ui-text-tertiary);
     font-size: 12px;
+  }
+
+  .mobile-settings-search {
+    margin: 0 14px 16px;
+  }
+
+  .mobile-settings-search input {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-control);
+    color: var(--ui-text);
+    background: var(--ui-surface);
+    font-size: 16px;
+  }
+
+  .mobile-settings-search input:focus-visible {
+    border-color: var(--ui-accent);
+    outline: var(--ui-focus-outline);
+    outline-offset: 1px;
+  }
+
+  .mobile-settings-search-results {
+    margin-bottom: 20px;
+  }
+
+  .mobile-settings-search-results h2 {
+    margin: 0;
+    padding: 12px 16px 10px;
+    color: var(--ui-text-tertiary);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .mobile-settings-search-empty {
+    margin: 0;
+    padding: 14px 16px;
+    color: var(--ui-text-tertiary);
+    font-size: 13px;
   }
 
   .mobile-settings-group {

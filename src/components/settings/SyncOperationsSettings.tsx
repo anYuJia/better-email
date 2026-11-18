@@ -155,14 +155,14 @@ export default function SyncOperationsSettings({
         dataSection="sync-preferences"
       >
         <SettingsRow
-          title="获取新邮件"
+          title="检查新邮件频率"
           description={syncModeValue === MIXED_ACCOUNT_SETTING_VALUE
             ? '不同邮箱账号当前设置不同。选择一个频率后会统一应用。'
-            : '控制此账号的后台检查频率。'}
+            : '设置后台自动检查新邮件的频率。'}
           control={(
             <CustomSelect
               dense
-              ariaLabel="获取新邮件"
+              ariaLabel="检查新邮件频率"
               value={typeof syncModeValue === 'string' ? syncModeValue : MIXED_ACCOUNT_SETTING_VALUE}
               options={[
                 ...(syncModeValue === MIXED_ACCOUNT_SETTING_VALUE ? [mixedSyncOption] : []),
@@ -207,7 +207,7 @@ export default function SyncOperationsSettings({
           dataSection="sync-mailboxes"
         >
           {accountMailboxes.length === 0 ? (
-            <SettingsEmptyState>还没有发现远端文件夹。请先确认账号连接，再同步邮件。</SettingsEmptyState>
+            <SettingsEmptyState>未获取到服务器文件夹。请检查账号连接状态后重试同步。</SettingsEmptyState>
           ) : (
             <div className="settings-mailbox-groups">
               {systemMailboxes.length > 0 && (

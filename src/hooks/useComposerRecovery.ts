@@ -56,7 +56,7 @@ export default function useComposerRecovery(
         setComposerAutosave(parseComposerAutosave(record.payload));
       }
     }).catch((error: unknown) => {
-      if (mounted.current) onErrorRef.current(`恢复点读取失败，请保留编辑内容：${String(error)}`);
+      if (mounted.current) onErrorRef.current(`草稿恢复失败，请保留当前编辑内容：${String(error)}`);
     });
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden') flush.current?.();
@@ -102,7 +102,7 @@ export default function useComposerRecovery(
         const accepted = empty
           ? await invoke<boolean>(IPC.ClearComposerRecovery, { revision: nextRevision() })
           : await invoke<boolean>(IPC.SaveComposerRecovery, { payloadJson, revision: nextRevision() });
-        if (!accepted) throw new Error('存在更新的恢复点，未覆盖；请手动保存当前草稿。');
+        if (!accepted) throw new Error('检测到更新的草稿，未覆盖；请手动保存当前内容。');
         if (currentGeneration !== generation.current) return;
         try {
           if (payloadJson === null) window.localStorage.removeItem(composerAutosaveStorageKey);
@@ -148,11 +148,11 @@ export default function useComposerRecovery(
     if (mounted.current) setComposerAutosave({ ...snapshot, save_state: 'saving' });
     const operation = queue.current.then(async () => {
       await ready.current;
-      if (currentClearVersion !== clearVersion.current) throw new Error('草稿恢复点已清除，请重新确认当前草稿。');
+      if (currentClearVersion !== clearVersion.current) throw new Error('草稿已清除，请重新确认当前内容。');
       const payloadJson = JSON.stringify(snapshot);
       const accepted = await invoke<boolean>(IPC.SaveComposerRecovery, { payloadJson, revision: nextRevision() });
-      if (!accepted) throw new Error('存在更新的恢复点，未覆盖；请手动保存当前草稿。');
-      if (currentClearVersion !== clearVersion.current) throw new Error('草稿恢复点已清除，请重新确认当前草稿。');
+      if (!accepted) throw new Error('检测到更新的草稿，未覆盖；请手动保存当前内容。');
+      if (currentClearVersion !== clearVersion.current) throw new Error('草稿已清除，请重新确认当前内容。');
       // An editor-flush render may advance generation while this write waits.
       // It must not cancel persistence or falsely acknowledge newer UI content.
       if (currentGeneration !== generation.current) return;
@@ -189,9 +189,9 @@ export default function useComposerRecovery(
     queue.current = queue.current.then(async () => {
       await ready.current;
       const cleared = await invoke<boolean>(IPC.ClearComposerRecovery, { revision: nextRevision() });
-      if (!cleared) throw new Error('存在更新的恢复点，未清除。');
+      if (!cleared) throw new Error('检测到更新的草稿，未清除。');
     }).catch((error: unknown) => {
-      if (mounted.current) onErrorRef.current(`恢复点清理失败，请勿重复发送旧恢复点：${String(error)}`);
+      if (mounted.current) onErrorRef.current(`草稿清理失败：${String(error)}`);
     });
   }, [nextRevision]);
 

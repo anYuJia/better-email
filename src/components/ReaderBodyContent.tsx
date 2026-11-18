@@ -109,7 +109,7 @@ export default function ReaderBodyContent({
     return (
       <EmptyMessageBody
         title="这封邮件较大，尚未渲染完整内容"
-        detail="正文完整保存在本机，没有截断。加载完整邮件可能需要更多内存。"
+        detail="邮件完整内容已保存在本地。加载超长邮件可能需要更长时间。"
         action={<button type="button" className="reader-warning-primary-action" onClick={() => setExpandedBody(activeBody)}>加载完整邮件</button>}
       />
     );

@@ -288,14 +288,14 @@ export default function ComposerWindow({
   const autosaveLabel = explicitSaveStatus
     ? saveFailed ? '草稿保存失败' : status
     : saveFailed
-      ? '本机保存失败'
+      ? '草稿保存失败'
       : autosave?.save_state === 'saving' || (!autosave && !isDraftEmpty(draft))
         ? '正在保存…'
-        : autosave && !isDraftEmpty(draft) ? '已存本机' : '';
+        : autosave && !isDraftEmpty(draft) ? '草稿已保存' : '';
   const autosaveDetail = explicitSaveStatus ? status : saveFailed
-    ? `本机恢复点保存失败，内容仍在编辑器。${autosave?.save_error || ''}`
-    : autosaveLabel === '已存本机' && autosave
-      ? `本机恢复点已保存 · ${formatClock(autosave.saved_at)}。保存到草稿箱请使用“保存草稿”。`
+    ? `草稿自动保存失败，内容仍在编辑器中。${autosave?.save_error || ''}`
+    : autosaveLabel === '草稿已保存' && autosave
+      ? `草稿已自动保存 · ${formatClock(autosave.saved_at)}。保存到草稿箱请使用“保存草稿”。`
       : autosaveLabel;
 
   useLayoutEffect(() => {
@@ -656,7 +656,7 @@ export default function ComposerWindow({
                   data-save-state={saveFailed ? 'error' : autosave?.save_state ?? 'saved'}
                   title={autosaveDetail}
                 >
-                  <CheckCircle2 size={16} aria-hidden="true" style={{ visibility: autosaveLabel === '已存本机' ? 'visible' : 'hidden' }} />
+                  <CheckCircle2 size={16} aria-hidden="true" style={{ visibility: autosaveLabel === '草稿已保存' ? 'visible' : 'hidden' }} />
                   {autosaveLabel}
                   {saveFailed && (explicitSaveStatus || onRetryAutosave) && (
                     <button type="button" disabled={saveDraftPending} onClick={explicitSaveStatus ? handleSaveDraft : onRetryAutosave}>重试</button>
@@ -968,8 +968,8 @@ export default function ComposerWindow({
 
       <ConfirmDialog
         open={open && !minimized && sendRiskConfirm !== null}
-        title="跨邮箱发送风险"
-        description="发送前请确认以下风险。你可以返回修改发件账号或收件人。"
+        title="跨邮箱发送提醒"
+        description="发送前请确认以下账号信息。你可以返回修改发件账号或收件人。"
         summaryText={sendRiskConfirm?.map((risk) => `• ${risk.message}：${risk.detail}`).join('\n') ?? ''}
         danger
         confirmText="继续发送"

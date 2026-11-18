@@ -545,7 +545,7 @@ export default function useBackgroundTaskCoordinator({
       task.source === 'initial'
         ? `${task.title}执行中...`
         : task.source === 'timer'
-          ? '定时发送发件箱中...'
+          ? '正在处理定时发送队列…'
           : `${task.title}执行中...`,
     );
 

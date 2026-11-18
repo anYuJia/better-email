@@ -114,10 +114,10 @@ export default function AccountManageDialog({
                 />
               </label>
               <div className="settings-account-form-field">
-                获取新邮件时间
+                检查新邮件频率
                 <CustomSelect
                   dense
-                  ariaLabel="获取新邮件时间"
+                  ariaLabel="检查新邮件频率"
                   value={account.sync_mode === 'push' ? '5min' : account.sync_mode}
                   options={syncModeOptions}
                   onChange={(val) => onAccountChange({ ...account, sync_mode: val })}
@@ -168,7 +168,7 @@ export default function AccountManageDialog({
 
             <div className="settings-account-risk-toggle">
               <SettingsSwitch
-                label="跨邮箱发送风险提示"
+                label="跨邮箱发送提醒"
                 description="回复其他账号的邮件、收件人包含自己其他账号、快捷写信账号不一致时，在发送前提醒。"
                 checked={account.cross_account_risk_warning !== false}
                 onChange={(checked) => onAccountChange({

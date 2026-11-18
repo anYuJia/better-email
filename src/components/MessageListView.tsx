@@ -852,14 +852,14 @@ export default function MessageListView({
             <Search size={22} />
           </div>
           <strong>
-            {query.trim() || filter !== 'all' ? '没有匹配邮件' : '当前邮箱暂无可显示邮件'}
+            {query.trim() || filter !== 'all' ? '未找到匹配邮件' : '暂无邮件'}
           </strong>
           <span>
             {query.trim() && onExpandSearch
               ? '当前搜索范围内没有匹配邮件，可以扩大范围继续查找。'
               : query.trim() || filter !== 'all'
               ? '可以清空搜索/筛选，或切回“全部”查看当前邮箱。'
-              : '当前账号或统一邮箱范围里，这个文件夹暂时没有邮件。'}
+              : '该文件夹下暂无邮件。'}
           </span>
           <div className="empty-state-actions">
             {query.trim() && onExpandSearch && (

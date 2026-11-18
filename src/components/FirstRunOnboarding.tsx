@@ -468,11 +468,11 @@ export default function FirstRunOnboarding({
             <div className="onboarding-step-content">
               <p>
                 是否自动下载新接收邮件的附件？
-                <small>仅影响此后新到的邮件，不会触发历史全部附件下载。</small>
+                <small>仅在此后收到新邮件时自动保存附件，不会下载历史邮件的所有附件。</small>
               </p>
               <StepToggle
                 label="自动下载新邮件附件"
-                description="开启后，同步时新到达邮件的附件会自动保存到本地。"
+                description="开启后，新到达邮件的附件会自动保存到本地设备。"
                 checked={autoDownload}
                 disabled={saving}
                 onChange={handleAutoDownloadChange}
@@ -484,7 +484,7 @@ export default function FirstRunOnboarding({
             <div className="onboarding-step-content">
               <p>
                 发送邮件后，多久才真正发出？
-                <small>倒计时结束后邮件才真正进入待发送队列，到期后发送，期间可随时撤回。</small>
+                <small>在设定的倒计时内可以随时撤销发送，到期后由后台自动发出。</small>
               </p>
               <div className="onboarding-field">
                 <span>撤销发送延迟</span>

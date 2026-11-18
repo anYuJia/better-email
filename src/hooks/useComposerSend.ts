@@ -249,8 +249,8 @@ export default function useComposerSend({
 
     try {
       reportAttachmentProgress(null);
-      setStatus('发送中：准备发送任务...');
-      reportSendProgressMessage('发送中：准备发送任务...');
+      setStatus('正在准备发送…');
+      reportSendProgressMessage('正在准备发送…');
       const task = await invoke<BackgroundTask>(IPC.EnqueueBackgroundTask, {
         input: {
           kind: 'outbox-smtp',
@@ -261,7 +261,7 @@ export default function useComposerSend({
       taskId = task.id;
       await invoke<BackgroundTask>(IPC.MarkBackgroundTaskRunning, { taskId });
       const initialPercent = Math.max(0, Math.min(100, Math.round(task.progress || 0)));
-      const taskReadyMessage = task.message || '准备发送任务…';
+      const taskReadyMessage = task.message || '正在准备发送…';
       reportSendProgress(initialPercent);
       syncAttachmentProgressFromTask(task.message, initialPercent);
       setStatus(taskReadyMessage);
@@ -295,7 +295,7 @@ export default function useComposerSend({
         reportSendProgress(null);
         reportSendProgressMessage(null);
         reportAttachmentProgress(null);
-        const detail = `邮件已发送，请勿重发。请在主窗口核对已发送文件夹；界面更新失败：${errorMessage}`;
+        const detail = `邮件已发送，请勿重复发送。界面状态刷新失败：${errorMessage}`;
         setStatus(detail);
         uncertainSendRef.current = true;
         setSendIssue({ kind: 'uncertain', message: detail });

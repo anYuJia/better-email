@@ -519,8 +519,8 @@ describe('ComposerWindow focus lifecycle', () => {
       },
     }));
 
-    expect(screen.getByText('已存本机')).not.toBeNull();
-    expect(screen.getByText('已存本机').title).toContain('保存到草稿箱');
+    expect(screen.getByText('草稿已保存')).not.toBeNull();
+    expect(screen.getByText('草稿已保存').title).toContain('保存到草稿箱');
     expect(screen.queryByText(/已备份恢复点/)).toBeNull();
   });
 

@@ -312,7 +312,7 @@ export const settingsSearchEntries: SettingsSearchEntry[] = [
   { label: '账户信息', path: '偏好 › 邮箱账户', section: 'accounts', target: 'account-overview', keywords: ['添加账号', '删除账号', '邮箱', 'display name'] },
   { label: '同步频率', path: '邮箱账户 › 同步', section: 'sync', target: 'sync-preferences', keywords: ['获取新邮件', '后台检查', 'sync'] },
   { label: '自动下载附件', path: '邮箱账户 › 同步', section: 'sync', target: 'sync-preferences', keywords: ['附件', '自动下载', 'download'] },
-  { label: '跨邮箱发送风险提示', path: '邮箱账户 › 账户信息', section: 'accounts', target: 'account-preferences', keywords: ['发送提醒', '跨账号', 'risk'] },
+  { label: '跨邮箱发送提醒', path: '邮箱账户 › 账户信息', section: 'accounts', target: 'account-preferences', keywords: ['发送提醒', '跨账号', 'risk'] },
   { label: '收信与发信服务器', path: '邮箱账户 › 服务器与协议', section: 'providers', keywords: ['imap', 'pop3', 'smtp', '端口', 'ssl', 'tls'] },
   { label: '登录凭据与授权码', path: '邮箱账户 › 登录与安全', section: 'auth', keywords: ['密码', '授权码', 'oauth', 'token'] },
   { label: '发件身份', path: '邮箱账户 › 发件身份', section: 'identities', keywords: ['签名', '别名', 'reply-to', '回复地址', '显示名'] },

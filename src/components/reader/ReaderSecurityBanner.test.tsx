@@ -100,7 +100,7 @@ describe('ReaderSecurityBanner', () => {
     expect(banner.classList.contains('is-general-risk')).toBe(true);
     expect(screen.getByText('请核对外部发件人')).toBeDefined();
     expect(screen.getByText('1 项提醒')).toBeDefined();
-    expect(screen.getAllByText('这封邮件来自其他邮箱 / 外部发件人，请注意核对发件人身份。').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('这封邮件来自外部发件人，请注意核对发件人身份。').length).toBeGreaterThanOrEqual(1);
 
     const expandBtn = screen.getByRole('button', { name: '查看详情' });
     expect(expandBtn.getAttribute('aria-expanded')).toBe('false');

@@ -82,8 +82,8 @@ export default function PrivacySettingsPage({
       dataSection="privacy"
     >
       {accountScope === 'all' && (
-        <SettingsNotice tone="info" title="统一是批量编辑范围">
-          <p>下面的偏好只会在你点击“保存”后应用到所有支持的邮箱账号；未修改的字段会保持各账号原值。</p>
+        <SettingsNotice tone="info" title="正在统一设置全局偏好">
+          <p>在此修改的偏好将在保存后应用到所有邮箱账号；未作更改的项目将保留各账号原有设置。</p>
         </SettingsNotice>
       )}
 

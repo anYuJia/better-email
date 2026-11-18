@@ -73,10 +73,10 @@ export default function ReaderSecurityBanner({
           : '网页链接已隐藏';
 
   const externalBlockNote = selectedExternalBlocked
-    ? '发件人来自外部邮箱，已按账号策略拦截远程图片等远程内容。'
+    ? '发件人来自外部邮箱，已自动拦截远程图片等外部内容。'
     : null;
   const externalSenderNote = !selectedExternalBlocked && selectedWarnExternalSender
-    ? '这封邮件来自其他邮箱 / 外部发件人，请注意核对发件人身份。'
+    ? '这封邮件来自外部发件人，请注意核对发件人身份。'
     : null;
 
   const privacyNote = showRemoteImageNote && !selectedExternalBlocked && !isHighRisk

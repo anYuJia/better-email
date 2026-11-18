@@ -205,7 +205,7 @@ export default function AccountSettingsPage({
           <>
             <SettingsSection
               title="所有邮箱账号"
-              description="统一范围用于批量编辑账号偏好；服务器、认证、身份和文件夹映射请先选择具体账号。"
+              description="在此统一管理全部账号的通用偏好；配置服务器、认证或发件身份时请先选择具体账号。"
               actions={addAccountAction}
               className="settings-account-overview"
               dataSection="account-overview"
@@ -216,7 +216,7 @@ export default function AccountSettingsPage({
                 </SettingsEmptyState>
               ) : (
                 <SettingsNotice tone="info" title="为多个账号统一设置偏好">
-                  <p>下方修改会在保存后应用到所有支持的账号。配置服务器、认证或身份时，先用上方邮箱范围选择具体账号。</p>
+                  <p>下方修改将在保存后应用到所有账号。若需单独配置服务器、认证或身份，请先在上方切换到具体账号。</p>
                 </SettingsNotice>
               )}
             </SettingsSection>

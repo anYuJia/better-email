@@ -217,13 +217,13 @@ function McpConnectionGuide({
               aria-labelledby="settings-mcp-tab-connection"
             >
               <div className="settings-mcp-guide-intro">
-                <strong>把服务商提供的连接信息填在这里</strong>
-                <p>Better Email 会使用这个地址连接外部 MCP 服务，并自动完成 initialize 与 initialized 握手。</p>
+                <strong>填写 MCP 服务连接信息</strong>
+                <p>Better Email 将通过此地址连接外部 MCP 服务，并在通信建立时自动完成协议初始化。</p>
               </div>
 
               <div className="settings-mcp-guide-direction" role="note">
                 <Link2 size={15} aria-hidden="true" />
-                <span><strong>连接方向</strong> Better Email → 外部 MCP 服务</span>
+                <span><strong>连接说明</strong> 由 Better Email 主动连接外部 MCP 服务</span>
               </div>
 
               <SettingsField
@@ -340,8 +340,8 @@ function McpConnectionGuide({
               aria-labelledby="settings-mcp-tab-prompts"
             >
               <div className="settings-mcp-guide-intro">
-                <strong>把下面的提示词交给 AI 客户端</strong>
-                <p>它们用于引导 AI 按协议初始化、先确认工具，再执行有影响的操作。</p>
+                <strong>AI 客户端连接引导提示词</strong>
+                <p>将以下提示词提供给外部 AI，引导其规范调用 MCP 工具并在执行关键操作前进行确认。</p>
               </div>
 
               <div className="settings-mcp-prompt-block">

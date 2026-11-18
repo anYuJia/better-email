@@ -130,7 +130,7 @@ async function requestExternal(
   config: AiServiceConfig,
 ): Promise<AiRequestResult> {
   if (text.length > MAX_INPUT_CHARS || prompt.length > MAX_INPUT_CHARS) {
-    throw externalError('AI 单次请求内容过长，已拒绝静默截断；请使用分块处理或缩短提示词。');
+    throw externalError('邮件或提示词内容过长，超出处理限制；请缩短后重试。');
   }
   const isMcp = config.serviceType === 'mcp';
   const endpoint = validateAiEndpointForRequest(
@@ -150,10 +150,10 @@ async function requestExternal(
   };
   const result = await invoke<AiRequestResult>(IPC.AiRequest, { input });
   if (result.service_type !== config.serviceType || isOfflineAiResult(result.content)) {
-    throw externalError('AI 请求返回了非真实服务结果，已拒绝显示；请检查桌面端版本和 AI 接入配置。');
+    throw externalError('AI 请求未能返回有效的服务响应，已拒绝非真实服务结果；请检查 AI 接入配置。');
   }
   if (result.truncated) {
-    throw externalError('AI 服务返回内容超过安全上限，已拒绝显示不完整结果；请缩短内容后重试。');
+    throw externalError('AI 服务返回内容超出长度限制，已拒绝显示不完整结果；请缩短内容后重试。');
   }
   return result;
 }
@@ -234,7 +234,7 @@ export async function runAiOperation(
     return summarizeLargeText(text, resolved);
   }
   if (prompt.length > MAX_INPUT_CHARS) {
-    throw externalError('模板生成提示词过长，已拒绝静默截断；请缩短提示词后重试。');
+    throw externalError('模板生成提示词过长，超出处理限制；请缩短提示词后重试。');
   }
   return requestExternal(operation, text, prompt, targetLanguage, resolved);
 }
@@ -277,7 +277,7 @@ export async function testAiConnection(config: AiServiceConfig): Promise<AiTestC
     if (report.service_type !== config.serviceType || isOfflineAiResult(report.message)) {
       return {
         ok: false,
-        message: '连接测试返回了非真实服务结果，已拒绝；请检查桌面端版本和 AI 接入配置。',
+        message: '连接测试未能返回有效的服务响应，已拒绝非真实服务结果；请检查 AI 接入配置。',
         latencyMs: report.latency_ms,
       };
     }

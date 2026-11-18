@@ -115,7 +115,7 @@ describe('useSnoozeController 批量稍后处理', () => {
       messageIds: [11, 12],
       snoozedUntil: until,
     });
-    expect(mocks.setStatus).toHaveBeenCalledWith(expect.stringContaining('已将 2 封邮件稍后处理到'));
+    expect(mocks.setStatus).toHaveBeenCalledWith(expect.stringContaining('已将 2 封邮件延后至'));
     expect(snapshotMessages).toHaveBeenCalledTimes(1);
     expect(mocks.queueUndoAction).toHaveBeenCalledWith(
       '稍后处理',
@@ -145,7 +145,7 @@ describe('useSnoozeController 批量稍后处理', () => {
       messageIds: [7],
       snoozedUntil: '2030-01-01T09:00',
     });
-    expect(mocks.setStatus).toHaveBeenCalledWith(expect.stringContaining('已稍后处理到'));
+    expect(mocks.setStatus).toHaveBeenCalledWith(expect.stringContaining('已延后至'));
     expect(mocks.queueUndoAction).toHaveBeenCalledWith(
       '稍后处理',
       expect.anything(),
@@ -173,7 +173,7 @@ describe('useSnoozeController 批量稍后处理', () => {
     expect(mocks.setStatus).toHaveBeenCalledWith(
       expect.stringContaining('稍后处理失败，未做任何更改'),
     );
-    expect(mocks.setStatus).not.toHaveBeenCalledWith(expect.stringContaining('已稍后处理'));
+    expect(mocks.setStatus).not.toHaveBeenCalledWith(expect.stringContaining('已延后'));
     // 撤销只登记实际成功的邮件：批量失败时没有任何成功邮件，因此不登记撤销。
     expect(mocks.queueUndoAction).not.toHaveBeenCalled();
     expect(mocks.refreshAll).not.toHaveBeenCalled();
@@ -222,7 +222,7 @@ describe('useSnoozeController 批量稍后处理', () => {
     expect(mocks.setSelectedMessageIds).toHaveBeenCalledWith(expect.any(Function));
     // 成功事实与刷新失败都有正确提示，且绝不出现“未做任何更改”。
     expect(mocks.setStatus).toHaveBeenCalledWith(
-      expect.stringContaining('已稍后处理，但本地列表刷新失败'),
+      expect.stringContaining('已延后提醒，但本地列表刷新失败'),
     );
     expect(mocks.setStatus).not.toHaveBeenCalledWith(expect.stringContaining('未做任何更改'));
   });

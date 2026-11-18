@@ -62,8 +62,8 @@ export default function ReaderDeliveryStatus({ item, onResolve, onCancel, onRepa
         danger={false}
         title={confirmation ? '确认邮件已经发出' : '确认退回草稿'}
         description={confirmation
-          ? '请先在邮件服务商的已发送文件夹或与收件人核对。确认后只补存已发送副本，不会再次发送。'
-          : '没有在已发送中找到邮件并不能证明发送失败。请核对收件人或服务商记录；退回草稿后不会自动重发。'}
+          ? '请先在邮件服务商网页端或向收件人确认。确认后应用仅留存已发送记录，不会再次发送。'
+          : '若服务商已发送列表中未找到该邮件，可能尚未发出。确认退回草稿后，应用不会自动重发，可检查后再次发送。'}
         summaryText={`${item.subject || '(无主题)'} · ${item.recipients}`}
         confirmText={confirmation ? '已核对，仅补存副本' : '已核对，退回草稿'}
         onCancel={() => setConfirmation(null)}

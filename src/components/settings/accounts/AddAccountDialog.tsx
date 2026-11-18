@@ -157,10 +157,10 @@ export default function AddAccountDialog({
             />
           </label>
           <div className="settings-account-form-field">
-            获取新邮件时间
+            检查新邮件频率
             <CustomSelect
               dense
-              ariaLabel="获取新邮件时间"
+              ariaLabel="检查新邮件频率"
               value={form.sync_mode === 'push' ? '5min' : form.sync_mode}
               options={syncModeOptions}
               onChange={(val) => onFormChange({ ...form, sync_mode: val })}

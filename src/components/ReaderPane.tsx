@@ -250,7 +250,7 @@ function ReaderPane({
   const invalidBody = useMemo(() => !requiresExplicitRender && Boolean(selected && isMessageBodyCorrupted(selected.body)), [requiresExplicitRender, selected?.body]);
   const activeBodyFetchState: ReaderBodyFetchState | null = bodyFetchState?.messageId === selected?.id ? bodyFetchState
     : selected && invalidBody
-      ? { messageId: selected.id, status: 'error', errorKind: 'invalid-content', error: '已保存的正文格式无法解析。邮件和附件仍保留在本机。' } : null;
+      ? { messageId: selected.id, status: 'error', errorKind: 'invalid-content', error: '正文格式解析失败，邮件及附件已安全保存在本地。' } : null;
   const isActiveMessage = Boolean(selected && selected.id === activeSelectedId);
   const canCompleteReading = isActiveMessage && canAutomaticallyMarkRead && !activeThread && activeBodyFetchState == null;
   useEffect(() => setExpandedBody(null), [selected?.id]);
@@ -638,7 +638,7 @@ function ReaderPane({
         {requiresExplicitRender && !activeBodyFetchState ? (
           <EmptyMessageBody
             title="这封邮件较大，尚未渲染完整内容"
-            detail="正文完整保存在本机。按需加载可以保持阅读与切换流畅。"
+            detail="邮件完整内容已保存在本地，按需加载可保持界面流畅。"
             action={<button type="button" className="reader-warning-primary-action" onClick={() => setExpandedBody({ id: selected.id, source: selectedBodySource })}>加载完整邮件</button>}
           />
         ) : <ReaderBodyContent

@@ -113,11 +113,11 @@ export default function useSnoozeController({
       await refreshAll();
       setStatus(
         count === 1
-          ? `已稍后处理到 ${formatDate(snoozedUntil)}`
-          : `已将 ${count} 封邮件稍后处理到 ${formatDate(snoozedUntil)}`,
+          ? `已延后至 ${formatDate(snoozedUntil)} 提醒`
+          : `已将 ${count} 封邮件延后至 ${formatDate(snoozedUntil)} 提醒`,
       );
     } catch (error) {
-      setStatus(`已稍后处理，但本地列表刷新失败：${String(error)}`);
+      setStatus(`已延后提醒，但本地列表刷新失败：${String(error)}`);
     }
   }
 

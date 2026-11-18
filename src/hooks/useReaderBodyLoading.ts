@@ -342,7 +342,7 @@ export default function useReaderBodyLoading({
       : { messageId: currentMessageId, status: 'loading', error: null };
   }
   if (!currentBodyFetchState && currentMessageId && readerSelectedDetail && isMessageBodyCorrupted(readerSelectedDetail.body)) {
-    currentBodyFetchState = { messageId: currentMessageId, status: 'error', errorKind: 'invalid-content', error: '已保存的正文格式无法解析。邮件和附件仍保留在本机。' };
+    currentBodyFetchState = { messageId: currentMessageId, status: 'error', errorKind: 'invalid-content', error: '正文格式解析失败，邮件及附件已安全保存在本地。' };
   }
 
   return {

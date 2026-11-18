@@ -63,7 +63,7 @@ export default function AboutSettings({ onNotify = () => undefined }: AboutSetti
     setAvailableUpdate(null);
 
     if (!isTauriRuntime()) {
-      onNotify('开发预览无法访问桌面更新服务，请在已安装的 Better Email 中检查更新。', 'info');
+      onNotify('网页预览环境不支持桌面自动更新，请在桌面客户端中检查。', 'info');
       setChecking(false);
       return;
     }
@@ -159,7 +159,7 @@ export default function AboutSettings({ onNotify = () => undefined }: AboutSetti
 
       <SettingsSection
         title="软件更新"
-        description="自动检查签名版本，下载后由应用完成安装并重启"
+        description="检查新版本并自动下载安装"
         actions={(
           <SettingsButton
             variant="primary"

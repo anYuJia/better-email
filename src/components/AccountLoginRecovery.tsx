@@ -85,7 +85,7 @@ export default function AccountLoginRecovery(props: Props) {
               aria-label={`修复 ${account.email} 的登录`} onClick={() => repair(account.id)}>修复登录</button>}
           </div>
         ))}
-        {error && <p>登录状态检查失败，未删除账号或凭据。稍后将自动重新检查。</p>}
+        {error && <p>登录状态检查失败，当前账号与凭据未受影响，稍后将自动重试。</p>}
         {repairError && <p role="alert">{repairError}</p>}
       </div>
     </section>

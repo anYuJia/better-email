@@ -75,7 +75,7 @@ describe('AccountLoginRecovery', () => {
     health.error = true;
     view.rerender(<AccountLoginRecovery {...props} />);
     fireEvent.click(screen.getByRole('button', { name: '登录状态暂不可用' }));
-    expect(screen.getByText('登录状态检查失败，未删除账号或凭据。稍后将自动重新检查。')).toBeDefined();
+    expect(screen.getByText('登录状态检查失败，当前账号与凭据未受影响，稍后将自动重试。')).toBeDefined();
     expect(screen.queryByRole('button', { name: '修复登录' })).toBeNull();
   });
 

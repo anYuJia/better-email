@@ -26,7 +26,7 @@ export default function NotificationSettingsPage({
     >
       <SettingsSwitch
         label="只提醒 VIP"
-        description="开启后，非 VIP 联系人的新邮件保持静默。"
+        description="开启后，非 VIP 联系人的新邮件不发提醒。"
         checked={notificationPolicy.vipOnly}
         onChange={(checked) => onNotificationPolicyChange({
           ...notificationPolicy,
@@ -41,7 +41,7 @@ export default function NotificationSettingsPage({
 
       <SettingsSwitch
         label="免打扰"
-        description="该时段内仅 VIP 联系人的邮件可以提醒。"
+        description="该时段内仅 VIP 联系人的邮件会发出提醒。"
         checked={quietHoursOn}
         onChange={(checked) => onNotificationPolicyChange({
           ...notificationPolicy,

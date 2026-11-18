@@ -153,7 +153,7 @@ export default function CredentialSecuritySettings({
           variant="primary"
           disabled={credentialBusy}
           aria-busy={credentialBusy}
-          title={hasSecret ? '保存到本地数据库后立即验证 IMAP 与 SMTP 登录' : '验证已保存的 IMAP 与 SMTP 凭据'}
+          title={hasSecret ? '保存到本地并验证登录' : '验证已保存的登录凭据'}
           icon={<BadgeCheck size={14} />}
           onClick={hasSecret ? onStoreAndVerifyCredential : onVerifyCredential}
         >

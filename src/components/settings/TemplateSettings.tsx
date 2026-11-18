@@ -467,7 +467,7 @@ export default function TemplateSettings({
                 <small>{variable.label}</small>
               </button>
             ))}
-            <small>无法解析的变量会保留原样，不会静默删除。</small>
+            <small>无法解析的变量会按原文保留。</small>
           </div>
 
           {(editor.subject.trim() || editor.body.trim()) && (

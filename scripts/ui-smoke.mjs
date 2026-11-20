@@ -2713,7 +2713,7 @@ async function main() {
     await waitForExpression(cdp, 'window.innerWidth === 1440');
     await waitForSettingsPageStable(cdp);
     await openSettingsSection(cdp, '登录与安全', 'auth', '.settings-page[data-settings-page="auth"]');
-    await waitForExpression(cdp, "document.querySelector('.settings-credential-panel')?.innerText.includes('本地凭据存储') && document.querySelector('.credential-safety-points')?.innerText.includes('保存后立即清空输入框') && document.querySelector('.settings-credential-panel')?.innerText.includes('验证登录')");
+    await waitForExpression(cdp, "document.querySelector('.settings-credential-panel')?.innerText.includes('本地凭据存储') && document.querySelector('.credential-safety-points')?.innerText.includes('保存后清空输入框') && document.querySelector('.settings-credential-panel')?.innerText.includes('验证登录')");
     await waitForExpression(cdp, "document.querySelector('.settings-credential-panel .credential-guide-card') && document.querySelector('.credential-provider-tag')");
     await waitForSettingsPageStable(cdp);
     await captureScreenshot(cdp, 'settings-auth-desktop');

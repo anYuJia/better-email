@@ -1502,7 +1502,7 @@ async function captureComposeReferenceFixture(cdp) {
     await waitForExpression(cdp, "[...document.querySelectorAll('.composer-contact-row')].some((row) => row.innerText.includes('李俊（东华）') && row.innerText.includes('已添加'))");
     await closeComposeContacts(cdp);
     await waitForExpression(cdp, "!document.querySelector('.composer-richtext-body')?.textContent?.trim() && !document.querySelector('.composer textarea[placeholder=\"正文\"]')?.value?.trim()");
-    await waitForExpression(cdp, "document.querySelector('.composer-autosave-status')?.textContent.includes('已存本机') && document.querySelector('.composer-autosave-status')?.title.includes('11:05')", 12_000);
+    await waitForExpression(cdp, "document.querySelector('.composer-autosave-status')?.textContent.includes('草稿已保存') && document.querySelector('.composer-autosave-status')?.title.includes('11:05')", 12_000);
 
     await evalInPage(cdp, "document.querySelector('.composer-send-menu-trigger')?.click()");
     await waitForExpression(cdp, "document.querySelector('.composer-send-menu')");
@@ -1518,7 +1518,7 @@ async function captureComposeReferenceFixture(cdp) {
     await clickButton(cdp, '00', "document.querySelector('.composer-schedule-time-options')");
     await clickButton(cdp, '确定', "document.querySelector('.composer-schedule-picker-popover')");
     await waitForExpression(cdp, "document.querySelector('.composer-schedule-status') && document.querySelector('.composer-schedule-picker-trigger')?.innerText.includes('8月28日 09:00')");
-    await waitForExpression(cdp, "document.querySelector('.composer-autosave-status')?.textContent.includes('已存本机') && document.querySelector('.composer-autosave-status')?.title.includes('11:05')", 12_000);
+    await waitForExpression(cdp, "document.querySelector('.composer-autosave-status')?.textContent.includes('草稿已保存') && document.querySelector('.composer-autosave-status')?.title.includes('11:05')", 12_000);
 
     await openComposeContacts(cdp);
     const compactSnapshot = await composeLayoutSnapshot(cdp);
@@ -1858,7 +1858,7 @@ async function main() {
     // commands; a transient menu can close between separate presence/click calls.
     await waitForExpression(cdp, "!document.querySelector('.mailbox-load-state') && document.querySelector('.message-card')");
     await clickFolderContextMenuItem(cdp, 'trash', '清空废纸篓');
-    await waitForExpression(cdp, "document.querySelector('.dialog-card') && document.querySelector('.dialog-card')?.innerText.includes('此操作不可逆')");
+    await waitForExpression(cdp, "document.querySelector('.dialog-card') && document.querySelector('.dialog-card')?.innerText.includes('永久删除')");
     await clickButton(cdp, '清空废纸篓', "document.querySelector('.dialog-card')");
     await waitForExpression(cdp, "document.body.innerText.includes('已清空废纸篓：本地永久删除 1 封') && document.body.innerText.includes('远端成功 1 封')");
 
@@ -2025,7 +2025,7 @@ async function main() {
     await waitForExpression(cdp, "[...document.querySelectorAll('.composer-recipient-chip-copy')].some((item) => item.getAttribute('title') === 'ada@example.com')");
     await fillInput(cdp, '.composer input[aria-label="主题"]', 'Smoke Draft Flow');
     await fillComposerBody(cdp, '保存草稿路径验证');
-    await waitForExpression(cdp, "JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.subject === 'Smoke Draft Flow' && (JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.body ?? '').includes('保存草稿路径验证') && document.body.innerText.includes('已存本机')");
+    await waitForExpression(cdp, "JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.subject === 'Smoke Draft Flow' && (JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.body ?? '').includes('保存草稿路径验证') && document.body.innerText.includes('草稿已保存')");
     await cdp.send('Page.reload', { ignoreCache: true });
     await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('Better Email')");
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 2");
@@ -3072,7 +3072,7 @@ async function main() {
     await evalInPage(cdp, "(() => { const button = document.querySelector('.reader-message-actions button[aria-label=\"稍后处理\"]'); if (!button) throw new Error('Reader snooze action not found'); button.click(); })()");
     await waitForExpression(cdp, "document.querySelector('.snooze-dialog') && document.querySelectorAll('[data-snooze-preset]').length === 4 && document.querySelector('input[aria-label=\"自定义稍后处理时间\"]')");
     await evalInPage(cdp, "document.querySelector('[data-snooze-preset=\"tomorrow\"]').click()");
-    await waitForExpression(cdp, "!document.querySelector('.snooze-dialog') && document.body.innerText.includes('已稍后处理到')");
+    await waitForExpression(cdp, "!document.querySelector('.snooze-dialog') && document.body.innerText.includes('已延后至')");
     await clickButton(cdp, '稍后处理', "document.querySelector('.primary-folder-list')");
     await waitForExpression(cdp, "document.body.innerText.includes('安全检查清单') && document.body.innerText.includes('稍后到')");
     await evalInPage(cdp, "(() => { const button = document.querySelector('.reader-message-actions button[aria-label=\"取消稍后处理\"]'); if (!button) throw new Error('Reader unsnooze action not found'); button.click(); })()");
@@ -3173,7 +3173,7 @@ async function main() {
     await pickCustomSelect(cdp, '.composer .custom-select-summary[aria-label="发件人"]', 'design@better-email.local');
     await waitForExpression(cdp, "document.querySelector('.composer-risk-banner')?.innerText.includes('正在回复其他账号的邮件')");
     await evalInPage(cdp, "document.querySelector('.composer .composer-send-primary').click()");
-    await waitForExpression(cdp, "document.querySelector('.dialog-card')?.innerText.includes('跨邮箱发送风险')");
+    await waitForExpression(cdp, "document.querySelector('.dialog-card')?.innerText.includes('跨邮箱发送提醒')");
     await clickButton(cdp, '返回修改', "document.querySelector('.dialog-card')");
     await waitForExpression(cdp, "!document.querySelector('.dialog-card') && document.querySelector('.composer')");
     await pickCustomSelect(cdp, '.composer .custom-select-summary[aria-label="发件人"]', 'demo@better-email.local');

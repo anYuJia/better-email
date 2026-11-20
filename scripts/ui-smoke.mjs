@@ -1791,11 +1791,13 @@ async function main() {
     await evalInPage(
       cdp,
       `(async () => {
-        const folder = [...document.querySelectorAll('.folder')].find((item) => item.getAttribute('data-folder-role') === 'inbox');
+        const folder = document.querySelector('.primary-folder-list .folder[data-folder-role="inbox"]')
+          ?? [...document.querySelectorAll('.folder')].find((item) => item.getAttribute('data-folder-role') === 'inbox');
         if (!folder) throw new Error('Inbox folder target not found');
         const badge = folder.querySelector('.badge');
-        if (badge && Number(badge.textContent) > 0) return;
-        const card = document.querySelector('.message-card');
+        const unreadCard = document.querySelector('.message-card.is-unread');
+        if (unreadCard && badge && Number(badge.textContent) > 0) return;
+        const card = document.querySelector('.message-card:not(.is-unread)') ?? document.querySelector('.message-card');
         if (!card) throw new Error('Inbox unread setup target not found');
         card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 520, clientY: 320, button: 2 }));
         for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -1807,7 +1809,7 @@ async function main() {
         throw new Error('Inbox unread setup target not found: mark-unread context action did not appear');
       })()`,
     );
-    await waitForExpression(cdp, "Number(document.querySelector('.folder[data-folder-role=\"inbox\"] .badge')?.textContent || 0) > 0 && document.querySelector('.message-card.is-unread')");
+    await waitForExpression(cdp, "Number(document.querySelector('.folder[data-folder-role=\"inbox\"] .badge')?.textContent || 0) > 0 && document.querySelector('.message-card.is-unread')", 15_000);
     await evalInPage(
       cdp,
       "(() => { const card = document.querySelector('.message-card.is-unread'); if (!card) throw new Error('Unread auto-read target not found'); window.__autoReadMessageId = card.dataset.messageId; window.__autoReadCardCountBefore = document.querySelectorAll('.message-card').length; const target = card.querySelector('.message-card-main') ?? card; target.click(); })()",

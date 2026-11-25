@@ -1,5 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 
+import { registerMobileOverlay } from '../app/mobileOverlayHistory';
+
 const FOCUSABLE_SELECTOR = [
   'a[href]',
   'button:not([disabled])',
@@ -23,6 +25,7 @@ type UseModalAccessibilityOptions = {
   initialFocusRef?: RefObject<HTMLElement>;
   onEscape?: () => void;
   escapeDisabled?: boolean;
+  ownsNavigation?: boolean;
   focusTrapDisabled?: boolean;
 };
 
@@ -56,6 +59,7 @@ export default function useModalAccessibility({
   initialFocusRef,
   onEscape,
   escapeDisabled = false,
+  ownsNavigation = false,
   focusTrapDisabled = false,
 }: UseModalAccessibilityOptions) {
   const onEscapeRef = useRef(onEscape);
@@ -176,9 +180,13 @@ export default function useModalAccessibility({
 
     // Bubble phase lets an open combobox or other nested control consume the
     // first Escape before the containing modal sees it.
+    const releaseBack = !ownsNavigation && onEscapeRef.current
+      ? registerMobileOverlay(modalDialog, () => { if (!escapeDisabledRef.current) onEscapeRef.current?.(); })
+      : undefined;
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      releaseBack?.();
       document.removeEventListener('keydown', handleKeyDown);
 
       for (const state of backgroundStates.reverse()) {
@@ -206,5 +214,5 @@ export default function useModalAccessibility({
         previouslyFocused.focus({ preventScroll: true });
       }
     };
-  }, [backdropRef, dialogRef, initialFocusRef, open]);
+  }, [backdropRef, dialogRef, initialFocusRef, open, ownsNavigation]);
 }

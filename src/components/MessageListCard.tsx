@@ -9,6 +9,7 @@ import { MESSAGE_ROW_HEIGHT, MOBILE_MESSAGE_ROW_HEIGHT } from './messageListLayo
 
 type MessageListCardProps = {
   mobile?: boolean;
+  rowHeight?: number;
   showAccountSource?: boolean;
   showAccountSourceLabel?: boolean;
   accountSourceLabels?: ReadonlyMap<number, string>;
@@ -23,7 +24,6 @@ type MessageListCardProps = {
   selectedMessageIdsRef: React.MutableRefObject<number[]>;
   onSelectMessage: (messageId: number) => void;
   onToggleMessageSelection: (messageId: number, checked: boolean) => void;
-  onToggleAllVisible: (checked: boolean) => void;
   onOpenMessageMenu: (message: MessageSummary, x: number, y: number, bulk: boolean) => void;
   onCloseMessageMenu: () => void;
   onSetDraggingMessageIds: (messageIds: number[]) => void;
@@ -32,6 +32,7 @@ type MessageListCardProps = {
 
 export default React.memo(function MessageListCard({
   mobile = false,
+  rowHeight = mobile ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT,
   showAccountSource = false,
   showAccountSourceLabel = showAccountSource,
   accountSourceLabels,
@@ -46,7 +47,6 @@ export default React.memo(function MessageListCard({
   selectedMessageIdsRef,
   onSelectMessage,
   onToggleMessageSelection,
-  onToggleAllVisible,
   onOpenMessageMenu,
   onCloseMessageMenu,
   onSetDraggingMessageIds,
@@ -79,7 +79,8 @@ export default React.memo(function MessageListCard({
     message.subject || '无主题',
     accountSource ? `，来源邮箱：${accountSource}` : '',
     message.is_read ? '' : '，未读',
-    mobile && isSelectionMode ? `，${isSelected ? '已选择' : '未选择'}` : `。按回车打开，按空格${isSelected ? '取消选择' : '选择'}`,
+    mobile && isSelectionMode ? `，${isSelected ? '已选择' : '未选择'}` : '',
+    mobile ? '' : `。按回车打开，按空格${isSelected ? '取消选择' : '选择'}`,
   ].join('');
 
   function activateMessage() {
@@ -88,16 +89,7 @@ export default React.memo(function MessageListCard({
   }
 
   function openMessageMenuAt(x: number, y: number) {
-    const selectedMessageIds = selectedMessageIdsRef.current;
-    const useBulkContext = isSelected && hasBulkSelection;
-    if (!useBulkContext && selectedMessageIds.length > 0 && !isSelected) {
-      onToggleAllVisible(false);
-    }
-    // On mobile the row action menu is an in-place action surface. Selecting
-    // the row here would immediately push the reader screen and unmount the
-    // menu before the user can choose archive, snooze, move, or delete.
-    if (!mobile) onSelectMessage(message.id);
-    onOpenMessageMenu(message, x, y, useBulkContext);
+    onOpenMessageMenu(message, x, y, isSelected && hasBulkSelection);
   }
 
   // J/K and Arrow navigation update the current message outside this row.
@@ -139,7 +131,7 @@ export default React.memo(function MessageListCard({
       ].filter(Boolean).join(' ')}
       data-message-id={message.id}
       data-folder-role={message.folder_role}
-      style={{ minHeight: mobile ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT }}
+      style={{ minHeight: rowHeight }}
       draggable={!mobile}
       onClick={activateMessage}
       onTouchStart={longPress.onTouchStart}

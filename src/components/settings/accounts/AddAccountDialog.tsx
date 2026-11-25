@@ -74,7 +74,7 @@ export default function AddAccountDialog({
 }: AddAccountDialogProps) {
   const titleId = useId();
   const backdropRef = useRef<HTMLDivElement>(null);
-  const dialogRef = useRef<HTMLElement>(null);
+  const dialogRef = useRef<HTMLFormElement>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
 
   useModalAccessibility({
@@ -94,8 +94,12 @@ export default function AddAccountDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <section
+      <form
         ref={dialogRef}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (canSubmit && !submitting) onSubmit();
+        }}
         className="settings-account-add-dialog"
         role="dialog"
         aria-modal="true"
@@ -278,12 +282,12 @@ export default function AddAccountDialog({
             variant="primary"
             disabled={!canSubmit || submitting}
             icon={!submitting ? <Plus size={14} /> : undefined}
-            onClick={onSubmit}
+            type="submit"
           >
             {submitting ? '添加中' : '添加'}
           </SettingsButton>
         </footer>
-      </section>
+      </form>
     </div>
   );
 

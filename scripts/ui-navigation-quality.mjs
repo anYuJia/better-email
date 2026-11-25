@@ -189,6 +189,30 @@ export async function runNavigationQuality(cdp, api) {
     })()`, `Compact selection stays aligned at ${width}x${height}, ${theme}, ${scale * 100}%`);
     await captureScreenshot(cdp, `selection-${width}-${height}-${theme}-${scale * 100}`);
   }
+  await setUiViewport(cdp, 390, 844);
+  await evalInPage(cdp, 'location.reload()');
+  await waitForExpression(cdp, "document.querySelector('.mobile-bottom-compose') && document.querySelector('.message-card-main')");
+  await evalInPage(cdp, "document.querySelector('.mobile-bottom-compose').click()");
+  await waitForExpression(cdp, "document.querySelector('.composer-richtext-body') && history.state?.betterEmailOverlay");
+  await evalInPage(cdp, "document.querySelector('.composer-richtext-body').focus()");
+  await cdp.send('Input.insertText', { text: '手机返回验收' });
+  await evalInPage(cdp, 'history.back()');
+  await waitForExpression(cdp, "document.querySelector('.composer-close-dialog') && history.state?.betterEmailOverlay");
+  await evalInPage(cdp, 'history.back()');
+  await waitForExpression(cdp, "!document.querySelector('.composer-close-dialog') && document.querySelector('.composer-richtext-body')?.textContent.includes('手机返回验收') && history.state?.betterEmailOverlay");
+  await evalInPage(cdp, 'history.back()');
+  await waitForExpression(cdp, "document.querySelector('.composer-close-dialog .dialog-button-danger-secondary')");
+  await evalInPage(cdp, "document.querySelector('.composer-close-dialog .dialog-button-danger-secondary').click()");
+  await waitForExpression(cdp, "!document.querySelector('.composer') && !history.state?.betterEmailOverlay && history.state?.betterEmailScreen === 'mail'");
+  checks.push('Mobile Back protects a dirty draft, continues editing, and returns to the mailbox after discard');
+  await evalInPage(cdp, "document.querySelector('.message-card-main').click()");
+  await waitForExpression(cdp, "document.querySelector('.reader-more-menu summary') && history.state?.betterEmailScreen === 'reader'");
+  await evalInPage(cdp, "document.querySelector('.reader-more-menu summary').click()");
+  await waitForExpression(cdp, "document.querySelector('.reader-more-menu[open]') && history.state?.betterEmailOverlay");
+  await evalInPage(cdp, 'history.back()');
+  await waitForExpression(cdp, "!document.querySelector('.reader-more-menu[open]') && document.activeElement === document.querySelector('.reader-more-menu summary') && history.state?.betterEmailScreen === 'reader' && !history.state?.betterEmailOverlay");
+  checks.push('Mobile Back dismisses the reader menu and restores its trigger before leaving the message');
+
   if (captureDir) {
     mkdirSync(captureDir, { recursive: true });
     writeFileSync(join(captureDir, 'navigation-quality.json'), JSON.stringify({ checks }, null, 2));

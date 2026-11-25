@@ -10,6 +10,7 @@ import {
 import type { Account, AccountScope, Folder } from '../../app/types';
 import { folderIconForRole } from '../../app/appConfig';
 import { useRef } from 'react';
+import useSurfaceMotion from '../../hooks/useSurfaceMotion';
 import useModalAccessibility from '../../hooks/useModalAccessibility';
 
 type MobileMailboxSheetProps = {
@@ -53,7 +54,9 @@ export default function MobileMailboxSheet({
   const backdropRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  useModalAccessibility({ open: active, dialogRef, backdropRef, initialFocusRef: closeButtonRef, onEscape: onClose });
+  useSurfaceMotion(backdropRef, active, { axis: 'none' });
+  useSurfaceMotion(dialogRef, active, { axis: 'x', distance: -12 });
+  useModalAccessibility({ open: active, ownsNavigation: true, dialogRef, backdropRef, initialFocusRef: closeButtonRef, onEscape: onClose });
   return (
     <div ref={backdropRef} className="mobile-sheet-backdrop" role="presentation" onClick={onClose}>
       <aside
@@ -156,8 +159,15 @@ export default function MobileMailboxSheet({
           <button
             type="button"
             onClick={() => {
-              onClose();
-              onCompose();
+              // Finish the drawer's own Back before mounting a composer that
+              // needs its own entry over the restored mailbox.
+              if (window.history.state?.betterEmailScreen === 'mailbox') {
+                window.addEventListener('popstate', onCompose, { once: true });
+                onClose();
+              } else {
+                onClose();
+                onCompose();
+              }
             }}
           >
             <PenLine size={20} strokeWidth={1.75} aria-hidden="true" />

@@ -70,7 +70,6 @@ function renderCard(
         selectedMessageIdsRef={{ current: [] }}
         onSelectMessage={() => undefined}
         onToggleMessageSelection={options.onToggleMessageSelection ?? (() => undefined)}
-        onToggleAllVisible={() => undefined}
         onOpenMessageMenu={() => undefined}
         onCloseMessageMenu={() => undefined}
         onSetDraggingMessageIds={() => undefined}

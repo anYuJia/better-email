@@ -29,7 +29,10 @@ const QUICK_FILTER_CHIPS = [
   { id: 'is-unread', label: '未读邮件', syntax: 'is:unread' },
   { id: 'is-starred', label: '星标邮件', syntax: 'is:starred' },
   { id: 'from', label: '发件人', syntax: 'from:' },
-];
+].map((chip) => ({
+  ...chip,
+  query: chip.syntax.endsWith(':') ? chip.syntax : `${chip.syntax} `,
+}));
 
 export default function GlobalSearch({
   searchInputRef,
@@ -54,7 +57,6 @@ export default function GlobalSearch({
   const scopeHintId = React.useId();
   const [searchFocused, setSearchFocused] = React.useState(false);
   const [activeSearchSuggestionIndex, setActiveSearchSuggestionIndex] = React.useState(-1);
-  const searchBlurTimerRef = React.useRef<number | null>(null);
   const searchSuggestionListId = React.useId();
   const searchScopeMenuRef = React.useRef<HTMLDetailsElement>(null);
   const searchSuggestionPanelRef = React.useRef<HTMLDivElement>(null);
@@ -75,9 +77,8 @@ export default function GlobalSearch({
   const showSearchSuggestions = searchFocused && trimmedQuery.length >= 1 && searchSuggestions.length > 0;
   const showSearchPanel = showSearchSuggestions || showQuickChips;
   useWheelContainment(searchSuggestionPanelRef, showSearchPanel);
-  const activeSearchSuggestion = showSearchSuggestions && activeSearchSuggestionIndex >= 0
-    ? searchSuggestions[activeSearchSuggestionIndex]
-    : null;
+  const options = trimmedQuery.length === 0 ? QUICK_FILTER_CHIPS : searchSuggestions;
+  const activeSearchSuggestion = showSearchPanel ? options[activeSearchSuggestionIndex] : null;
 
   React.useLayoutEffect(() => {
     if (!activeSearchSuggestion) return;
@@ -90,18 +91,8 @@ export default function GlobalSearch({
     else if (item.top < bounds.top) panel.scrollTop -= bounds.top - item.top + 4;
   }, [activeSearchSuggestion]);
 
-  const clearSearchBlurTimer = React.useCallback(() => {
-    if (searchBlurTimerRef.current === null) return;
-    window.clearTimeout(searchBlurTimerRef.current);
-    searchBlurTimerRef.current = null;
-  }, []);
-
-  React.useEffect(() => () => {
-    clearSearchBlurTimer();
-  }, [clearSearchBlurTimer]);
-
   function applySuggestedSearch(nextQuery: string) {
-    clearSearchBlurTimer();
+    inputRef.current?.focus({ preventScroll: true });
     onApplySearchShortcut(nextQuery);
     setSearchFocused(false);
     setActiveSearchSuggestionIndex(-1);
@@ -117,6 +108,48 @@ export default function GlobalSearch({
         onSearchSubmit(event);
       }}
       role="search"
+      onBlur={(event) => {
+        if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+        setSearchFocused(false);
+        setActiveSearchSuggestionIndex(-1);
+      }}
+      onKeyDown={(event) => {
+        if (ime.isComposing(event) || searchScopeMenuRef.current?.open) return;
+        if (event.key === 'Escape' && showSearchPanel) {
+          event.preventDefault();
+          event.stopPropagation();
+          inputRef.current?.focus({ preventScroll: true });
+          setSearchFocused(false);
+          setActiveSearchSuggestionIndex(-1);
+          return;
+        }
+        const fromInput = event.target === inputRef.current;
+        if (!fromInput && !searchSuggestionPanelRef.current?.contains(event.target as Node)) return;
+        const arrow = event.key === 'ArrowDown' || event.key === 'ArrowUp';
+        if (!showSearchPanel) {
+          if (arrow && options.length > 0) {
+            event.preventDefault();
+            setSearchFocused(true);
+            setActiveSearchSuggestionIndex(event.key === 'ArrowDown' ? 0 : options.length - 1);
+          }
+          return;
+        }
+        if (arrow || (activeSearchSuggestion && (event.key === 'Home' || event.key === 'End'))) {
+          event.preventDefault();
+          let next = event.key === 'Home' ? 0 : options.length - 1;
+          if (arrow) {
+            const direction = event.key === 'ArrowDown' ? 1 : -1;
+            next = activeSearchSuggestionIndex < 0
+              ? (direction > 0 ? 0 : options.length - 1)
+              : (activeSearchSuggestionIndex + direction + options.length) % options.length;
+          }
+          if (!fromInput) inputRef.current?.focus({ preventScroll: true });
+          setActiveSearchSuggestionIndex(next);
+        } else if (event.key === 'Enter' && fromInput && activeSearchSuggestion) {
+          event.preventDefault();
+          applySuggestedSearch(activeSearchSuggestion.query);
+        }
+      }}
     >
       <Search size={16} aria-hidden="true" />
       <input
@@ -128,54 +161,18 @@ export default function GlobalSearch({
           onQueryChange(event.target.value);
         }}
         onFocus={() => {
-          clearSearchBlurTimer();
           setSearchFocused(true);
           setActiveSearchSuggestionIndex(-1);
-        }}
-        onBlur={() => {
-          clearSearchBlurTimer();
-          searchBlurTimerRef.current = window.setTimeout(() => {
-            searchBlurTimerRef.current = null;
-            setSearchFocused(false);
-          }, 120);
         }}
         onCompositionStart={ime.onCompositionStart}
         onCompositionEnd={ime.onCompositionEnd}
         aria-describedby={scopeHintId}
-        onKeyDown={(event) => {
-          if (ime.isComposing(event)) return;
-          if (!showSearchSuggestions) return;
-          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault();
-            const direction = event.key === 'ArrowDown' ? 1 : -1;
-            setActiveSearchSuggestionIndex((current) => {
-              if (current < 0) return direction > 0 ? 0 : searchSuggestions.length - 1;
-              return (current + direction + searchSuggestions.length) % searchSuggestions.length;
-            });
-            return;
-          }
-          if ((event.key === 'Home' || event.key === 'End') && activeSearchSuggestion) {
-            event.preventDefault();
-            setActiveSearchSuggestionIndex(event.key === 'Home' ? 0 : searchSuggestions.length - 1);
-            return;
-          }
-          if (event.key === 'Enter' && activeSearchSuggestion) {
-            event.preventDefault();
-            applySuggestedSearch(activeSearchSuggestion.query);
-            return;
-          }
-          if (event.key === 'Escape') {
-            event.preventDefault();
-            setSearchFocused(false);
-            setActiveSearchSuggestionIndex(-1);
-          }
-        }}
         role="combobox"
         aria-label="搜索主题、发件人、正文"
         aria-haspopup="listbox"
         aria-autocomplete="list"
-        aria-expanded={showSearchSuggestions}
-        aria-controls={showSearchSuggestions ? searchSuggestionListId : undefined}
+        aria-expanded={showSearchPanel}
+        aria-controls={showSearchPanel ? searchSuggestionListId : undefined}
         aria-activedescendant={activeSearchSuggestion
           ? `${searchSuggestionListId}-${activeSearchSuggestion.id}`
           : undefined}
@@ -198,6 +195,9 @@ export default function GlobalSearch({
       <details
         className="compact-menu search-scope-menu"
         ref={searchScopeMenuRef}
+        onToggle={(event) => {
+          if (event.currentTarget.open) setSearchFocused(false);
+        }}
         data-floating-menu="true"
       >
         <summary
@@ -230,56 +230,36 @@ export default function GlobalSearch({
       </details>
       <span className="sr-only" id={scopeHintId}>{activeSearchScope.label}，仅搜索已同步到本机的邮件。</span>
       <span className="global-search-shortcut" aria-hidden="true">{shortcutLabel}</span>
-      {showQuickChips && (
+      {showSearchPanel && (
         <div
           ref={searchSuggestionPanelRef}
-          className="search-suggestion-panel search-quick-chips-panel"
-          role="region"
-          aria-label="快速筛选"
+          className={`search-suggestion-panel${showQuickChips ? ' search-quick-chips-panel' : ''}`}
+          id={searchSuggestionListId}
+          role="listbox"
+          aria-label={showQuickChips ? '快速筛选' : '搜索建议'}
         >
-          <span className="search-suggestion-title" aria-hidden="true">快捷语法过滤</span>
-          <div className="search-quick-chips" role="group" aria-label="快捷语法过滤">
-            {QUICK_FILTER_CHIPS.map((chip) => (
+          <span className="search-suggestion-title" aria-hidden="true">{showQuickChips ? '快捷语法过滤' : '搜索方式'}</span>
+          <div className={showQuickChips ? 'search-quick-chips' : 'search-suggestion-options'} role="presentation">
+            {options.map((item, index) => (
               <button
                 type="button"
-                key={chip.id}
-                className="search-quick-chip"
+                role="option"
+                id={`${searchSuggestionListId}-${item.id}`}
+                key={item.id}
+                className={[showQuickChips && 'search-quick-chip', index === activeSearchSuggestionIndex && 'active'].filter(Boolean).join(' ')}
+                aria-selected={index === activeSearchSuggestionIndex}
+                tabIndex={showQuickChips ? 0 : -1}
+                onFocus={() => setActiveSearchSuggestionIndex(index)}
                 onMouseDown={(event) => event.preventDefault()}
-                onClick={() => applySuggestedSearch(chip.syntax.endsWith(':') ? chip.syntax : `${chip.syntax} `)}
+                onClick={() => applySuggestedSearch(item.query)}
               >
-                <span className="search-chip-label">{chip.label}</span>
-                <code className="search-chip-syntax">{chip.syntax}</code>
+                {showQuickChips ? <>
+                  <span className="search-chip-label">{item.label}</span>
+                  <code className="search-chip-syntax">{QUICK_FILTER_CHIPS[index].syntax}</code>
+                </> : <span><strong>{item.label}</strong></span>}
               </button>
             ))}
           </div>
-        </div>
-      )}
-      {showSearchSuggestions && (
-        <div
-          ref={searchSuggestionPanelRef}
-          className="search-suggestion-panel"
-          id={searchSuggestionListId}
-          role="listbox"
-          aria-label="搜索建议"
-        >
-          <span className="search-suggestion-title" aria-hidden="true">搜索方式</span>
-          {searchSuggestions.map((item, index) => (
-            <button
-              type="button"
-              role="option"
-              id={`${searchSuggestionListId}-${item.id}`}
-              key={item.id}
-              className={index === activeSearchSuggestionIndex ? 'active' : ''}
-              aria-selected={index === activeSearchSuggestionIndex}
-              tabIndex={-1}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => applySuggestedSearch(item.query)}
-            >
-              <span>
-                <strong>{item.label}</strong>
-              </span>
-            </button>
-          ))}
         </div>
       )}
     </form>

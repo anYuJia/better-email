@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Loader2, MessageSquareText, Sparkles, WandSparkles, X } from 'lucide-react';
 import type { Message } from '../../app/types';
 import { aiErrorMessage, generateTemplate, summarizeMessage } from '../../app/aiService';
@@ -14,6 +14,7 @@ import { ContextMenuContent, type ContextMenuItem } from '../ContextMenu';
 
 type ReaderAiContextActionsProps = {
   message: Message;
+  renderMenu?: (items: ContextMenuItem[]) => ReactNode;
   onComposeFromMessage: (message: Message, mode: 'reply' | 'replyAll' | 'forward', prefillBody?: string) => void;
 };
 
@@ -22,6 +23,7 @@ type AiResultState = { messageKey: string; busyAction: AiBusyAction; summary: st
 
 export default function ReaderAiContextActions({
   message,
+  renderMenu,
   onComposeFromMessage,
 }: ReaderAiContextActionsProps) {
   const menuRef = useRef<HTMLDetailsElement>(null);
@@ -126,7 +128,7 @@ export default function ReaderAiContextActions({
 
   return (
     <div className="reader-ai-context">
-      <details
+      {renderMenu ? renderMenu(menuItems) : <details
         ref={menuRef}
         className="reader-ai-menu compact-menu"
         data-floating-menu="true"
@@ -152,7 +154,7 @@ export default function ReaderAiContextActions({
             note="外部 AI 遵循隐私确认设置"
           />
         </div>
-      </details>
+      </details>}
 
       {(summary || error) && (
         <aside

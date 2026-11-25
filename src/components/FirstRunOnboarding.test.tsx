@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Account } from '../app/types';
 import FirstRunOnboarding from './FirstRunOnboarding';
 
@@ -75,6 +75,16 @@ describe('FirstRunOnboarding', () => {
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     expect(onSkipAll).not.toHaveBeenCalled();
     expect(onAccountSettingsChange).not.toHaveBeenCalled();
+  });
+
+  it('returns to the previous step with saved selections intact', async () => {
+    const { onComplete } = renderOnboarding();
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: '自动下载新邮件附件' })); });
+    fireEvent.click(screen.getByRole('button', { name: '下一步' }));
+    fireEvent.click(screen.getByRole('button', { name: '上一步' }));
+    expect(screen.getByRole('switch', { name: '自动下载新邮件附件' })).toHaveProperty('checked', true);
+    expect(screen.queryByRole('button', { name: '上一步' })).toBeNull();
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
   it('preserves default values when skipping every step', async () => {

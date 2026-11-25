@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { pushMobileDestination } from '../app/mobileOverlayHistory';
 import type { ListMode } from '../app/types';
 import { mobileSelectionHistoryKey, withoutMobileSelection } from './mobileSelectionHistory';
 
@@ -42,7 +43,7 @@ export default function useMobileInboxSelection(options: Options) {
 
   const ensureHistory = useCallback(() => {
     if (window.history.state?.[mobileSelectionHistoryKey] === ownerRef.current) { ownsHistoryRef.current = true; return; }
-    window.history.pushState({ ...withoutMobileSelection(window.history.state), [mobileSelectionHistoryKey]: ownerRef.current }, '');
+    pushMobileDestination({ ...withoutMobileSelection(window.history.state), [mobileSelectionHistoryKey]: ownerRef.current });
     ownsHistoryRef.current = true;
   }, []);
 

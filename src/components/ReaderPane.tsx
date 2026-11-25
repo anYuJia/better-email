@@ -522,7 +522,7 @@ function ReaderPane({
   const isTrash = selected.folder_role === 'trash';
 
   return (
-    <section className="reader-panel" ref={readerRef} onScroll={maybeCompleteReading}>
+    <section className="reader-panel" ref={readerRef} tabIndex={0} aria-label="邮件阅读区" onScroll={maybeCompleteReading}>
       <NarrowReaderNavigation onBack={onBackToList} />
       <article className="reader">
         <ReaderToolbar

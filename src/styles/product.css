@@ -886,12 +886,13 @@
   }
 
   .app-shell.is-mobile-app .reader-header {
-    gap: 8px;
+    gap: 4px;
     margin-bottom: 8px;
+    padding-bottom: 8px;
   }
 
   .app-shell.is-mobile-app .reader-header h1 {
-    margin-bottom: 7px;
+    margin-bottom: 0;
     font-size: 22px;
     line-height: 1.27;
   }
@@ -960,7 +961,6 @@
 
   /* Secondary actions tucked into More menu on mobile */
   .app-shell.is-mobile-app .reader-actions .reader-star-action,
-  .app-shell.is-mobile-app .reader-actions .reader-snooze-action,
   .app-shell.is-mobile-app .reader-actions .reader-translate-action {
     display: none;
   }

@@ -37,7 +37,13 @@ export default function UndoSnackbarStack({
             type="button"
             className="undo-snackbar-action"
             aria-label={`撤销${undoAction.title}`}
-            onClick={onUndoAction}
+            onClick={() => {
+              // The undo button disappears immediately. Put focus back in the
+              // desktop list so its restored current row can claim it.
+              const list = document.querySelector<HTMLElement>('.message-list-panel:not(.mobile-message-list-panel) .message-list');
+              (list?.querySelector<HTMLElement>('.message-card-main[aria-current="true"]') ?? list)?.focus({ preventScroll: true });
+              onUndoAction();
+            }}
           >
             撤销
           </button>

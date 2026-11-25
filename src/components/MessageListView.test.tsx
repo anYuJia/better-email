@@ -764,8 +764,11 @@ describe('MessageListView theme-safe separators', () => {
     trigger.focus();
     fireEvent.keyDown(trigger, { key: 'F10', shiftKey: true });
 
-    expect(onSelectMessage).toHaveBeenCalledWith(message.id);
+    expect(onSelectMessage).not.toHaveBeenCalled();
     expect(onOpenMessageMenu).toHaveBeenCalledWith(message, 260, 240, false);
+    fireEvent.contextMenu(trigger, { clientX: 17, clientY: 23 });
+    expect(onOpenMessageMenu).toHaveBeenCalledWith(message, 17, 23, false);
+    expect(onSelectMessage).not.toHaveBeenCalled();
   });
 
   it('moves focus from the removed load-more button to the first appended message', async () => {

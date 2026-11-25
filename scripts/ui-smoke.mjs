@@ -1502,7 +1502,7 @@ async function captureComposeReferenceFixture(cdp) {
     await waitForExpression(cdp, "[...document.querySelectorAll('.composer-contact-row')].some((row) => row.innerText.includes('李俊（东华）') && row.innerText.includes('已添加'))");
     await closeComposeContacts(cdp);
     await waitForExpression(cdp, "!document.querySelector('.composer-richtext-body')?.textContent?.trim() && !document.querySelector('.composer textarea[placeholder=\"正文\"]')?.value?.trim()");
-    await waitForExpression(cdp, "document.querySelector('.composer-autosave-status')?.textContent.includes('草稿已保存') && document.querySelector('.composer-autosave-status')?.title.includes('11:05')", 12_000);
+    await waitForExpression(cdp, "document.querySelector('.composer-autosave-status')?.textContent.includes('已在本机暂存') && document.querySelector('.composer-autosave-status')?.title.includes('11:05')", 12_000);
 
     await evalInPage(cdp, "document.querySelector('.composer-send-menu-trigger')?.click()");
     await waitForExpression(cdp, "document.querySelector('.composer-send-menu')");
@@ -1518,7 +1518,7 @@ async function captureComposeReferenceFixture(cdp) {
     await clickButton(cdp, '00', "document.querySelector('.composer-schedule-time-options')");
     await clickButton(cdp, '确定', "document.querySelector('.composer-schedule-picker-popover')");
     await waitForExpression(cdp, "document.querySelector('.composer-schedule-status') && document.querySelector('.composer-schedule-picker-trigger')?.innerText.includes('8月28日 09:00')");
-    await waitForExpression(cdp, "document.querySelector('.composer-autosave-status')?.textContent.includes('草稿已保存') && document.querySelector('.composer-autosave-status')?.title.includes('11:05')", 12_000);
+    await waitForExpression(cdp, "document.querySelector('.composer-autosave-status')?.textContent.includes('已在本机暂存') && document.querySelector('.composer-autosave-status')?.title.includes('11:05')", 12_000);
 
     await openComposeContacts(cdp);
     const compactSnapshot = await composeLayoutSnapshot(cdp);
@@ -2027,7 +2027,7 @@ async function main() {
     await waitForExpression(cdp, "[...document.querySelectorAll('.composer-recipient-chip-copy')].some((item) => item.getAttribute('title') === 'ada@example.com')");
     await fillInput(cdp, '.composer input[aria-label="主题"]', 'Smoke Draft Flow');
     await fillComposerBody(cdp, '保存草稿路径验证');
-    await waitForExpression(cdp, "JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.subject === 'Smoke Draft Flow' && (JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.body ?? '').includes('保存草稿路径验证') && document.body.innerText.includes('草稿已保存')");
+    await waitForExpression(cdp, "JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.subject === 'Smoke Draft Flow' && (JSON.parse(localStorage.getItem('better-email.composerAutosave')).draft.body ?? '').includes('保存草稿路径验证') && document.body.innerText.includes('已在本机暂存')");
     await cdp.send('Page.reload', { ignoreCache: true });
     await waitForExpression(cdp, "document.querySelector('.app-shell') && document.body.innerText.includes('Better Email')");
     await waitForExpression(cdp, "document.querySelectorAll('.message-card').length >= 2");
@@ -2264,7 +2264,7 @@ async function main() {
     await waitForExpression(cdp, "(() => { const rich = document.querySelector('.composer-richtext-body'); if (rich) return (rich.textContent ?? '').includes('Better Email Support'); const plain = document.querySelector('.composer textarea[placeholder=\\\"正文\\\"]'); return Boolean(plain && (plain.value ?? '').includes('Better Email Support')); })()");
     await clickButton(cdp, '更多写信工具', "document.querySelector('.composer')");
     await waitForExpression(cdp, "document.querySelector('.composer-more-popover')");
-    await clickButton(cdp, '保存并关闭', "document.querySelector('.composer-more-popover')");
+    await clickButton(cdp, '保存到草稿箱并关闭', "document.querySelector('.composer-more-popover')");
     await waitForExpression(cdp, "document.body.innerText.includes('同步到远端草稿箱')");
     await closeComposer(cdp);
 

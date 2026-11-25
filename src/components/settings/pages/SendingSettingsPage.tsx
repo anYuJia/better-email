@@ -1,3 +1,4 @@
+import { generalSettingsLabels } from '../generalSettingsLabels';
 import {
   sendUndoDelayOptions,
   type SendUndoDelaySeconds,
@@ -20,7 +21,7 @@ export default function SendingSettingsPage({
   return (
     <SettingsSection dataSection="sending">
       <SettingsRow
-        title="撤销发送"
+        title={generalSettingsLabels.sending}
         description="发送后保留一小段时间，期间可撤回到草稿。"
         control={
           <div className="settings-inline-select" aria-label="撤销发送延迟">

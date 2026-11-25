@@ -39,6 +39,50 @@ async function openSuggestions(input: HTMLInputElement) {
 }
 
 describe('RecipientField keyboard', () => {
+  it('keeps incorrect pasted entries editable and commits the remaining valid addresses on blur', () => {
+    const onChange = vi.fn();
+    renderField(onChange);
+    const input = recipientInput();
+    fireEvent.paste(input, { clipboardData: { getData: () => 'ok@example.com，unfinished；\nsecond@example.com,another-bad,' } });
+    fireEvent.blur(input);
+    expect(input.value).toBe('unfinished, another-bad');
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(onChange).toHaveBeenLastCalledWith('ok@example.com, second@example.com, unfinished, another-bad');
+    fireEvent.change(input, { target: { value: 'fixed@example.com' } });
+    fireEvent.blur(input);
+    expect(input.value).toBe('');
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(onChange).toHaveBeenLastCalledWith('ok@example.com, second@example.com, fixed@example.com');
+  });
+
+  it('commits a quoted display name as one chip and keeps its quoting in the draft', () => {
+    const onChange = vi.fn();
+    renderField(onChange);
+    const input = recipientInput();
+    const addresses = '"Doe, Jane" <jane@example.com>, lead@example.com';
+    fireEvent.change(input, { target: { value: '"Doe,' } });
+    expect(input.value).toBe('"Doe,');
+    expect(screen.queryByRole('status')).toBeNull();
+    fireEvent.change(input, { target: { value: addresses } });
+    fireEvent.blur(input);
+    expect(screen.getByTitle('jane@example.com').textContent).toBe('Doe, Jane');
+    expect(input.value).toBe('');
+    expect(onChange).toHaveBeenLastCalledWith(addresses);
+  });
+
+  it('allows correcting pending delimiters one character at a time', () => {
+    const onChange = vi.fn();
+    renderField(onChange);
+    const input = recipientInput();
+    fireEvent.change(input, { target: { value: 'lead@example.com,broken,' } });
+    fireEvent.change(input, { target: { value: 'broken,' } });
+    expect(input.value).toBe('broken,');
+    fireEvent.change(input, { target: { value: 'broken' } });
+    expect(input.value).toBe('broken');
+    fireEvent.change(input, { target: { value: '' } });
+    expect(onChange).toHaveBeenLastCalledWith('lead@example.com');
+  });
+
   it('exposes the input as an owned list autocomplete combobox', () => {
     renderField();
     const input = screen.getByRole('combobox', { name: '收件人' });
@@ -85,6 +129,8 @@ describe('RecipientField keyboard', () => {
     renderField(onChange);
     const input = recipientInput();
     await openSuggestions(input);
+    expect(onChange).toHaveBeenLastCalledWith('ada');
+    onChange.mockClear();
     expect(fireEvent.keyDown(input, { key: 'Tab', shiftKey: true })).toBe(true);
     expect(onChange).not.toHaveBeenCalled();
     expect(input.value).toBe('ada');
@@ -103,7 +149,7 @@ describe('RecipientField keyboard', () => {
     fireEvent.change(input, { target: { value: 'unfinished@' } });
     expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
     expect(input.value).toBe('unfinished@');
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenLastCalledWith('new@example.com, unfinished@');
   });
 
   it('keeps focus in the field when Escape closes the suggestions', async () => {
@@ -134,6 +180,8 @@ describe('RecipientField keyboard', () => {
     renderField(onChange);
     const input = recipientInput();
     await openSuggestions(input);
+    expect(onChange).toHaveBeenLastCalledWith('ada');
+    onChange.mockClear();
     fireEvent.keyDown(input, { key: 'Escape' });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onChange).not.toHaveBeenCalled();
@@ -148,6 +196,8 @@ describe('RecipientField keyboard', () => {
     renderField(onChange);
     const input = recipientInput();
     await openSuggestions(input);
+    expect(onChange).toHaveBeenLastCalledWith('ada');
+    onChange.mockClear();
     fireEvent.compositionStart(input);
     expect(fireEvent.keyDown(input, { key: 'Tab', isComposing: true, keyCode: 229 })).toBe(true);
     expect(onChange).not.toHaveBeenCalled();
@@ -187,7 +237,7 @@ describe('RecipientField keyboard', () => {
     fireEvent.keyDown(input, { key: 'Enter', keyCode: 229, isComposing: true });
     fireEvent.compositionEnd(input, { data: '涵涵', target: { value: '涵涵' } });
     await act(async () => {});
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onChange).toHaveBeenLastCalledWith('涵涵');
     expect(input.value).toBe('涵涵');
   });
 });

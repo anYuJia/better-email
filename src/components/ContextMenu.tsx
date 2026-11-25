@@ -1,3 +1,4 @@
+import { registerMobileOverlay } from '../app/mobileOverlayHistory';
 import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronRight } from 'lucide-react';
@@ -435,7 +436,8 @@ function ContextMenuSurface({
   }, [active, contentKey]);
 
   useEffect(() => {
-    if (!active) return undefined;
+    if (!active || !menuRef.current) return undefined;
+    const releaseBack = registerMobileOverlay(menuRef.current, dismiss);
     function handlePointerDown(event: PointerEvent) {
       if (dismissedRef.current) return;
       const target = event.target as Node;
@@ -480,6 +482,7 @@ function ContextMenuSurface({
     window.addEventListener('resize', handleViewportChange);
     window.addEventListener('scroll', handleViewportChange, true);
     return () => {
+      releaseBack();
       document.removeEventListener('pointerdown', handlePointerDown, true);
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('resize', handleViewportChange);

@@ -43,6 +43,22 @@ describe('AddAccountDialog', () => {
     vi.restoreAllMocks();
   });
 
+  it('uses the same form submission for the Add action and credential input', () => {
+    const onSubmit = vi.fn();
+    const { rerender } = render(<AddAccountDialog {...addDialogProps} onClose={vi.fn()} onSubmit={onSubmit} />);
+    const form = screen.getByRole('dialog', { name: '添加邮箱' }) as HTMLFormElement;
+    const credential = screen.getByPlaceholderText('输入授权码') as HTMLInputElement;
+    const add = screen.getByRole('button', { name: '添加' }) as HTMLButtonElement;
+    expect(credential.form).toBe(form);
+    expect(add.form).toBe(form);
+    expect(add.type).toBe('submit');
+    fireEvent.submit(form);
+    expect(onSubmit).toHaveBeenCalledOnce();
+    rerender(<AddAccountDialog {...addDialogProps} onClose={vi.fn()} onSubmit={onSubmit} submitting />);
+    fireEvent.submit(form);
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
   it('stores the historical attachment information choice in the account form', () => {
     const onFormChange = vi.fn();
     render(

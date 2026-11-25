@@ -1,3 +1,4 @@
+import { generalSettingsLabels } from '../generalSettingsLabels';
 import { vipSenderEntries } from '../../../app/appConfig';
 import type { NotificationPolicy } from '../../../mailUtils';
 import {
@@ -20,12 +21,12 @@ export default function NotificationSettingsPage({
 
   return (
     <SettingsSection
-      title="通知"
+      title={generalSettingsLabels.notifications}
       description="只保留真正需要打断你的提醒。"
       dataSection="notifications"
     >
       <SettingsSwitch
-        label="只提醒 VIP"
+        label={generalSettingsLabels.vip}
         description="开启后，非 VIP 联系人的新邮件不发提醒。"
         checked={notificationPolicy.vipOnly}
         onChange={(checked) => onNotificationPolicyChange({
@@ -40,7 +41,7 @@ export default function NotificationSettingsPage({
       )}
 
       <SettingsSwitch
-        label="免打扰"
+        label={generalSettingsLabels.quiet}
         description="该时段内仅 VIP 联系人的邮件会发出提醒。"
         checked={quietHoursOn}
         onChange={(checked) => onNotificationPolicyChange({

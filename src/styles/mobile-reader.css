@@ -11,3 +11,51 @@
   flex-direction: column;
   overflow: hidden;
 }
+
+@media (max-width: 720px) {
+  .mobile-reader-surface .reader-sender-copy {
+    flex: 1;
+  }
+
+  .mobile-reader-surface :is(.reader-sender-email-line, .reader-recipient-expand, .reader-meta time, .reader-meta .reader-account-source) {
+    display: none;
+  }
+
+  .mobile-reader-surface .reader-mobile-sender-address {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-font-size-meta, 12px);
+  }
+
+  .mobile-reader-surface .reader-recipient-summary {
+    flex-shrink: 1;
+  }
+
+  .mobile-reader-surface .reader-identity-details {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    gap: 2px;
+    padding-inline: 4px;
+    border: 0;
+    border-radius: var(--ui-radius-control);
+    color: var(--ui-text-secondary);
+    background: transparent;
+    font: inherit;
+    font-size: var(--ui-font-size-secondary);
+  }
+
+  .mobile-reader-surface .reader-identity-details:is(:hover, :active) {
+    background: var(--quiet-row-hover);
+  }
+
+  .reader-detail-address {
+    min-height: 44px;
+  }
+}

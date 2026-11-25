@@ -60,7 +60,7 @@ describe('SenderIdentity recipient summary', () => {
     render(
       <SenderIdentity
         message={message({
-          recipients: 'one@example.com, two@example.com, three@example.com',
+          recipients: '"Chen, Mai" <one@example.com>, two@example.com, three@example.com',
           cc: 'copy@example.com',
         })}
         onComposeNew={vi.fn()}
@@ -69,6 +69,8 @@ describe('SenderIdentity recipient summary', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '展开' }));
     expect(screen.getByRole('dialog', { name: '收件人详情' })).toBeDefined();
+    expect(screen.getByText('共 4 个地址')).toBeDefined();
+    expect(screen.getByText('"Chen, Mai" <one@example.com>')).toBeDefined();
     expect(screen.getByText('three@example.com')).toBeDefined();
     expect(screen.getByText('copy@example.com')).toBeDefined();
 

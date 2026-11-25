@@ -399,7 +399,7 @@ export default function ComposerAdvancedTools({
               {saveDraftPending
                 ? <LoaderCircle className="spinning" size={14} aria-hidden="true" />
                 : <Save size={14} aria-hidden="true" />}
-              {saveDraftPending ? '正在保存…' : '保存并关闭'}
+              {saveDraftPending ? '正在保存…' : '保存到草稿箱并关闭'}
             </button>
           ) : null}
           {onInsertSignature ? (

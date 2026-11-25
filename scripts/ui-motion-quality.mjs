@@ -419,6 +419,12 @@ export async function runMotionQuality(cdp, api) {
     if (mobileReturn.some(f => f.present && (f.animations > 0 || (f.translate && !['none', '0px', '0px 0px'].includes(f.translate))))) throw new Error('Mobile inbox replays entry on return');
     if (!mobileReturn.at(-1)?.present) throw new Error('Mobile inbox did not return');
 
+    const drawerEnter = await trace('mobile mailbox drawer enter', '.mobile-sheet-backdrop', () => click('[aria-label="打开邮箱导航"]'));
+    assertInterpolated(drawerEnter, ['opacity'], 'Mailbox drawer enter');
+    const drawerExit = await trace('mobile mailbox drawer exit', '.mobile-sheet-backdrop', () => click('[aria-label="关闭邮箱导航"]'));
+    assertInterpolated(drawerExit, ['opacity'], 'Mailbox drawer exit');
+    if (drawerExit.at(-1)?.present) throw new Error('Mailbox drawer remained after exit');
+
     await click('[aria-label="打开邮箱导航"]');
     await clickButton(cdp, '设置', "document.querySelector('.mobile-mailbox-footer')");
     await waitForExpression(cdp, "document.querySelector('.mobile-settings-root') && !document.querySelector('.mobile-settings-root').closest('[inert]')");

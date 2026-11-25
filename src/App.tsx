@@ -22,6 +22,7 @@ import MobileInboxHeader from './components/mobile/MobileInboxHeader';
 import MobileBottomNav from './components/mobile/MobileBottomNav';
 import MobileMailboxSheet from './components/mobile/MobileMailboxSheet';
 import MobileScreenSurface from './components/mobile/MobileScreenSurface';
+import { pushMobileDestination } from './app/mobileOverlayHistory';
 import useMobileNavigation from './hooks/useMobileNavigation';
 import useExitPresence from './hooks/useExitPresence';
 import MobileSettingsRoot from './components/mobile/MobileSettingsRoot';
@@ -736,14 +737,13 @@ function MailboxApp({
         );
       }
       const { betterEmailSearch: _search, ...baseState } = window.history.state ?? {};
-      window.history.pushState(
+      pushMobileDestination(
         {
           ...baseState,
           betterEmailScreen: 'settings',
           betterEmailSettingsSection: section,
           betterEmailSettingsDirection: enteringFromSettingsPage ? 'forward' : 'none',
         },
-        '',
       );
     }
     setActiveSettingsSection(section);
@@ -1433,15 +1433,15 @@ function MailboxApp({
     composeFromMessage,
     toggleStar,
     toggleRead,
-    moveSelected,
+    moveMessage: (message, role) => message.id === selectedId ? moveSelected(role) : runMessageAction(message, role),
     toggleSidebarCollapse,
     threads: mailboxView.unavailable ? [] : threads,
     activeThread: mailboxView.unavailable ? null : activeThread,
     onOpenThread: openThread,
   });
 
-  const { handleRefresh, handleRefreshAction, resolveDelivery } = useMailFeedback({
-    enqueueManualSyncAndWait, refreshAll, setStatus, setOutbox,
+  const { refreshError, handleRefresh, handleRefreshAction, resolveDelivery } = useMailFeedback({
+    accountScope, enqueueManualSyncAndWait, refreshAll, setStatus, setOutbox,
   });
 
   const { handleOnboardingAccountPatch, completeOnboarding } = useOnboardingAccount({
@@ -1650,6 +1650,10 @@ function MailboxApp({
           nativeSettings={useNativeSettingsWindow} changeAccountScope={changeAccountScope}
           selectSettingsAccount={selectSettingsAccount} openSection={openMobileSettingsSection}
           onRepairCredentials={repairCredentials} repairError={repairError} />
+          {refreshError && <div className="message-list-refresh-error" role="status">
+            <span>同步未完成 · {refreshError}</span>
+            <button type="button" disabled={isBackgroundSyncRunning} onClick={handleRefreshAction}>重试同步</button>
+          </div>}
           {deleteRefreshError && <div className="message-list-refresh-error" role="alert">
             <span>{deleteRefreshError}</span><button type="button" onClick={() => { void retryDeleteRefresh(); }}>重试刷新</button>
           </div>}

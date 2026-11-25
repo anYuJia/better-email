@@ -544,8 +544,22 @@ fn mailbox(name: &str, email: &str) -> Result<Mailbox, MailError> {
 }
 
 fn split_recipients(value: &str) -> Vec<String> {
+    let mut quoted = false;
+    let mut escaped = false;
     value
-        .split([',', ';', '\u{FF0C}', '\u{FF1B}'])
+        .split(|character| {
+            if escaped {
+                escaped = false;
+            } else if quoted && character == '\\' {
+                escaped = true;
+            } else if character == '"' {
+                quoted = !quoted;
+            } else if !quoted && matches!(character, ',' | ';' | '，' | '；' | '\r' | '\n' | '\t')
+            {
+                return true;
+            }
+            false
+        })
         .map(str::trim)
         .filter(|item| !item.is_empty())
         .map(ToOwned::to_owned)
@@ -690,6 +704,25 @@ mod tests {
         assert_eq!(
             split_recipients("a@example.com, b@example.com; c@example.com"),
             vec!["a@example.com", "b@example.com", "c@example.com"]
+        );
+    }
+
+    #[test]
+    fn preserves_quoted_display_names_in_the_smtp_envelope() {
+        let mut message = binary_attachment_message(b"");
+        message.attachments.clear();
+        message.recipients = r#""Doe, Jane" <jane@example.com>, lead@example.com"#.into();
+        message.cc = r#""Lee \"Sam\"；Junior" <lee@example.com>"#.into();
+        let email = build_outbound_email(&message, None).unwrap();
+        let addresses: Vec<_> = email
+            .envelope()
+            .to()
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        assert_eq!(
+            addresses,
+            ["jane@example.com", "lead@example.com", "lee@example.com"]
         );
     }
 

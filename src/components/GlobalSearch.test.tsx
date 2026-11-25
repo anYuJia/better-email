@@ -101,13 +101,36 @@ describe('GlobalSearch keyboard and focus continuity', () => {
     expect(screen.getByRole('listbox').textContent).not.toContain('0 封');
   });
 
+  it('keeps quick filters open across internal Tab stops and supports Escape, arrows and Enter', () => {
+    const apply = vi.fn();
+    render(<SearchHarness query="" onApplySearchShortcut={apply} />);
+    const input = screen.getByRole('combobox');
+    act(() => input.focus());
+    expect(input.getAttribute('aria-expanded')).toBe('true');
+    const scope = screen.getByRole('button', { name: /搜索范围/ });
+    act(() => scope.focus());
+    const option = screen.getByRole('option', { name: /含附件/ });
+    act(() => option.focus());
+    fireEvent.keyDown(option, { key: 'Escape' });
+    expect(document.activeElement).toBe(input);
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    const selected = screen.getByRole('option', { selected: true });
+    expect(selected.textContent).toContain('未读邮件');
+    expect(input.getAttribute('aria-activedescendant')).toBe(selected.id);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(apply).toHaveBeenCalledWith('is:unread ');
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it('displays quick filter chips when focusing an empty query and applies syntax on click', () => {
     const applyShortcut = vi.fn();
     render(<SearchHarness query="" onApplySearchShortcut={applyShortcut} />);
     const input = screen.getByRole('combobox');
     fireEvent.focus(input);
-    expect(screen.getByRole('region', { name: '快速筛选' })).toBeDefined();
-    const unreadChip = screen.getByRole('button', { name: /未读邮件/ });
+    expect(screen.getByRole('listbox', { name: '快速筛选' })).toBeDefined();
+    const unreadChip = screen.getByRole('option', { name: /未读邮件/ });
     expect(unreadChip.tabIndex).toBe(0);
     unreadChip.focus();
     expect(document.activeElement).toBe(unreadChip);

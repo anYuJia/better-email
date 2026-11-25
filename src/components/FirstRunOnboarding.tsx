@@ -1,3 +1,4 @@
+import { generalSettingsLabels } from './settings/generalSettingsLabels';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
   AlertCircle,
@@ -39,7 +40,7 @@ const stepOrder: StepId[] = ['attachments', 'send-delay', 'security', 'contacts'
 
 const stepTitles: Record<StepId, string> = {
   attachments: '新邮件附件自动下载',
-  'send-delay': '延迟发送',
+  'send-delay': generalSettingsLabels.sendDelay,
   security: '邮件安全与内容显示',
   contacts: '导入联系人',
 };
@@ -558,6 +559,16 @@ export default function FirstRunOnboarding({
           <button type="button" className="onboarding-skip-all" onClick={handleSkipAll} disabled={completing}>
             跳过全部
           </button>
+          {stepIndex > 0 && (
+            <button
+              type="button"
+              className="onboarding-previous"
+              disabled={saving || completing || importing || previewing}
+              onClick={() => setStepIndex((current) => current - 1)}
+            >
+              上一步
+            </button>
+          )}
           <button
             type="button"
             className="onboarding-primary"

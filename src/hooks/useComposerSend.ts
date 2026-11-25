@@ -26,6 +26,7 @@ import { formatDate, prefixedSubject, quoteMessage, replyThreadingHeaders } from
 import { flowInfo, flowWarn } from '../app/logger';
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
+import { invalidDraftRecipientMessage, splitRecipientTokens } from '../components/composer/recipientAddresses';
 import type { QuickReplySnapshot } from './useQuickReplyDraft';
 
 const DIRECT_SEND_PROGRESS_POLL_INTERVAL_MS = 1000;
@@ -327,6 +328,11 @@ export default function useComposerSend({
 
   const sendDraft = useCallback(async () => {
     const { draft, revision } = getDraftSnapshot();
+    const invalidRecipient = invalidDraftRecipientMessage(draft);
+    if (invalidRecipient) {
+      setStatus(invalidRecipient);
+      return;
+    }
     if (!draft.to.trim()) {
       setStatus('请先填写收件人');
       return;
@@ -338,7 +344,7 @@ export default function useComposerSend({
     await beforeSubmitDraft?.(draftInputForCurrentAccount(draft));
     composerFlowLog('sendDraft start', {
       accountId: input.account_id,
-      toCount: input.to.split(/[;,，；]/).filter((item) => item.trim()).length,
+      toCount: splitRecipientTokens(input.to).length,
       subjectLength: subject.length,
       attachments: input.attachments.length,
       undoDelaySeconds: sendUndoDelaySeconds,
@@ -526,6 +532,11 @@ export default function useComposerSend({
 
   const queueDraft = useCallback(async () => {
     const { draft, revision } = getDraftSnapshot();
+    const invalidRecipient = invalidDraftRecipientMessage(draft);
+    if (invalidRecipient) {
+      setStatus(invalidRecipient);
+      return;
+    }
     if (!draft.to.trim()) {
       setStatus('请先填写收件人');
       return;

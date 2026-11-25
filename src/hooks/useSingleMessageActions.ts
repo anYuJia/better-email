@@ -110,7 +110,7 @@ export default function useSingleMessageActions({
       if (action === 'restore' || action === 'not-spam') {
         const result = await invoke<RestoreMessageReport>(IPC.RestoreMessageToInbox, { messageId: message.id });
         clearSelectedDetailIf(message.id);
-        setSelectedId(null);
+        setSelectedId((current) => current === message.id ? null : current);
         await refreshAll();
         const actionLabel = action === 'restore' ? '恢复到收件箱' : '标记为不是垃圾邮件';
         setStatus(action === 'restore' ? result.remote.message : `已${actionLabel}：${message.subject || '(无主题)'}`);
@@ -121,7 +121,7 @@ export default function useSingleMessageActions({
       if (action === 'unsnooze') {
         await invoke<Message>(IPC.UnsnoozeMessage, { messageId: message.id });
         clearSelectedDetailIf(message.id);
-        setSelectedId(null);
+        setSelectedId((current) => current === message.id ? null : current);
         await refreshAll();
         setStatus(`已取消稍后处理：${message.subject || '(无主题)'}`);
         queueUndoAction('取消稍后处理', undoSnapshots);
@@ -131,7 +131,7 @@ export default function useSingleMessageActions({
       const targetRole = action === 'spam' ? 'spam' : action;
       await invoke(IPC.MoveMessageToRole, { messageId: message.id, role: targetRole });
       clearSelectedDetailIf(message.id);
-      setSelectedId(null);
+      setSelectedId((current) => current === message.id ? null : current);
       await refreshAll();
       const actionLabel =
         action === 'archive'
@@ -147,7 +147,7 @@ export default function useSingleMessageActions({
       const undoSnapshots = snapshotMessages([message]);
       await invoke(IPC.MoveMessageToRole, { messageId: message.id, role: folder.role });
       clearSelectedDetailIf(message.id);
-      setSelectedId(null);
+      setSelectedId((current) => current === message.id ? null : current);
       await refreshAll();
       setStatus(`已移动到 ${folder.name}：${message.subject || '(无主题)'}`);
       queueUndoAction(`移动到 ${folder.name}`, undoSnapshots);

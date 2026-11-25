@@ -1,3 +1,5 @@
+import { generalSettingsLabels } from './generalSettingsLabels';
+import { sendUndoDelayOptions } from '../../app/notificationConfig';
 import {
   ContactRound,
   HardDrive,
@@ -305,10 +307,12 @@ export const settingsNavigationItems = settingsNavigationGroups.flatMap((group) 
 ));
 
 export const settingsSearchEntries: SettingsSearchEntry[] = [
-  { label: '界面外观', path: '偏好 › 通用', section: 'general', target: 'appearance', keywords: ['主题', '系统', '亮色', '暗色', 'theme'] },
-  { label: '撤销发送', path: '偏好 › 通用', section: 'general', target: 'sending', keywords: ['发送延迟', '撤回', 'undo', '5秒', '10秒'] },
-  { label: '只提醒 VIP', path: '偏好 › 通用', section: 'general', target: 'notifications', keywords: ['vip', '只提醒', '重点联系人'] },
-  { label: '免打扰时段', path: '偏好 › 通用', section: 'general', target: 'notifications', keywords: ['免打扰', '静音', '时间', 'dnd'] },
+  { label: '界面外观', path: '偏好 › 通用', section: 'general', target: 'appearance', keywords: [generalSettingsLabels.theme, ...Object.values(generalSettingsLabels.themeModes), '亮色', '暗色', 'theme'] },
+  { label: '紧凑邮件列表', path: '偏好 › 通用 › 外观', section: 'general', target: 'list-density', keywords: ['密度', '紧凑', '标准', '邮件列表'] },
+  { label: generalSettingsLabels.sending, path: '偏好 › 通用', section: 'general', target: 'sending', keywords: [generalSettingsLabels.sendDelay, '发送延迟', '撤回', 'undo', ...sendUndoDelayOptions.flatMap(option => [option.label, `${option.value}秒`])] },
+  { label: generalSettingsLabels.notifications, path: '偏好 › 通用', section: 'general', target: 'notifications', keywords: ['提醒'] },
+  { label: generalSettingsLabels.vip, path: '偏好 › 通用', section: 'general', target: 'notifications', keywords: ['vip', '只提醒', '重点联系人'] },
+  { label: '免打扰时段', path: '偏好 › 通用', section: 'general', target: 'notifications', keywords: [generalSettingsLabels.quiet, '静音', '时间', 'dnd'] },
   { label: '账户信息', path: '偏好 › 邮箱账户', section: 'accounts', target: 'account-overview', keywords: ['添加账号', '删除账号', '邮箱', 'display name'] },
   { label: '同步频率', path: '邮箱账户 › 同步', section: 'sync', target: 'sync-preferences', keywords: ['获取新邮件', '后台检查', 'sync'] },
   { label: '自动下载附件', path: '邮箱账户 › 同步', section: 'sync', target: 'sync-preferences', keywords: ['附件', '自动下载', 'download'] },

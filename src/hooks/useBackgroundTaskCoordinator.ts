@@ -17,6 +17,7 @@ import {
   fetchTimerLog,
   fetchTimerWarn,
 } from '../app/backgroundTaskFlow';
+import { formatInvokeError } from '../app/accountConnectionFlows';
 import type {
   Account,
   AccountScope,
@@ -99,6 +100,13 @@ type CurrentCoordinatorState = Pick<
   | 'releaseDueSnoozedMessages'
 >;
 
+function completedSyncMessage(run: SyncRun, summary: string): string {
+  if (run.status.endsWith('_failed') || run.status.endsWith('_partial')) {
+    throw new Error(run.message || '部分邮件未能同步');
+  }
+  return summary;
+}
+
 /** 进度轮询间隔：消费 Rust 写入的文件夹/批次级进度。 */
 const PROGRESS_POLL_INTERVAL_MS = 1000;
 /** 渐进式界面刷新节流：避免每次进度都重查一次邮件列表。 */
@@ -129,6 +137,7 @@ export default function useBackgroundTaskCoordinator({
   loadMessages,
   releaseDueSnoozedMessages,
 }: UseBackgroundTaskCoordinatorOptions) {
+  const manualRefreshes = useRef(new Map<AccountScope, Promise<void>>());
   const backgroundSyncRef = useRef(false);
   const backgroundTaskWorkerRef = useRef(false);
   const currentRef = useRef<CurrentCoordinatorState>({
@@ -305,7 +314,7 @@ export default function useBackgroundTaskCoordinator({
           requestRefreshId: mailboxRequest.id,
           currentRefreshId: mailboxRefreshRef.current,
         });
-        return summary;
+        return completedSyncMessage(run, summary);
       }
       let meta: LoadMetaResult;
       try {
@@ -320,11 +329,11 @@ export default function useBackgroundTaskCoordinator({
             accountId: syncAccountId,
             error: String(error),
           });
-          return summary;
+          return completedSyncMessage(run, summary);
         }
         throw error;
       }
-      if (!isMailboxRefreshCurrent(mailboxRequest)) return summary;
+      if (!isMailboxRefreshCurrent(mailboxRequest)) return completedSyncMessage(run, summary);
       let latestMessages: MessageSummary[];
       try {
         latestMessages = await current.loadMessages(
@@ -345,11 +354,11 @@ export default function useBackgroundTaskCoordinator({
             accountId: syncAccountId,
             error: String(error),
           });
-          return summary;
+          return completedSyncMessage(run, summary);
         }
         throw error;
       }
-      if (!isMailboxRefreshCurrent(mailboxRequest)) return summary;
+      if (!isMailboxRefreshCurrent(mailboxRequest)) return completedSyncMessage(run, summary);
       setBackgroundSyncStatus(summary);
       await notifyNewMail(run, latestMessages);
       fetchTimerLog('sync done', {
@@ -362,10 +371,11 @@ export default function useBackgroundTaskCoordinator({
         visibleMessages: latestMessages.length,
         durationMs: Math.round(performance.now() - startedAt),
       });
+      const result = completedSyncMessage(run, summary);
       if (reason === 'manual') {
         setStatus(released.released_count > 0 ? `${run.message} 已恢复 ${released.released_count} 封稍后邮件。` : run.message);
       }
-      return summary;
+      return result;
     } catch (error) {
       const message = String(error);
       fetchTimerWarn('sync failed', {
@@ -376,7 +386,6 @@ export default function useBackgroundTaskCoordinator({
       });
       if (isMailboxRefreshCurrent(mailboxRequest)) {
         setBackgroundSyncStatus(`后台同步暂停：${message}`);
-        if (reason === 'manual') setStatus(message);
       }
       throw error;
     } finally {
@@ -534,7 +543,7 @@ export default function useBackgroundTaskCoordinator({
       });
       // 完成后最终刷新一次界面（绑定账号仍是当前账号时生效）。
       await applyAccountSyncRefresh(task);
-      return syncStatusLabel(run);
+      return completedSyncMessage(run, syncStatusLabel(run));
     } finally {
       window.clearInterval(pollTimer);
     }
@@ -660,7 +669,7 @@ export default function useBackgroundTaskCoordinator({
           await refreshBackgroundTasks();
           setBackgroundSyncStatus(message);
         } catch (error) {
-          const message = String(error);
+          const message = formatInvokeError(error);
           // 失败也可能是执行期间请求取消（Rust 安全点中止）：优先落为已取消。
           const cancelled = await invoke<boolean>(IPC.ConsumeBackgroundTaskCancel, {
             taskId: runningTask.id,
@@ -684,7 +693,9 @@ export default function useBackgroundTaskCoordinator({
               ? `${runningTask.title}失败：${message}，可重试`
               : `${runningTask.title}失败：${message}`,
           );
-          if (runningTask.source === 'manual') setStatus(message);
+          // The mailbox refresh caller owns its persistent retry notice.
+          const mailboxWillReport = runningTask.kind === 'sync' && manualRefreshes.current.has(runningTask.account_id ?? 'all');
+          if (runningTask.source === 'manual' && !mailboxWillReport) setStatus(message);
         }
       }
     } finally {
@@ -755,7 +766,6 @@ export default function useBackgroundTaskCoordinator({
     return enqueueAccountSyncTask(selectedScope, 'manual');
   }, [enqueueAccountSyncTask, enqueueBackgroundTask]);
 
-  const manualRefreshes = useRef(new Map<AccountScope, Promise<void>>());
   const refreshWaiters = useRef(new Set<AbortController>());
   useEffect(() => () => {
     refreshWaiters.current.forEach((controller) => controller.abort());

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
+import { registerMobileOverlay } from '../app/mobileOverlayHistory';
 import { containWheelWithin } from '../app/wheelContainment';
 import { focusMenuItem, focusPastMenu, getMenuFocusTargets } from '../app/menuFocus';
 import { cancelMenuExit, enterMenu, exitMenu, finishMenuEnter, pauseMenuExit } from '../app/transientMenuMotion';
@@ -259,7 +260,13 @@ export function useDetailsMenu(
       });
     }
 
+    let releaseBack: (() => void) | undefined;
+    function syncBack() {
+      if (menu.hasAttribute('open')) releaseBack ??= registerMobileOverlay(menu, () => closeMenu());
+      else { releaseBack?.(); releaseBack = undefined; }
+    }
     function handleToggle() {
+      syncBack();
       syncSummaryDisclosureState(menu);
       if (!menu.hasAttribute('open')) {
         if (menu.hasAttribute('data-menu-exiting')) return;
@@ -361,10 +368,12 @@ export function useDetailsMenu(
     }
 
     function handleViewportChange(event: Event) {
-      if (event.type === 'scroll' && event.target instanceof Node && menu.contains(event.target)) {
-        return;
-      }
-      if (menu.hasAttribute('open')) closeMenu();
+      if (!menu.hasAttribute('open')) return;
+      const target = event.target;
+      // Only an ancestor scroll can move the trigger. A neighboring input can
+      // dispatch scroll after blur when the browser resets its text position.
+      if (event.type === 'scroll' && target instanceof Node && (target === menu || !target.contains(menu))) return;
+      closeMenu();
     }
 
     function handleWheel(event: WheelEvent) {
@@ -388,7 +397,9 @@ export function useDetailsMenu(
     menu.addEventListener('wheel', handleWheel, { passive: false });
     syncSummaryDisclosureState(menu);
     if (menu.hasAttribute('open')) scheduleFloatingPosition();
+    syncBack();
     return () => {
+      releaseBack?.();
       clearPositionFrame();
       menu.removeEventListener('toggle', handleToggle);
       menu.removeEventListener('click', handleSummaryClick, true);

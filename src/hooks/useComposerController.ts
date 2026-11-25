@@ -30,7 +30,7 @@ import useQuickReplyDraft from './useQuickReplyDraft';
 import useComposerTemplates from './useComposerTemplates';
 import useComposerAttachments from './useComposerAttachments';
 import { pendingAttachmentRecovery } from '../app/attachmentImports';
-import { canonicalRecipientEmails, parseRecipientInput, parseRecipientToken } from '../components/composer/recipientAddresses';
+import { canonicalRecipientEmails, invalidDraftRecipientMessage, splitRecipientTokens, parseRecipientToken } from '../components/composer/recipientAddresses';
 
 
 type LoadMetaResult = {
@@ -364,7 +364,13 @@ export default function useComposerController({
   );
 
   const requestSend = useCallback(async () => {
-    const risks = analyzeCrossAccountRisks(getDraftSnapshot().draft, accounts, {
+    const snapshot = getDraftSnapshot().draft;
+    const invalidRecipient = invalidDraftRecipientMessage(snapshot);
+    if (invalidRecipient) {
+      setStatus(invalidRecipient);
+      return;
+    }
+    const risks = analyzeCrossAccountRisks(snapshot, accounts, {
       originalMessageAccountId: composerContextAccountId,
       contextAccountId: null,
     });
@@ -373,7 +379,7 @@ export default function useComposerController({
       return;
     }
     await sendDraft();
-  }, [getDraftSnapshot, accounts, composerContextAccountId, sendDraft]);
+  }, [getDraftSnapshot, accounts, composerContextAccountId, sendDraft, setStatus]);
 
   const confirmSendRisk = useCallback(async () => {
     setSendRiskConfirm(null);
@@ -514,7 +520,7 @@ export default function useComposerController({
     const skippedIds: number[] = [];
     const fieldLabel = field === 'to' ? '收件人' : field === 'cc' ? '抄送' : '密送';
     const used = canonicalRecipientEmails(draft.to, draft.cc, draft.bcc);
-    const currentFieldTokens = parseRecipientInput(draft[field]).valid.map((token) => token.email);
+    const currentFieldTokens = splitRecipientTokens(draft[field]);
     for (const contact of contactsToAdd) {
       const primary = parseRecipientToken(contact.email);
       const aliases = [contact.email, ...(contact.aliases ?? [])]

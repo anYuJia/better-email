@@ -519,8 +519,8 @@ describe('ComposerWindow focus lifecycle', () => {
       },
     }));
 
-    expect(screen.getByText('草稿已保存')).not.toBeNull();
-    expect(screen.getByText('草稿已保存').title).toContain('保存到草稿箱');
+    expect(screen.getByText('已在本机暂存')).not.toBeNull();
+    expect(screen.getByText('已在本机暂存').title).toContain('保存到草稿箱');
     expect(screen.queryByText(/已备份恢复点/)).toBeNull();
   });
 
@@ -551,7 +551,7 @@ describe('ComposerWindow focus lifecycle', () => {
     }));
 
     fireEvent.click(screen.getByRole('button', { name: '更多写信工具' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '保存并关闭' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '保存到草稿箱并关闭' }));
 
     const composerPanel = document.querySelector<HTMLElement>('.composer');
     const savingAction = screen.getByRole('menuitem', { name: '正在保存…' });
@@ -579,10 +579,10 @@ describe('ComposerWindow focus lifecycle', () => {
     }));
 
     fireEvent.click(screen.getByRole('button', { name: '更多写信工具' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '保存并关闭' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '保存到草稿箱并关闭' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('menuitem', { name: '保存并关闭' }).hasAttribute('disabled')).toBe(false);
+      expect(screen.getByRole('menuitem', { name: '保存到草稿箱并关闭' }).hasAttribute('disabled')).toBe(false);
       expect(document.querySelector('.composer')?.hasAttribute('inert')).toBe(false);
     });
     expect(onSaveDraft).toHaveBeenCalledTimes(1);
@@ -594,7 +594,7 @@ describe('ComposerWindow focus lifecycle', () => {
     const onSaveDraft = vi.fn().mockResolvedValue({ status, message });
     render(cloneElement(composer(), { onSaveDraft }));
     fireEvent.click(screen.getByRole('button', { name: '更多写信工具' }));
-    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '保存并关闭' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '保存到草稿箱并关闭' })); });
 
     expect(screen.getByRole('menu', { name: '更多写信工具' })).not.toBeNull();
     expect(screen.getByText(message)).not.toBeNull();
@@ -609,14 +609,14 @@ describe('ComposerWindow focus lifecycle', () => {
       attachmentImports: [{ id: 'file', filename: '资料.zip', sizeBytes: 10, status, progress: null, error: null, source: 'file', inline: false }],
     }));
     fireEvent.click(screen.getByRole('button', { name: '更多写信工具' }));
-    const save = screen.getByRole('menuitem', { name: '保存并关闭' });
+    const save = screen.getByRole('menuitem', { name: '保存到草稿箱并关闭' });
     expect(save.hasAttribute('disabled')).toBe(true);
     const explanation = document.getElementById(save.getAttribute('aria-describedby')!);
     expect(explanation?.textContent).toContain(status === 'preparing' ? '等待完成' : '重试或移除');
     fireEvent.click(save);
     expect(onSaveDraft).not.toHaveBeenCalled();
     rerender(cloneElement(composer(), { onSaveDraft, attachmentImports: [] }));
-    expect(screen.getByRole('menuitem', { name: '保存并关闭' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('menuitem', { name: '保存到草稿箱并关闭' }).hasAttribute('disabled')).toBe(false);
     expect(document.querySelector('.composer-save-feedback')).toBeNull();
   });
 

@@ -7,6 +7,7 @@ import type {
 } from '../app/types';
 import type { LocalDateTimeRange } from '../mailUtils';
 import MessageListCard from './MessageListCard';
+import useCompactMessageList from '../hooks/useCompactMessageList';
 import usePullToRefresh from '../hooks/usePullToRefresh';
 import useVirtualRowMeasurements from '../hooks/useVirtualRowMeasurements';
 import MessageSelectionControls from './MessageSelectionControls';
@@ -14,6 +15,7 @@ import { installScrollbarThumbDrag } from '../hooks/scrollbarThumbDrag';
 import {
   GROUP_HEADER_HEIGHT,
   LIST_FOOTER_HEIGHT,
+  COMPACT_MESSAGE_ROW_HEIGHT,
   MOBILE_MESSAGE_ROW_HEIGHT,
   MOBILE_GROUP_HEADER_HEIGHT,
   MESSAGE_ROW_HEIGHT,
@@ -146,7 +148,10 @@ export default function MessageListView({
     listStateKey: string;
     previousMessageIds: ReadonlySet<number>;
   } | null>(null);
-  const messageRowHeight = isMobileViewport ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT;
+  const compactPreference = useCompactMessageList();
+  const compact = !isMobileViewport && compactPreference;
+  const desktopRowHeight = compact ? COMPACT_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT;
+  const messageRowHeight = isMobileViewport ? MOBILE_MESSAGE_ROW_HEIGHT : desktopRowHeight;
   const groupHeaderHeight = isMobileViewport ? MOBILE_GROUP_HEADER_HEIGHT : GROUP_HEADER_HEIGHT;
   const heightCacheContextRef = useRef({ listStateKey, messageRowHeight });
 
@@ -625,7 +630,7 @@ export default function MessageListView({
 
   const showFooter = messages.length > 1 || hasMoreMessages || Boolean(loadMoreStatus);
   return (
-    <div className="message-list-shell">
+    <div className="message-list-shell" data-density={compact ? 'compact' : 'standard'}>
       <div
         className="message-list"
         ref={listRef}
@@ -758,6 +763,7 @@ export default function MessageListView({
                   }}
                 >
                   <MessageListCard
+                    rowHeight={messageRowHeight}
                     mobile={mobile}
                     showAccountSource={showAccountSource}
                     showAccountSourceLabel={showAccountSourceLabel}
@@ -773,7 +779,6 @@ export default function MessageListView({
                     selectedMessageIdsRef={selectedMessageIdsRef}
                     onSelectMessage={onSelectMessage}
                     onToggleMessageSelection={onToggleMessageSelection}
-                    onToggleAllVisible={onToggleAllVisible}
                     onOpenMessageMenu={onOpenMessageMenu}
                     onCloseMessageMenu={onCloseMessageMenu}
                     onSetDraggingMessageIds={onSetDraggingMessageIds}

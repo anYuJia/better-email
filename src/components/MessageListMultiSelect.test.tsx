@@ -74,7 +74,6 @@ describe('MessageListCard desktop vs mobile multi-select behavior', () => {
             selectedMessageIdsRef={{ current: [] }}
             onSelectMessage={() => undefined}
             onToggleMessageSelection={() => undefined}
-            onToggleAllVisible={() => undefined}
             onOpenMessageMenu={() => undefined}
             onCloseMessageMenu={() => undefined}
             onSetDraggingMessageIds={() => undefined}
@@ -105,7 +104,6 @@ describe('MessageListCard desktop vs mobile multi-select behavior', () => {
             selectedMessageIdsRef={{ current: [101] }}
             onSelectMessage={() => undefined}
             onToggleMessageSelection={() => undefined}
-            onToggleAllVisible={() => undefined}
             onOpenMessageMenu={() => undefined}
             onCloseMessageMenu={() => undefined}
             onSetDraggingMessageIds={() => undefined}
@@ -138,7 +136,6 @@ describe('MessageListCard desktop vs mobile multi-select behavior', () => {
             selectedMessageIdsRef={{ current: [999] }}
             onSelectMessage={() => undefined}
             onToggleMessageSelection={() => undefined}
-            onToggleAllVisible={() => undefined}
             onOpenMessageMenu={() => undefined}
             onCloseMessageMenu={() => undefined}
             onSetDraggingMessageIds={() => undefined}
@@ -176,7 +173,6 @@ describe('MessageListCard desktop vs mobile multi-select behavior', () => {
               selectedMessageIdsRef={{ current: [] }}
               onSelectMessage={onSelectMessage}
               onToggleMessageSelection={onToggleMessageSelection}
-              onToggleAllVisible={() => undefined}
               onOpenMessageMenu={() => undefined}
               onCloseMessageMenu={() => undefined}
               onSetDraggingMessageIds={() => undefined}
@@ -220,7 +216,6 @@ describe('MessageListCard desktop vs mobile multi-select behavior', () => {
               selectedMessageIdsRef={{ current: [101] }}
               onSelectMessage={onSelectMessage}
               onToggleMessageSelection={onToggleMessageSelection}
-              onToggleAllVisible={() => undefined}
               onOpenMessageMenu={() => undefined}
               onCloseMessageMenu={() => undefined}
               onSetDraggingMessageIds={() => undefined}
@@ -238,7 +233,6 @@ describe('MessageListCard desktop vs mobile multi-select behavior', () => {
               selectedMessageIdsRef={{ current: [101] }}
               onSelectMessage={onSelectMessage}
               onToggleMessageSelection={onToggleMessageSelection}
-              onToggleAllVisible={() => undefined}
               onOpenMessageMenu={() => undefined}
               onCloseMessageMenu={() => undefined}
               onSetDraggingMessageIds={() => undefined}
@@ -293,7 +287,6 @@ describe('MessageListCard desktop vs mobile multi-select behavior', () => {
               selectedMessageIdsRef={{ current: [101] }}
               onSelectMessage={onSelectMessage}
               onToggleMessageSelection={onToggleMessageSelection}
-              onToggleAllVisible={() => undefined}
               onOpenMessageMenu={() => undefined}
               onCloseMessageMenu={() => undefined}
               onSetDraggingMessageIds={() => undefined}
@@ -330,7 +323,6 @@ describe('MessageListCard desktop vs mobile multi-select behavior', () => {
               selectedMessageIdsRef={{ current: [101] }}
               onSelectMessage={onSelectMessage}
               onToggleMessageSelection={onToggleMessageSelection}
-              onToggleAllVisible={() => undefined}
               onOpenMessageMenu={() => undefined}
               onCloseMessageMenu={() => undefined}
               onSetDraggingMessageIds={() => undefined}
@@ -367,7 +359,6 @@ describe('MessageListCard desktop vs mobile multi-select behavior', () => {
               selectedMessageIdsRef={{ current: [101] }}
               onSelectMessage={onSelectMessage}
               onToggleMessageSelection={onToggleMessageSelection}
-              onToggleAllVisible={() => undefined}
               onOpenMessageMenu={() => undefined}
               onCloseMessageMenu={() => undefined}
               onSetDraggingMessageIds={() => undefined}
@@ -395,7 +386,6 @@ describe('MessageListCard desktop vs mobile multi-select behavior', () => {
               selectedMessageIdsRef={{ current: [] }}
               onSelectMessage={onSelectMessage}
               onToggleMessageSelection={onToggleMessageSelection}
-              onToggleAllVisible={() => undefined}
               onOpenMessageMenu={() => undefined}
               onCloseMessageMenu={() => undefined}
               onSetDraggingMessageIds={() => undefined}

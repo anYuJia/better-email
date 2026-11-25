@@ -1,9 +1,12 @@
+import { generalSettingsLabels } from './generalSettingsLabels';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import {
   SettingsRow,
+  SettingsSwitch,
   SettingsSection,
 } from './shared';
+import useCompactMessageList, { setCompactMessageList } from '../../hooks/useCompactMessageList';
 import type { ThemeMode } from '../../hooks/useThemeMode';
 
 type AppearanceSettingsProps = {
@@ -19,19 +22,19 @@ const themeOptions: Array<{
 }> = [
   {
     value: 'system',
-    label: '系统',
+    label: generalSettingsLabels.themeModes.system,
     description: '跟随操作系统自动切换亮色与暗色',
     icon: Monitor,
   },
   {
     value: 'light',
-    label: '浅色',
+    label: generalSettingsLabels.themeModes.light,
     description: '始终使用浅色界面',
     icon: Sun,
   },
   {
     value: 'dark',
-    label: '深色',
+    label: generalSettingsLabels.themeModes.dark,
     description: '始终使用深色界面',
     icon: Moon,
   },
@@ -41,6 +44,7 @@ export default function AppearanceSettings({
   themeMode,
   onThemeModeChange,
 }: AppearanceSettingsProps) {
+  const compact = useCompactMessageList();
   const selectedOption = themeOptions.find((option) => option.value === themeMode) ?? themeOptions[0];
 
   const handleOptionKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -80,7 +84,7 @@ export default function AppearanceSettings({
       dataSection="appearance"
     >
       <SettingsRow
-        title="界面主题"
+        title={generalSettingsLabels.theme}
         description={selectedOption.description}
         control={(
           <div
@@ -112,6 +116,13 @@ export default function AppearanceSettings({
             })}
           </div>
         )}
+      />
+      <SettingsSwitch
+        dataSection="list-density"
+        label="紧凑邮件列表"
+        description="缩小桌面邮件行距，一屏显示更多邮件。"
+        checked={compact}
+        onChange={setCompactMessageList}
       />
     </SettingsSection>
   );

@@ -56,7 +56,7 @@ function makeOptions(): ShortcutOptions {
     composeFromMessage: vi.fn(),
     toggleStar: vi.fn(async () => undefined),
     toggleRead: vi.fn(async () => undefined),
-    moveSelected: vi.fn(async () => undefined),
+    moveMessage: vi.fn(async () => undefined),
   };
 }
 
@@ -143,14 +143,15 @@ describe('useAppShortcuts text selection boundary', () => {
     }
     fireEvent.keyDown(trigger, { key: 'a', metaKey: true });
     fireEvent.keyDown(trigger, { key: 'z', metaKey: true });
-    for (const name of ['setSelectedId', 'toggleStar', 'toggleRead', 'moveSelected', 'runBulkAction', 'composeFromMessage', 'composeNew', 'toggleAllVisibleMessages', 'restoreUndoAction', 'openShortcuts'] as const) {
+    for (const name of ['setSelectedId', 'toggleStar', 'toggleRead', 'moveMessage', 'runBulkAction', 'composeFromMessage', 'composeNew', 'toggleAllVisibleMessages', 'restoreUndoAction', 'openShortcuts'] as const) {
       expect(options[name]).not.toHaveBeenCalled();
     }
     fireEvent.keyDown(trigger, { key: 'Escape' });
     expect(details.open).toBe(false);
     expect(document.activeElement).toBe(trigger);
     fireEvent.keyDown(trigger, { key: 'Delete' });
-    expect(bulk ? options.runBulkAction : options.moveSelected).toHaveBeenCalledWith('trash');
+    if (bulk) expect(options.runBulkAction).toHaveBeenCalledWith('trash');
+    else expect(options.moveMessage).toHaveBeenCalledWith(options.selected, 'trash');
   });
 
   it('keeps command-a available to the browser while text is selected', () => {
@@ -215,6 +216,46 @@ describe('useAppShortcuts text selection boundary', () => {
 
     expect(options.composeNew).not.toHaveBeenCalled();
     delete document.body.dataset.imagePreviewModal;
+  });
+
+  it('keeps native scrolling and selection in the reader while J still opens the next message', () => {
+    const options = makeOptions();
+    render(<><ShortcutHarness options={options} /><section className="reader-panel" tabIndex={0}>正文</section></>);
+    const reader = document.querySelector<HTMLElement>('.reader-panel')!;
+    reader.focus();
+    expect(fireEvent.keyDown(reader, { key: 'ArrowDown' })).toBe(true);
+    expect(fireEvent.keyDown(reader, { key: 'ArrowUp' })).toBe(true);
+    expect(fireEvent.keyDown(reader, { key: 'a', ctrlKey: true })).toBe(true);
+    expect(options.setSelectedId).not.toHaveBeenCalled();
+    expect(options.toggleAllVisibleMessages).not.toHaveBeenCalled();
+    fireEvent.keyDown(reader, { key: 'j' });
+    expect(options.setSelectedId).toHaveBeenCalled();
+  });
+
+  it('navigates and archives from the focused row when the reader is showing another message', () => {
+    const options = makeOptions();
+    options.messages = [1, 2, 3].map((id) => ({ id, folder_role: 'inbox' } as MessageSummary));
+    options.selected = options.messages[0];
+    options.selectedId = 1;
+    render(<><ShortcutHarness options={options} /><div className="message-list"><div className="message-card" data-message-id="2"><button>第二封</button></div></div></>);
+    const row = document.querySelector('button')!;
+    fireEvent.keyDown(row, { key: 'ArrowDown' });
+    expect(options.setSelectedId).toHaveBeenCalledWith(3);
+    fireEvent.keyDown(row, { key: 'e' });
+    expect(options.moveMessage).toHaveBeenCalledWith(options.messages[1], 'archive');
+  });
+
+  it('allows select-all and cancel from a message checkbox without intercepting text fields', () => {
+    const options = makeOptions();
+    options.selectedMessageIds = [1];
+    render(<><ShortcutHarness options={options} /><section className="message-list-panel"><input type="checkbox" /><input /></section></>);
+    const [checkbox, input] = document.querySelectorAll('.message-list-panel input');
+    fireEvent.keyDown(checkbox, { key: 'a', metaKey: true });
+    fireEvent.keyDown(checkbox, { key: 'Escape' });
+    fireEvent.keyDown(input, { key: 'a', ctrlKey: true });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(options.toggleAllVisibleMessages).toHaveBeenCalledTimes(1);
+    expect(options.clearSelection).toHaveBeenCalledTimes(1);
   });
 
   it('focuses the global search input with the command shortcut', () => {

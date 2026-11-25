@@ -8,6 +8,7 @@ import {
   parseRecipientInput,
   parseRecipientToken,
   recipientErrorMessage,
+  recipientInputParts,
   type ParsedRecipientToken,
 } from './recipientAddresses';
 
@@ -27,22 +28,17 @@ const compositionEnterGuardMs = 80;
 
 function initialParse(value: string) {
   const parsed = parseRecipientInput(value);
-  const lastToken = parsed.tokens[parsed.tokens.length - 1];
-  const hasTrailingSeparator = /[,，;；\n\t]\s*$/.test(value);
-  const query = lastToken && !lastToken.valid && !hasTrailingSeparator ? lastToken.raw : '';
+  const query = parsed.invalid.map((token) => token.raw).join(', ');
   const chipLabels = Object.fromEntries(
     parsed.valid
-      .map((token) => {
-        const displayName = token.raw.match(/^(.+?)\s*<[^<>]+>$/)?.[1]?.trim().replace(/^(["'])(.*)\1$/, '$2') ?? '';
-        return [token.normalized, displayName];
-      })
+      .map((token) => [token.normalized, token.displayName])
       .filter(([, displayName]) => Boolean(displayName)),
   );
   return {
     chips: parsed.valid.map((token) => token.email),
     query,
     chipLabels,
-    validationMessage: recipientErrorMessage(parsed.invalid.length, parsed.duplicates.length),
+    validationMessage: recipientErrorMessage(parsed.invalid, parsed.duplicates.length),
   };
 }
 
@@ -123,7 +119,7 @@ export default function RecipientField({
   queryRef.current = query;
 
   const matches = useMemo(() => {
-    if (!query.trim()) return [];
+    if (!query.trim() || /[,，;；\n\t]/.test(query)) return [];
     const selectedEmails = new Set(chips.map((email) => email.toLowerCase()));
     return matchingContacts(contactSearchEntries, query, suggestionLimit * 2)
       .filter((contact) => {
@@ -154,36 +150,44 @@ export default function RecipientField({
     suggestionChosenRef.current = false;
   }, [value]);
 
-  function emit(nextChips: string[], nextLabels = chipLabelsRef.current) {
-    const next = deriveValue(nextChips, nextLabels);
+  function emit(nextChips: string[], nextLabels = chipLabelsRef.current, pending = queryRef.current) {
+    const next = [deriveValue(nextChips, nextLabels), pending.trim()].filter(Boolean).join(', ');
+    if (next === lastValueRef.current) return;
     lastValueRef.current = next;
     onChange(next);
   }
 
-  function commitTokens(tokens: ParsedRecipientToken[]) {
+  function commitTokens(tokens: ParsedRecipientToken[], tail?: string) {
     const validTokens = tokens.filter((token) => token.valid);
-    const invalidCount = tokens.length - validTokens.length;
+    const invalid = tokens.filter((token) => !token.valid);
+    const pendingParts = invalid.map((token) => token.raw);
+    if (tail !== undefined) pendingParts.push(pendingParts.length ? tail.trimStart() : tail);
+    const pending = pendingParts.join(', ');
     const { next, duplicates, addedTokens } = appendUnique(chipsRef.current, validTokens, blockedEmailSet);
     const nextLabels = { ...chipLabelsRef.current };
     for (const token of addedTokens) {
-      const displayName = token.raw.match(/^(.+?)\s*<[^<>]+>$/)?.[1]?.trim().replace(/^(["'])(.*)\1$/, '$2') ?? '';
-      if (displayName) nextLabels[token.normalized] = displayName;
+      if (token.displayName) nextLabels[token.normalized] = token.displayName;
     }
     chipsRef.current = next;
     chipLabelsRef.current = nextLabels;
-    queryRef.current = '';
+    queryRef.current = pending;
     setChips(next);
     setChipLabels(nextLabels);
-    setQuery('');
-    setValidationMessage(recipientErrorMessage(invalidCount, duplicates.length));
-    emit(next, nextLabels);
+    setQuery(pending);
+    setValidationMessage(recipientErrorMessage(invalid, duplicates.length));
+    setSuggestionsDismissed(invalid.length > 0);
+    emit(next, nextLabels, pending);
     setHighlight(0);
     suggestionChosenRef.current = false;
   }
 
   function commitEmail(raw: string) {
-    const normalizedRaw = raw.replace(/\t/g, '').trim();
-    const token = parseRecipientToken(normalizedRaw);
+    const { tokens } = parseRecipientInput(raw);
+    if (tokens.length > 1) {
+      commitTokens(tokens);
+      return;
+    }
+    const token = parseRecipientToken(raw.trim());
     if (!token.valid) {
       setValidationMessage('请选择匹配联系人，或输入完整邮箱地址');
       return;
@@ -210,7 +214,8 @@ export default function RecipientField({
     setHighlight(0);
     suggestionChosenRef.current = false;
     setSuggestionsDismissed(false);
-    if (!nextQuery.trim()) setValidationMessage('');
+    setValidationMessage('');
+    emit(chipsRef.current, chipLabelsRef.current, nextQuery);
   }
 
   function commitCurrentRecipient() {
@@ -224,21 +229,40 @@ export default function RecipientField({
     }
   }
 
-  function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const raw = event.target.value;
-    const nativeEvent = event.nativeEvent as InputEvent;
-    if (composingRef.current || nativeEvent.isComposing) {
+  function updateInput(raw: string) {
+    const parts = recipientInputParts(raw);
+    if (parts.length === 1) {
       setQueryValue(raw);
       return;
     }
-    const parts = raw.split(/[,，;；\n]/);
-    if (parts.length > 1) {
-      const committed = parts.slice(0, -1).map((part) => part.trim()).filter(Boolean);
-      commitTokens(committed.map(parseRecipientToken));
-      setQueryValue(parts[parts.length - 1] ?? '');
+    const completed = parts.slice(0, -1).filter((part) => part.trim()).map(parseRecipientToken);
+    if (completed.some((token) => token.valid)) {
+      commitTokens(completed, parts[parts.length - 1]);
     } else {
       setQueryValue(raw);
+      setValidationMessage(recipientErrorMessage(completed));
+      setSuggestionsDismissed(true);
     }
+  }
+
+  function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (composingRef.current || (event.nativeEvent as InputEvent).isComposing) {
+      setQueryValue(event.target.value);
+    } else {
+      updateInput(event.target.value);
+    }
+  }
+
+  function handlePaste(event: React.ClipboardEvent<HTMLInputElement>) {
+    // Single-line inputs strip newlines before onChange. Parse the clipboard
+    // with the same delimiters as typed addresses before the browser does so.
+    const pasted = event.clipboardData.getData('text/plain');
+    if (!/[\r\n\t]/.test(pasted)) return;
+    event.preventDefault();
+    const input = event.currentTarget;
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    updateInput(input.value.slice(0, start) + pasted + input.value.slice(end));
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -303,14 +327,16 @@ export default function RecipientField({
 
   function handleBlur() {
     if (!composingRef.current) {
-      const trimmed = queryRef.current.trim();
-      if (trimmed && parseRecipientToken(trimmed.replace(/\t/g, '')).valid) commitEmail(trimmed);
+      const parsed = parseRecipientInput(queryRef.current);
+      if (parsed.tokens.length) commitTokens(parsed.tokens);
     }
     setFocused(false);
   }
 
   function chipDisplayName(email: string) {
-    return chipLabels[email.toLowerCase()] || contactForEmail(contactSearchEntries, email)?.name || email;
+    const name = chipLabels[email.toLowerCase()];
+    if (name?.startsWith('"') && name.endsWith('"')) return name.slice(1, -1).replace(/\\(.)/g, '$1');
+    return name || contactForEmail(contactSearchEntries, email)?.name || email;
   }
 
   return (
@@ -346,6 +372,8 @@ export default function RecipientField({
             spellCheck={false}
             data-gramm="false"
             role="combobox"
+            aria-label={label}
+            aria-invalid={validationMessage && parseRecipientInput(query).invalid.length > 0 ? true : undefined}
             aria-haspopup="listbox"
             aria-autocomplete="list"
             aria-controls={menuOpen ? suggestionListId : undefined}
@@ -355,6 +383,7 @@ export default function RecipientField({
             value={query}
             placeholder={chips.length === 0 ? placeholder : ''}
             onChange={handleInputChange}
+            onPaste={handlePaste}
             onKeyDown={handleKeyDown}
             onCompositionStart={() => {
               composingRef.current = true;
@@ -362,7 +391,7 @@ export default function RecipientField({
             onCompositionEnd={(event) => {
               composingRef.current = false;
               compositionEndedAtRef.current = performance.now();
-              setQueryValue(event.currentTarget.value);
+              updateInput(event.currentTarget.value);
             }}
             onFocus={() => {
               onFocus?.();
@@ -373,6 +402,11 @@ export default function RecipientField({
             }}
             onBlur={handleBlur}
           />
+          {validationMessage && (
+            <span className="composer-recipient-error" id={errorId} role="status">
+              {validationMessage}
+            </span>
+          )}
         </div>
       </label>
 
@@ -409,11 +443,7 @@ export default function RecipientField({
           ))}
         </div>
       )}
-      {validationMessage && (
-        <p className="composer-recipient-error" id={errorId} role="status">
-          {validationMessage}
-        </p>
-      )}
+
     </div>
   );
 }

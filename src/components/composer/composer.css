@@ -2661,16 +2661,17 @@
 }
 
 .composer-recipient-error {
-  position: absolute;
-  right: var(--compose-space-5);
-  bottom: 2px;
-  z-index: 3;
-  max-width: min(360px, calc(100% - 90px));
+  flex: 0 0 100%;
+  min-width: 0;
   margin: 0;
   color: var(--ui-danger);
-  font-size: 11px;
-  line-height: 1.2;
-  pointer-events: none;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.composer .composer-recipient-editor input[aria-invalid="true"] {
+  flex-basis: 100%;
 }
 
 .composer-schedule-clear:hover,

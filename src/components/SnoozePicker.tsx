@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { registerMobileOverlay } from '../app/mobileOverlayHistory';
 import { createPortal } from 'react-dom';
 import {
   CalendarClock,
@@ -129,9 +130,15 @@ export default function SnoozePicker({
         onClose();
       }
     }
+    const releaseBack = modalRef.current
+      ? registerMobileOverlay(modalRef.current, () => { if (!submitting) onClose(); })
+      : undefined;
     // 顶层对话框必须在应用级 Escape 快捷键之前消费事件。
     window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
+    return () => {
+      releaseBack?.();
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
   }, [onClose, submitting]);
 
   async function confirm(date: Date) {

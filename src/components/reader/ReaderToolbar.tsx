@@ -11,6 +11,7 @@ import {
   RotateCcw,
   ShieldCheck,
   ShieldOff,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { canSnoozeRole } from '../../app/snooze';
@@ -193,21 +194,6 @@ function ReaderToolbar({
     },
     ...(isMobileViewport
       ? [
-          ...(selected.folder_role === 'snoozed'
-            ? [{
-                id: 'menu-unsnooze',
-                label: '取消稍后处理',
-                icon: <Clock size={16} />,
-                onSelect: onUnsnooze,
-              }]
-            : canSnooze
-              ? [{
-                  id: 'menu-snooze',
-                  label: '稍后处理',
-                  icon: <Clock size={16} />,
-                  onSelect: onSnooze,
-                }]
-              : []),
           ...(!isDraft && needsTranslation
               ? [{
                 id: 'menu-translate',
@@ -271,6 +257,24 @@ function ReaderToolbar({
     });
   }
 
+  const renderMoreMenu = (items: ContextMenuItem[]) => (
+    <details
+      className="reader-more-menu compact-menu"
+      ref={moreMenuRef}
+      data-floating-menu="true"
+    >
+      <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
+        <MoreHorizontal size={18} aria-hidden="true" />
+      </summary>
+      <div
+        className="context-menu-surface context-menu--anchored reader-more-menu-panel"
+        data-floating-menu-panel="true"
+      >
+        <ContextMenuContent items={items} onClose={moreMenu.closeMenu} ariaLabel="邮件操作" />
+      </div>
+    </details>
+  );
+
   return (
     <header className="reader-header">
       <ReaderSubject subject={selected.subject} />
@@ -330,25 +334,16 @@ function ReaderToolbar({
             <ReaderAiContextActions
               key={`reader-ai:${selected.account_id}:${selected.id}`}
               message={selected}
+              renderMenu={isMobileViewport ? (aiItems) => renderMoreMenu([
+                ...readerMenuItems.filter(item => !item.danger),
+                { id: 'mobile-ai', label: 'AI 邮件工具', icon: <Sparkles size={16} />, children: aiItems },
+                ...readerMenuItems.filter(item => item.danger),
+              ]) : undefined}
               onComposeFromMessage={onComposeFromMessage}
             />
           </div>
         )}
-        <details
-          className="reader-more-menu compact-menu"
-          ref={moreMenuRef}
-          data-floating-menu="true"
-        >
-          <summary className="icon-only-summary" title="更多操作" aria-label="更多操作">
-            <MoreHorizontal size={18} aria-hidden="true" />
-          </summary>
-          <div
-            className="context-menu-surface context-menu--anchored reader-more-menu-panel"
-            data-floating-menu-panel="true"
-          >
-            <ContextMenuContent items={readerMenuItems} onClose={moreMenu.closeMenu} ariaLabel="邮件操作" />
-          </div>
-        </details>
+        {(!isMobileViewport || isDraft) && renderMoreMenu(readerMenuItems)}
       </div>
       {(metadata || showTranslationAction) && <div className="reader-context-row">
         {metadata}

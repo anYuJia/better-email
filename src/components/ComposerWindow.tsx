@@ -26,6 +26,7 @@ import type {
 import type { CrossAccountRiskItem } from '../app/crossAccountRisk';
 import ConfirmDialog from './ConfirmDialog';
 import ComposerAdvancedTools, { ComposerSenderContext, type ComposerPopoverMode } from './composer/ComposerAdvancedTools';
+import { invalidDraftRecipientMessage } from './composer/recipientAddresses';
 import ComposerContactsPanel, { type AddContactsResult, type ComposerRecipientField } from './composer/ComposerContactsPanel';
 import ComposerPrimaryFields from './composer/ComposerPrimaryFields';
 import ComposerQuickTools, { ComposerRichToolbar } from './composer/ComposerQuickTools';
@@ -291,11 +292,11 @@ export default function ComposerWindow({
       ? '草稿保存失败'
       : autosave?.save_state === 'saving' || (!autosave && !isDraftEmpty(draft))
         ? '正在保存…'
-        : autosave && !isDraftEmpty(draft) ? '草稿已保存' : '';
+        : autosave && !isDraftEmpty(draft) ? '已在本机暂存' : '';
   const autosaveDetail = explicitSaveStatus ? status : saveFailed
     ? `草稿自动保存失败，内容仍在编辑器中。${autosave?.save_error || ''}`
-    : autosaveLabel === '草稿已保存' && autosave
-      ? `草稿已自动保存 · ${formatClock(autosave.saved_at)}。保存到草稿箱请使用“保存草稿”。`
+    : autosaveLabel === '已在本机暂存' && autosave
+      ? `本机暂存时间 ${formatClock(autosave.saved_at)}。关闭时可选择保存到草稿箱。`
       : autosaveLabel;
 
   useLayoutEffect(() => {
@@ -430,6 +431,12 @@ export default function ComposerWindow({
     dialogRef: panelRef,
     backdropRef,
     focusTrapDisabled: sendRiskConfirm !== null || contactsOverlayOpen,
+    onEscape: () => {
+      if (scheduleClearConfirmOpen) setScheduleClearConfirmOpen(false);
+      else if (sendMenuOpen) closeSendMenu();
+      else if (popoverMode) closePopover();
+      else requestClose();
+    },
   });
 
   function closeContacts() {
@@ -570,6 +577,7 @@ export default function ComposerWindow({
     : normalizedAttachmentProgress == null
       ? ''
       : `附件处理中（${normalizedAttachmentProgress}%）`;
+  const invalidRecipient = invalidDraftRecipientMessage(draft);
   const composerBusy = submissionPending || isImportingAttachments || attachmentImports.some((item) => item.status === 'failed')
     || sendIssue?.kind === 'uncertain' || normalizedSendProgress !== null || normalizedAttachmentProgress !== null;
   const uploadingToServer = normalizedSendProgress !== null && normalizedSendProgress >= 60 && normalizedSendProgress < 88;
@@ -587,7 +595,7 @@ export default function ComposerWindow({
   }
 
   function handlePrimarySend() {
-    if (composerBusy) return;
+    if (composerBusy || invalidRecipient) return;
     flushPendingRef.current?.();
     if (draft.send_at.trim()) onQueueDraft();
     else onSendDraft();
@@ -656,7 +664,7 @@ export default function ComposerWindow({
                   data-save-state={saveFailed ? 'error' : autosave?.save_state ?? 'saved'}
                   title={autosaveDetail}
                 >
-                  <CheckCircle2 size={16} aria-hidden="true" style={{ visibility: autosaveLabel === '草稿已保存' ? 'visible' : 'hidden' }} />
+                  <CheckCircle2 size={16} aria-hidden="true" style={{ visibility: autosaveLabel === '已在本机暂存' ? 'visible' : 'hidden' }} />
                   {autosaveLabel}
                   {saveFailed && (explicitSaveStatus || onRetryAutosave) && (
                     <button type="button" disabled={saveDraftPending} onClick={explicitSaveStatus ? handleSaveDraft : onRetryAutosave}>重试</button>
@@ -884,9 +892,9 @@ export default function ComposerWindow({
                   <button
                     type="button"
                     className="composer-send-primary"
-                    disabled={composerBusy}
+                    disabled={composerBusy || Boolean(invalidRecipient)}
                     aria-busy={sendWorking || isImportingAttachments}
-                    title={sendStateLabel ? sendProgressMessage || (sendIssue?.kind === 'uncertain' ? '请先在发件箱核对发送结果' : sendStateLabel) : undefined}
+                    title={invalidRecipient || (sendStateLabel ? sendProgressMessage || (sendIssue?.kind === 'uncertain' ? '请先在发件箱核对发送结果' : sendStateLabel) : undefined)}
                     onClick={handlePrimarySend}
                   >
                     {sendWorking || isImportingAttachments ? <LoaderCircle size={18} className="ui-spinner" aria-hidden="true" /> : <Send size={18} aria-hidden="true" />}
@@ -916,10 +924,10 @@ export default function ComposerWindow({
                       role="menu"
                       aria-label="发送选项"
                     >
-                      <button ref={(element) => { if (element) sendMenuItemRefs.current[0] = element; }} type="button" role="menuitem" onClick={() => { closeSendMenu(); setPopoverMode(null); onSendDraft(); }}>
+                      <button ref={(element) => { if (element) sendMenuItemRefs.current[0] = element; }} type="button" role="menuitem" disabled={Boolean(invalidRecipient)} title={invalidRecipient ?? undefined} onClick={() => { closeSendMenu(); setPopoverMode(null); onSendDraft(); }}>
                         立即发送
                       </button>
-                      <button ref={(element) => { if (element) sendMenuItemRefs.current[1] = element; }} type="button" role="menuitem" onClick={() => { closeSendMenu(); setPopoverMode(null); onQueueDraft(); }}>
+                      <button ref={(element) => { if (element) sendMenuItemRefs.current[1] = element; }} type="button" role="menuitem" disabled={Boolean(invalidRecipient)} title={invalidRecipient ?? undefined} onClick={() => { closeSendMenu(); setPopoverMode(null); onQueueDraft(); }}>
                         发件箱
                       </button>
                       <button ref={(element) => { if (element) sendMenuItemRefs.current[2] = element; }} type="button" role="menuitem" onClick={() => { closeSendMenu(); setPopoverMode(null); setScheduleOpenRequest((current) => current + 1); }}>

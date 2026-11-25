@@ -59,7 +59,7 @@ function Harness({ controllerRef, direct = false }: { controllerRef: MutableRefO
     closeOverlays: controller.closeComposer, clearSelection: noop, setStatus: noop,
     restoreUndoAction: done, toggleAllVisibleMessages: noop, openShortcuts: noop,
     composeNew: noop, setSelectedId: noop, runBulkAction: done,
-    composeFromMessage: noop, toggleStar: done, toggleRead: done, moveSelected: done,
+    composeFromMessage: noop, toggleStar: done, toggleRead: done, moveMessage: done,
   });
   return controller.isComposerOpen ? <ComposerWindow
     editorFlushRef={controller.editorFlushRef}
@@ -129,7 +129,7 @@ describe('pending rich input at business action boundaries', () => {
     // The minimal harness deliberately omits the derived disabled state, as
     // happens when an action races the import notification's React commit.
     fireEvent.click(screen.getByRole('button', { name: '更多写信工具' }));
-    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '保存并关闭' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '保存到草稿箱并关闭' })); });
     expect(screen.getByRole('menu', { name: '更多写信工具' })).not.toBeNull();
     expect(screen.getByText('附件仍在准备中，请等待完成后再发送或保存草稿。')).not.toBeNull();
     expect(bridge.invoke.mock.calls.some(([command]) => command === 'save_draft')).toBe(false);
@@ -137,7 +137,7 @@ describe('pending rich input at business action boundaries', () => {
 
     const attachment = { filename: '资料.txt', mime_type: 'text/plain', size_bytes: 4, local_path: '/tmp/mock/资料.txt' };
     await act(async () => { finishImport([attachment]); await importing; });
-    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '保存并关闭' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '保存到草稿箱并关闭' })); });
     expect(bridge.invoke).toHaveBeenCalledWith('save_draft', expect.objectContaining({ input: expect.objectContaining({
       body: '保留完整草稿', attachments: [attachment],
     }) }));
@@ -192,6 +192,23 @@ describe('pending rich input at business action boundaries', () => {
     },
   );
 
+  it.each(['to', 'cc', 'bcc'] as const)('preserves invalid %s in drafts and blocks all sending paths', async (field) => {
+    const controllerRef: MutableRefObject<Controller | null> = { current: null };
+    render(<Harness controllerRef={controllerRef} />);
+    const draft = { ...emptyDraft, account_id: 1, to: 'team@example.com', [field]: 'lead@example.com, broken-address' };
+    act(() => controllerRef.current!.openComposer(draft));
+    const label = { to: '收件人', cc: '抄送', bcc: '密送' }[field];
+    const input = screen.getByRole('combobox', { name: label }) as HTMLInputElement;
+    expect(input.value).toBe('broken-address');
+    expect(screen.getByRole('button', { name: '发送' }).hasAttribute('disabled')).toBe(true);
+    await act(async () => { await controllerRef.current!.requestSend(); await controllerRef.current!.queueDraft(); });
+    expect(bridge.invoke.mock.calls.some(([command]) => command === 'queue_outbox_message' || command === 'send_message')).toBe(false);
+    await act(async () => { await controllerRef.current!.saveDraft(); });
+    expect(bridge.invoke).toHaveBeenCalledWith('save_draft', expect.objectContaining({
+      input: expect.objectContaining({ [field]: 'lead@example.com, broken-address' }),
+    }));
+  });
+
   it('checks cross-account send risks using recipient changes from the same event', async () => {
     const controllerRef: MutableRefObject<Controller | null> = { current: null };
     render(<Harness controllerRef={controllerRef} />);
@@ -218,7 +235,7 @@ describe('pending rich input at business action boundaries', () => {
     expect(preventDefault).toHaveBeenCalledOnce();
     expect(bridge.close).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: '保存这封邮件？' })).toBeTruthy();
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: '保存并关闭' })));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: '保存到草稿箱并关闭' })));
     expect(bridge.invoke).toHaveBeenCalledWith('save_draft', expect.objectContaining({
       input: expect.objectContaining({ body: '原生关闭前的最后输入' }),
     }));

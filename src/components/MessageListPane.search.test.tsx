@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import MessageListPane, { type MessageListPaneProps } from './MessageListPane';
 import type { MessageSummary } from '../app/types';
 
@@ -73,5 +73,33 @@ describe('empty search recovery', () => {
     expect(screen.getByRole('button', { name: '清空搜索和筛选' })).toBeDefined();
     view.rerender(<MessageListPane {...input} messages={[message]} />);
     expect(screen.queryByRole('button', { name: '在全部账号中搜索' })).toBeNull();
+  });
+});
+
+describe('desktop list action continuity', () => {
+  it('opens the context menu without changing selection and tracks the latest target state', () => {
+    const target = { ...message, id: 2, subject: 'Other' };
+    const initial = { ...props(), mobile: false, messages: [message, target], selectedId: 1,
+      selectedMessageIds: [1], selectedMessages: [message] };
+    const view = render(<MessageListPane {...initial} />);
+    fireEvent.contextMenu(view.container.querySelector('[data-message-id="2"]')!, { clientX: 150, clientY: 100 });
+    expect(initial.onSelectMessage).not.toHaveBeenCalled();
+    expect(initial.onToggleAllVisible).not.toHaveBeenCalled();
+    expect(within(screen.getByRole('menu', { name: '邮件操作' })).getByRole('menuitem', { name: /标为已读/ })).toBeDefined();
+    const updated = { ...target, is_read: true };
+    view.rerender(<MessageListPane {...initial} messages={[message, updated]} />);
+    fireEvent.click(within(screen.getByRole('menu', { name: '邮件操作' })).getByRole('menuitem', { name: /标为未读/ }));
+    expect(initial.onRunMessageAction).toHaveBeenCalledWith(updated, 'unread');
+  });
+
+  it('restores focus beside removed messages without opening them', () => {
+    const items = [message, { ...message, id: 2 }, { ...message, id: 3 }];
+    const initial = { ...props(), mobile: false, messages: items, selectedId: 1,
+      selectedMessageIds: [1, 2], selectedMessages: items.slice(0, 2) };
+    const view = render(<MessageListPane {...initial} />);
+    view.container.querySelector<HTMLElement>('.bulk-primary-action')!.focus();
+    view.rerender(<MessageListPane {...initial} messages={[items[2]]} selectedMessageIds={[]} selectedMessages={[]} />);
+    expect(document.activeElement).toBe(view.container.querySelector('[data-message-id="3"] .message-card-main'));
+    expect(initial.onSelectMessage).not.toHaveBeenCalled();
   });
 });

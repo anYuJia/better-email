@@ -420,6 +420,10 @@
   font-weight: 500;
 }
 
+.search-suggestion-options {
+  display: grid;
+}
+
 .search-quick-chips {
   display: flex;
   flex-wrap: wrap;
@@ -443,10 +447,15 @@
   transition: var(--ui-transition-fast);
 }
 
-.search-suggestion-panel button.search-quick-chip:hover,
-.search-suggestion-panel button.search-quick-chip:focus-visible {
+.search-suggestion-panel button.search-quick-chip:hover {
   background: var(--quiet-row-hover);
   border-color: var(--ui-border-strong);
+}
+
+.search-suggestion-panel button.search-quick-chip.active,
+.search-suggestion-panel button.search-quick-chip:focus-visible {
+  background: var(--quiet-row-selected);
+  border-color: var(--ui-accent);
 }
 
 .search-chip-label {
@@ -1124,6 +1133,10 @@
   width: 100%;
   max-width: 100%;
   align-content: center;
+}
+
+.message-list-shell[data-density="compact"] .message-card {
+  padding-block: 6px;
 }
 
 .app-shell .message-card.is-current::before {

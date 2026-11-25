@@ -352,3 +352,7 @@
   color: var(--ui-danger);
   background: var(--ui-danger-bg);
 }
+
+@media (max-width: 720px), (hover: none) and (pointer: coarse) {
+  .context-menu-items kbd { display: none; }
+}

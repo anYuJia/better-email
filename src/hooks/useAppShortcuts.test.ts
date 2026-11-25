@@ -52,7 +52,7 @@ function renderShortcuts(overrides: Partial<Parameters<typeof useAppShortcuts>[0
     composeFromMessage: vi.fn(),
     toggleStar: vi.fn(async () => undefined),
     toggleRead: vi.fn(async () => undefined),
-    moveSelected: vi.fn(async () => undefined),
+    moveMessage: vi.fn(async () => undefined),
   };
 
   renderHook(() => useAppShortcuts({
@@ -92,8 +92,8 @@ describe('useAppShortcuts', () => {
     const handlers = renderShortcuts();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '#', bubbles: true, cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true }));
-    expect(handlers.moveSelected).toHaveBeenNthCalledWith(1, 'trash');
-    expect(handlers.moveSelected).toHaveBeenNthCalledWith(2, 'trash');
+    expect(handlers.moveMessage).toHaveBeenNthCalledWith(1, selectedMessage, 'trash');
+    expect(handlers.moveMessage).toHaveBeenNthCalledWith(2, selectedMessage, 'trash');
   });
 
   it('does not run mail shortcuts while typing', () => {
@@ -103,7 +103,7 @@ describe('useAppShortcuts', () => {
     input.focus();
     input.dispatchEvent(new KeyboardEvent('keydown', { key: '#', bubbles: true, cancelable: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true }));
-    expect(handlers.moveSelected).not.toHaveBeenCalled();
+    expect(handlers.moveMessage).not.toHaveBeenCalled();
     expect(handlers.composeFromMessage).not.toHaveBeenCalled();
   });
 
@@ -111,7 +111,7 @@ describe('useAppShortcuts', () => {
     const handlers = renderShortcuts({ selectedMessages: [selectedMessage] });
     window.dispatchEvent(new KeyboardEvent('keydown', { key: '#', bubbles: true, cancelable: true }));
     expect(handlers.runBulkAction).toHaveBeenCalledWith('trash');
-    expect(handlers.moveSelected).not.toHaveBeenCalled();
+    expect(handlers.moveMessage).not.toHaveBeenCalled();
   });
 
   it('does not intercept arrow keys or mail navigation when focused inside an overlay or dropdown', () => {

@@ -141,6 +141,29 @@ describe('useDetailsMenu', () => {
     expect(details.hasAttribute('open')).toBe(true);
   });
 
+  it('keeps a menu open when an adjacent search field resets its scroll on blur', () => {
+    render(<div><input aria-label="搜索" /><MenuHarness floating /></div>);
+    const { details } = openDetails();
+    fireEvent.scroll(screen.getByRole('textbox', { name: '搜索' }));
+    expect(details.hasAttribute('open')).toBe(true);
+    fireEvent.scroll(screen.getByRole('button', { name: '命令A' }).parentElement!);
+    expect(details.hasAttribute('open')).toBe(true);
+
+    fireEvent.scroll(details.parentElement!);
+    expect(details.hasAttribute('open')).toBe(false);
+  });
+
+  it('closes when the document scrolls or the window resizes', () => {
+    render(<MenuHarness floating />);
+    const { details } = openDetails();
+    fireEvent.scroll(document);
+    expect(details.hasAttribute('open')).toBe(false);
+
+    openDetails();
+    fireEvent.resize(window);
+    expect(details.hasAttribute('open')).toBe(false);
+  });
+
   it('contains wheel gestures when the menu has no remaining scroll range', () => {
     render(<MenuHarness />);
     openDetails();

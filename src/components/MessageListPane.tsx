@@ -4,6 +4,7 @@ import {
   Volume2,
   VolumeX,
   ListChecks,
+  MoreHorizontal,
 } from 'lucide-react';
 import {
   listSortOptions,
@@ -165,6 +166,30 @@ function MessageListPane({
   onCompose,
 }: MessageListPaneProps) {
   const paneRef = React.useRef<HTMLElement | null>(null);
+  // Keep a list position when a bulk command removes the focused toolbar
+  // button or message. Other panes retain focus if the user leaves during IPC.
+  const lastListFocus = React.useRef<{ element: HTMLElement; index: number; view: string } | null>(null);
+  function rememberListFocus(event: React.FocusEvent<HTMLElement>) {
+    if (mobile) return;
+    const element = event.target;
+    const row = element.closest<HTMLElement>('[data-message-id]');
+    if (!row && !element.closest('.bulk-toolbar')) {
+      lastListFocus.current = null;
+      return;
+    }
+    const messageId = row ? Number(row.dataset.messageId) : selectedMessageIds[0];
+    const index = messages.findIndex((message) => message.id === messageId);
+    lastListFocus.current = { element, index: Math.max(0, index), view: listStateKey };
+  }
+  React.useLayoutEffect(() => {
+    const anchor = lastListFocus.current;
+    const pane = paneRef.current;
+    if (!pane || !anchor || anchor.element.isConnected || document.activeElement !== document.body
+      || mobile || anchor.view !== listStateKey || listMode !== 'messages') return;
+    const next = messages[Math.min(anchor.index, messages.length - 1)];
+    const button = next && pane.querySelector<HTMLElement>(`[data-message-id="${next.id}"] .message-card-main`);
+    (button || pane.querySelector<HTMLElement>('.message-card-main') || pane).focus({ preventScroll: true });
+  }, [listMode, listStateKey, messages, mobile, selectedMessageIds]);
   const handleExpandSearch = React.useCallback(() => {
     // The empty-state action disappears when the range changes. Keep keyboard
     // focus in the persistent pane while its list is hidden for loading.
@@ -174,7 +199,7 @@ function MessageListPane({
   const [messageMenu, setMessageMenu] = React.useState<{
     x: number;
     y: number;
-    message: MessageSummary;
+    messageId: number;
     bulk: boolean;
   } | null>(null);
   const [draggingMessageIds, setDraggingMessageIds] = React.useState<number[]>([]);
@@ -258,7 +283,7 @@ function MessageListPane({
 
   const handleOpenMessageMenu = React.useCallback((message: MessageSummary, x: number, y: number, bulk: boolean) => {
     handleCloseThreadMenu();
-    setMessageMenu({ x, y, message, bulk });
+    setMessageMenu({ x, y, messageId: message.id, bulk });
   }, [handleCloseThreadMenu]);
 
   const handleCloseMessageMenu = React.useCallback(() => {
@@ -269,7 +294,10 @@ function MessageListPane({
     () => listSortOptions.find((item) => item.id === listSort)?.label ?? '最新优先',
     [listSort],
   );
-  const contextMessage = messageMenu?.message;
+  const contextMessage = messageMenu && messages.find((message) => message.id === messageMenu.messageId);
+  React.useEffect(() => {
+    if (messageMenu && !contextMessage) setMessageMenu(null);
+  }, [messageMenu, contextMessage]);
   const isBulkContext = Boolean(messageMenu?.bulk && selectedMessages.length > 1);
 
   const messageContextItems = React.useMemo(() => {
@@ -300,6 +328,16 @@ function MessageListPane({
       icon: <ListChecks size={18} strokeWidth={1.75} aria-hidden="true" />,
       onSelect: () => { onEnterSelection(); onToggleMessageSelection(contextMessage.id, true); },
     });
+    if (mobile && contextMessage && !isBulkContext) {
+      const primaryIds = ['select-message', 'reply', 'archive', 'snooze', 'unsnooze', 'restore', 'not-spam', 'read-state'];
+      const primary = primaryIds.flatMap(id => items.filter(item => item.id === id));
+      const secondary = items.filter(item => !primaryIds.includes(item.id) && !item.danger);
+      return [
+        ...primary.map(item => ({ ...item, separatorBefore: false })),
+        ...(secondary.length ? [{ id: 'more-actions', label: '更多操作', icon: <MoreHorizontal size={16} />, children: secondary }] : []),
+        ...items.filter(item => item.danger),
+      ];
+    }
     return items;
   }, [
     isBulkContext,
@@ -383,7 +421,13 @@ function MessageListPane({
 
   return (
     <section className={`message-list-panel${mobile ? ' mobile-message-list-panel' : ''}`}
-      ref={paneRef} tabIndex={-1} aria-label="邮件列表区域">
+      ref={paneRef} tabIndex={-1} aria-label="邮件列表区域"
+      onFocusCapture={rememberListFocus}
+      onBlurCapture={(event) => {
+        if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) {
+          lastListFocus.current = null;
+        }
+      }}>
       {!mobile && (
         <MessageListToolbar
           onOpenNavigation={onOpenNavigation}
@@ -496,11 +540,11 @@ function MessageListPane({
         title: threadMenu.thread.subject || '(无主题)', detail: `${threadMenu.messages.length} 封邮件`,
         ariaLabel: '会话操作', onClose: handleCloseThreadMenu,
       } : null} />
-      <ContextMenu menu={messageMenu && !mailboxUnavailable ? {
-        targetKey: `${isBulkContext ? 'bulk' : 'message'}:${messageMenu.message.id}`,
+      <ContextMenu menu={messageMenu && contextMessage && !mailboxUnavailable ? {
+        targetKey: `${isBulkContext ? 'bulk' : 'message'}:${contextMessage.id}`,
         x: messageMenu.x, y: messageMenu.y, items: messageContextItems,
-        title: isBulkContext ? `已选 ${selectedMessages.length} 封邮件` : messageMenu.message.subject || '(无主题)',
-        detail: isBulkContext ? '更改将应用到全部已选邮件' : messageMenu.message.sender_name || messageMenu.message.sender_email,
+        title: isBulkContext ? `已选 ${selectedMessages.length} 封邮件` : contextMessage.subject || '(无主题)',
+        detail: isBulkContext ? '更改将应用到全部已选邮件' : contextMessage.sender_name || contextMessage.sender_email,
         ariaLabel: isBulkContext ? '批量邮件操作' : '邮件操作', onClose: () => setMessageMenu(null),
       } : null} />
     </section>

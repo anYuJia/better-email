@@ -81,7 +81,7 @@ export default function ComposerCloseConfirmDialog({
           </span>
           <span className="dialog-card-heading">
             <strong id={titleId}>保存这封邮件？</strong>
-            <small>当前内容还未保存到草稿箱</small>
+            <small>要在草稿箱中保留本次编辑吗？</small>
           </span>
           <button
             className="dialog-card-close"
@@ -95,7 +95,7 @@ export default function ComposerCloseConfirmDialog({
           </button>
         </header>
         <p id={descriptionId} className="composer-close-dialog-description">
-          保存后可随时从草稿箱继续编辑。恢复点仅用于意外关闭，不能代替草稿。
+          保存后可在草稿箱继续编辑。舍弃将清除本次编辑的本机暂存。
         </p>
         {error && (
           <div className="confirm-dialog-error" role="alert">
@@ -126,7 +126,7 @@ export default function ComposerCloseConfirmDialog({
             disabled={pending}
             onClick={() => { void handleSaveDraft(); }}
           >
-            {pending ? '正在保存…' : '保存并关闭'}
+            {pending ? '正在保存…' : '保存到草稿箱并关闭'}
           </button>
         </footer>
       </section>

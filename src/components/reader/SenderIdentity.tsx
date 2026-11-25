@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { MessageSummary } from '../../app/types';
 import { senderAvatarTone } from '../../app/messageDetailUtils';
 import Avatar from '../Avatar';
@@ -35,7 +36,7 @@ export default function SenderIdentity({ message, onComposeNew }: SenderIdentity
     const suffix = remainingCount > 0 ? ` 等 ${remainingCount} 人` : '';
     return `${label} ${visibleAddresses.join(', ')}${suffix}`;
   }).join('，');
-  const [recipientDetailsOpen, setRecipientDetailsOpen] = useState(false);
+  const [detailView, setDetailView] = useState<'recipients' | 'message' | null>(null);
 
   return (
     <>
@@ -72,10 +73,10 @@ export default function SenderIdentity({ message, onComposeNew }: SenderIdentity
                 type="button"
                 className="reader-recipient-expand"
                 aria-haspopup="dialog"
-                aria-expanded={recipientDetailsOpen}
+                aria-expanded={detailView === 'recipients'}
                 onClick={(event) => {
                   event.stopPropagation();
-                  setRecipientDetailsOpen(true);
+                  setDetailView('recipients');
                 }}
               >
                 展开
@@ -101,12 +102,20 @@ export default function SenderIdentity({ message, onComposeNew }: SenderIdentity
               )}
             </div>
           ) : null}
+          {hasDistinctName && senderEmail && <small className="reader-mobile-sender-address">{senderEmail}</small>}
         </span>
+        <button type="button" className="reader-identity-details" aria-haspopup="dialog"
+          aria-label="查看邮件详情" aria-expanded={detailView === 'message'}
+          onClick={() => setDetailView('message')}>
+          详情<ChevronDown size={16} aria-hidden="true" />
+        </button>
       </div>
-      {recipientDetailsOpen && (
+      {detailView && (
         <RecipientDetailsDialog
           groups={recipientGroups}
-          onClose={() => setRecipientDetailsOpen(false)}
+          message={detailView === 'message' ? message : undefined}
+          onComposeNew={onComposeNew}
+          onClose={() => setDetailView(null)}
         />
       )}
     </>

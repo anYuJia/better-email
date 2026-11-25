@@ -72,7 +72,7 @@ export async function runWorkflowQuality(cdp, api) {
     await waitForExpression(cdp, "document.querySelector('.composer')");
     await clickButton(cdp, '更多写信工具', "document.querySelector('.composer')");
     await waitForExpression(cdp, "document.querySelector('.composer-more-menu')");
-    await clickButton(cdp, '保存并关闭', "document.querySelector('.composer-more-menu')");
+    await clickButton(cdp, '保存到草稿箱并关闭', "document.querySelector('.composer-more-menu')");
     await waitForExpression(cdp, "document.querySelector('.composer-more-menu .composer-save-feedback')");
     if (!await evalInPage(cdp, "!!document.querySelector('.composer') && !window.__betterEmailMockInvocations.some(call => call.command === 'save_draft')")) {
       throw new Error(`Empty save unexpectedly persisted or closed: ${label}`);
@@ -107,13 +107,13 @@ export async function runWorkflowQuality(cdp, api) {
       return null;
     }`);
     await clickButton(cdp, '更多写信工具', "document.querySelector('.composer')");
-    await clickButton(cdp, '保存并关闭', "document.querySelector('.composer-more-menu')");
+    await clickButton(cdp, '保存到草稿箱并关闭', "document.querySelector('.composer-more-menu')");
     await waitForExpression(cdp, "document.querySelector('.composer-more-menu [role=alert]') && document.querySelector('.composer input[aria-label=\"主题\"]').value === '保存失败后仍然可以继续编辑'");
     await scaleText(scale);
     await captureScreenshot(cdp, `workflow-${label}-save-failure`);
     const saveBounds = await evalInPage(cdp, `(() => {
       const panel = document.querySelector('.composer-advanced-popover'); const p = panel.getBoundingClientRect();
-      const button = [...panel.querySelectorAll('button')].find(b => b.textContent === '保存并关闭');
+      const button = [...panel.querySelectorAll('button')].find(b => b.textContent === '保存到草稿箱并关闭');
       return { fits: p.left >= 0 && p.right <= innerWidth && p.top >= 0 && p.bottom <= innerHeight,
         textFits: panel.scrollWidth <= panel.clientWidth + 1, retryEnabled: !button.disabled,
         duplicateToasts: document.querySelectorAll('.message-toast').length };

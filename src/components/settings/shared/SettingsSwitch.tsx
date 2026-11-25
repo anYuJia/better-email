@@ -11,6 +11,7 @@ type SettingsSwitchProps = {
   disabled?: boolean;
   ariaLabel?: string;
   className?: string;
+  dataSection?: string;
 };
 
 /**
@@ -26,6 +27,7 @@ export default function SettingsSwitch({
   disabled = false,
   ariaLabel,
   className = '',
+  dataSection,
 }: SettingsSwitchProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -34,7 +36,7 @@ export default function SettingsSwitch({
   }, [indeterminate]);
 
   return (
-    <label className={`st-switch${indeterminate ? ' is-indeterminate' : ''} ${className}`.trim()}>
+    <label data-settings-section={dataSection} className={`st-switch${indeterminate ? ' is-indeterminate' : ''} ${className}`.trim()}>
       <span className="st-switch-copy">
         <strong>{label}</strong>
         {description != null && <small>{description}</small>}

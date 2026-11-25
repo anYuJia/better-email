@@ -133,3 +133,12 @@ describe('useSingleMessageActions 标签切换回归', () => {
     );
   });
 });
+
+it('archives a context target without clearing a different reader, including a later selection', async () => {
+  const { result, mocks } = renderController(makeMessage(1));
+  await act(async () => result.current.runMessageAction(makeMessage(2), 'archive'));
+  const update = mocks.setSelectedId.mock.calls[0][0];
+  expect(update(1)).toBe(1);
+  expect(update(2)).toBeNull();
+  expect(update(3)).toBe(3);
+});

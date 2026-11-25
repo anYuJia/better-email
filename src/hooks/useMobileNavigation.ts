@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { installMobileOverlayHistory, pushMobileDestination } from '../app/mobileOverlayHistory';
 import type { SettingsSectionId } from '../components/settings/settingsNavigation';
 import { mobileSelectionHistoryKey, withoutMobileSelection } from './mobileSelectionHistory';
 
@@ -14,6 +15,7 @@ type Options = {
 export default function useMobileNavigation({ isMobileApp, isSettingsOpen, activeSettingsSection, setActiveSettingsSection, setSettingsOpen }: Options) {
   const [mobileScreen, setMobileScreen] = useState<'mail' | 'reader' | 'mailbox' | 'settings'>('mail');
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  useLayoutEffect(() => isMobileApp ? installMobileOverlayHistory() : undefined, [isMobileApp]);
   const initializedHistoryRef = useRef(false);
   const settingsRef = useRef({ isSettingsOpen, activeSettingsSection });
   settingsRef.current = { isSettingsOpen, activeSettingsSection };
@@ -52,6 +54,7 @@ export default function useMobileNavigation({ isMobileApp, isSettingsOpen, activ
       betterEmailSettingsDirection: _settingsDirection,
       betterEmailSearch: _search,
       betterEmailInboxSelection: _selection,
+      betterEmailOverlay: _overlay,
       ...baseState
     } = window.history.state ?? {};
     if (!firstMobileEntry && historyChangedOnDesktop) {
@@ -116,7 +119,7 @@ export default function useMobileNavigation({ isMobileApp, isSettingsOpen, activ
     }
     const nextState = { ...baseState, betterEmailScreen: nextScreen };
     if (currentState[mobileSelectionHistoryKey]) window.history.replaceState(nextState, '');
-    else window.history.pushState(nextState, '');
+    else pushMobileDestination(nextState);
   }, [isMobileApp]);
 
   const backMobileScreen = useCallback(() => {
@@ -146,7 +149,7 @@ export default function useMobileNavigation({ isMobileApp, isSettingsOpen, activ
     const state = window.history.state;
     const nextState = { ...withoutMobileSelection(state), betterEmailSearch: true };
     if (state?.[mobileSelectionHistoryKey]) window.history.replaceState(nextState, '');
-    else window.history.pushState(nextState, '');
+    else pushMobileDestination(nextState);
   }, [isMobileApp]);
 
   const closeMobileSearch = useCallback(() => {

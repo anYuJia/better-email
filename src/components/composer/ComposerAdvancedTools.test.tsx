@@ -135,7 +135,7 @@ describe('ComposerAdvancedTools mobile overflow', () => {
     const actions = props({ onInsertSignature, onClose });
     render(<ComposerAdvancedTools {...actions} />);
 
-    const save = screen.getByRole('menuitem', { name: '保存并关闭' });
+    const save = screen.getByRole('menuitem', { name: '保存到草稿箱并关闭' });
     expect(document.activeElement).toBe(save);
     fireEvent.click(save);
     expect(actions.onSaveDraft).toHaveBeenCalledTimes(1);
@@ -168,7 +168,7 @@ describe('ComposerAdvancedTools mobile overflow', () => {
   it('skips an unavailable signature during keyboard navigation', () => {
     render(<ComposerAdvancedTools {...props({ signature: '' })} />);
     const signature = screen.getByRole('menuitem', { name: '插入签名' });
-    const save = screen.getByRole('menuitem', { name: '保存并关闭' });
+    const save = screen.getByRole('menuitem', { name: '保存到草稿箱并关闭' });
     const templates = screen.getByRole('menuitem', { name: '插入模板…' });
 
     expect(signature.hasAttribute('disabled')).toBe(true);

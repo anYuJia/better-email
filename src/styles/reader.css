@@ -86,8 +86,30 @@
   overflow-wrap: anywhere;
 }
 
-.reader-subject-toggle {
-  display: none;
+.app-shell .reader-title-block--clamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.app-shell .reader-subject-toggle {
+  width: fit-content;
+  min-height: 32px;
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--ui-text-accent);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.app-shell .reader-subject-toggle:focus-visible {
+  outline: var(--ui-focus-outline);
+  outline-offset: 2px;
 }
 
 .reader-header p {
@@ -350,6 +372,25 @@
 
 .app-shell .reader-sender {
   gap: 12px;
+}
+
+.reader-identity-details,
+.reader-mobile-sender-address {
+  display: none;
+}
+
+.reader-detail-address {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text-accent);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.recipient-details-group p {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .reader-sender-copy {
@@ -2571,29 +2612,8 @@
 }
 
 @media (max-width: 720px) {
-  .app-shell .reader-title-block--clamped {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-  }
-
   .app-shell .reader-subject-toggle {
-    width: fit-content;
-    min-height: 32px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0;
-    border: 0;
-    color: var(--ui-text-accent);
-    background: transparent;
-    font-size: 12px;
-    font-weight: 500;
-  }
-
-  .app-shell .reader-subject-toggle:focus-visible {
-    outline: var(--ui-focus-outline);
-    outline-offset: 2px;
+    min-height: 44px;
   }
 
   .app-shell .empty-reader {

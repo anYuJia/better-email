@@ -50,6 +50,16 @@ describe('useComposeFromMessage quick-reply handoff', () => {
     expect(resolveReplyPrefill).not.toHaveBeenCalled();
   });
 
+  it('preserves named mailboxes when replying to all recipients', async () => {
+    const openComposer = vi.fn();
+    const { result } = renderHook(() => useComposeFromMessage({
+      account: null, openComposer, setStatus: vi.fn(),
+    }));
+    const recipients = '"Doe, Jane" <jane@example.com>;lead@example.com';
+    await act(async () => { await result.current.composeFromMessage({ ...message, recipients }, 'replyAll'); });
+    expect(openComposer.mock.calls[0][0].cc).toBe('"Doe, Jane" <jane@example.com>, lead@example.com');
+  });
+
   it('never resolves or includes reply text in a forward', async () => {
     const openComposer = vi.fn();
     const resolveReplyPrefill = vi.fn(() => '不应转发的快速回复');

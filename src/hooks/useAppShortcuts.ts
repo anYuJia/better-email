@@ -40,7 +40,7 @@ type UseAppShortcutsOptions = {
   composeFromMessage: (message: MessageSummary, mode: ComposeMode) => void;
   toggleStar: (message: MessageSummary) => Promise<void>;
   toggleRead: (message: MessageSummary) => Promise<void>;
-  moveSelected: (role: 'archive' | 'trash') => Promise<void>;
+  moveMessage: (message: MessageSummary, role: 'archive' | 'trash') => Promise<void>;
   toggleSidebarCollapse?: () => void;
   threads?: ThreadSummary[];
   activeThread?: ThreadSummary | null;
@@ -54,6 +54,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
   useEffect(() => {
     function isEditableTarget(target: EventTarget | null): boolean {
       if (!(target instanceof HTMLElement)) return false;
+      if (target.matches('.message-list-panel input[type="checkbox"]')) return false;
       return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable;
     }
 
@@ -62,12 +63,17 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       return Boolean(selection && !selection.isCollapsed && selection.toString());
     }
 
-    function selectRelativeMessage(offset: number) {
+    function selectRelativeMessage(offset: number, row: Element | null) {
       const { messages, selectedId, setSelectedId } = optionsRef.current;
       if (messages.length === 0) return;
-      const currentIndex = selectedId ? messages.findIndex((message) => message.id === selectedId) : -1;
+      const anchorId = row ? Number(row.getAttribute('data-message-id')) : selectedId;
+      const currentIndex = messages.findIndex((message) => message.id === anchorId);
       const nextIndex = Math.min(Math.max(currentIndex + offset, 0), messages.length - 1);
-      setSelectedId(messages[nextIndex].id);
+      const nextId = messages[nextIndex].id;
+      if (row && nextId === selectedId) {
+        row.closest('.message-list')?.querySelector<HTMLElement>(`[data-message-id="${nextId}"] .message-card-main`)?.focus();
+      }
+      setSelectedId(nextId);
     }
 
     function selectRelativeThread(offset: number) {
@@ -105,7 +111,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
       const {
         searchInputRef,
         messages,
-        selected,
+        selected: readerMessage,
         selectedMessages,
         selectedMessageIds,
         selectionMode = false,
@@ -128,7 +134,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         composeFromMessage,
         toggleStar,
         toggleRead,
-        moveSelected,
+        moveMessage,
       } = optionsRef.current;
       const key = event.key.toLowerCase();
       const editable = isEditableTarget(event.target);
@@ -138,6 +144,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         '.custom-select-dropdown.is-open[aria-hidden="false"], .custom-select-summary[aria-expanded="true"]',
       ));
       const commandModifier = event.metaKey || event.ctrlKey;
+      const withinReader = event.target instanceof Element && Boolean(event.target.closest('.reader-panel'));
 
       if (isAccountLoginRequired) return;
       if (document.body.dataset.imagePreviewModal === '1') return;
@@ -190,6 +197,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         && key === 'a'
         && listMode === 'messages'
         && messages.length > 0
+        && !withinReader
         && !hasActiveTextSelection()
       ) {
         event.preventDefault();
@@ -237,12 +245,15 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         composeNew();
         return;
       }
+      if (withinReader && (key === 'arrowdown' || key === 'arrowup')) return;
+      const focusedRow = event.target instanceof Element
+        ? event.target.closest('.message-list .message-card[data-message-id]') : null;
       if (key === 'j' || key === 'arrowdown') {
         event.preventDefault();
         if (listMode === 'threads') {
           selectRelativeThread(1);
         } else {
-          selectRelativeMessage(1);
+          selectRelativeMessage(1, focusedRow);
         }
         return;
       }
@@ -251,7 +262,7 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         if (listMode === 'threads') {
           selectRelativeThread(-1);
         } else {
-          selectRelativeMessage(-1);
+          selectRelativeMessage(-1, focusedRow);
         }
         return;
       }
@@ -291,6 +302,10 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         }
       }
 
+      // After a cancelled context menu or a bulk operation, row focus can
+      // intentionally differ from the reader. Commands act on the focused row.
+      const selected = focusedRow
+        ? messages.find((message) => message.id === Number(focusedRow.getAttribute('data-message-id'))) : readerMessage;
       if (!selected) return;
       if (key === 'a' && !event.shiftKey) {
         event.preventDefault();
@@ -313,11 +328,11 @@ export default function useAppShortcuts(options: UseAppShortcutsOptions) {
         else setStatus('这封邮件没有可更改的已读状态');
       } else if (key === 'e') {
         event.preventDefault();
-        if (canArchiveMessageRole(selected.folder_role)) runSafely(moveSelected('archive'));
+        if (canArchiveMessageRole(selected.folder_role)) runSafely(moveMessage(selected, 'archive'));
         else setStatus('这封邮件无法归档');
       } else if (key === '#' || key === 'delete' || key === 'backspace') {
         event.preventDefault();
-        if (canMoveMessageToTrashRole(selected.folder_role)) runSafely(moveSelected('trash'));
+        if (canMoveMessageToTrashRole(selected.folder_role)) runSafely(moveMessage(selected, 'trash'));
         else setStatus('废纸篓中的邮件需使用“永久删除”并确认');
       }
     }

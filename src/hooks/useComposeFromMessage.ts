@@ -18,6 +18,7 @@ import {
 import { invoke } from '../tauriBridge';
 import { IPC } from '../ipc/commands';
 import type { QuickReplySnapshot } from './useQuickReplyDraft';
+import { parseRecipientInput } from '../components/composer/recipientAddresses';
 import type { OpenComposerOptions } from './useComposerController';
 
 type ComposeFromMessageOptions = {
@@ -69,10 +70,9 @@ export default function useComposeFromMessage({
     const replyRecipients = mode === 'forward' ? '' : fullMessage.sender_email;
     const includeOriginalRecipients =
       mode === 'replyAll'
-        ? fullMessage.recipients
-            .split(/[;,]/)
-            .map((recipient) => recipient.trim())
-            .filter((recipient) => recipient && recipient !== account?.email)
+        ? parseRecipientInput(fullMessage.recipients).tokens
+            .filter((recipient) => recipient.normalized !== account?.email.toLowerCase())
+            .map((recipient) => recipient.raw)
             .join(', ')
         : '';
     let forwardPlan = buildForwardAttachmentPlan([]);

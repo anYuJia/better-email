@@ -353,10 +353,18 @@
 }
 
 .composer-close-dialog > .composer-close-dialog-actions {
+  flex-wrap: wrap;
   gap: var(--ui-space-2);
   margin-top: 0;
   padding-top: var(--ui-space-4);
   border-top: 1px solid var(--ui-border);
+}
+
+.composer-close-dialog-actions .dialog-button {
+  flex: 0 0 auto;
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.3;
 }
 
 .dialog-button:disabled {
@@ -400,7 +408,7 @@
     width: 100%;
   }
 
-  .composer-close-dialog .dialog-button-secondary {
+  .composer-close-dialog .dialog-button-primary {
     grid-column: 1 / -1;
   }
 }

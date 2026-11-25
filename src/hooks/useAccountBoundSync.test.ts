@@ -95,6 +95,7 @@ function renderCoordinator(
     tasks: BackgroundTask[];
     syncCommand: string;
     syncError?: Error;
+    syncResult?: SyncRun;
     pauseSync?: boolean;
     claimRejects?: boolean;
     cancelRequestedDuringRun?: boolean;
@@ -174,7 +175,7 @@ function renderCoordinator(
             probe();
           });
         }
-        return syncRun;
+        return scenario.syncResult ?? syncRun;
       }
       case 'complete_background_task': {
         const taskId = Number((args as { taskId: number }).taskId);
@@ -410,6 +411,16 @@ describe('useBackgroundTaskCoordinator account-bound sync', () => {
       expect(scenario.tasks[0]?.status).toBe('cancelled');
     });
     expect(invoke).not.toHaveBeenCalledWith('complete_background_task', expect.anything());
+  });
+
+  it('preserves imported mail and exposes a retry for a partially completed account sync', async () => {
+    const loadMessages = vi.fn().mockResolvedValue([]);
+    const { utils, scenario } = renderCoordinator(accountA.id, undefined, loadMessages);
+    scenario.syncResult = { ...syncRun, status: 'imap_headers_account_partial', message: '部分文件夹未同步' };
+    await act(async () => { await utils.result.current.enqueueAccountInitialSync(accountA.id); });
+    await waitFor(() => expect(scenario.tasks[0]?.status).toBe('failed'));
+    expect(scenario.tasks[0].message).toBe('部分文件夹未同步');
+    expect(loadMessages).toHaveBeenCalled();
   });
 
   it('marks the task failed-with-retry when the sync succeeded but the UI refresh failed', async () => {

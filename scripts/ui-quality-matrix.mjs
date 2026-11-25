@@ -318,6 +318,15 @@ export async function runQualityMatrix(cdp, api) {
       if (overflow) throw new Error(`Long/empty/large content overflow: ${w}/${scenario}: ${JSON.stringify(overflow)}`);
       await captureScreenshot(cdp, `quality-${w}x${h}-${scenario}`);
       if (scenario === 'long-text') {
+        const titleIsClamped = `(() => {
+          const h = document.querySelector('.reader h1');
+          return h && h.scrollHeight > h.clientHeight + 1 && h.clientHeight <= 3 * parseFloat(getComputedStyle(h).lineHeight) + 1;
+        })()`;
+        await waitForExpression(cdp, titleIsClamped);
+        await clickButton(cdp, '展开完整主题', "document.querySelector('.reader')");
+        await waitForExpression(cdp, "document.querySelector('.reader h1').scrollHeight <= document.querySelector('.reader h1').clientHeight + 1");
+        await clickButton(cdp, '收起完整主题', "document.querySelector('.reader')");
+        await waitForExpression(cdp, titleIsClamped);
         await waitForExpression(cdp, "document.querySelector('.quick-reply')");
         const savedOffset = await evalInPage(cdp, `(async () => {
           const panel = document.querySelector('.reader-panel');

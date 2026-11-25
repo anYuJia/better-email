@@ -31,18 +31,21 @@ impl MailStore {
                     created_at TEXT NOT NULL
                 );
 
-                CREATE TABLE IF NOT EXISTS composer_recovery (
-                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                CREATE TABLE IF NOT EXISTS composer_recovery_points (
+                    account_id INTEGER NOT NULL,
+                    draft_id INTEGER NOT NULL,
+                    recovery_id TEXT NOT NULL DEFAULT '',
                     revision INTEGER NOT NULL,
                     snapshot TEXT NOT NULL DEFAULT 'null' CHECK (json_valid(snapshot)),
-                    updated_at TEXT NOT NULL
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (account_id, draft_id, recovery_id)
                 );
 
-                CREATE TRIGGER IF NOT EXISTS composer_recovery_account_deleted
+                CREATE TRIGGER IF NOT EXISTS composer_recovery_points_account_deleted
                 AFTER DELETE ON accounts
                 BEGIN
-                    UPDATE composer_recovery SET snapshot = 'null', revision = revision + 1
-                    WHERE json_extract(snapshot, '$.draft.account_id') = OLD.id;
+                    UPDATE composer_recovery_points SET snapshot = 'null', revision = revision + 1
+                    WHERE account_id = OLD.id OR json_extract(snapshot, '$.draft.account_id') = OLD.id;
                 END;
 
                 CREATE TABLE IF NOT EXISTS account_credentials (
@@ -303,6 +306,21 @@ impl MailStore {
                 );
                 ",
             )?;
+
+            {
+                let transaction = rusqlite::Transaction::new_unchecked(conn, rusqlite::TransactionBehavior::Immediate)?;
+                if table_has_column(&transaction, "composer_recovery", "id")? {
+                    transaction.execute_batch(
+                    "INSERT INTO composer_recovery_points(account_id, draft_id, revision, snapshot, updated_at)
+                     SELECT COALESCE(json_extract(snapshot, '$.draft.account_id'), 0),
+                            COALESCE(json_extract(snapshot, '$.draft.draft_id'), 0), revision, snapshot, updated_at
+                     FROM composer_recovery;
+                     DROP TRIGGER IF EXISTS composer_recovery_account_deleted;
+                     DROP TABLE composer_recovery;",
+                    )?;
+                }
+                transaction.commit()?;
+            }
 
             add_column_if_missing(conn, "pending_message_rules", "suppressed_actions", "INTEGER NOT NULL DEFAULT 0")?;
 

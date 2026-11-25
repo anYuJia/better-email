@@ -3,11 +3,12 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import type { MessageSummary } from '../app/types';
 import MessageListView from './MessageListView';
 import * as scrollAnchors from './messageListAnchor';
-import type { ComponentProps } from 'react';
+import { Profiler, type ComponentProps } from 'react';
 import {
   GROUP_HEADER_HEIGHT,
   LIST_FOOTER_HEIGHT,
   MESSAGE_ROW_HEIGHT,
+  MOBILE_MESSAGE_ROW_HEIGHT,
 } from './messageListLayout';
 
 const message: MessageSummary = {
@@ -93,6 +94,66 @@ describe('MessageListView virtual geometry', () => {
       return { x: 0, y: 0, top: 0, left: 0, right: 400, bottom: measuredHeight, width: 400, height: measuredHeight, toJSON() {} };
     });
   }
+
+  it.each([false, true])('keeps one visible Tab entry when the current row is virtualized away (mobile=%s)', (mobile) => {
+    vi.useFakeTimers();
+    mockGeometry(() => MESSAGE_ROW_HEIGHT);
+    const messages = Array.from({ length: 80 }, (_, index) => ({ ...message, id: index + 1 }));
+    const props = propsFor(messages);
+    const view = render(<MessageListView {...props} mobile={mobile} selectedId={null} />);
+    const tabStops = () => [...view.container.querySelectorAll('.message-card-main[tabindex="0"]')];
+    expect(tabStops().map((row) => row.closest('.message-card')?.getAttribute('data-message-id'))).toEqual(['1']);
+    view.rerender(<MessageListView {...props} mobile={mobile} selectedId={3} />);
+    expect(tabStops().map((row) => row.closest('.message-card')?.getAttribute('data-message-id'))).toEqual(['3']);
+    const rowHeight = mobile ? MOBILE_MESSAGE_ROW_HEIGHT : MESSAGE_ROW_HEIGHT;
+    fireEvent.scroll(screen.getByRole('region', { name: '邮件列表' }), { target: { scrollTop: 20 * rowHeight } });
+    act(() => vi.advanceTimersByTime(20));
+    expect(tabStops().map((row) => row.closest('.message-card')?.getAttribute('data-message-id'))).toEqual(['21']);
+    if (mobile) {
+      const menu = view.container.querySelectorAll('.message-mobile-menu-button[tabindex="0"]');
+      expect(menu).toHaveLength(1);
+      expect(menu[0].closest('.message-card')).toBe(tabStops()[0].closest('.message-card'));
+    }
+    expect(props.onSelectMessage).not.toHaveBeenCalled();
+  });
+
+  it('updates the Tab entry at a viewport boundary without rendering for every scroll pixel', () => {
+    vi.useFakeTimers();
+    mockGeometry(() => MESSAGE_ROW_HEIGHT);
+    const messages = Array.from({ length: 80 }, (_, index) => ({ ...message, id: index + 1 }));
+    const onRender = vi.fn();
+    const view = render(<Profiler id="list" onRender={onRender}>
+      <MessageListView {...propsFor(messages)} selectedId={1} />
+    </Profiler>);
+    const list = screen.getByRole('region', { name: '邮件列表' });
+    const scrollTo = (scrollTop: number) => {
+      fireEvent.scroll(list, { target: { scrollTop } });
+      act(() => vi.advanceTimersByTime(20));
+    };
+    scrollTo(8);
+    scrollTo(9);
+    onRender.mockClear();
+    for (let y = 10; y <= 15; y++) scrollTo(y);
+    expect(onRender).not.toHaveBeenCalled();
+    for (let y = 16; y <= 496; y += 16) {
+      scrollTo(y);
+      const row = view.container.querySelector('.message-card-main[tabindex="0"]')?.closest('.message-card');
+      expect(Number(row?.getAttribute('data-message-id'))).toBe(Math.floor(y / MESSAGE_ROW_HEIGHT) + 1);
+    }
+  });
+
+  it('names same-subject mail, checkboxes and mobile menus using the sender address when there is no display name', () => {
+    const messages = ['first@example.org', 'second@example.org'].map((email, index) => ({
+      ...message, id: index + 1, sender_name: '  ', sender_email: email, is_read: false, is_starred: true, attachment_count: 2,
+    }));
+    render(<MessageListView {...propsFor(messages)} mobile />);
+    for (const { sender_email } of messages) {
+      expect(screen.getByText(sender_email, { selector: '.sender' })).toBeDefined();
+      expect(screen.getByRole('button', { name: (name) => name.startsWith(`查看邮件：${sender_email}`) && name.includes('未读，星标，2 个附件') })).toBeDefined();
+      expect(screen.getByRole('checkbox', { name: `选择 Subject，${sender_email}` })).toBeDefined();
+      expect(screen.getByRole('button', { name: `打开邮件操作：Subject，${sender_email}` })).toBeDefined();
+    }
+  });
 
   it('shows the account label while preserving the full source address and falling back for unnamed accounts', () => {
     const second = { ...message, id: 2, account_id: 2, account_email: 'personal@example.org' };

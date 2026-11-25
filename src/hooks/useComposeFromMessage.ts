@@ -23,7 +23,7 @@ import type { OpenComposerOptions } from './useComposerController';
 
 type ComposeFromMessageOptions = {
   account: Account | null;
-  openComposer: (draft?: DraftInput, options?: OpenComposerOptions) => boolean | void;
+  openComposer: (draft?: DraftInput, options?: OpenComposerOptions) => boolean | void | Promise<boolean>;
   captureRequestGuard?: () => () => boolean;
   resolveReplySource?: (message: MessageSummary) => QuickReplySnapshot | undefined;
   resolveReplyPrefill?: (message: MessageSummary) => string | undefined;
@@ -102,7 +102,7 @@ export default function useComposeFromMessage({
     // a different inline draft merely because it replies to the same message.
     const ownsSource = source?.key === `${fullMessage.account_id}:${fullMessage.id}`
       && source.body === prefill && mode !== 'forward';
-    const opened = openComposer({
+    const opened = await openComposer({
       ...(ownsSource ? { quick_reply_source: { ...source, mode } } : {}),
       draft_id: 0,
       account_id: fullMessage.account_id,
@@ -142,7 +142,7 @@ export default function useComposeFromMessage({
       throw error;
     }
     if (!isCurrent()) return false;
-    const opened = openComposer({
+    const opened = await openComposer({
       draft_id: message.id,
       account_id: message.account_id,
       identity_id: 0,
@@ -163,7 +163,7 @@ export default function useComposeFromMessage({
         content_id: attachment.content_id,
         is_inline: attachment.is_inline,
       })),
-    }, { replaceExisting: true });
+    }, { restoreAutosave: true, replaceExisting: true });
     if (opened === false) return false;
     onDraftOpened?.(message.account_id);
     setStatus('已打开草稿继续编辑');

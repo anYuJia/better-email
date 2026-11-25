@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type RefObject } f
 import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useWheelContainment } from '../../hooks/useWheelContainment';
+import { observeComposerPopover } from './observeComposerPopover';
 import usePopoverPresence from '../../hooks/usePopoverPresence';
 
 type ComposerSchedulePickerProps = {
@@ -233,31 +234,7 @@ export default function ComposerSchedulePicker({
 
   useLayoutEffect(() => {
     if (!visible) return undefined;
-    function updatePosition() {
-      const anchor = triggerRef.current ?? anchorRef?.current;
-      const popover = popoverRef.current;
-      if (!anchor || !popover) return;
-      const anchorRect = anchor.getBoundingClientRect();
-      const popoverRect = popover.getBoundingClientRect();
-      const margin = 12;
-      const gap = 8;
-      const left = Math.min(Math.max(margin, anchorRect.right - popoverRect.width), Math.max(margin, window.innerWidth - popoverRect.width - margin));
-      const below = anchorRect.bottom + gap;
-      const above = anchorRect.top - popoverRect.height - gap;
-      const top = below + popoverRect.height <= window.innerHeight - margin
-        ? below
-        : above >= margin
-          ? above
-          : Math.min(Math.max(margin, below), Math.max(margin, window.innerHeight - popoverRect.height - margin));
-      setPosition({ top, left });
-    }
-    updatePosition();
-    window.addEventListener('resize', updatePosition);
-    document.addEventListener('scroll', updatePosition, true);
-    return () => {
-      window.removeEventListener('resize', updatePosition);
-      document.removeEventListener('scroll', updatePosition, true);
-    };
+    return observeComposerPopover(triggerRef.current ?? anchorRef?.current, popoverRef.current, 'end', setPosition);
   }, [anchorRef, visible]);
 
   function focusAnchor() {

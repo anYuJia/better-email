@@ -15,6 +15,38 @@ export async function runNavigationQuality(cdp, api) {
   await setUiViewport(cdp, 1180, 760);
   await evalInPage(cdp, `history.replaceState({}, '', ${JSON.stringify(url)}); location.reload()`);
   await waitForExpression(cdp, "document.querySelector('.message-card-main') && document.querySelector('.reader h1')");
+  await assert(`(async () => {
+    const list = document.querySelector('.message-list');
+    const viewport = list.getBoundingClientRect();
+    const settle = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    for (let y = 0; y <= 496; y += 16) {
+      list.scrollTop = y;
+      await settle();
+      const entries = list.querySelectorAll('.message-card-main[tabindex="0"]');
+      const row = entries[0]?.getBoundingClientRect();
+      if (entries.length !== 1 || row.bottom <= viewport.top || row.top >= viewport.bottom) return false;
+    }
+    list.scrollTop = 0;
+    await settle();
+    return true;
+  })()`, 'Tab enters a visible mail throughout incremental scrolling, including between overscan boundaries');
+  await evalInPage(cdp, "document.querySelector('.message-card-main').focus()");
+  for (let position = 2; position <= 20; position++) {
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+    await waitForExpression(cdp, `document.activeElement.closest('.message-list-item')?.getAttribute('aria-posinset') === '${position}'`);
+  }
+  await assert(`(() => {
+    const row = document.activeElement.closest('.message-card');
+    const list = row.closest('.message-list');
+    const item = row.getBoundingClientRect();
+    const viewport = list.getBoundingClientRect();
+    return row.classList.contains('is-current') && list.scrollTop > 0
+      && item.top >= viewport.top - 1 && item.bottom <= viewport.bottom + 1;
+  })()`, 'Arrow navigation keeps the focused mail visible beyond the initial virtual window');
+  await evalInPage(cdp, "document.querySelector('.message-list').scrollTop = 0");
+  await waitForExpression(cdp, "document.querySelector('.message-list-item[aria-posinset=\"1\"] .message-card-main[tabindex=\"0\"]')");
+  await evalInPage(cdp, "document.querySelector('.message-card-main').click()");
   // Exercise help before opening the lazy composer. Its backdrop must not rely
   // on the composer's separately loaded CSS or become a sidebar grid item.
   await evalInPage(cdp, "document.querySelector('.shortcut-help-button').focus(); document.querySelector('.shortcut-help-button').click()");
@@ -212,6 +244,17 @@ export async function runNavigationQuality(cdp, api) {
   await evalInPage(cdp, 'history.back()');
   await waitForExpression(cdp, "!document.querySelector('.reader-more-menu[open]') && document.activeElement === document.querySelector('.reader-more-menu summary') && history.state?.betterEmailScreen === 'reader' && !history.state?.betterEmailOverlay");
   checks.push('Mobile Back dismisses the reader menu and restores its trigger before leaving the message');
+
+  const bodyImage = "document.querySelector('.mobile-reader-surface .reader-html')?.shadowRoot?.querySelector('img[role=\"button\"]')";
+  await waitForExpression(cdp, bodyImage);
+  await evalInPage(cdp, `(${bodyImage}).focus()`);
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await waitForExpression(cdp, "document.querySelector('.reader-image-preview-backdrop') && history.state?.betterEmailOverlay");
+  await evalInPage(cdp, 'history.back()');
+  await waitForExpression(cdp, `!document.querySelector('.reader-image-preview-backdrop') && history.state?.betterEmailScreen === 'reader'
+    && (${bodyImage})?.matches(':focus')`);
+  checks.push('Mobile Back closes only the image preview and restores keyboard focus to the same image');
 
   if (captureDir) {
     mkdirSync(captureDir, { recursive: true });

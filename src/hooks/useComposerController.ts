@@ -10,7 +10,9 @@ import {
 } from '../app/crossAccountRisk';
 import type {
   Account,
+  AccountScope,
   Contact,
+  ComposerAutosave,
   DraftInput,
   Folder,
   FolderRole,
@@ -47,6 +49,7 @@ export type OpenComposerOptions = {
 
 type UseComposerControllerOptions = {
   account: Account | null;
+  mailboxScope?: AccountScope;
   accounts: Account[];
   identities: MailIdentity[];
   selectedId: number | null;
@@ -63,6 +66,7 @@ type UseComposerControllerOptions = {
   refreshContacts?: () => Promise<unknown>;
   focusMailboxRole: (role: FolderRole, targetAccountId: number | null, statusMessage: string) => Promise<void>;
   openExternalComposer?: (nextDraft?: DraftInput, options?: OpenComposerOptions) => void;
+  onOpenError?: (message: string) => void;
   setSendProgress?: (progress: number | null) => void;
   setSendProgressMessage?: (message: string | null) => void;
   setAttachmentProgress?: (progress: number | null) => void;
@@ -71,6 +75,7 @@ type UseComposerControllerOptions = {
 
 export default function useComposerController({
   account,
+  mailboxScope,
   accounts,
   identities,
   selectedId,
@@ -85,6 +90,7 @@ export default function useComposerController({
   refreshContacts,
   focusMailboxRole,
   openExternalComposer,
+  onOpenError,
   setSendProgress,
   setSendProgressMessage,
   setAttachmentProgress,
@@ -98,7 +104,7 @@ export default function useComposerController({
   const submissionInFlight = useRef(false);
   const composerActionRef = useRef(0);
   const composeSelectionRef = useRef('');
-  composeSelectionRef.current = `${account?.id ?? ''}:${quickReplyAccountId ?? ''}:${selectedId ?? ''}`;
+  composeSelectionRef.current = `${mailboxScope ?? ''}:${quickReplyAccountId ?? ''}:${selectedId ?? ''}`;
   const captureComposeRequestGuard = useCallback(() => {
     const action = composerActionRef.current;
     const revision = draftRevisionRef.current;
@@ -137,6 +143,9 @@ export default function useComposerController({
   const [composerCloseConfirmOpen, setComposerCloseConfirmOpen] = useState(false);
   const [composerContextAccountId, setComposerContextAccountId] = useState<number | null>(null);
   const [sendRiskConfirm, setSendRiskConfirm] = useState<CrossAccountRiskItem[] | null>(null);
+  // The mailbox owning an editing session stays stable if its From identity changes.
+  const [recoveryOwner, setRecoveryOwner] = useState<number | null>(null);
+  const [recoveryId, setRecoveryId] = useState('');
   const fallbackRecoveryAccount = account?.id || accounts[0]?.id || 0;
   const recoveryDraft = useMemo(() => ({
     ...draft, account_id: draft.account_id || fallbackRecoveryAccount,
@@ -239,9 +248,9 @@ export default function useComposerController({
     canImport: () => !submissionInFlight.current,
     getCurrentAttachments: () => draftRef.current.attachments,
   });
-  const { composerAutosave, setComposerAutosave, clearComposerAutosave, retryComposerAutosave, ensureComposerRecovery } =
+  const { composerAutosave, setComposerAutosave, clearComposerAutosave, retryComposerAutosave, ensureComposerRecovery, readRecovery } =
     useComposerRecovery(recoveryDraft, isRichComposer, isComposerOpen, setStatus,
-      pendingAttachmentRecovery(attachmentImports, draft.attachments));
+      pendingAttachmentRecovery(attachmentImports, draft.attachments), recoveryOwner ?? recoveryDraft.account_id, recoveryId);
 
   const {
     isSubmitting,
@@ -291,28 +300,63 @@ export default function useComposerController({
       return true;
     }
     const shouldReplaceDraft = !isComposerOpen || options.replaceExisting === true;
-    if (shouldReplaceDraft) {
-      resetAttachmentImports();
-      resetSendIssue();
-      setComposerContextAccountId(null);
-      setRichComposer(true);
-      setSendProgress?.(null);
-      setSendProgressMessage?.(null);
-      setAttachmentProgress?.(null);
-      if (nextDraft) {
-        setDraft(nextDraft);
-      } else if (options.restoreAutosave && isDraftEmpty(draft) && composerAutosave) {
-        setDraft(composerAutosave.draft);
-        restoreAttachmentImports(composerAutosave.pending_attachments);
-        setStatus(`已从恢复点还原邮件：${formatDate(composerAutosave.saved_at)}`);
+    const show = (checkpoint?: ComposerAutosave | null) => {
+      if (shouldReplaceDraft) {
+        resetAttachmentImports();
+        resetSendIssue();
+        setComposerContextAccountId(nextDraft?.draft_id ? nextDraft.account_id : null);
+        setRichComposer(true);
+        setSendProgress?.(null);
+        setSendProgressMessage?.(null);
+        setAttachmentProgress?.(null);
+        const initial = checkpoint?.draft ?? nextDraft;
+        if (initial) {
+          setDraft(initial.account_id || !fallbackRecoveryAccount ? initial : { ...initial, account_id: fallbackRecoveryAccount });
+          setRecoveryOwner(checkpoint?.recovery_account_id ?? (initial.account_id || fallbackRecoveryAccount || null));
+          // Explicit contact/reply/new requests may coexist with another unfinished letter.
+          setRecoveryId(checkpoint ? (checkpoint.recovery_id ?? '') : (initial.draft_id ? '' : crypto.randomUUID()));
+        }
+        if (options.restoreAutosave && !checkpoint && !nextDraft?.draft_id) setStatus('已打开新邮件');
+        if (checkpoint) {
+          restoreAttachmentImports(checkpoint.pending_attachments);
+          setStatus(`已从恢复点还原邮件：${formatDate(checkpoint.saved_at)}`);
+        }
       }
+      setSendRiskConfirm(null);
+      setComposerMinimized(false);
+      setComposerOpen(true);
+      setComposerFocusRequest((current) => current + 1);
+    };
+    const prior = isComposerOpen && shouldReplaceDraft ? getDraftSnapshot().draft : null;
+    const needsCheckpoint = prior && (!isDraftEmpty(prior) || getAttachmentSendBlockReason());
+    if (needsCheckpoint || (shouldReplaceDraft && options.restoreAutosave)) {
+      const isCurrent = captureComposeRequestGuard();
+      const prepare = async () => {
+        try {
+          if (needsCheckpoint) await ensureComposerRecovery({ ...prior, account_id: prior.account_id || fallbackRecoveryAccount });
+          if (!isCurrent()) return false;
+          const checkpoint = options.restoreAutosave
+            ? await readRecovery(nextDraft?.account_id || null, nextDraft?.draft_id ?? null)
+            : null;
+          if (!isCurrent()) return false;
+          show(checkpoint);
+          return true;
+        } catch (error) {
+          if (isCurrent()) {
+            const message = `无法打开写信窗口，本机暂存未完成：${String(error)}`;
+            setStatus(message);
+            if (!isComposerOpen) onOpenError?.(message);
+          }
+          return false;
+        }
+      };
+      return prepare();
     }
-    setSendRiskConfirm(null);
-    setComposerMinimized(false);
-    setComposerOpen(true);
-    setComposerFocusRequest((current) => current + 1);
+    show();
     return true;
-  }, [draft, composerAutosave, isComposerOpen, openExternalComposer, setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress, resetAttachmentImports, restoreAttachmentImports, resetSendIssue]);
+  }, [isComposerOpen, openExternalComposer, setStatus, setSendProgress, setSendProgressMessage, setAttachmentProgress,
+    resetAttachmentImports, restoreAttachmentImports, resetSendIssue, readRecovery, fallbackRecoveryAccount, setDraft,
+    captureComposeRequestGuard, getDraftSnapshot, getAttachmentSendBlockReason, ensureComposerRecovery, onOpenError]);
   const {
     composeFromMessage: openReplyComposer,
     editDraftMessage,

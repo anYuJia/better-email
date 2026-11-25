@@ -11,6 +11,8 @@ import type { Account, OutboundAttachmentInput } from '../app/types';
 const bridge = vi.hoisted(() => ({
   invoke: vi.fn(),
   close: vi.fn(async () => undefined),
+  takePending: vi.fn(async (): Promise<unknown> => null),
+  nativeOpen: null as null | (() => void),
   nativeClose: null as null | ((event: { preventDefault: () => void }) => void),
 }));
 vi.mock('../tauriBridge', () => ({
@@ -24,8 +26,11 @@ vi.mock('../tauriBridge', () => ({
   showCurrentWindow: async () => undefined,
   startDraggingCurrentWindow: async () => undefined,
   emitToMain: async () => undefined,
-  listenCurrentWindow: async () => () => undefined,
-  takePendingComposerRequest: async () => null,
+  listenCurrentWindow: async (name: string, handler: () => void) => {
+    if (name === 'composer-open') bridge.nativeOpen = handler;
+    return () => { if (name === 'composer-open') bridge.nativeOpen = null; };
+  },
+  takePendingComposerRequest: bridge.takePending,
   localFileAssetUrl: async () => '',
   COMPOSER_CLOSED_EVENT: 'composer-closed',
   COMPOSER_CONTACTS_SETTINGS_EVENT: 'composer-contacts',
@@ -92,6 +97,7 @@ beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => { frames.push(callback); return frames.length; }));
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
   bridge.close.mockClear();
+  bridge.takePending.mockReset().mockResolvedValue(null);
   bridge.invoke.mockReset();
   bridge.invoke.mockImplementation(async (command: string) => {
     if (command === 'load_composer_recovery') return { revision: 0, payload: null };
@@ -240,6 +246,37 @@ describe('pending rich input at business action boundaries', () => {
       input: expect.objectContaining({ body: '原生关闭前的最后输入' }),
     }));
     expect(bridge.close).toHaveBeenCalledOnce();
+  });
+
+  it.each([2, 0])('recovers the correct sender in a prewarmed native window (requested account %s)', async requestedAccount => {
+    const originalUrl = location.href;
+    history.replaceState({}, '', '?prewarm=1');
+    try {
+      let finishRead!: (value: unknown) => void;
+      const normalInvoke = bridge.invoke.getMockImplementation()!;
+      bridge.invoke.mockImplementation(async (command: string, args?: Record<string, unknown>) => {
+        if (command === 'list_accounts') return accounts;
+        if (command === 'get_account') return args?.accountId === 2 ? accounts[1] : accounts[0];
+        if (command === 'load_composer_recovery' && args && args.accountId === (requestedAccount || null)) {
+          return new Promise(resolve => { finishRead = resolve; });
+        }
+        return normalInvoke(command, args);
+      });
+      await act(async () => { render(<StandaloneComposerApp />); });
+      expect(bridge.close).not.toHaveBeenCalled();
+      bridge.takePending.mockResolvedValueOnce({ draft: { ...emptyDraft, account_id: requestedAccount }, restoreAutosave: true });
+      await act(async () => { bridge.nativeOpen!(); });
+      if (requestedAccount) expect(bridge.invoke).toHaveBeenCalledWith('get_account', { accountId: 2 });
+      expect(bridge.close).not.toHaveBeenCalled();
+      await act(async () => { finishRead({ revision: 22, payload: {
+        draft: { ...emptyDraft, account_id: 2, subject: '第二个账号的信' }, saved_at: '2026-11-25',
+      } }); });
+      expect((screen.getByRole('textbox', { name: '主题' }) as HTMLInputElement).value).toBe('第二个账号的信');
+      expect(bridge.invoke).toHaveBeenCalledWith('list_identities', { accountId: 2 });
+      expect(bridge.close).not.toHaveBeenCalled();
+    } finally {
+      history.replaceState({}, '', originalUrl);
+    }
   });
 
   it('still closes a truly empty native composer exactly once', async () => {

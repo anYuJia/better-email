@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import useMobileVisualViewport from './useMobileVisualViewport';
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 it('tracks the keyboard viewport, preserves zoom, and restores CSS on cleanup', () => {
-  const viewport = Object.assign(new EventTarget(), { height: 720, scale: 1 });
+  const viewport = Object.assign(new EventTarget(), { height: 720, scale: 1, offsetTop: 0 });
   vi.stubGlobal('visualViewport', viewport);
   let scheduled: FrameRequestCallback | undefined;
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { scheduled = cb; return 7; });
@@ -15,14 +15,20 @@ it('tracks the keyboard viewport, preserves zoom, and restores CSS on cleanup', 
   viewport.height = 360;
   act(() => { viewport.dispatchEvent(new Event('resize')); scheduled?.(0); });
   expect(style.getPropertyValue('--mobile-viewport-height')).toBe('360px');
+  viewport.offsetTop = 38;
+  act(() => { viewport.dispatchEvent(new Event('scroll')); scheduled?.(0); });
+  expect(style.getPropertyValue('--mobile-viewport-top')).toBe('38px');
   viewport.height = 180;
+  viewport.offsetTop = 90;
   viewport.scale = 2;
   act(() => { viewport.dispatchEvent(new Event('resize')); scheduled?.(0); });
   expect(style.getPropertyValue('--mobile-viewport-height')).toBe('360px');
+  expect(style.getPropertyValue('--mobile-viewport-top')).toBe('38px');
   viewport.dispatchEvent(new Event('resize'));
   unmount();
   expect(cancel).toHaveBeenCalledWith(7);
   expect(style.getPropertyValue('--mobile-viewport-height')).toBe('800px');
+  expect(style.getPropertyValue('--mobile-viewport-top')).toBe('');
   style.removeProperty('--mobile-viewport-height');
 });
 it('leaves desktop sizing untouched', () => {

@@ -7,6 +7,39 @@ function isWebLink(href: string): boolean {
 
 type HiddenLink = { href: string; children: Node[] | null; label: string | null };
 
+function enableImagePreviews(content: HTMLDivElement) {
+  const attributes = ['tabindex', 'role', 'aria-haspopup', 'aria-label'] as const;
+  const originals = new Map<HTMLImageElement, (string | null)[]>();
+  for (const image of content.querySelectorAll<HTMLImageElement>('img[src]:not([data-better-email-inline-cid])')) {
+    if (!image.getAttribute('src')?.trim() || image.closest('a[href], [hidden], [aria-hidden="true"], [role="presentation"], [role="none"]')) continue;
+    if (image.alt === '' && image.hasAttribute('alt') && !image.getAttribute('aria-label')) continue;
+    originals.set(image, attributes.map((name) => image.getAttribute(name)));
+    const description = image.getAttribute('aria-label') || image.alt;
+    image.tabIndex = 0;
+    image.setAttribute('role', 'button');
+    image.setAttribute('aria-haspopup', 'dialog');
+    image.setAttribute('aria-label', description ? `预览图片，${description}` : '预览图片');
+  }
+  function activate(event: KeyboardEvent) {
+    if (!(event.target instanceof HTMLImageElement) || !originals.has(event.target)) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    if (!event.repeat) event.target.click();
+  }
+  content.addEventListener('keydown', activate);
+  return () => {
+    content.removeEventListener('keydown', activate);
+    // Revealing a web link gives the enclosing anchor its native keyboard action back.
+    for (const [image, values] of originals) {
+      attributes.forEach((name, index) => {
+        const value = values[index];
+        if (value === null) image.removeAttribute(name);
+        else image.setAttribute(name, value);
+      });
+    }
+  };
+}
+
 function applyLinksVisibility(contentDiv: HTMLDivElement, linksHidden: boolean, hiddenLinks: Map<HTMLAnchorElement, HiddenLink>) {
   contentDiv.querySelectorAll<HTMLAnchorElement>('a').forEach((anchor) => {
     if (linksHidden) {
@@ -97,6 +130,11 @@ export default function EmailShadowView({
         a {
           color: var(--ui-text-accent);
         }
+        img[role="button"]:focus-visible {
+          outline: var(--ui-focus-outline);
+          outline-offset: 2px;
+          box-shadow: var(--ui-focus-ring);
+        }
         a[data-better-email-hidden-link] {
           color: var(--ui-text-tertiary);
           text-decoration: none;
@@ -164,8 +202,10 @@ export default function EmailShadowView({
   // text formatting. Only update the anchors affected by this policy.
   useEffect(() => {
     const contentDiv = contentDivRef.current;
-    if (contentDiv) applyLinksVisibility(contentDiv, linksHidden, hiddenLinksRef.current);
-  }, [html, linksHidden]);
+    if (!contentDiv) return;
+    applyLinksVisibility(contentDiv, linksHidden, hiddenLinksRef.current);
+    if (onClick) return enableImagePreviews(contentDiv);
+  }, [html, linksHidden, onClick]);
 
   useEffect(() => {
     const shadowRoot = shadowRootRef.current;

@@ -15,6 +15,8 @@ export default function useComposerRecovery(
   enabled: boolean,
   onError: (message: string) => void,
   pendingAttachments: readonly PendingAttachmentRecovery[] = [],
+  recoveryAccountId = draft.account_id,
+  recoveryId = '',
 ) {
   // Progress ticks must not restart the draft debounce or serialize its body.
   const normalizedPending = normalizePendingAttachments(pendingAttachments);
@@ -96,11 +98,11 @@ export default function useComposerRecovery(
       queue.current = queue.current.then(async () => {
         await ready.current;
         if (currentGeneration !== generation.current) return;
-        const snapshot: ComposerAutosave = { draft, isRichComposer, saved_at: new Date().toISOString(),
+        const snapshot: ComposerAutosave = { draft, recovery_account_id: recoveryAccountId, recovery_id: recoveryId, isRichComposer, saved_at: new Date().toISOString(),
           ...(pending.length ? { pending_attachments: pending } : {}) };
         const payloadJson = empty ? null : JSON.stringify(snapshot);
         const accepted = empty
-          ? await invoke<boolean>(IPC.ClearComposerRecovery, { revision: nextRevision() })
+          ? await invoke<boolean>(IPC.ClearComposerRecovery, { accountId: recoveryAccountId, draftId: draft.draft_id, recoveryId, revision: nextRevision() })
           : await invoke<boolean>(IPC.SaveComposerRecovery, { payloadJson, revision: nextRevision() });
         if (!accepted) throw new Error('检测到更新的草稿，未覆盖；请手动保存当前内容。');
         if (currentGeneration !== generation.current) return;
@@ -129,7 +131,18 @@ export default function useComposerRecovery(
       if (timer !== null) window.clearTimeout(timer);
       if (flush.current === persist) flush.current = null;
     };
-  }, [draft, isRichComposer, enabled, retryVersion, nextRevision, pending]);
+  }, [draft, isRichComposer, enabled, retryVersion, nextRevision, pending, recoveryAccountId, recoveryId]);
+
+  const readRecovery = useCallback(async (accountId: number | null, draftId: number | null) => {
+    // Finish an explicit discard or pending submission before opening the same scope.
+    await queue.current;
+    const record = await invoke<RecoveryRecord>(IPC.LoadComposerRecovery, { accountId, draftId });
+    if (record?.revision > 0) revision.current = Math.max(revision.current, record.revision);
+    const checkpoint = record?.revision > 0 ? parseComposerAutosave(record.payload) : loadComposerAutosave();
+    if (!checkpoint || (draftId !== null && checkpoint.draft.draft_id !== draftId)) return null;
+    const owner = checkpoint.recovery_account_id ?? checkpoint.draft.account_id;
+    return accountId === null || owner === accountId ? checkpoint : null;
+  }, []);
 
   const ensureComposerRecovery = useCallback((draftSnapshot: DraftInput): Promise<void> => {
     // Submission flushes the editor synchronously, before React may render that
@@ -137,7 +150,7 @@ export default function useComposerRecovery(
     const currentGeneration = ++generation.current;
     const currentClearVersion = clearVersion.current;
     const snapshot: ComposerAutosave = {
-      draft: draftSnapshot,
+      draft: draftSnapshot, recovery_account_id: recoveryAccountId, recovery_id: recoveryId,
       isRichComposer: richComposerRef.current,
       saved_at: new Date().toISOString(),
       ...(pendingRef.current.length ? { pending_attachments: pendingRef.current } : {}),
@@ -172,7 +185,7 @@ export default function useComposerRecovery(
     // rejecting promise and must not proceed without the database acknowledgement.
     queue.current = operation.catch(() => undefined);
     return operation;
-  }, [nextRevision]);
+  }, [nextRevision, recoveryAccountId, recoveryId]);
 
   const clearComposerAutosave = useCallback(() => {
     generation.current += 1;
@@ -188,13 +201,13 @@ export default function useComposerRecovery(
     }
     queue.current = queue.current.then(async () => {
       await ready.current;
-      const cleared = await invoke<boolean>(IPC.ClearComposerRecovery, { revision: nextRevision() });
+      const cleared = await invoke<boolean>(IPC.ClearComposerRecovery, { accountId: recoveryAccountId, draftId: draft.draft_id, recoveryId, revision: nextRevision() });
       if (!cleared) throw new Error('检测到更新的草稿，未清除。');
     }).catch((error: unknown) => {
       if (mounted.current) onErrorRef.current(`草稿清理失败：${String(error)}`);
     });
-  }, [nextRevision]);
+  }, [nextRevision, recoveryAccountId, recoveryId, draft.draft_id]);
 
   const retryComposerAutosave = useCallback(() => setRetryVersion((value) => value + 1), []);
-  return { composerAutosave, setComposerAutosave, clearComposerAutosave, retryComposerAutosave, ensureComposerRecovery };
+  return { composerAutosave, setComposerAutosave, clearComposerAutosave, retryComposerAutosave, ensureComposerRecovery, readRecovery };
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
+import { registerMobileOverlay } from '../../app/mobileOverlayHistory';
 import { Download, ImageOff, LoaderCircle, X, ZoomIn, ZoomOut } from 'lucide-react';
 import type { PreviewImage } from './useImagePreview';
 
@@ -68,6 +69,10 @@ export default function ImagePreviewOverlay({
   useEffect(() => {
     closeButtonRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (dialogRef.current) return registerMobileOverlay(dialogRef.current, onClose);
+  }, [onClose]);
 
   // 模态期间底层不可交互、快捷键不穿透。
   // 焦点恢复由 useImagePreview.closeImagePreview 负责（恢复到原点击图片）。

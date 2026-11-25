@@ -79,6 +79,7 @@ export default function StandaloneComposerApp() {
   const [platform, setPlatform] = useState<'macos' | 'windows' | 'linux' | 'web'>('web');
   const platformReadyRef = useRef(false);
   const closingRef = useRef(false);
+  const displayedComposerRef = useRef(false);
   const bootedRef = useRef(false);
   const frontendReadyRef = useRef(false);
   const loadErrorRef = useRef<string | null>(null);
@@ -118,7 +119,9 @@ export default function StandaloneComposerApp() {
     };
   }, []);
 
+  const accountLoadVersion = useRef(0);
   const loadComposerData = useCallback(async (preferredAccountId?: number) => {
+    const version = ++accountLoadVersion.current;
     const nextAccounts = await invoke<Account[]>(IPC.ListAccounts);
     const storedScope = loadAccountScope();
     const fallbackAccount = nextAccounts.find((entry) => entry.is_default) ?? nextAccounts[0] ?? null;
@@ -132,6 +135,7 @@ export default function StandaloneComposerApp() {
       invoke<Contact[]>(IPC.ListContacts, { accountId: requestedAccountId }),
       invoke<MailIdentity[]>(IPC.ListIdentities, { accountId: requestedAccountId }),
     ]);
+    if (version !== accountLoadVersion.current) return;
     setAccounts(nextAccounts);
     setAccount(nextAccount ?? fallbackAccount);
     setContacts(nextContacts);
@@ -275,10 +279,18 @@ export default function StandaloneComposerApp() {
     setSendProgress: setComposerSendProgress,
     setSendProgressMessage: setComposerSendProgressMessage,
     setAttachmentProgress: setComposerAttachmentProgress,
+    onOpenError: setLoadError,
     onQueuedSend: (item, undo) => emitToMain(COMPOSER_QUEUED_EVENT, { item, undo }),
   });
 
   closeComposerRef.current = closeComposer;
+
+  useEffect(() => {
+    if (isComposerOpen && draft.account_id && draft.account_id !== account?.id) {
+      // Unified-inbox recovery may reveal a sender other than the prewarmed one.
+      void loadComposerData(draft.account_id).catch((error) => setStatus(`读取发件账号失败：${String(error)}`));
+    }
+  }, [account?.id, draft.account_id, isComposerOpen, loadComposerData]);
 
   const applyComposerRequest = useCallback((request: ComposerWindowRequest | null, restoreWhenMissing = false) => {
     if (request) {
@@ -406,6 +418,7 @@ export default function StandaloneComposerApp() {
           openRequestedBeforeBootRef.current,
         );
         if (decision.shouldOpen) {
+          setOpenRequestVersion((current) => current + 1);
           closingRef.current = false;
           applyComposerRequestRef.current(pending, decision.restoreWhenMissing);
           openRequestedBeforeBootRef.current = false;
@@ -476,7 +489,7 @@ export default function StandaloneComposerApp() {
     closeListenerReady: nativeCloseListenerReady,
     composerOpen: isComposerOpen,
     hasLoadError: loadError !== null,
-    openRequested: openRequestVersion > 0,
+    openRequested: !isPrewarmedWindow || openRequestVersion > 0,
   });
 
   useEffect(() => {
@@ -496,7 +509,10 @@ export default function StandaloneComposerApp() {
   }, [composerFocusRequest, openRequestVersion, shouldRevealWindow]);
 
   useEffect(() => {
-    if (!booted || isComposerOpen || closingRef.current) return;
+    if (isComposerOpen) displayedComposerRef.current = true;
+    // A prewarmed window or a slow recovery read has no editor yet. Only an
+    // editor that actually transitioned from open to closed ends the window.
+    if (!booted || isComposerOpen || !displayedComposerRef.current || closingRef.current) return;
     void finishNativeClose();
   }, [booted, finishNativeClose, isComposerOpen]);
 

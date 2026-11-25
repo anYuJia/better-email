@@ -10,6 +10,7 @@ import type {
 } from '../../app/types';
 import { useWheelContainment } from '../../hooks/useWheelContainment';
 import usePopoverPresence from '../../hooks/usePopoverPresence';
+import { observeComposerPopover } from './observeComposerPopover';
 import { CustomSelect } from '../settings/accounts/CustomSelect';
 
 export type ComposerPopoverMode = 'templates' | 'more' | null;
@@ -151,26 +152,6 @@ export function ComposerSenderContext({
   );
 }
 
-function clampPosition(anchor: HTMLElement | null, popover: HTMLElement | null) {
-  if (!anchor || !popover) return null;
-  const anchorRect = anchor.getBoundingClientRect();
-  const popoverRect = popover.getBoundingClientRect();
-  const margin = 12;
-  const gap = 8;
-  const left = Math.min(
-    Math.max(margin, anchorRect.left),
-    Math.max(margin, window.innerWidth - popoverRect.width - margin),
-  );
-  const below = anchorRect.bottom + gap;
-  const above = anchorRect.top - popoverRect.height - gap;
-  const top = below + popoverRect.height <= window.innerHeight - margin
-    ? below
-    : above >= margin
-      ? above
-      : Math.min(Math.max(margin, below), Math.max(margin, window.innerHeight - popoverRect.height - margin));
-  return { top, left };
-}
-
 export default function ComposerAdvancedTools({
   mode,
   anchorRef,
@@ -207,23 +188,7 @@ export default function ComposerAdvancedTools({
 
   useLayoutEffect(() => {
     if (!mode) return undefined;
-    const update = () => {
-      const next = clampPosition(anchorRef?.current ?? null, popoverRef.current);
-      setPosition((current) => current?.top === next?.top && current?.left === next?.left ? current : next);
-    };
-    update();
-    // Font scaling and late content can resize a portal without changing any
-    // React dependency or the viewport. Keep its measured box at the anchor.
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
-    if (popoverRef.current) observer?.observe(popoverRef.current);
-    if (anchorRef?.current) observer?.observe(anchorRef.current);
-    window.addEventListener('resize', update);
-    document.addEventListener('scroll', update, true);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', update);
-      document.removeEventListener('scroll', update, true);
-    };
+    return observeComposerPopover(anchorRef?.current, popoverRef.current, 'start', setPosition);
   }, [anchorRef, mode, saveDialogOpen, templates.length, saveDraftBlockedReason, saveDraftFeedback?.message, templateSaveError]);
 
   useEffect(() => {

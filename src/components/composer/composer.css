@@ -1216,7 +1216,7 @@
   position: fixed;
   z-index: 1250;
   width: min(318px, calc(100vw - 24px));
-  max-height: calc(100vh - 24px);
+  max-height: calc(var(--mobile-viewport-height, 100vh) - 24px);
   overflow-y: auto;
   border: 1px solid var(--ui-border-strong);
   border-radius: var(--ui-radius-panel);

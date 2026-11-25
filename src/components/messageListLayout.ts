@@ -55,3 +55,18 @@ export function calculateVisibleRange(
 
   return { startIdx, endIdx };
 }
+
+// The mounted window includes overscan. Its boundaries can stay fixed while
+// the first or last row on screen changes during a small scroll gesture.
+export function calculateMessageWindow(layout: LayoutItem[], scrollTop: number, viewportHeight: number) {
+  const { startIdx, endIdx } = calculateVisibleRange(layout, scrollTop, viewportHeight);
+  let firstOnscreen = startIdx;
+  let lastOnscreen = Math.min(endIdx, layout.length - 1);
+  while (firstOnscreen <= lastOnscreen && layout[firstOnscreen].top + layout[firstOnscreen].height <= scrollTop) {
+    firstOnscreen++;
+  }
+  while (lastOnscreen >= firstOnscreen && layout[lastOnscreen].top >= scrollTop + viewportHeight) {
+    lastOnscreen--;
+  }
+  return { startIdx, endIdx, firstOnscreen, lastOnscreen };
+}

@@ -278,6 +278,24 @@ describe('asynchronous composer opening ownership', () => {
     expect(result.current.composerContextAccountId).toBeNull();
   });
 
+  it.each(['close', 'selection', 'new composer'] as const)('ignores a slow local restore after a newer %s', async action => {
+    const loading = deferred<unknown>();
+    mockInvoke.mockImplementation(async (command, args) => command === 'load_composer_recovery' && args
+      ? loading.promise : { revision: 0, payload: null });
+    const { result, rerender } = renderComposer();
+    let pending!: boolean | Promise<boolean>;
+    await act(async () => { pending = result.current.openComposer({ ...emptyDraft, account_id: 2 }, { restoreAutosave: true }); });
+    if (action === 'close') act(() => { result.current.closeComposer(); });
+    if (action === 'selection') rerender({ selectedId: 40, accountId: 2 });
+    if (action === 'new composer') act(() => { result.current.openComposer({ ...emptyDraft, body: '新的编辑' }); });
+    await act(async () => {
+      loading.resolve({ revision: 50, payload: { draft: { ...emptyDraft, account_id: 2, body: '过期恢复' } } });
+      expect(await pending).toBe(false);
+    });
+    expect(result.current.isComposerOpen).toBe(action === 'new composer');
+    expect(result.current.draft.body).toBe(action === 'new composer' ? '新的编辑' : '');
+  });
+
   it('does not reopen after a newer close while draft attachments are loading', async () => {
     const attachments = deferred<never[]>();
     mockInvoke.mockImplementation(async (command) => (
@@ -558,7 +576,7 @@ describe('useComposerController close lifecycle', () => {
     expect(result.current.composerCloseConfirmOpen).toBe(false);
   });
 
-  it('describes local autosave recovery as a recovery point instead of a mailbox draft', () => {
+  it('describes local autosave recovery as a recovery point instead of a mailbox draft', async () => {
     localStorage.setItem(composerAutosaveStorageKey, JSON.stringify({
       draft: { ...emptyDraft, subject: '恢复内容', body: '恢复正文' },
       isRichComposer: true,
@@ -566,7 +584,7 @@ describe('useComposerController close lifecycle', () => {
     }));
     const { result, mocks } = renderComposer();
 
-    act(() => result.current.openComposer(undefined, { restoreAutosave: true }));
+    await act(async () => { result.current.openComposer(undefined, { restoreAutosave: true }); });
 
     expect(result.current.draft.subject).toBe('恢复内容');
     expect(mocks.setStatus).toHaveBeenCalledWith(expect.stringMatching(/^已从恢复点还原邮件：/));
@@ -957,7 +975,7 @@ describe('composer attachment ownership and submission gating', () => {
     act(() => result.current.openComposer({ ...emptyDraft, subject: 'Old letter' }));
     let importing!: Promise<void>;
     act(() => { importing = result.current.pickDraftAttachments(); });
-    act(() => result.current.openComposer({ ...emptyDraft, subject: 'New letter' }, { replaceExisting: true }));
+    await act(async () => { await result.current.openComposer({ ...emptyDraft, subject: 'New letter' }, { replaceExisting: true }); });
     await act(async () => { picked.resolve([readyAttachment]); await importing; });
     expect(result.current.draft.subject).toBe('New letter');
     expect(result.current.draft.attachments).toEqual([]);
@@ -1008,7 +1026,7 @@ describe('composer attachment ownership and submission gating', () => {
     localStorage.clear();
     const restored = renderComposer();
     await act(async () => { await Promise.resolve(); });
-    act(() => restored.result.current.openComposer(undefined, { restoreAutosave: true }));
+    await act(async () => { restored.result.current.openComposer(undefined, { restoreAutosave: true }); });
     expect(restored.result.current.draft.attachments.map(file => file.filename)).toEqual(['good.txt']);
     expect(restored.result.current.attachmentImports[0]).toMatchObject({ status: 'failed', error: expect.stringContaining('bad.txt') });
     await act(async () => {

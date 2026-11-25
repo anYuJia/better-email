@@ -1,6 +1,54 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+async function checkKeyboardComposer(cdp, { clickButton, fillInput, evalInPage, waitForExpression }) {
+  await clickButton(cdp, '展开抄送和密送', "document.querySelector('.composer')");
+  await fillInput(cdp, '.composer input[aria-label="收件人"]',
+    Array.from({ length: 8 }, (_, index) => `recipient${index}@example.com,`).join(' '));
+  await evalInPage(cdp, "document.querySelector('.composer-richtext-body').focus()");
+  await cdp.send('Input.insertText', { text: '键盘遮挡测试\n'.repeat(40) + '保留光标' });
+  try {
+    // Keep the layout viewport at full size, as when a mobile keyboard
+    // reduces and pans the visual viewport after the field already has focus.
+    await evalInPage(cdp, `Object.defineProperties(visualViewport, {
+      height: { value: 360, configurable: true }, offsetTop: { value: 38, configurable: true }
+    }); visualViewport.dispatchEvent(new Event('resize'))`);
+    await waitForExpression(cdp, `(() => {
+      const fields = document.querySelector('.composer-primary-fields').getBoundingClientRect();
+      const send = document.querySelector('.composer-send-primary').getBoundingClientRect();
+      const selection = getSelection();
+      const caret = selection.rangeCount && selection.getRangeAt(0).getBoundingClientRect();
+      return document.activeElement.matches('.composer-richtext-body')
+        && caret.height > 0 && caret.top >= fields.top - 1 && caret.bottom <= fields.bottom + 1
+        && send.top >= 38 && send.bottom <= 398;
+    })()`);
+    await clickButton(cdp, '更多写信工具', "document.querySelector('.composer')");
+    await waitForExpression(cdp, `(() => {
+      const bounds = document.querySelector('.composer-advanced-popover[role=menu]')?.getBoundingClientRect();
+      return bounds?.height > 0 && bounds.top >= 49 && bounds.bottom <= 387;
+    })()`);
+    await evalInPage(cdp, "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+    await clickButton(cdp, '发送选项', "document.querySelector('.composer')");
+    await clickButton(cdp, '定时发送…', "document.querySelector('.composer-send-menu')");
+    await waitForExpression(cdp, `(() => {
+      const bounds = document.querySelector('.composer-schedule-picker-popover')?.getBoundingClientRect();
+      return bounds?.height > 0 && bounds.top >= 49 && bounds.bottom <= 387;
+    })()`);
+    await evalInPage(cdp, "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+    await clickButton(cdp, '关闭写信窗口', "document.querySelector('.composer')");
+    await waitForExpression(cdp, `(() => {
+      const controls = [...document.querySelectorAll('.composer-close-dialog button')];
+      return controls.length >= 3 && controls.every(button => {
+        const r = button.getBoundingClientRect(); return r.top >= 38 && r.bottom <= 398 && r.height >= 44;
+      });
+    })()`);
+    await clickButton(cdp, '继续编辑', "document.querySelector('.composer-close-dialog')");
+    await waitForExpression(cdp, "document.querySelector('.composer-richtext-body')?.textContent.endsWith('保留光标')");
+  } finally {
+    await evalInPage(cdp, "delete visualViewport.height; delete visualViewport.offsetTop; visualViewport.dispatchEvent(new Event('resize'))");
+  }
+}
+
 // Runs in the same isolated mock profile as the functional UI smoke. Text
 // scaling deliberately changes computed font sizes, not viewport screenshots.
 export async function runQualityMatrix(cdp, api) {
@@ -245,6 +293,7 @@ export async function runQualityMatrix(cdp, api) {
     }
     await clickButton(cdp, '继续编辑', "document.querySelector('.composer-close-dialog')");
     await waitForExpression(cdp, "!document.querySelector('.composer-close-dialog') && document.querySelector('.composer input[aria-label=\"主题\"]')?.value === '关闭确认保留草稿'");
+    if (mobile && theme === 'light' && scale === 1) await checkKeyboardComposer(cdp, api);
     await closeComposer(cdp);
     if (mobile) {
       await evalInPage(cdp, "document.querySelector('[aria-label=\"打开邮箱导航\"]').click()");

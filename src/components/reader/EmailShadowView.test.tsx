@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render } from '@testing-library/react';
 import EmailShadowView from './EmailShadowView';
 
 const HTML_WITH_LINKED_IMAGE = `
@@ -57,6 +57,26 @@ describe('EmailShadowView image vs link click routing', () => {
 
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(onLinkClick).not.toHaveBeenCalled();
+  });
+
+  it('exposes available images as keyboard previews and preserves revealed links and decorative images', () => {
+    const onClick = vi.fn();
+    const html = HTML_WITH_LINKED_IMAGE + '<img src="icon.png" alt=""><img src="pending.png" data-better-email-inline-cid="x">';
+    const { container, rerender } = render(<EmailShadowView html={html} onClick={onClick} linksHidden />);
+    const root = container.firstElementChild!.shadowRoot!;
+    const [linked, bare, decorative, pending] = root.querySelectorAll('img');
+    expect(bare.getAttribute('aria-label')).toBe('预览图片，裸图');
+    expect([bare.tabIndex, linked.tabIndex, decorative.tabIndex, pending.tabIndex]).toEqual([0, 0, -1, -1]);
+    fireEvent.keyDown(bare, { key: 'Enter' });
+    fireEvent.keyDown(linked, { key: ' ' });
+    fireEvent.keyDown(linked, { key: ' ', repeat: true });
+    expect(onClick).toHaveBeenCalledTimes(2);
+
+    rerender(<EmailShadowView html={html} onClick={onClick} />);
+    expect(linked.tabIndex).toBe(-1);
+    expect(linked.hasAttribute('role')).toBe(false);
+    expect(linked.closest('a')?.getAttribute('href')).toBe('https://example.com/photo');
+    expect(bare.getAttribute('aria-label')).toBe('预览图片，裸图');
   });
 
   it('routes clicks on <a><img></a> to the host image preview, never to link security handling', () => {

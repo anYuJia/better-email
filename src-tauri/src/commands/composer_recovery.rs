@@ -3,9 +3,13 @@ use crate::models::DraftInput;
 use tauri::State;
 
 #[tauri::command]
-pub async fn load_composer_recovery(store: State<'_, MailStore>) -> MailResult<serde_json::Value> {
+pub async fn load_composer_recovery(
+    store: State<'_, MailStore>,
+    account_id: Option<i64>,
+    draft_id: Option<i64>,
+) -> MailResult<serde_json::Value> {
     let store = store.inner().clone();
-    super::executor::database(move || store.load_composer_recovery()).await
+    super::executor::database(move || store.load_composer_recovery(account_id, draft_id)).await
 }
 
 #[tauri::command]
@@ -27,7 +31,19 @@ pub async fn save_composer_recovery(
             .map_err(|error| MailError::Io(std::io::Error::other(error)))?;
         super::attachments::validate_outbound_attachment_inputs(&store, &draft.attachments)?;
         store.get_account_by_id(Some(draft.account_id).filter(|id| *id > 0))?;
-        store.write_composer_recovery(revision, &payload_json)
+        let owner = value["recovery_account_id"]
+            .as_i64()
+            .unwrap_or(draft.account_id);
+        if owner != draft.account_id {
+            store.get_account_by_id(Some(owner))?;
+        }
+        store.write_composer_recovery(
+            owner,
+            draft.draft_id,
+            value["recovery_id"].as_str().unwrap_or(""),
+            revision,
+            &payload_json,
+        )
     })
     .await
     .map_err(|error| MailError::Io(std::io::Error::other(error.to_string())))?
@@ -36,11 +52,15 @@ pub async fn save_composer_recovery(
 #[tauri::command]
 pub async fn clear_composer_recovery(
     store: State<'_, MailStore>,
+    account_id: i64,
+    draft_id: i64,
+    recovery_id: String,
     revision: i64,
 ) -> MailResult<bool> {
     let store = store.inner().clone();
     super::executor::database(move || {
-        let cleared = store.write_composer_recovery(revision, "null")?;
+        let cleared =
+            store.write_composer_recovery(account_id, draft_id, &recovery_id, revision, "null")?;
         if cleared {
             let _ = store.prune_temp_attachments(std::time::Duration::ZERO);
         }

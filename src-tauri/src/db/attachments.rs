@@ -183,7 +183,7 @@ impl MailStore {
                   )
                 UNION
                 SELECT json_extract(item.value, '$.local_path')
-                FROM composer_recovery recovery, json_each(recovery.snapshot, '$.draft.attachments') item
+                FROM composer_recovery_points recovery, json_each(recovery.snapshot, '$.draft.attachments') item
                 WHERE json_type(item.value, '$.local_path') = 'text'
                 ",
             )?;

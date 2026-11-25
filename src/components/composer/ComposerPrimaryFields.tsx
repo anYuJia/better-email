@@ -144,6 +144,7 @@ export default function ComposerPrimaryFields({
   buildInlineImageAttachments,
   onInlineImagesAdded,
 }: ComposerPrimaryFieldsProps) {
+  const fieldsRef = useRef<HTMLDivElement>(null);
   const richBodyRef = useRef<HTMLDivElement>(null);
   const attachmentsRef = useRef<HTMLElement>(null);
   const removalFocusRef = useRef<{ index: number; composer: Element | null; trigger: HTMLElement } | null>(null);
@@ -172,6 +173,36 @@ export default function ComposerPrimaryFields({
     () => draft.attachments.filter((attachment) => !attachment.is_inline),
     [draft.attachments],
   );
+  useEffect(() => {
+    const fields = fieldsRef.current;
+    if (!active || !mobile || !fields?.closest('.composer-backdrop.is-modal') || typeof ResizeObserver === 'undefined') return;
+    // The keyboard can finish opening after focus and typing have settled.
+    // Reveal that same caret within the editor and the form without moving focus.
+    let previousHeight = fields.clientHeight;
+    const observer = new ResizeObserver(() => {
+      const shrank = fields.clientHeight < previousHeight;
+      previousHeight = fields.clientHeight;
+      const input = document.activeElement;
+      if (!shrank || !(input instanceof HTMLElement) || !fields.contains(input)) return;
+      const selection = input.isContentEditable ? window.getSelection() : null;
+      let caret: Range | undefined;
+      if (selection?.focusNode && input.contains(selection.focusNode)) {
+        caret = document.createRange();
+        caret.setStart(selection.focusNode, selection.focusOffset);
+        caret.collapse(true);
+      }
+      for (let scroller: HTMLElement | null = input; scroller && fields.contains(scroller); scroller = scroller.parentElement) {
+        if (scroller.scrollHeight <= scroller.clientHeight) continue;
+        const cursor = caret?.getBoundingClientRect();
+        const target = cursor?.height ? cursor : input.getBoundingClientRect();
+        const bounds = scroller.getBoundingClientRect();
+        if (target.top < bounds.top) scroller.scrollTop += target.top - bounds.top;
+        else if (target.bottom > bounds.bottom) scroller.scrollTop += target.bottom - bounds.bottom;
+      }
+    });
+    observer.observe(fields);
+    return () => observer.disconnect();
+  }, [active, mobile]);
   useLayoutEffect(() => {
     const pending = removalFocusRef.current;
     if (!pending) return;
@@ -413,7 +444,7 @@ export default function ComposerPrimaryFields({
   useEffect(() => cancelPendingRichBodySync, [cancelPendingRichBodySync]);
 
   return (
-    <div className="composer-primary-fields">
+    <div ref={fieldsRef} className="composer-primary-fields">
       <RecipientField
         label="收件人"
         placeholder="姓名或邮箱"

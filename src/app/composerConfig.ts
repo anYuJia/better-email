@@ -129,6 +129,8 @@ export function parseComposerAutosave(value: unknown): ComposerAutosave | null {
     if (!draft || (isDraftEmpty(draft) && !pending.length)) return null;
     return {
       draft,
+      ...(typeof parsed?.recovery_id === 'string' ? { recovery_id: parsed.recovery_id } : {}),
+      ...(typeof parsed?.recovery_account_id === 'number' ? { recovery_account_id: parsed.recovery_account_id } : {}),
       isRichComposer: true,
       saved_at: typeof parsed?.saved_at === 'string' ? parsed.saved_at : new Date().toISOString(),
       ...(pending.length ? { pending_attachments: pending } : {}),

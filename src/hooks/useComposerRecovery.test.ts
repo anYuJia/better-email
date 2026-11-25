@@ -87,7 +87,7 @@ describe('durable composer recovery', () => {
     act(() => result.current.clearComposerAutosave());
     await advance(1000);
     expect(mockInvoke.mock.calls.filter(([command]) => command === IPC.SaveComposerRecovery)).toHaveLength(0);
-    expect(mockInvoke).toHaveBeenCalledWith(IPC.ClearComposerRecovery, { revision: expect.any(Number) });
+    expect(mockInvoke).toHaveBeenCalledWith(IPC.ClearComposerRecovery, { accountId: 1, draftId: 0, recoveryId: '', revision: expect.any(Number) });
     expect(result.current.composerAutosave).toBeNull();
   });
 

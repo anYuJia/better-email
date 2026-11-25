@@ -937,7 +937,6 @@ function MailboxApp({
     retryQuickReplySave,
     isSubmitting,
     isRichComposer,
-    setRichComposer,
     composeTemplates,
     templateName,
     setTemplateName,
@@ -988,6 +987,7 @@ function MailboxApp({
     composeToContact,
   } = useComposerController({
     account,
+    mailboxScope: accountScope,
     accounts,
     identities,
     selectedId,
@@ -1008,6 +1008,20 @@ function MailboxApp({
     setSendProgressMessage: setComposerSendProgressMessage,
     setAttachmentProgress: setComposerAttachmentProgress,
   });
+  const handleComposeNew = useCallback((fields: { to?: string; cc?: string; bcc?: string; subject?: string; body?: string } | undefined) => {
+    const hasPrefill = Boolean(fields && Object.values(fields).some((value) => value?.trim()));
+    openComposer({
+      ...emptyDraft,
+      account_id: hasPrefill ? (account?.id ?? accounts[0]?.id ?? 0) : (scopedAccountId ?? 0),
+      to: fields?.to || '',
+      cc: fields?.cc || '',
+      bcc: fields?.bcc || '',
+      subject: fields?.subject || '',
+      body: fields?.body || '',
+    }, { replaceExisting: hasPrefill, restoreAutosave: !hasPrefill });
+    if (hasPrefill) setStatus('已打开新邮件');
+  }, [account, accounts, scopedAccountId, openComposer, setStatus]);
+
   const composerPresent = useExitPresence(isComposerOpen);
   useStatusFeedback(status, showMessageToast, {
     visible: isComposerOpen && !isComposerMinimized, sendIssue, imports: attachmentImports,
@@ -1022,9 +1036,7 @@ function MailboxApp({
       try {
         const unlistenCompose = await listen('tray://compose', () => {
           if (!active || isModalGateActive) return;
-          setRichComposer(true);
-          openComposer(emptyDraft);
-          setStatus('已打开新邮件');
+          handleComposeNew(undefined);
         });
         unlisteners.push(unlistenCompose);
 
@@ -1104,7 +1116,7 @@ function MailboxApp({
       active = false;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [accountScope, appliedQuery, enqueueManualSync, filter, folders, isModalGateActive, loadMessages, loadMeta, openComposer, openMobileSettings, openMobileSettingsSection, refreshAll, resetSearch, setActiveThread, setFilter, setFolderId, setRichComposer, setSelectedId, setSelectedMessageIds, setStatus, setThreadMessages, standaloneSettingsWindow]);
+  }, [accountScope, appliedQuery, enqueueManualSync, filter, folders, isModalGateActive, loadMessages, loadMeta, handleComposeNew, openMobileSettings, openMobileSettingsSection, refreshAll, resetSearch, setActiveThread, setFilter, setFolderId, setSelectedId, setSelectedMessageIds, setStatus, setThreadMessages, standaloneSettingsWindow]);
 
   const {
     toggleGroup,
@@ -1424,10 +1436,7 @@ function MailboxApp({
     restoreUndoAction,
     toggleAllVisibleMessages: toggleAllMessages,
     openShortcuts: () => setShortcutsOpen(true),
-    composeNew: () => {
-      openComposer(emptyDraft);
-      setStatus('已打开新邮件');
-    },
+    composeNew: () => handleComposeNew(undefined),
     setSelectedId: selectMessageForReading,
     runBulkAction,
     composeFromMessage,
@@ -1505,20 +1514,6 @@ function MailboxApp({
   const handleOpenHttpsLink = useCallback((href: string) => {
     invoke(IPC.OpenUrl, { url: href }).catch((error) => setStatus(String(error)));
   }, [setStatus]);
-
-  const handleComposeNew = useCallback((fields: { to?: string; cc?: string; bcc?: string; subject?: string; body?: string } | undefined) => {
-    const hasPrefill = Boolean(fields && Object.values(fields).some((value) => value?.trim()));
-    openComposer({
-      ...emptyDraft,
-      account_id: account?.id ?? accounts[0]?.id ?? 0,
-      to: fields?.to || '',
-      cc: fields?.cc || '',
-      bcc: fields?.bcc || '',
-      subject: fields?.subject || '',
-      body: fields?.body || '',
-    }, { replaceExisting: hasPrefill });
-    setStatus('已打开新邮件');
-  }, [account, accounts, openComposer, setStatus]);
 
   const openComposerContactsSettings = useCallback(() => {
     const openContactsSettings = () => openMobileSettingsSection('contacts');
@@ -1919,15 +1914,7 @@ function MailboxApp({
         onSetDefaultAccount={(accountId) => {
           setDefaultAccount(accountId).catch((error) => setStatus(String(error)));
         }}
-        onCompose={() => {
-          if (isDraftEmpty(draft) && composerAutosave) {
-            openComposer(undefined, { restoreAutosave: true });
-          } else {
-            setRichComposer(true);
-            openComposer(emptyDraft);
-            setStatus('已打开新邮件');
-          }
-        }}
+        onCompose={() => handleComposeNew(undefined)}
         onSavedSearchNameChange={setSavedSearchName}
         onSaveCurrentSearch={() => saveCurrentSearch(queryDraft, filter, searchScope)}
         onRunSavedSearch={(savedSearch) => {

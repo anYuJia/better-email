@@ -104,7 +104,7 @@ export async function runAttachmentQuality(cdp, api) {
     data.items.add(new File(['retry'], '恢复附件.txt', { type: 'text/plain' }));
     document.querySelector('.composer-body-field').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: data }));
   })()`);
-  await waitForExpression(cdp, "JSON.parse(localStorage.getItem('better-email:composer-recovery-v1') || '{}').payload?.pending_attachments?.some(item => item.filename === '恢复附件.txt')");
+  await waitForExpression(cdp, "JSON.parse(localStorage.getItem('better-email.composerAutosave') || '{}').pending_attachments?.some(item => item.filename === '恢复附件.txt')");
   await evalInPage(cdp, 'location.reload()');
   await waitForExpression(cdp, "document.querySelector('.message-card-main')");
   await clickButton(cdp, '写邮件', "document.querySelector('.sidebar')");

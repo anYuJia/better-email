@@ -15,6 +15,7 @@ type MessageListCardProps = {
   accountSourceLabels?: ReadonlyMap<number, string>;
   message: MessageSummary;
   isCurrentMessage: boolean;
+  isTabStop?: boolean;
   isSelected: boolean;
   isDragging: boolean;
   isNew: boolean;
@@ -38,6 +39,7 @@ export default React.memo(function MessageListCard({
   accountSourceLabels,
   message,
   isCurrentMessage,
+  isTabStop = isCurrentMessage,
   isSelected,
   isDragging,
   isNew,
@@ -74,11 +76,16 @@ export default React.memo(function MessageListCard({
     };
   }, [message.account_email, message.labels, message.sender_email, message.sender_name, message.subject]);
   const metadataLabels = metadataLabelState.labels;
+  const sender = message.sender_name.trim() || message.sender_email.trim() || '未知发件人';
+  const subject = message.subject.trim() || '无主题';
+  const actionTarget = `${subject}，${sender}`;
   const cardLabel = [
-    `${mobile && isSelectionMode ? '选择邮件' : '查看邮件'}：${message.sender_name || '未知发件人'}，${formatDate(message.received_at)}，`,
-    message.subject || '无主题',
+    `${mobile && isSelectionMode ? '选择邮件' : '查看邮件'}：${sender}，${formatDate(message.received_at)}，`,
+    subject,
     accountSource ? `，来源邮箱：${accountSource}` : '',
     message.is_read ? '' : '，未读',
+    message.is_starred ? '，星标' : '',
+    message.attachment_count > 0 ? `，${message.attachment_count} 个附件` : message.has_attachments ? '，有附件' : '',
     mobile && isSelectionMode ? `，${isSelected ? '已选择' : '未选择'}` : '',
     mobile ? '' : `。按回车打开，按空格${isSelected ? '取消选择' : '选择'}`,
   ].join('');
@@ -101,6 +108,7 @@ export default React.memo(function MessageListCard({
     if (!(activeElement instanceof HTMLElement) || !activeElement.closest('.message-list')) return;
     if (activeElement === mainButtonRef.current) return;
     mainButtonRef.current.focus({ preventScroll: true });
+    mainButtonRef.current.scrollIntoView?.({ block: 'nearest' });
   }, [isCurrentMessage]);
 
   // A newly virtualized row claims focus only after its real button has been
@@ -166,7 +174,7 @@ export default React.memo(function MessageListCard({
         aria-label={cardLabel}
         aria-current={isCurrentMessage && !mobile ? 'true' : undefined}
         aria-keyshortcuts="Enter Space Shift+F10"
-        tabIndex={isCurrentMessage ? 0 : -1}
+        tabIndex={isTabStop ? 0 : -1}
         onKeyDown={(event) => {
           if ((event.shiftKey && event.key === 'F10') || event.key === 'ContextMenu') {
             event.preventDefault();
@@ -192,8 +200,9 @@ export default React.memo(function MessageListCard({
         <button
           type="button"
           className="message-mobile-menu-button"
+          tabIndex={isTabStop ? 0 : -1}
           data-no-long-press="true"
-          aria-label={`打开邮件操作：${message.subject || '无主题'}`}
+          aria-label={`打开邮件操作：${actionTarget}`}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -214,15 +223,15 @@ export default React.memo(function MessageListCard({
       </span>
       <label className="message-select" onClick={(event) => event.stopPropagation()}>
         <input
-          aria-label={`选择 ${message.subject || '无主题'}`}
+          aria-label={`选择 ${actionTarget}`}
           checked={isSelected}
           type="checkbox"
-          tabIndex={isSelectionMode ? 0 : -1}
+          tabIndex={isSelectionMode && (!mobile || isTabStop) ? 0 : -1}
           onChange={(event) => onToggleMessageSelection(message.id, event.target.checked)}
         />
       </label>
       <div className="message-topline">
-        <span className={message.is_read ? 'sender' : 'sender unread'}>{message.sender_name}</span>
+        <span className={message.is_read ? 'sender' : 'sender unread'}>{sender}</span>
         <time dateTime={message.received_at} title={formatDate(message.received_at)}>{formatListDate(message.received_at)}</time>
       </div>
       <div className="message-subject-line">

@@ -19,7 +19,7 @@ import {
   MOBILE_MESSAGE_ROW_HEIGHT,
   MOBILE_GROUP_HEADER_HEIGHT,
   MESSAGE_ROW_HEIGHT,
-  calculateVisibleRange,
+  calculateMessageWindow,
 } from './messageListLayout';
 
 const SCROLL_SAVE_DEBOUNCE_MS = 220;
@@ -380,11 +380,10 @@ export default function MessageListView({
   }, [flatItems, heightCacheVersion, messageRowHeight, groupHeaderHeight]);
 
   const [visibleRange, setVisibleRange] = useState(() =>
-    calculateVisibleRange(layout, latestScrollTopRef.current, viewportHeight)
+    calculateMessageWindow(layout, latestScrollTopRef.current, viewportHeight)
   );
 
   const visibleRangeRef = useRef(visibleRange);
-  visibleRangeRef.current = visibleRange;
 
   const previousLayout = useRef({ rows: flatItems, layout });
   const measuredWidthRef = useRef(0);
@@ -396,15 +395,18 @@ export default function MessageListView({
   const viewportHeightRef = useRef(viewportHeight);
   viewportHeightRef.current = viewportHeight;
 
-  // Synchronize visibleRange when layout or viewportHeight changes (layout effect, not render phase)
+  const updateVisibleRange = useCallback((scrollTop: number) => {
+    const next = calculateMessageWindow(layoutRef.current, scrollTop, viewportHeightRef.current);
+    const previous = visibleRangeRef.current;
+    if (next.startIdx === previous.startIdx && next.endIdx === previous.endIdx
+      && next.firstOnscreen === previous.firstOnscreen && next.lastOnscreen === previous.lastOnscreen) return;
+    visibleRangeRef.current = next;
+    setVisibleRange(next);
+  }, []);
+
   useLayoutEffect(() => {
-    const nextRange = calculateVisibleRange(layout, latestScrollTopRef.current, viewportHeight);
-    setVisibleRange((current) => (
-      nextRange.startIdx === current.startIdx && nextRange.endIdx === current.endIdx
-        ? current
-        : nextRange
-    ));
-  }, [layout, viewportHeight]);
+    updateVisibleRange(latestScrollTopRef.current);
+  }, [layout, viewportHeight, updateVisibleRange]);
 
   useLayoutEffect(() => {
     const listElement = listRef.current;
@@ -421,8 +423,7 @@ export default function MessageListView({
     previousLayout.current = { rows: flatItems, layout };
     listElement.scrollTop = requestedScrollTop;
     latestScrollTopRef.current = requestedScrollTop;
-    const nextRange = calculateVisibleRange(layout, requestedScrollTop, viewportHeight);
-    setVisibleRange((current) => nextRange.startIdx === current.startIdx && nextRange.endIdx === current.endIdx ? current : nextRange);
+    updateVisibleRange(requestedScrollTop);
     restoredViewKeyRef.current = listStateKey;
     if (isNewView) {
       listStateKeyRef.current = listStateKey;
@@ -430,7 +431,7 @@ export default function MessageListView({
     } else if (newMessageExceededRef.current) {
       baselineMessageIdsRef.current = new Set(messages.map((m) => m.id));
     }
-  }, [listStateKey, initialScrollTop, flatItems, itemIndexByKey, layout, viewportHeight, visibilityVersion]);
+  }, [listStateKey, initialScrollTop, flatItems, itemIndexByKey, layout, viewportHeight, visibilityVersion, updateVisibleRange]);
 
   // Absorb newly added ids after their appearance animation has finished, so
   // the is-new highlight is not replayed when virtualized cards remount.
@@ -500,13 +501,7 @@ export default function MessageListView({
     rafIdRef.current = requestAnimationFrame(() => {
       rafIdRef.current = null;
       revealScrollbar(nextScrollTop);
-      const nextRange = calculateVisibleRange(layoutRef.current, nextScrollTop, viewportHeightRef.current);
-      if (
-        nextRange.startIdx !== visibleRangeRef.current.startIdx ||
-        nextRange.endIdx !== visibleRangeRef.current.endIdx
-      ) {
-        setVisibleRange(nextRange);
-      }
+      updateVisibleRange(nextScrollTop);
     });
 
     if (scrollSaveTimerRef.current !== null) {
@@ -544,9 +539,9 @@ export default function MessageListView({
     [draggingMessageIds],
   );
 
+  const { startIdx, endIdx, firstOnscreen, lastOnscreen } = visibleRange;
   const visibleItems = useMemo(() => {
     const items = [];
-    const { startIdx, endIdx } = visibleRange;
     for (let i = startIdx; i <= endIdx && i < flatItems.length; i++) {
       items.push({
         index: i,
@@ -562,7 +557,7 @@ export default function MessageListView({
       });
     }
     return items;
-  }, [flatItems, layout, visibleRange]);
+  }, [flatItems, layout, startIdx, endIdx]);
 
   const loadMoreFocusTarget = useMemo(() => {
     if (!loadMoreFocusRequest || loadMoreFocusRequest.listStateKey !== listStateKey) {
@@ -578,6 +573,17 @@ export default function MessageListView({
   }, []);
 
   const visibleRows = useMemo(() => visibleItems.map(({ item }) => item), [visibleItems]);
+  // Keep one keyboard entry in the viewport even after the current mail has
+  // scrolled out of the virtual window. Focusing that entry need not open it.
+  let tabStopId: number | null = null;
+  for (const { item, index } of visibleItems) {
+    if (item.type !== 'message' || index < firstOnscreen || index > lastOnscreen) continue;
+    tabStopId ??= item.message.id;
+    if (item.message.id === selectedId) {
+      tabStopId = selectedId;
+      break;
+    }
+  }
   const handleRowHeightsChanged = useCallback(() => setHeightCacheVersion((current) => current + 1), []);
   useVirtualRowMeasurements({
     rows: visibleRows,
@@ -617,7 +623,7 @@ export default function MessageListView({
     const nextScrollTop = Math.max(0, layout[targetItemIndex]?.top ?? 0);
     listElement.scrollTop = nextScrollTop;
     latestScrollTopRef.current = nextScrollTop;
-    setVisibleRange(calculateVisibleRange(layout, nextScrollTop, viewportHeight));
+    updateVisibleRange(nextScrollTop);
   }, [
     flatItems,
     layout,
@@ -625,6 +631,7 @@ export default function MessageListView({
     loadMoreFocusRequest,
     loadMoreFocusTarget,
     viewportHeight,
+    updateVisibleRange,
     visibleItems,
   ]);
 
@@ -770,6 +777,7 @@ export default function MessageListView({
                     accountSourceLabels={accountSourceLabels}
                     message={message}
                     isCurrentMessage={message.id === selectedId}
+                    isTabStop={message.id === tabStopId}
                     isSelected={selectedMessageSet.has(message.id)}
                     isDragging={draggingMessageSet.has(message.id)}
                     isNew={newIds.has(message.id)}

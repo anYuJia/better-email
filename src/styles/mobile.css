@@ -963,6 +963,13 @@
 
   /* Full-screen compose ------------------------------------------------ */
 
+  .app-shell.is-mobile-app > .composer-backdrop,
+  .app-shell.is-mobile-app > .composer-loading-layer.is-mobile {
+    top: var(--mobile-viewport-top, 0px);
+    bottom: auto;
+    height: var(--mobile-viewport-height, 100dvh);
+  }
+
   .app-shell.is-mobile-app > .composer-backdrop {
     z-index: 1000;
     align-items: stretch;
@@ -973,11 +980,20 @@
 
   .app-shell.is-mobile-app .composer {
     width: 100%;
-    height: 100dvh;
+    height: 100%;
     max-height: none;
     border: 0;
     border-radius: 0;
     box-shadow: none;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-primary-fields {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .app-shell.is-mobile-app .composer .composer-body-field {
+    min-height: 8em;
   }
 
   .app-shell.is-mobile-app .composer header {

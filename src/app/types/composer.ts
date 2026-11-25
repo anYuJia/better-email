@@ -63,6 +63,8 @@ export type PendingAttachmentRecovery = {
 };
 
 export type ComposerAutosave = {
+  recovery_account_id?: number;
+  recovery_id?: string;
   save_state?: 'saving' | 'saved' | 'error';
   save_error?: string;
   draft: DraftInput;

@@ -34,6 +34,18 @@
   color: var(--ui-text);
 }
 
+@media (max-width: 720px) {
+  .dialog-backdrop {
+    top: var(--mobile-viewport-top, 0px);
+    bottom: auto;
+    height: var(--mobile-viewport-height, 100dvh);
+  }
+
+  .dialog-card {
+    max-height: min(100%, 640px);
+  }
+}
+
 .dialog-card > header {
   display: flex;
   align-items: center;
